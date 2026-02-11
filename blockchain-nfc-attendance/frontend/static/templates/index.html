@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blockchain NFC Attendance System</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+  </head>
+  <body>
+    <nav class="navbar">
+      <div class="container">
+        <h1 class="logo">📱 NFC Attendance System</h1>
+        <ul class="nav-links">
+          <li><a href="/">Home</a></li>
+          <li><a href="/dashboard">Dashboard</a></li>
+          <li class="status" id="status">Connecting...</li>
+        </ul>
+      </div>
+    </nav>
+
+    <div class="container">
+      <section class="hero">
+        <h2>Blockchain-based NFC Attendance System</h2>
+        <p>
+          Secure, transparent, and decentralized attendance tracking using NFC
+          technology
+        </p>
+      </section>
+
+      <section class="features">
+        <div class="feature-card">
+          <div class="icon">🔗</div>
+          <h3>Blockchain Security</h3>
+          <p>
+            All attendance records are immutable and stored on the blockchain
+          </p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">📱</div>
+          <h3>NFC Technology</h3>
+          <p>Quick and easy check-in using NFC tags or cards</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">📊</div>
+          <h3>Real-time Analytics</h3>
+          <p>View attendance statistics and reports instantly</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">🔐</div>
+          <h3>Transparent</h3>
+          <p>All transactions are visible and verifiable on the blockchain</p>
+        </div>
+      </section>
+
+      <section class="actions">
+        <h3>Quick Actions</h3>
+        <div class="button-group">
+          <button class="btn btn-primary" onclick="goToDashboard()">
+            View Dashboard
+          </button>
+          <button class="btn btn-secondary" onclick="showRegisterModal()">
+            Register Student
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="registerModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeRegisterModal()">&times;</span>
+        <h2>Register Student</h2>
+        <form id="registerForm" onsubmit="registerStudent(event)">
+          <div class="form-group">
+            <label for="studentAddress">Wallet Address:</label>
+            <input
+              type="text"
+              id="studentAddress"
+              required
+              placeholder="0x..."
+            />
+          </div>
+          <div class="form-group">
+            <label for="studentId">Student ID:</label>
+            <input type="text" id="studentId" required placeholder="STU001" />
+          </div>
+          <div class="form-group">
+            <label for="studentName">Student Name:</label>
+            <input
+              type="text"
+              id="studentName"
+              required
+              placeholder="John Doe"
+            />
+          </div>
+          <div class="form-group">
+            <label for="nfcId">NFC ID:</label>
+            <input type="text" id="nfcId" required placeholder="NFC123ABC" />
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%">
+            Register
+          </button>
+        </form>
+        <div id="registerStatus"></div>
+      </div>
+    </div>
+
+    <footer>
+      <p>
+        &copy; 2026 Blockchain NFC Attendance System. Built with Solidity, Flask
+        & Web3
+      </p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  </body>
+</html>

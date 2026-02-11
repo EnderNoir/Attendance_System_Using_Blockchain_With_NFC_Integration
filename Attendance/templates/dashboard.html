@@ -1,0 +1,102 @@
+{% extends "base.html" %} {% block content %}
+<h2 class="mt-4">📋 Student Dashboard</h2>
+<p class="lead">
+  All registered students – click on a name to view attendance.
+</p>
+
+<!-- Search Input -->
+<div class="row mb-3">
+  <div class="col-md-6">
+    <input
+      type="text"
+      id="searchInput"
+      class="form-control"
+      placeholder="Search by name or NFC ID..."
+    />
+  </div>
+  <div class="col-md-2">
+    <button class="btn btn-primary w-100" onclick="filterTable()">
+      Search
+    </button>
+  </div>
+  <div class="col-md-2">
+    <button class="btn btn-secondary w-100" onclick="clearSearch()">
+      Clear
+    </button>
+  </div>
+</div>
+
+<!-- Students Table -->
+<div class="table-responsive">
+  <table class="table table-striped table-hover" id="studentTable">
+    <thead class="table-dark">
+      <tr>
+        <th>Name</th>
+        <th>NFC ID</th>
+        <th>Ethereum Address</th>
+        <th>Registration Tx</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for student in students %}
+      <tr>
+        <td>{{ student.name }}</td>
+        <td><code>{{ student.nfcId }}</code></td>
+        <td>
+          <small class="text-muted"
+            >{{ student.address[:10] }}...{{ student.address[-8:] }}</small
+          >
+        </td>
+        <td>
+          <a
+            href="https://etherscan.io/tx/{{ student.tx_hash }}"
+            target="_blank"
+            class="text-truncate"
+            >{{ student.tx_hash[:10] }}...</a
+          >
+        </td>
+        <td>
+          <a
+            href="{{ url_for('view_attendance', nfc_id=student.nfcId) }}"
+            class="btn btn-sm btn-success"
+            >View Attendance</a
+          >
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="text-center">No students registered yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  // Filter table based on search input
+  function filterTable() {
+    let input = document.getElementById("searchInput").value.toLowerCase();
+    let rows = document.querySelectorAll("#studentTable tbody tr");
+    rows.forEach((row) => {
+      let name = row.cells[0].innerText.toLowerCase();
+      let nfcId = row.cells[1].innerText.toLowerCase();
+      if (name.includes(input) || nfcId.includes(input)) {
+        row.style.display = "";
+      } else {
+        row.style.display = "none";
+      }
+    });
+  }
+
+  // Clear search and show all rows
+  function clearSearch() {
+    document.getElementById("searchInput").value = "";
+    filterTable();
+  }
+
+  // Trigger filter as you type (optional)
+  document.getElementById("searchInput").addEventListener("keyup", filterTable);
+</script>
+
+{% endblock %}

@@ -1,0 +1,55 @@
+"""
+Docker configuration for Attendance System
+Note: This is for reference. Configure according to your environment.
+"""
+
+version: '3.8'
+
+services:
+  ganache:
+    image: trufflesuite/ganache:latest
+    ports:
+      - "8545:8545"
+    environment:
+      - MNEMONIC=myth like limit edge mutual passion suit skill tweet pool legal produce best load value purple brass desire catch her limit circle wife write
+      - ACCOUNTS=10
+      - DEFAULT_BALANCE=100
+    volumes:
+      - ganache_data:/data
+    networks:
+      - blockchain-net
+
+  flask:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - WEB3_PROVIDER=http://ganache:8545
+      - FLASK_ENV=development
+    depends_on:
+      - ganache
+    volumes:
+      - ./backend:/app
+    networks:
+      - blockchain-net
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - flask
+    networks:
+      - blockchain-net
+
+volumes:
+  ganache_data:
+
+networks:
+  blockchain-net:
+    driver: bridge

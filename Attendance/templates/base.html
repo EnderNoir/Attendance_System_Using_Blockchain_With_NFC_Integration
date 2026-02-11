@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blockchain Attendance System</title>
+    <!-- Bootstrap 5 CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        padding-top: 70px;
+      }
+      .container {
+        max-width: 800px;
+      }
+      .flash-messages {
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+      <div class="container">
+        <a class="navbar-brand" href="{{ url_for('index') }}"
+          >📋 Blockchain Attendance</a
+        >
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('register') }}"
+              >Register Student</a
+            >
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('index') }}">Home</a>
+          </li>
+        </ul>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <!-- Flash messages -->
+      <div class="flash-messages">
+        {% with messages = get_flashed_messages() %} {% if messages %} {% for
+        message in messages %}
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="alert"
+          ></button>
+        </div>
+        {% endfor %} {% endif %} {% endwith %}
+      </div>
+
+      {% block content %}{% endblock %}
+    </div>
+    <!-- Toast container (bottom‑right corner) -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 11" id="toastContainer"></div>
+
+<script>
+    // Timestamp of the last notification we have seen
+    let lastSeenTimestamp = Date.now() / 1000;  // seconds
+
+    // Fetch new attendance events every 3 seconds
+    function pollAttendance() {
+        fetch(`/api/attendance/recent?since=${lastSeenTimestamp}`)
+            .then(response => response.json())
+            .then(events => {
+                events.forEach(event => {
+                    // Update timestamp to avoid duplicates
+                    if (event.timestamp > lastSeenTimestamp) {
+                        lastSeenTimestamp = event.timestamp;
+                    }
+                    showToast(event);
+                });
+            })
+            .catch(err => console.error('Polling error:', err));
+    }
+
+    // Display a Bootstrap toast notification
+    function showToast(event) {
+        const toastEl = document.createElement('div');
+        toastEl.className = 'toast align-items-center text-white bg-success border-0';
+        toastEl.setAttribute('role', 'alert');
+        toastEl.setAttribute('aria-live', 'assertive');
+        toastEl.setAttribute('aria-atomic', 'true');
+
+        // Format the time
+        const time = new Date(event.timestamp * 1000).toLocaleTimeString([], {
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+
+        toastEl.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    <strong>✅ Attendance Marked</strong><br>
+                    ${event.name} — <code>${event.nfc_id}</code> at ${time}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+
+        document.getElementById('toastContainer').appendChild(toastEl);
+        const toast = new bootstrap.Toast(toastEl, { autohide: true, delay: 5000 });
+        toast.show();
+
+        // Remove from DOM after hidden
+        toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+    }
+
+    // Start polling when page loads
+    window.addEventListener('load', () => {
+        pollAttendance();                    // immediate check
+        setInterval(pollAttendance, 3000);   // every 3 seconds
+    });
+</script>
+    <!-- Bootstrap 5 JS bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

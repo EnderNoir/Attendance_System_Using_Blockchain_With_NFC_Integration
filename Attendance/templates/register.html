@@ -1,0 +1,108 @@
+{% extends "base.html" %} {% block content %}
+<h2 class="mt-4">📝 Register New Student</h2>
+
+<!-- NFC Scan Status -->
+<div id="scanStatus" class="alert alert-info" style="display: none"></div>
+
+<form method="POST" action="{{ url_for('register') }}">
+  <!-- Student Name -->
+  <div class="mb-3">
+    <label for="name" class="form-label">Student Full Name</label>
+    <input
+      type="text"
+      class="form-control"
+      id="name"
+      name="name"
+      placeholder="John Doe"
+      required
+    />
+  </div>
+
+  <!-- NFC UID with Scan Button -->
+  <div class="mb-3">
+    <label for="nfc_id" class="form-label">NFC Tag UID</label>
+    <div class="input-group">
+      <input
+        type="text"
+        class="form-control"
+        id="nfc_id"
+        name="nfc_id"
+        placeholder="Tap card or click Scan"
+        required
+      />
+      <button type="button" class="btn btn-primary" onclick="scanNFC()">
+        📱 Scan NFC
+      </button>
+    </div>
+    <div class="form-text">
+      Click "Scan NFC" and tap the card on the reader.
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-success">Register</button>
+  <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+</form>
+
+<script>
+  function scanNFC() {
+    const scanBtn = document.querySelector('button[onclick="scanNFC()"]');
+    scanBtn.disabled = true;
+    scanBtn.innerHTML = "⏳ Scanning...";
+
+    const statusDiv = document.getElementById("scanStatus");
+    statusDiv.style.display = "block";
+    statusDiv.className = "alert alert-info";
+    statusDiv.innerHTML =
+      "🔄 Ready to scan. Please tap your NFC card on the reader...";
+
+    fetch("/request_registration_scan", { method: "POST" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.status === "ready") {
+          pollForUID();
+        } else {
+          throw new Error("Server not ready");
+        }
+      })
+      .catch((error) => {
+        statusDiv.className = "alert alert-danger";
+        statusDiv.innerHTML =
+          "❌ Could not connect to NFC listener. Make sure it is running.";
+        resetButton();
+      });
+  }
+
+  function pollForUID() {
+    let attempts = 0;
+    const maxAttempts = 30;
+    const poll = setInterval(() => {
+      fetch("/get_scanned_uid")
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.uid) {
+            clearInterval(poll);
+            document.getElementById("nfc_id").value = data.uid;
+            document.getElementById("scanStatus").style.display = "none";
+            resetButton();
+          } else {
+            attempts++;
+            if (attempts >= maxAttempts) {
+              clearInterval(poll);
+              document.getElementById("scanStatus").className =
+                "alert alert-warning";
+              document.getElementById("scanStatus").innerHTML =
+                "⏰ Timeout. Please try again.";
+              resetButton();
+            }
+          }
+        });
+    }, 500);
+  }
+
+  function resetButton() {
+    const scanBtn = document.querySelector('button[onclick="scanNFC()"]');
+    scanBtn.disabled = false;
+    scanBtn.innerHTML = "📱 Scan NFC";
+  }
+</script>
+{% endblock %}

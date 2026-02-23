@@ -1,0 +1,194 @@
+{
+  "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  "abi": [
+    {
+      "type": "constructor",
+      "payable": false,
+      "inputs": []
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "AttendanceMarked",
+      "inputs": [
+        {
+          "type": "string",
+          "name": "nfcId",
+          "indexed": true
+        },
+        {
+          "type": "uint256",
+          "name": "timestamp",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "StudentRegistered",
+      "inputs": [
+        {
+          "type": "address",
+          "name": "studentAddr",
+          "indexed": true
+        },
+        {
+          "type": "string",
+          "name": "nfcId",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "name",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "admin",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "attendance",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": "timestamp"
+        },
+        {
+          "type": "bool",
+          "name": "present"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getAttendance",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_nfcId"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256[]"
+        },
+        {
+          "type": "bool[]"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "markAttendance",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_nfcId"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "registerStudent",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "address",
+          "name": "_studentAddress"
+        },
+        {
+          "type": "string",
+          "name": "_nfcId"
+        },
+        {
+          "type": "string",
+          "name": "_name"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "studentsByAddr",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "string",
+          "name": "name"
+        },
+        {
+          "type": "string",
+          "name": "nfcId"
+        },
+        {
+          "type": "bool",
+          "name": "isRegistered"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "studentsByNfc",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "string",
+          "name": "name"
+        },
+        {
+          "type": "string",
+          "name": "nfcId"
+        },
+        {
+          "type": "bool",
+          "name": "isRegistered"
+        }
+      ]
+    }
+  ]
+}

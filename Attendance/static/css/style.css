@@ -1,0 +1,267 @@
+/* ============================================
+   Blockchain Attendance System - Main Styles
+   ============================================ */
+
+:root {
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  --danger-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --warning-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+* {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+body {
+  padding-top: 70px;
+  padding-bottom: 200px;
+  background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  color: #2c3e50;
+  min-height: 100vh;
+}
+
+/* ============================================
+   Navigation Bar
+   ============================================ */
+
+.navbar {
+  background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 1rem 0;
+}
+
+.navbar-brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.navbar-brand i {
+  margin-right: 0.5rem;
+}
+
+.nav-link {
+  margin-left: 1rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8) !important;
+  padding: 0.5rem 0 !important;
+  border-bottom: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+  color: #fff !important;
+  border-bottom-color: #667eea;
+}
+
+/* ============================================
+   Container & Layout
+   ============================================ */
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* ============================================
+   Flash Messages
+   ============================================ */
+
+.flash-messages {
+  margin-top: 2rem;
+  padding: 1rem;
+}
+
+.alert {
+  border: none;
+  border-left: 4px solid;
+  border-radius: 0.5rem;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  animation: slideInDown 0.3s ease;
+}
+
+.alert-success {
+  background: rgba(17, 153, 142, 0.1);
+  border-left-color: #11998e;
+  color: #0d5f57;
+}
+
+.alert-success i {
+  margin-right: 0.5rem;
+}
+
+.alert-danger {
+  background: rgba(245, 87, 108, 0.1);
+  border-left-color: #f5576c;
+  color: #c13845;
+}
+
+.alert-danger i {
+  margin-right: 0.5rem;
+}
+
+.alert-warning {
+  background: rgba(250, 112, 154, 0.1);
+  border-left-color: #fa709a;
+  color: #994557;
+}
+
+.alert-warning i {
+  margin-right: 0.5rem;
+}
+
+.alert-info {
+  background: rgba(102, 126, 234, 0.1);
+  border-left-color: #667eea;
+  color: #3a4b8f;
+}
+
+.alert-info i {
+  margin-right: 0.5rem;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   Footer
+   ============================================ */
+
+footer {
+  background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%);
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 4rem;
+  padding: 2rem 0;
+  text-align: center;
+  font-size: 0.95rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+
+footer p {
+  margin-bottom: 0.5rem;
+}
+
+footer i {
+  color: #667eea;
+  margin: 0 0.3rem;
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+
+.btn-primary {
+  background: var(--primary-gradient);
+  border: none;
+  font-weight: 600;
+  padding: 0.7rem 1.5rem;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  color: white;
+}
+
+.btn-success {
+  background: var(--success-gradient);
+  border: none;
+  font-weight: 600;
+  color: white;
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, #38ef7d 0%, #11998e 100%);
+  color: white;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  border: none;
+  font-weight: 600;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+  color: #fff;
+}
+
+/* ============================================
+   Forms
+   ============================================ */
+
+.form-control,
+.form-select {
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+.card {
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.badge {
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  border-radius: 0.4rem;
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0.75rem 0;
+  }
+
+  .navbar-brand {
+    font-size: 1.2rem;
+  }
+
+  .nav-link {
+    margin-left: 0.5rem;
+  }
+
+  body {
+    padding-bottom: 300px;
+  }
+}

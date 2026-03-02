@@ -1,0 +1,597 @@
+/* ============================================
+   Page-Specific Inline Styles
+   ============================================ */
+
+/* Common Block Styles */
+.page-header {
+  margin-top: 2rem;
+  margin-bottom: 3rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-weight: 700;
+}
+
+.page-header p {
+  margin: 0.5rem 0 0 0;
+  color: #6c757d;
+}
+
+.icon-box {
+  background: rgba(102, 126, 234, 0.1);
+  width: 50px;
+  height: 50px;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-box.primary i {
+  font-size: 1.8rem;
+  color: #667eea;
+}
+
+.icon-box.success i {
+  font-size: 1.8rem;
+  color: #11998e;
+}
+
+.icon-box.warning i {
+  font-size: 1.8rem;
+  color: #f39c12;
+}
+
+/* ============================================
+   Card Components
+   ============================================ */
+
+.stat-card {
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-card-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.stat-card-success {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.stat-card-warning {
+  background: linear-gradient(135deg, #f39c12 0%, #f8b500 100%);
+}
+
+.stat-card-danger {
+  background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+}
+
+.stat-card small {
+  opacity: 0.9;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.stat-card h3 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.stat-card i {
+  font-size: 2rem;
+  opacity: 0.3;
+}
+
+/* ============================================
+   Progress Steps
+   ============================================ */
+
+.progress-steps {
+  margin-bottom: 3rem;
+}
+
+.progress-steps-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: space-between;
+  position: relative;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.progress-step-number {
+  background: #667eea;
+  color: white;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.progress-step.inactive .progress-step-number {
+  background: #e9ecef;
+  color: #6c757d;
+}
+
+.progress-step span {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.progress-step.inactive span {
+  color: #6c757d;
+}
+
+.progress-line {
+  flex: 1;
+  height: 2px;
+  background: #dee2e6;
+  position: absolute;
+  top: 25px;
+  left: 0;
+  right: 0;
+  z-index: 0;
+}
+
+/* ============================================
+   Form Components
+   ============================================ */
+
+.white-card {
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 2rem;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 0.75rem;
+}
+
+.form-group small {
+  color: #6c757d;
+  display: block;
+  margin-top: 0.5rem;
+}
+
+.input-group-custom {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.input-group-custom .form-control {
+  flex: 1;
+  font-size: 1rem;
+  padding: 0.85rem 1rem;
+  border: 2px solid #dee2e6;
+  border-radius: 0.5rem;
+  font-family: "Courier New", monospace;
+}
+
+/* ============================================
+   Table Styles
+   ============================================ */
+
+.table-container {
+  background: white;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 2rem;
+}
+
+.table-dark-header {
+  background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%);
+  color: white;
+}
+
+.table-dark-header th {
+  padding: 1rem;
+  border: none;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid #dee2e6;
+  transition: background-color 0.2s;
+}
+
+.table tbody td {
+  padding: 1.25rem 1rem;
+  vertical-align: middle;
+}
+
+.table code {
+  background: #f8f9fa;
+  padding: 0.3rem 0.6rem;
+  border-radius: 0.3rem;
+  font-size: 0.85rem;
+}
+
+/* ============================================
+   Info Cards / Alerts
+   ============================================ */
+
+.info-card {
+  background: rgba(102, 126, 234, 0.05);
+  border-left: 4px solid #667eea;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+.info-card p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.info-card h6 {
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.info-card i {
+  color: #667eea;
+  margin-right: 0.5rem;
+}
+
+/* ============================================
+   Status Messages
+   ============================================ */
+
+.status-alert {
+  margin-bottom: 2rem;
+  display: none;
+}
+
+.status-alert.show {
+  display: block;
+  animation: slideInDown 0.3s ease;
+}
+
+.status-success {
+  background: rgba(17, 153, 142, 0.1);
+  border-left: 4px solid #11998e;
+  border-radius: 0.5rem;
+  padding: 1rem 1.5rem;
+  color: #0d5f57;
+}
+
+.status-error {
+  background: rgba(245, 87, 108, 0.1);
+  border-left: 4px solid #f5576c;
+  border-radius: 0.5rem;
+  padding: 1rem 1.5rem;
+  color: #c13845;
+}
+
+.status-warning {
+  background: rgba(250, 112, 154, 0.1);
+  border-left: 4px solid #fa709a;
+  border-radius: 0.5rem;
+  padding: 1rem 1.5rem;
+  color: #994557;
+}
+
+.status-info {
+  background: rgba(102, 126, 234, 0.1);
+  border-left: 4px solid #667eea;
+  border-radius: 0.5rem;
+  padding: 1rem 1.5rem;
+  color: #3a4b8f;
+}
+
+/* ============================================
+   Empty States
+   ============================================ */
+
+.empty-state {
+  background: white;
+  border-radius: 1rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 2rem;
+}
+
+.empty-state i {
+  font-size: 3rem;
+  color: #dee2e6;
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.empty-state h4 {
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: #6c757d;
+  margin-bottom: 1.5rem;
+}
+
+/* ============================================
+   Status Badge
+   ============================================ */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.4rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.status-badge.present {
+  background: rgba(17, 153, 142, 0.1);
+  color: #0d5f57;
+}
+
+.status-badge.absent {
+  background: rgba(245, 87, 108, 0.1);
+  color: #c13845;
+}
+
+/* ============================================
+   Button Groups
+   ============================================ */
+
+.button-group {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+.button-group .btn {
+  flex: 1;
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ============================================
+   Tips Section
+   ============================================ */
+
+.tips-card {
+  background: rgba(102, 126, 234, 0.05);
+  border-left: 4px solid #667eea;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+}
+
+.tips-card h6 {
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+}
+
+.tips-card ul {
+  list-style: none;
+  padding: 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.tips-card li {
+  margin-bottom: 0.75rem;
+}
+
+.tips-card i {
+  color: #11998e;
+  margin-right: 0.5rem;
+}
+
+/* ============================================
+   Hero Section
+   ============================================ */
+
+.hero-section {
+  margin-top: 2rem;
+  margin-bottom: 3rem;
+  text-align: center;
+}
+
+.hero-icon {
+  margin-bottom: 2rem;
+}
+
+.hero-icon i {
+  font-size: 4rem;
+  color: #667eea;
+}
+
+.hero-title {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: 1.2rem;
+  color: #6c757d;
+  margin-bottom: 2rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ============================================
+   Action Card Grid
+   ============================================ */
+
+.action-card {
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border-left: 4px solid;
+}
+
+.action-card.primary {
+  border-left-color: #667eea;
+}
+
+.action-card.success {
+  border-left-color: #11998e;
+}
+
+.action-card.warning {
+  border-left-color: #f39c12;
+}
+
+.action-card:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+}
+
+.action-card .icon-box {
+  margin-bottom: 1rem;
+}
+
+.action-card h5 {
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.action-card p {
+  color: #6c757d;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ============================================
+   Feature List
+   ============================================ */
+
+.feature-list {
+  list-style: none;
+  padding: 0;
+  color: #6c757d;
+  font-size: 0.95rem;
+}
+
+.feature-list li {
+  margin-bottom: 0.75rem;
+}
+
+.feature-list span {
+  color: #667eea;
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.feature-list i {
+  color: #11998e;
+  margin-right: 0.5rem;
+}
+
+/* ============================================
+   Status Indicator
+   ============================================ */
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  border-radius: 1rem;
+  padding: 2rem;
+  color: white;
+  box-shadow: 0 8px 16px rgba(17, 153, 142, 0.2);
+  margin-bottom: 2rem;
+}
+
+.status-indicator i {
+  font-size: 2rem;
+  color: #38ef7d;
+}
+
+.status-indicator h6 {
+  margin: 0;
+  font-weight: 700;
+}
+
+.status-indicator p {
+  margin: 0.25rem 0 0 0;
+  opacity: 0.95;
+  font-size: 0.95rem;
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .icon-box {
+    width: 40px;
+    height: 40px;
+  }
+
+  .chart-container {
+    margin-bottom: 2rem;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .button-group .btn {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .stat-card {
+    margin-bottom: 1rem;
+  }
+}

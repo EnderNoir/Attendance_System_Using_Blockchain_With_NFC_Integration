@@ -1,59 +1,347 @@
 {% extends "base.html" %} {% block content %}
-<h2 class="mt-4">📝 Register New Student</h2>
-
-<!-- NFC Scan Status -->
-<div id="scanStatus" class="alert alert-info" style="display: none"></div>
-
-<form method="POST" action="{{ url_for('register') }}">
-  <!-- Student Name -->
-  <div class="mb-3">
-    <label for="name" class="form-label">Student Full Name</label>
-    <input
-      type="text"
-      class="form-control"
-      id="name"
-      name="name"
-      placeholder="John Doe"
-      required
-    />
+<!-- Page Header -->
+<div style="margin-top: 2rem; margin-bottom: 3rem">
+  <div
+    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem"
+  >
+    <div
+      style="
+        background: rgba(102, 126, 234, 0.1);
+        width: 50px;
+        height: 50px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <i
+        class="bi bi-person-plus"
+        style="font-size: 1.8rem; color: #667eea"
+      ></i>
+    </div>
+    <div>
+      <h2 style="margin: 0; font-weight: 700">Register New Student</h2>
+      <p style="margin: 0.5rem 0 0 0; color: #6c757d">
+        Assign NFC card and register on blockchain
+      </p>
+    </div>
   </div>
+</div>
 
-  <!-- NFC UID with Scan Button -->
-  <div class="mb-3">
-    <label for="nfc_id" class="form-label">NFC Tag UID</label>
-    <div class="input-group">
+<!-- Progress Steps -->
+<div style="margin-bottom: 3rem">
+  <div
+    style="
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      justify-content: space-between;
+      position: relative;
+    "
+  >
+    <!-- Step 1 -->
+    <div
+      style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        position: relative;
+        z-index: 1;
+      "
+    >
+      <div
+        style="
+          background: #667eea;
+          color: white;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        "
+      >
+        1
+      </div>
+      <span style="font-size: 0.9rem; font-weight: 600; color: #2c3e50"
+        >Enter Name</span
+      >
+    </div>
+
+    <!-- Line -->
+    <div
+      style="
+        flex: 1;
+        height: 2px;
+        background: #dee2e6;
+        position: absolute;
+        top: 25px;
+        left: 0;
+        right: 0;
+      "
+    ></div>
+
+    <!-- Step 2 -->
+    <div
+      style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        position: relative;
+        z-index: 1;
+      "
+    >
+      <div
+        style="
+          background: #e9ecef;
+          color: #6c757d;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        "
+      >
+        2
+      </div>
+      <span style="font-size: 0.9rem; font-weight: 600; color: #6c757d"
+        >Scan NFC</span
+      >
+    </div>
+
+    <!-- Line -->
+    <div
+      style="
+        flex: 1;
+        height: 2px;
+        background: #dee2e6;
+        position: absolute;
+        top: 25px;
+        right: 0;
+        left: 0;
+      "
+    ></div>
+
+    <!-- Step 3 -->
+    <div
+      style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        position: relative;
+        z-index: 1;
+      "
+    >
+      <div
+        style="
+          background: #e9ecef;
+          color: #6c757d;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        "
+      >
+        3
+      </div>
+      <span style="font-size: 0.9rem; font-weight: 600; color: #6c757d"
+        >Confirm</span
+      >
+    </div>
+  </div>
+</div>
+
+<!-- NFC Scan Status Alert -->
+<div id="scanStatus" style="display: none; margin-bottom: 2rem"></div>
+
+<!-- Registration Form -->
+<div
+  style="
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+  "
+>
+  <form method="POST" action="{{ url_for('register') }}">
+    <!-- Student Name Input -->
+    <div style="margin-bottom: 2rem">
+      <label
+        for="name"
+        style="
+          display: block;
+          font-weight: 600;
+          color: #2c3e50;
+          margin-bottom: 0.75rem;
+        "
+      >
+        <i
+          class="bi bi-person-fill"
+          style="color: #667eea; margin-right: 0.5rem"
+        ></i>
+        Student Full Name
+      </label>
       <input
         type="text"
         class="form-control"
-        id="nfc_id"
-        name="nfc_id"
-        placeholder="Tap card or click Scan"
+        id="name"
+        name="name"
+        placeholder="e.g., John Doe"
         required
+        style="
+          font-size: 1rem;
+          padding: 0.85rem 1rem;
+          border: 2px solid #dee2e6;
+          border-radius: 0.5rem;
+        "
       />
-      <button type="button" class="btn btn-primary" onclick="scanNFC()">
-        📱 Scan NFC
+      <small style="color: #6c757d; display: block; margin-top: 0.5rem"
+        >Enter the student's full name</small
+      >
+    </div>
+
+    <!-- NFC UID Input with Scan Button -->
+    <div style="margin-bottom: 2rem">
+      <label
+        for="nfc_id"
+        style="
+          display: block;
+          font-weight: 600;
+          color: #2c3e50;
+          margin-bottom: 0.75rem;
+        "
+      >
+        <i class="bi bi-nfc" style="color: #667eea; margin-right: 0.5rem"></i>
+        NFC Tag UID
+      </label>
+      <div style="display: flex; gap: 0.75rem">
+        <input
+          type="text"
+          class="form-control"
+          id="nfc_id"
+          name="nfc_id"
+          placeholder="Tap card or click Scan"
+          required
+          style="
+            flex: 1;
+            font-size: 1rem;
+            padding: 0.85rem 1rem;
+            border: 2px solid #dee2e6;
+            border-radius: 0.5rem;
+            font-family: 'Courier New', monospace;
+          "
+        />
+        <button
+          type="button"
+          class="btn btn-primary"
+          onclick="scanNFC()"
+          style="white-space: nowrap; padding: 0.85rem 1.5rem; font-weight: 600"
+        >
+          <i class="bi bi-phone"></i> Scan
+        </button>
+      </div>
+      <small style="color: #6c757d; display: block; margin-top: 0.5rem"
+        >Click "Scan" and tap the NFC card on the reader</small
+      >
+    </div>
+
+    <!-- Action Buttons -->
+    <div style="display: flex; gap: 1rem; margin-top: 2.5rem">
+      <button
+        type="submit"
+        class="btn btn-success"
+        style="flex: 1; padding: 0.85rem 1rem; font-weight: 600"
+      >
+        <i class="bi bi-check-circle"></i> Register Student
       </button>
+      <a
+        href="{{ url_for('index') }}"
+        class="btn btn-secondary"
+        style="
+          flex: 1;
+          padding: 0.85rem 1rem;
+          font-weight: 600;
+          text-decoration: none;
+        "
+      >
+        <i class="bi bi-arrow-left"></i> Cancel
+      </a>
     </div>
-    <div class="form-text">
-      Click "Scan NFC" and tap the card on the reader.
-    </div>
-  </div>
+  </form>
+</div>
 
-  <button type="submit" class="btn btn-success">Register</button>
-  <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
-</form>
+<!-- Tips Card -->
+<div
+  style="
+    background: rgba(102, 126, 234, 0.05);
+    border-left: 4px solid #667eea;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+  "
+>
+  <h6 style="font-weight: 700; color: #2c3e50; margin-bottom: 1rem">
+    <i
+      class="bi bi-info-circle"
+      style="color: #667eea; margin-right: 0.5rem"
+    ></i>
+    Tips
+  </h6>
+  <ul style="list-style: none; padding: 0; color: #6c757d; font-size: 0.95rem">
+    <li style="margin-bottom: 0.75rem">
+      <i class="bi bi-check2" style="color: #11998e; margin-right: 0.5rem"></i>
+      Make sure the NFC listener is running
+    </li>
+    <li style="margin-bottom: 0.75rem">
+      <i class="bi bi-check2" style="color: #11998e; margin-right: 0.5rem"></i>
+      Tap the card firmly on the NFC reader
+    </li>
+    <li>
+      <i class="bi bi-check2" style="color: #11998e; margin-right: 0.5rem"></i>
+      Wait for confirmation before submitting
+    </li>
+  </ul>
+</div>
 
+<script src="{{ url_for('static', filename='js/register.js') }}"></script>
 <script>
+  // Functions loaded from external JS
   function scanNFC() {
     const scanBtn = document.querySelector('button[onclick="scanNFC()"]');
-    scanBtn.disabled = true;
-    scanBtn.innerHTML = "⏳ Scanning...";
-
+    const nfcInput = document.getElementById("nfc_id");
     const statusDiv = document.getElementById("scanStatus");
+
+    // Disable button and show loading state
+    scanBtn.disabled = true;
+    const originalHTML = scanBtn.innerHTML;
+    scanBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Scanning...';
+
+    // Show status message
     statusDiv.style.display = "block";
-    statusDiv.className = "alert alert-info";
-    statusDiv.innerHTML =
-      "🔄 Ready to scan. Please tap your NFC card on the reader...";
+    statusDiv.className = "alert alert-info d-flex align-items-center";
+    statusDiv.innerHTML = `
+      <div class="spinner-border spinner-border-sm me-2" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <div>
+        <strong>Ready to scan</strong>
+        <br/>
+        <small>Tap your NFC card on the reader...</small>
+      </div>
+    `;
 
     fetch("/request_registration_scan", { method: "POST" })
       .then((response) => response.json())
@@ -65,9 +353,16 @@
         }
       })
       .catch((error) => {
-        statusDiv.className = "alert alert-danger";
-        statusDiv.innerHTML =
-          "❌ Could not connect to NFC listener. Make sure it is running.";
+        console.error("Error:", error);
+        statusDiv.className = "alert alert-danger d-flex align-items-center";
+        statusDiv.innerHTML = `
+          <i class="bi bi-exclamation-circle me-2" style="font-size: 1.2rem;"></i>
+          <div>
+            <strong>Could not connect to NFC listener</strong>
+            <br/>
+            <small>Make sure the NFC listener service is running</small>
+          </div>
+        `;
         resetButton();
       });
   }
@@ -75,34 +370,61 @@
   function pollForUID() {
     let attempts = 0;
     const maxAttempts = 30;
+    const statusDiv = document.getElementById("scanStatus");
+
     const poll = setInterval(() => {
       fetch("/get_scanned_uid")
         .then((response) => response.json())
         .then((data) => {
           if (data.uid) {
             clearInterval(poll);
+
+            // Set the NFC ID and show success
             document.getElementById("nfc_id").value = data.uid;
-            document.getElementById("scanStatus").style.display = "none";
+
+            statusDiv.className =
+              "alert alert-success d-flex align-items-center";
+            statusDiv.innerHTML = `
+              <i class="bi bi-check-circle me-2" style="font-size: 1.2rem;"></i>
+              <div>
+                <strong>NFC card scanned successfully!</strong>
+                <br/>
+                <small>UID: <code>${data.uid}</code></small>
+              </div>
+            `;
+
             resetButton();
+
+            // Auto-hide success message after 3 seconds
+            setTimeout(() => {
+              statusDiv.style.display = "none";
+            }, 3000);
           } else {
             attempts++;
             if (attempts >= maxAttempts) {
               clearInterval(poll);
-              document.getElementById("scanStatus").className =
-                "alert alert-warning";
-              document.getElementById("scanStatus").innerHTML =
-                "⏰ Timeout. Please try again.";
+              statusDiv.className =
+                "alert alert-warning d-flex align-items-center";
+              statusDiv.innerHTML = `
+                <i class="bi bi-clock-history me-2" style="font-size: 1.2rem;"></i>
+                <div>
+                  <strong>Scan timeout</strong>
+                  <br/>
+                  <small>Please try again</small>
+                </div>
+              `;
               resetButton();
             }
           }
-        });
+        })
+        .catch((err) => console.error("Polling error:", err));
     }, 500);
   }
 
   function resetButton() {
     const scanBtn = document.querySelector('button[onclick="scanNFC()"]');
     scanBtn.disabled = false;
-    scanBtn.innerHTML = "📱 Scan NFC";
+    scanBtn.innerHTML = '<i class="bi bi-phone"></i> Scan';
   }
 </script>
 {% endblock %}

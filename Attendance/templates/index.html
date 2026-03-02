@@ -1,61 +1,287 @@
 {% extends "base.html" %} {% block content %}
-<div class="text-center mt-5">
-  <h1 class="display-4">📌 Blockchain Attendance System</h1>
-  <p class="lead">Secure, immutable attendance tracking with NFC + Ethereum</p>
-  <hr class="my-4" />
-  <div class="row mt-5">
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">👨‍🏫 Admin</h5>
-          <p class="card-text">Register new students and assign NFC cards.</p>
-          <a href="{{ url_for('register') }}" class="btn btn-primary"
-            >Register Student</a
-          >
-        </div>
+<!-- Hero Section -->
+<div style="margin-top: 2rem; margin-bottom: 3rem; text-align: center">
+  <div style="margin-bottom: 2rem">
+    <i class="bi bi-shield-check" style="font-size: 4rem; color: #667eea"></i>
+  </div>
+  <h1
+    style="
+      font-size: 3rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    "
+  >
+    Blockchain Attendance System
+  </h1>
+  <p
+    style="
+      font-size: 1.2rem;
+      color: #6c757d;
+      margin-bottom: 2rem;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    "
+  >
+    Secure, immutable attendance tracking powered by Ethereum
+    <i class="bi bi-lightning-fill" style="color: #f39c12"></i> and NFC
+    technology
+  </p>
+</div>
+
+<!-- Action Cards -->
+<div class="row g-4 mb-5">
+  <!-- Register Student -->
+  <div class="col-md-6 col-lg-4">
+    <div
+      style="
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        border-left: 4px solid #667eea;
+      "
+    >
+      <div
+        style="
+          background: rgba(102, 126, 234, 0.1);
+          width: 50px;
+          height: 50px;
+          border-radius: 0.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 1rem;
+        "
+      >
+        <i
+          class="bi bi-person-plus"
+          style="font-size: 1.5rem; color: #667eea"
+        ></i>
       </div>
-    </div>
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">📊 View Dashboard</h5>
-          <p class="card-text">
-            See all registered students and their attendance.
-          </p>
-          <a href="{{ url_for('dashboard') }}" class="btn btn-info"
-            >Go to Dashboard
-          </a>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">📅 View Attendance</h5>
-          <p class="card-text">Check attendance history for any NFC ID.</p>
-          <form
-            action="{{ url_for('view_attendance', nfc_id='') }}"
-            method="GET"
-            id="viewForm"
-            class="d-flex"
-          >
-            <input
-              type="text"
-              name="nfc_id"
-              class="form-control me-2"
-              placeholder="Enter NFC UID"
-              required
-            />
-            <button type="submit" class="btn btn-success">View</button>
-          </form>
-        </div>
-      </div>
+      <h5 style="font-weight: 700; margin-bottom: 0.5rem">Register Student</h5>
+      <p style="color: #6c757d; font-size: 0.95rem; margin-bottom: 1.5rem">
+        Enroll new students and assign their NFC cards to the blockchain.
+      </p>
+      <a href="{{ url_for('register') }}" class="btn btn-primary w-100">
+        <i class="bi bi-arrow-right"></i> Register Now
+      </a>
     </div>
   </div>
-  <div class="mt-5">
-    <div class="alert alert-secondary">
-      <strong>NFC Listener Status:</strong> Running – tap your card on the
-      reader to mark attendance.
+
+  <!-- View Dashboard -->
+  <div class="col-md-6 col-lg-4">
+    <div
+      style="
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        border-left: 4px solid #11998e;
+      "
+    >
+      <div
+        style="
+          background: rgba(17, 153, 142, 0.1);
+          width: 50px;
+          height: 50px;
+          border-radius: 0.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 1rem;
+        "
+      >
+        <i class="bi bi-graph-up" style="font-size: 1.5rem; color: #11998e"></i>
+      </div>
+      <h5 style="font-weight: 700; margin-bottom: 0.5rem">View Dashboard</h5>
+      <p style="color: #6c757d; font-size: 0.95rem; margin-bottom: 1.5rem">
+        See all registered students and manage their attendance records.
+      </p>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-success w-100">
+        <i class="bi bi-arrow-right"></i> Open Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Check Attendance -->
+  <div class="col-md-6 col-lg-4">
+    <div
+      style="
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        border-left: 4px solid #f39c12;
+      "
+    >
+      <div
+        style="
+          background: rgba(243, 156, 18, 0.1);
+          width: 50px;
+          height: 50px;
+          border-radius: 0.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 1rem;
+        "
+      >
+        <i
+          class="bi bi-calendar-check"
+          style="font-size: 1.5rem; color: #f39c12"
+        ></i>
+      </div>
+      <h5 style="font-weight: 700; margin-bottom: 0.5rem">
+        Attendance History
+      </h5>
+      <p style="color: #6c757d; font-size: 0.95rem; margin-bottom: 1.5rem">
+        Check detailed attendance records for any student by NFC ID.
+      </p>
+      <form
+        action="{{ url_for('view_attendance', nfc_id='') }}"
+        method="GET"
+        id="viewForm"
+      >
+        <div style="display: flex; gap: 0.5rem">
+          <input
+            type="text"
+            name="nfc_id"
+            class="form-control"
+            placeholder="Enter NFC ID"
+            style="flex: 1; border-radius: 0.5rem"
+            required
+          />
+          <button
+            type="submit"
+            class="btn btn-primary"
+            style="white-space: nowrap"
+          >
+            <i class="bi bi-search"></i> View
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Status Card -->
+<div
+  style="
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    border-radius: 1rem;
+    padding: 2rem;
+    color: white;
+    box-shadow: 0 8px 16px rgba(17, 153, 142, 0.2);
+  "
+>
+  <div style="display: flex; align-items: center; gap: 1rem">
+    <i class="bi bi-dot" style="font-size: 2rem; color: #38ef7d"></i>
+    <div>
+      <h6 style="margin: 0; font-weight: 700">NFC Listener Active</h6>
+      <p style="margin: 0.25rem 0 0 0; opacity: 0.95; font-size: 0.95rem">
+        Tap your card on the reader to mark attendance instantly
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Info Sections -->
+<div class="row g-4 mt-4 mb-5">
+  <div class="col-md-6">
+    <div
+      style="
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      "
+    >
+      <h6 style="font-weight: 700; color: #2c3e50; margin-bottom: 1rem">
+        <i
+          class="bi bi-lock-fill"
+          style="color: #667eea; margin-right: 0.5rem"
+        ></i>
+        How It Works
+      </h6>
+      <ul
+        style="list-style: none; padding: 0; color: #6c757d; font-size: 0.95rem"
+      >
+        <li style="margin-bottom: 0.75rem">
+          <span style="color: #667eea; font-weight: 600">1.</span> Register
+          students with their NFC cards
+        </li>
+        <li style="margin-bottom: 0.75rem">
+          <span style="color: #667eea; font-weight: 600">2.</span> Tap cards on
+          the NFC reader
+        </li>
+        <li style="margin-bottom: 0.75rem">
+          <span style="color: #667eea; font-weight: 600">3.</span> Attendance
+          recorded on blockchain
+        </li>
+        <li>
+          <span style="color: #667eea; font-weight: 600">4.</span> View
+          immutable records
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div
+      style="
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      "
+    >
+      <h6 style="font-weight: 700; color: #2c3e50; margin-bottom: 1rem">
+        <i
+          class="bi bi-star-fill"
+          style="color: #f39c12; margin-right: 0.5rem"
+        ></i>
+        Key Features
+      </h6>
+      <ul
+        style="list-style: none; padding: 0; color: #6c757d; font-size: 0.95rem"
+      >
+        <li style="margin-bottom: 0.75rem">
+          <i
+            class="bi bi-check-circle-fill"
+            style="color: #11998e; margin-right: 0.5rem"
+          ></i>
+          Secure blockchain storage
+        </li>
+        <li style="margin-bottom: 0.75rem">
+          <i
+            class="bi bi-check-circle-fill"
+            style="color: #11998e; margin-right: 0.5rem"
+          ></i>
+          Real-time notifications
+        </li>
+        <li style="margin-bottom: 0.75rem">
+          <i
+            class="bi bi-check-circle-fill"
+            style="color: #11998e; margin-right: 0.5rem"
+          ></i>
+          NFC-based scanning
+        </li>
+        <li>
+          <i
+            class="bi bi-check-circle-fill"
+            style="color: #11998e; margin-right: 0.5rem"
+          ></i>
+          Complete audit trail
+        </li>
+      </ul>
     </div>
   </div>
 </div>

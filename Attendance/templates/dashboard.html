@@ -1,90 +1,370 @@
 {% extends "base.html" %} {% block content %}
-<h2 class="mt-4">📋 Student Dashboard</h2>
-<p class="lead">
-  All registered students – click on a name to view attendance.
-</p>
+<!-- Page Header -->
+<div style="margin-top: 2rem; margin-bottom: 3rem">
+  <div
+    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem"
+  >
+    <div
+      style="
+        background: rgba(102, 126, 234, 0.1);
+        width: 50px;
+        height: 50px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <i class="bi bi-graph-up" style="font-size: 1.8rem; color: #667eea"></i>
+    </div>
+    <div>
+      <h2 style="margin: 0; font-weight: 700">Student Dashboard</h2>
+      <p style="margin: 0.5rem 0 0 0; color: #6c757d">
+        Manage all registered students and view attendance
+      </p>
+    </div>
+  </div>
+</div>
 
-<!-- Search Input -->
-<div class="row mb-3">
-  <div class="col-md-6">
-    <input
-      type="text"
-      id="searchInput"
-      class="form-control"
-      placeholder="Search by name or NFC ID..."
-    />
+<!-- Stats Cards -->
+{% if students %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-md-3">
+    <div
+      style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <small style="opacity: 0.9">Total Students</small>
+          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">
+            {{ students|length }}
+          </h3>
+        </div>
+        <i class="bi bi-people-fill" style="font-size: 2rem; opacity: 0.3"></i>
+      </div>
+    </div>
   </div>
-  <div class="col-md-2">
-    <button class="btn btn-primary w-100" onclick="filterTable()">
-      Search
-    </button>
+  <div class="col-sm-6 col-md-3">
+    <div
+      style="
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        color: white;
+        box-shadow: 0 4px 12px rgba(17, 153, 142, 0.2);
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <small style="opacity: 0.9">Active Now</small>
+          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">0</h3>
+        </div>
+        <i
+          class="bi bi-person-check-fill"
+          style="font-size: 2rem; opacity: 0.3"
+        ></i>
+      </div>
+    </div>
   </div>
-  <div class="col-md-2">
-    <button class="btn btn-secondary w-100" onclick="clearSearch()">
-      Clear
-    </button>
+  <div class="col-sm-6 col-md-3">
+    <div
+      style="
+        background: linear-gradient(135deg, #f39c12 0%, #f8b500 100%);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        color: white;
+        box-shadow: 0 4px 12px rgba(243, 156, 18, 0.2);
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <small style="opacity: 0.9">Today</small>
+          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">-</h3>
+        </div>
+        <i class="bi bi-calendar-day" style="font-size: 2rem; opacity: 0.3"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-md-3">
+    <div
+      style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <small style="opacity: 0.9">NFC Listener</small>
+          <h3 style="margin: 0; font-size: 1.3rem; font-weight: 700">
+            <span style="color: #38ef7d">●</span> Active
+          </h3>
+        </div>
+        <i class="bi bi-wifi" style="font-size: 2rem; opacity: 0.3"></i>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Search Section -->
+<div
+  style="
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  "
+>
+  <div class="row g-2 align-items-end">
+    <div class="col-sm-6 col-lg-4">
+      <label
+        for="searchInput"
+        style="
+          display: block;
+          font-weight: 600;
+          margin-bottom: 0.5rem;
+          color: #2c3e50;
+        "
+      >
+        <i
+          class="bi bi-search"
+          style="color: #667eea; margin-right: 0.5rem"
+        ></i>
+        Search Students
+      </label>
+      <input
+        type="text"
+        id="searchInput"
+        class="form-control"
+        placeholder="Name or NFC ID..."
+        style="
+          border-radius: 0.5rem;
+          border: 2px solid #dee2e6;
+          padding: 0.75rem 1rem;
+        "
+      />
+    </div>
+    <div class="col-sm-6 col-lg-2">
+      <button class="btn btn-primary w-100" onclick="filterTable()">
+        <i class="bi bi-search"></i> Search
+      </button>
+    </div>
+    <div class="col-sm-6 col-lg-2">
+      <button class="btn btn-secondary w-100" onclick="clearSearch()">
+        <i class="bi bi-arrow-clockwise"></i> Reset
+      </button>
+    </div>
   </div>
 </div>
 
 <!-- Students Table -->
-<div class="table-responsive">
-  <table class="table table-striped table-hover" id="studentTable">
-    <thead class="table-dark">
-      <tr>
-        <th>Name</th>
-        <th>NFC ID</th>
-        <th>Ethereum Address</th>
-        <th>Registration Tx</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for student in students %}
-      <tr>
-        <td>{{ student.name }}</td>
-        <td><code>{{ student.nfcId }}</code></td>
-        <td>
-          <small class="text-muted"
-            >{{ student.address[:10] }}...{{ student.address[-8:] }}</small
+<div
+  style="
+    background: white;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  "
+>
+  <div class="table-responsive">
+    <table class="table table-hover" id="studentTable" style="margin-bottom: 0">
+      <thead
+        style="
+          background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%);
+          color: white;
+        "
+      >
+        <tr>
+          <th style="padding: 1rem; border: none">
+            <i class="bi bi-person"></i> Name
+          </th>
+          <th style="padding: 1rem; border: none">
+            <i class="bi bi-nfc"></i> NFC ID
+          </th>
+          <th style="padding: 1rem; border: none">
+            <i class="bi bi-shield-lock"></i> Eth Address
+          </th>
+          <th style="padding: 1rem; border: none">
+            <i class="bi bi-link-45deg"></i> Tx Hash
+          </th>
+          <th style="padding: 1rem; border: none; text-align: center">
+            <i class="bi bi-eye"></i> Actions
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if students %} {% for student in students %}
+        <tr
+          style="
+            border-bottom: 1px solid #dee2e6;
+            transition: background-color 0.2s;
+          "
+        >
+          <td
+            style="
+              padding: 1.25rem 1rem;
+              vertical-align: middle;
+              font-weight: 600;
+            "
           >
-        </td>
-        <td>
-          <a
-            href="https://etherscan.io/tx/{{ student.tx_hash }}"
-            target="_blank"
-            class="text-truncate"
-            >{{ student.tx_hash[:10] }}...</a
+            <i
+              class="bi bi-person-circle"
+              style="color: #667eea; margin-right: 0.5rem"
+            ></i>
+            {{ student.name }}
+          </td>
+          <td style="padding: 1.25rem 1rem; vertical-align: middle">
+            <code
+              style="
+                background: #f8f9fa;
+                padding: 0.3rem 0.6rem;
+                border-radius: 0.3rem;
+                font-size: 0.85rem;
+              "
+              >{{ student.nfcId }}</code
+            >
+          </td>
+          <td style="padding: 1.25rem 1rem; vertical-align: middle">
+            <small
+              style="color: #6c757d; font-family: 'Courier New', monospace"
+            >
+              {{ student.address[:10] }}...{{ student.address[-8:] }}
+            </small>
+          </td>
+          <td style="padding: 1.25rem 1rem; vertical-align: middle">
+            <a
+              href="https://etherscan.io/tx/{{ student.tx_hash }}"
+              target="_blank"
+              style="
+                color: #667eea;
+                text-decoration: none;
+                font-size: 0.85rem;
+                font-family: 'Courier New', monospace;
+              "
+            >
+              {{ student.tx_hash[:10] }}...
+              <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+          </td>
+          <td
+            style="
+              padding: 1.25rem 1rem;
+              vertical-align: middle;
+              text-align: center;
+            "
           >
-        </td>
-        <td>
-          <a
-            href="{{ url_for('view_attendance', nfc_id=student.nfcId) }}"
-            class="btn btn-sm btn-success"
-            >View Attendance</a
+            <a
+              href="{{ url_for('view_attendance', nfc_id=student.nfcId) }}"
+              class="btn btn-sm btn-success"
+              style="white-space: nowrap"
+            >
+              <i class="bi bi-graph-up"></i> Attendance
+            </a>
+          </td>
+        </tr>
+        {% endfor %} {% else %}
+        <tr>
+          <td
+            colspan="5"
+            style="padding: 2rem; text-align: center; color: #6c757d"
           >
-        </td>
-      </tr>
-      {% else %}
-      <tr>
-        <td colspan="5" class="text-center">No students registered yet.</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+            <i
+              class="bi bi-inbox"
+              style="
+                font-size: 2rem;
+                margin-bottom: 0.5rem;
+                display: block;
+                opacity: 0.5;
+              "
+            ></i>
+            <strong>No students registered yet</strong>
+            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem">
+              <a
+                href="{{ url_for('register') }}"
+                style="color: #667eea; text-decoration: none"
+                >Register the first student</a
+              >
+            </p>
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
 </div>
 
+<!-- Info Footer -->
+<div
+  style="
+    background: rgba(102, 126, 234, 0.05);
+    border-left: 4px solid #667eea;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-top: 2rem;
+  "
+>
+  <p style="margin: 0; color: #6c757d; font-size: 0.95rem">
+    <i
+      class="bi bi-info-circle"
+      style="color: #667eea; margin-right: 0.5rem"
+    ></i>
+    Click "Attendance" to view detailed attendance history for any student. Data
+    is stored immutably on the blockchain.
+  </p>
+</div>
+
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script>
-  // Filter table based on search input
+  // Functions loaded from external JS
   function filterTable() {
     let input = document.getElementById("searchInput").value.toLowerCase();
     let rows = document.querySelectorAll("#studentTable tbody tr");
+    let visibleCount = 0;
+
     rows.forEach((row) => {
-      let name = row.cells[0].innerText.toLowerCase();
-      let nfcId = row.cells[1].innerText.toLowerCase();
-      if (name.includes(input) || nfcId.includes(input)) {
-        row.style.display = "";
-      } else {
-        row.style.display = "none";
+      if (row.cells.length === 5) {
+        let name = row.cells[0].innerText.toLowerCase();
+        let nfcId = row.cells[1].innerText.toLowerCase();
+        if (name.includes(input) || nfcId.includes(input)) {
+          row.style.display = "";
+          visibleCount++;
+        } else {
+          row.style.display = "none";
+        }
       }
     });
   }
@@ -95,7 +375,7 @@
     filterTable();
   }
 
-  // Trigger filter as you type (optional)
+  // Trigger filter as you type
   document.getElementById("searchInput").addEventListener("keyup", filterTable);
 </script>
 

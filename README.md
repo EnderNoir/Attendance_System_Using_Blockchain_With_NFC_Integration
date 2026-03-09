@@ -54,23 +54,8 @@ pip install -r requirements.txt
 ### 3. Smart Contracts (Solidity)
 
 ```bash
-# Install Truffle or Hardhat (for compilation and deployment)
-npm install -g truffle
-# or
+# Install Hardhat (for compilation and deployment)
 npm install -g hardhat
-
-# Deploy contracts to your blockchain network
-truffle migrate --network <network-name>
-```
-
-### 4. Frontend Setup
-
-```bash
-# If using npm for frontend dependencies
-npm install
-
-# Start development server
-npm start
 ```
 
 ## Usage

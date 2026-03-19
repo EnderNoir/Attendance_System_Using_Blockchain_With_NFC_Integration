@@ -4,55 +4,130 @@
 {% block content %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-  .stat-chip-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
-  @media(max-width:640px){.stat-chip-row{grid-template-columns:repeat(2,1fr);}}
-  .stat-chip-mini{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;}
-  .chip-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
-  .chip-val{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;line-height:1;}
-  .chip-lbl{font-size:11px;color:var(--muted);margin-top:2px;}
-  .period-tabs{display:flex;gap:3px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:4px;flex-wrap:wrap;}
-  .ptab{padding:6px 12px;border:none;background:transparent;color:var(--muted);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
-  .ptab.active{background:rgba(45,106,39,.12);color:var(--accent);}
-  .chart-tabs{display:flex;border-bottom:1px solid var(--border);gap:0;}
-  .ctab{padding:10px 16px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;display:flex;align-items:center;gap:5px;white-space:nowrap;}
-  .ctab.active{color:var(--accent);border-bottom-color:var(--accent);}
-  .chart-pane{display:none;padding:16px 20px;}.chart-pane.active{display:block;}
-  .no-data{display:none;text-align:center;padding:32px;color:var(--muted);font-size:13px;}
-  .no-data.show{display:block;}
-  .live-dot{width:7px;height:7px;background:var(--success);border-radius:50%;animation:pulse 1.5s infinite;flex-shrink:0;display:inline-block;}
+  .welcome-bar{background:linear-gradient(135deg,rgba(45,106,39,.12),rgba(45,106,39,.04));border:1px solid rgba(45,106,39,.2);border-radius:14px;padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .welcome-name{font-size:22px;font-weight:700;margin:0;}
+  .welcome-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+  .clock-display{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);text-align:right;}
+  .clock-date{font-size:11px;color:var(--muted);text-align:right;margin-top:3px;}
+  .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;}
+  @media(max-width:640px){.stats-row{grid-template-columns:repeat(2,1fr);}}
+  .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;}
+  .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .stat-val{font-family:'Space Mono',monospace;font-size:24px;font-weight:700;line-height:1;}
+  .stat-lbl{font-size:11px;color:var(--muted);margin-top:3px;}
+  .live-dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;flex-shrink:0;}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
-  .spin{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;display:inline-block;}
+  .btn-monitor{background:var(--success);border:none;color:#fff;font-weight:700;border-radius:8px;padding:8px 16px;font-size:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .2s;}
+  [data-theme="dark"] .btn-monitor{color:#000;}
+  .btn-monitor:hover{opacity:.85;color:#fff;}
+  .sec-mono{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+
+  /* ── Analytics panel ── */
+  .ap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px;}
+  .ap-head{padding:18px 22px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .ap-head h2{font-size:15px;font-weight:700;margin:0;}
+  .ap-head p{font-size:11px;color:var(--muted);margin:3px 0 0;}
+
+  /* Period pills */
+  .period-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .pbtn{padding:7px 14px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;}
+  .pbtn:hover{border-color:var(--accent);color:var(--accent);}
+  .pbtn.active{background:rgba(45,106,39,.12);border-color:rgba(45,106,39,.3);color:var(--accent);}
+  .pp-sel{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;}
+  .picker{display:none;align-items:center;gap:6px;}.picker.show{display:flex;}
+
+  /* Filter row */
+  .filter-row{display:flex;gap:8px;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--border);}
+  .fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px;}
+  .fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .fi{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;appearance:none;outline:none;transition:border-color .2s;width:100%;}
+  .fi:focus{border-color:var(--accent);}
+  .btn-apply{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:9px 16px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;font-family:'DM Sans',sans-serif;}
+  [data-theme="dark"] .btn-apply{color:#000;}
+  .btn-reset-f{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px 12px;font-size:12px;cursor:pointer;transition:all .2s;}
+  .btn-reset-f:hover{border-color:var(--danger);color:var(--danger);}
+
+  /* Totals */
+  .sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 22px;}
+  @media(max-width:580px){.sum-grid{grid-template-columns:repeat(2,1fr);}}
+  .sum-box{border-radius:10px;padding:14px;text-align:center;border:1px solid;}
+  .sum-box .sn{font-family:'Space Mono',monospace;font-size:26px;font-weight:700;line-height:1;}
+  .sum-box .sl{font-size:11px;font-weight:600;margin-top:4px;}
+
+  /* Chart tabs */
+  .ctabs{display:flex;border-top:1px solid var(--border);}
+  .ctab{padding:10px 18px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;}
+  .ctab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .cpane{display:none;padding:16px 22px 20px;}.cpane.active{display:block;}
+  .chart-wrap{position:relative;height:260px;}
+  .chart-wrap.tall{height:220px;}
+  .cscroll{height:100%;overflow-y:auto;scrollbar-width:thin;}
+  .cloading{position:absolute;inset:0;background:var(--surface);display:flex;align-items:center;justify-content:center;z-index:10;font-size:12px;color:var(--muted);gap:8px;border-radius:8px;}
+  .cspin{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;}
   @keyframes sp{to{transform:rotate(360deg);}}
-  .btn-exp{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:11px;display:inline-flex;align-items:center;gap:5px;text-decoration:none;transition:all .2s;cursor:pointer;}
-  .btn-exp:hover{border-color:var(--accent);color:var(--accent);}
+  .cnodata{display:none;position:absolute;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--muted);font-size:12px;text-align:center;}
+  .cnodata.show{display:flex;}
+
+  /* Showing bar */
+  .showing-bar{background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.12);border-radius:10px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 22px 14px;}
+  .sb-main{font-size:13px;font-weight:700;}
+  .sb-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .sb-num{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);}
+  .sb-nlbl{font-size:10px;color:var(--muted);text-align:right;}
 </style>
 
-<!-- Greeting -->
-<div style="margin-bottom:20px;">
-  <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">// WELCOME BACK</div>
-  <h2 style="font-size:20px;font-weight:600;margin:0;">{{ user.full_name }}</h2>
-  <p style="font-size:12px;color:var(--muted);margin-top:3px;">
-    {{ sections|length }} section{{ 's' if sections|length!=1 else '' }} assigned &nbsp;·&nbsp;
-    {{ my_subjects|length }} subject{{ 's' if my_subjects|length!=1 else '' }} in schedule
-    &nbsp;·&nbsp; <span id="liveClock" style="font-family:'Space Mono',monospace;color:var(--accent);"></span>
-  </p>
+<!-- Welcome bar -->
+<div class="welcome-bar">
+  <div>
+    <div class="welcome-name">Welcome back, {{ user.full_name.split(' ')[0] }}! 👋</div>
+    <div class="welcome-sub">
+      {{ sections|length }} section{{ 's' if sections|length != 1 }} assigned
+      &nbsp;·&nbsp; {{ my_subjects|length }} subject{{ 's' if my_subjects|length != 1 }} in schedule
+    </div>
+  </div>
+  <div>
+    <div class="clock-display" id="liveClock">—</div>
+    <div class="clock-date" id="liveDate">—</div>
+  </div>
 </div>
 
-<!-- Live sessions banner -->
-{% set live_subjects = my_subjects | selectattr('active_session_id') | list %}
-{% if live_subjects %}
-<div style="margin-bottom:20px;">
-  <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--success);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">// LIVE NOW</div>
-  {% for ms in live_subjects %}
-  <div style="background:rgba(45,106,39,.06);border:1px solid rgba(45,106,39,.3);border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
-    <div style="display:flex;align-items:center;gap:10px;">
+<!-- Quick stats — no at-risk percentage shown -->
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="stat-icon" style="background:rgba(45,106,39,.1);color:var(--accent);"><i class="bi bi-broadcast"></i></div>
+    <div><div class="stat-val" style="color:var(--success);">{{ live_sessions|length }}</div><div class="stat-lbl">Live Now</div></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-icon" style="background:rgba(245,197,24,.1);color:#C8960C;"><i class="bi bi-people"></i></div>
+    <div><div class="stat-val">{{ total_students }}</div><div class="stat-lbl">My Students</div></div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-icon" style="background:rgba(96,165,250,.1);color:#60a5fa;"><i class="bi bi-journal-check"></i></div>
+    <div><div class="stat-val">{{ total_sessions }}</div><div class="stat-lbl">Sessions Done</div></div>
+  </div>
+
+</div>
+
+<!-- Live sessions -->
+{% if live_sessions %}
+<div class="sec-mono" style="color:var(--success);">// LIVE RIGHT NOW</div>
+<div style="margin-bottom:24px;">
+  {% for sid, s in live_sessions.items() %}
+  <div style="background:rgba(45,106,39,.06);border:1px solid rgba(45,106,39,.3);border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
       <div class="live-dot"></div>
-      <div>
-        <div style="font-weight:700;font-size:14px;">{% if ms.course_code %}<code style="font-size:10px;">[{{ ms.course_code }}]</code> {% endif %}{{ ms.subject_name }}</div>
-        <div style="font-size:11px;color:var(--muted);">{{ ms.section_key.replace('|',' · ') }}</div>
+      <div style="min-width:0;">
+        <div style="font-weight:700;font-size:14px;">
+          {% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif %}{{ s.subject_name }}
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+          {{ s.section_key.replace('|',' · ') }} &nbsp;·&nbsp;
+          <span style="color:var(--success);font-weight:600;">{{ s.present|length }} present</span>
+          &nbsp;·&nbsp; Started {{ fmt_time_short(s.started_at) }}
+        </div>
       </div>
     </div>
-    <a href="{{ url_for('live_session', sess_id=ms.active_session_id) }}" class="btn-primary" style="text-decoration:none;padding:8px 16px;font-size:13px;">
+    <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-monitor">
       <i class="bi bi-broadcast"></i> Monitor Live
     </a>
   </div>
@@ -60,142 +135,365 @@
 </div>
 {% endif %}
 
-<!-- ══ ANALYTICS ══ -->
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
-  <div style="padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+<!-- ══ ANALYTICS PANEL ══ -->
+<div class="sec-mono">// MY ATTENDANCE ANALYTICS</div>
+<div class="ap">
+
+  <!-- Header -->
+  <div class="ap-head">
     <div>
-      <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:3px;">// ATTENDANCE ANALYTICS</div>
-      <div style="font-size:15px;font-weight:700;">My Class Overview</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px;" id="sessionCountBadge">Select a period to load.</div>
+      <h2>Attendance Analytics</h2>
+      <p id="showingSub">Select a period and click Apply Filters to load data.</p>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <div class="period-tabs">
-        <button class="ptab active" onclick="switchPeriod('today',this)">Today</button>
-        <button class="ptab"        onclick="switchPeriod('month',this)">Month</button>
-        <button class="ptab"        onclick="switchPeriod('year',this)">Year</button>
-        <button class="ptab"        onclick="switchPeriod('all',this)">All Time</button>
+    <span style="font-size:11px;color:var(--muted);" id="sessCountLabel"></span>
+  </div>
+
+  <!-- Step 1: Period -->
+  <div style="padding:14px 22px;border-bottom:1px solid var(--border);">
+    <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">
+      <i class="bi bi-calendar3"></i> &nbsp;Period
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="period-row">
+        <button class="pbtn active" onclick="switchPeriod('today',this)">Today</button>
+        <button class="pbtn"        onclick="switchPeriod('month',this)">Month</button>
+        <button class="pbtn"        onclick="switchPeriod('year',this)">Year</button>
+        <button class="pbtn"        onclick="switchPeriod('all',this)">All Time</button>
       </div>
-      <a id="exportBtn" href="#" class="btn-exp"><i class="bi bi-download"></i> Export CSV</a>
+      <div class="picker" id="monthPicker">
+        <select class="pp-sel" id="pickMonth">
+          <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+          <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+          <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+          <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+        </select>
+        <select class="pp-sel" id="pickMonthYear">
+          <option>2024</option><option>2025</option><option selected>2026</option><option>2027</option>
+        </select>
+      </div>
+      <div class="picker" id="yearPicker">
+        <select class="pp-sel" id="pickYear">
+          <option>2024</option><option>2025</option><option selected>2026</option><option>2027</option>
+        </select>
+      </div>
     </div>
   </div>
 
-  <div style="padding:14px 20px 0;">
-    <div class="stat-chip-row">
-      <div class="stat-chip-mini" style="border-color:rgba(45,106,39,.25);"><div class="chip-dot" style="background:#10b981;"></div><div><div class="chip-val" id="sc_present">—</div><div class="chip-lbl">Present</div></div></div>
-      <div class="stat-chip-mini" style="border-color:rgba(245,197,24,.25);"><div class="chip-dot" style="background:#f59e0b;"></div><div><div class="chip-val" id="sc_late">—</div><div class="chip-lbl">Late</div></div></div>
-      <div class="stat-chip-mini" style="border-color:rgba(239,68,68,.25);"><div class="chip-dot" style="background:#ef4444;"></div><div><div class="chip-val" id="sc_absent">—</div><div class="chip-lbl">Absent</div></div></div>
-      <div class="stat-chip-mini" style="border-color:rgba(96,165,250,.25);"><div class="chip-dot" style="background:#60a5fa;"></div><div><div class="chip-val" id="sc_excused">—</div><div class="chip-lbl">Excused</div></div></div>
+  <!-- Step 2: Filters -->
+  <div class="filter-row">
+    <div class="fg">
+      <span class="fl">Subject</span>
+      <select class="fi" id="f_subject">
+        <option value="">All Subjects</option>
+        {% for ms in my_subjects %}
+        <option value="{{ ms.subject_name }}">{{ ms.subject_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Section</span>
+      <select class="fi" id="f_section">
+        <option value="">All Sections</option>
+        {% for key, sec in sections.items() %}
+        <option value="{{ key }}">{{ key.replace('|',' · ') }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Time of Day</span>
+      <select class="fi" id="f_tod">
+        <option value="">Any Time</option>
+        <option value="morning">Morning (before 12PM)</option>
+        <option value="afternoon">Afternoon (12PM+)</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:6px;align-self:flex-end;">
+      <button class="btn-apply" onclick="applyFilters()"><i class="bi bi-search"></i> Apply</button>
+      <button class="btn-reset-f" onclick="resetFilters()"><i class="bi bi-x-circle"></i></button>
     </div>
   </div>
 
-  <div class="chart-tabs">
-    <button class="ctab active" onclick="switchChart('donut',this)"><i class="bi bi-pie-chart"></i> Status</button>
-    <button class="ctab"        onclick="switchChart('trend',this)"><i class="bi bi-graph-up"></i> Trend</button>
-    <button class="ctab"        onclick="switchChart('subject',this)"><i class="bi bi-bar-chart-steps"></i> By Subject</button>
+  <!-- Showing bar -->
+  <div class="showing-bar" id="showingBar" style="display:none;">
+    <div>
+      <div class="sb-main" id="sb_main">—</div>
+      <div class="sb-sub"  id="sb_sub">—</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="sb-num"  id="sb_num">—</div>
+      <div class="sb-nlbl">sessions</div>
+    </div>
   </div>
 
-  <div class="chart-pane active" id="pane-donut">
-    <div class="no-data show" id="donutNoData"><i class="bi bi-pie-chart" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>Select a period above.</div>
-    <div id="donutContent" style="display:none;max-width:480px;"><canvas id="donutChart" height="200"></canvas></div>
+  <!-- Totals row -->
+  <div class="sum-grid">
+    <div class="sum-box" style="background:rgba(45,106,39,.07);border-color:rgba(45,106,39,.25);">
+      <div class="sn" style="color:var(--success);" id="sc_present">—</div>
+      <div class="sl" style="color:var(--success);">✓ Present</div>
+    </div>
+    <div class="sum-box" style="background:rgba(245,197,24,.07);border-color:rgba(245,197,24,.25);">
+      <div class="sn" style="color:var(--warning);" id="sc_late">—</div>
+      <div class="sl" style="color:var(--warning);">⏱ Late</div>
+    </div>
+    <div class="sum-box" style="background:rgba(192,57,43,.07);border-color:rgba(192,57,43,.2);">
+      <div class="sn" style="color:var(--danger);" id="sc_absent">—</div>
+      <div class="sl" style="color:var(--danger);">✕ Absent</div>
+    </div>
+    <div class="sum-box" style="background:rgba(96,165,250,.07);border-color:rgba(96,165,250,.2);">
+      <div class="sn" style="color:#60a5fa;" id="sc_excused">—</div>
+      <div class="sl" style="color:#60a5fa;">◎ Excused</div>
+    </div>
   </div>
-  <div class="chart-pane" id="pane-trend">
-    <div class="no-data show" id="trendNoData"><i class="bi bi-bar-chart" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>No sessions in this period yet.</div>
-    <canvas id="trendChart" height="200" style="display:none;"></canvas>
+
+  <!-- Chart tabs -->
+  <div class="ctabs">
+    <button class="ctab active" onclick="switchChart('donut',this)"><i class="bi bi-pie-chart-fill"></i> &nbsp;Status Breakdown</button>
+    <button class="ctab"        onclick="switchChart('trend',this)"><i class="bi bi-graph-up-arrow"></i> &nbsp;Daily Trend</button>
+    <button class="ctab"        onclick="switchChart('subject',this)"><i class="bi bi-bar-chart-horizontal-fill"></i> &nbsp;By Subject</button>
   </div>
-  <div class="chart-pane" id="pane-subject">
-    <div class="no-data show" id="subjNoData"><i class="bi bi-bar-chart-steps" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>No subject data.</div>
-    <canvas id="subjChart" height="200" style="display:none;"></canvas>
+
+  <!-- Donut chart -->
+  <div class="cpane active" id="pane-donut">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Percentage breakdown of all attendance records.</div>
+    <div style="position:relative;min-height:60px;">
+      <div class="cnodata show" id="donutNoData" style="position:relative;height:120px;">
+        <i class="bi bi-pie-chart" style="font-size:32px;opacity:.2;"></i>Apply filters above to see data.
+      </div>
+    </div>
+    <div id="donutContent" style="display:none;">
+      <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+        <div style="flex-shrink:0;width:200px;height:200px;"><canvas id="donutChart" width="200" height="200"></canvas></div>
+        <div style="flex:1;min-width:140px;display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:8px;">
+            <span style="width:9px;height:9px;border-radius:50%;background:#10b981;flex-shrink:0;"></span>
+            <span style="flex:1;font-size:13px;">Present</span>
+            <span id="leg_present" style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#10b981;">—</span>
+            <span id="pct_present" style="font-size:11px;color:var(--muted);"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:8px;">
+            <span style="width:9px;height:9px;border-radius:50%;background:#f59e0b;flex-shrink:0;"></span>
+            <span style="flex:1;font-size:13px;">Late</span>
+            <span id="leg_late" style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#f59e0b;">—</span>
+            <span id="pct_late" style="font-size:11px;color:var(--muted);"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:8px;">
+            <span style="width:9px;height:9px;border-radius:50%;background:#ef4444;flex-shrink:0;"></span>
+            <span style="flex:1;font-size:13px;">Absent</span>
+            <span id="leg_absent" style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#ef4444;">—</span>
+            <span id="pct_absent" style="font-size:11px;color:var(--muted);"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:8px;">
+            <span style="width:9px;height:9px;border-radius:50%;background:#60a5fa;flex-shrink:0;"></span>
+            <span style="flex:1;font-size:13px;">Excused</span>
+            <span id="leg_excused" style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#60a5fa;">—</span>
+            <span id="pct_excused" style="font-size:11px;color:var(--muted);"></span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
-</div>
+
+  <!-- Trend chart -->
+  <div class="cpane" id="pane-trend">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Day-by-day attendance counts across your sessions.</div>
+    <div class="chart-wrap">
+      <div class="cloading" id="trendLoading" style="display:none;"><div class="cspin"></div> Loading…</div>
+      <div class="cnodata show" id="trendNoData"><i class="bi bi-bar-chart" style="font-size:32px;opacity:.2;"></i>Apply filters above to see data.</div>
+      <canvas id="trendChart" height="200" style="display:none;"></canvas>
+    </div>
+  </div>
+
+  <!-- Subject chart -->
+  <div class="cpane" id="pane-subject">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Which subjects have the best and worst attendance in your classes?</div>
+    <div class="chart-wrap tall" id="subjChartArea">
+      <div class="cloading" id="subjLoading" style="display:none;"><div class="cspin"></div> Loading…</div>
+      <div class="cnodata show" id="subjNoData"><i class="bi bi-bar-chart-steps" style="font-size:32px;opacity:.2;"></i>Apply filters above to see data.</div>
+      <div class="cscroll" id="subjScroll" style="display:none;"><canvas id="subjChart"></canvas></div>
+    </div>
+  </div>
+
+</div><!-- /ap -->
 
 <script>
-function tick(){ const el=document.getElementById('liveClock'); if(el) el.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+// ── Clock ──
+function tick(){
+  const n=new Date();
+  const cl=document.getElementById('liveClock'); const cd=document.getElementById('liveDate');
+  if(cl)cl.textContent=n.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  if(cd)cd.textContent=n.toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+}
 tick(); setInterval(tick,1000);
 
-const COLORS={present:'#10b981',late:'#f59e0b',absent:'#ef4444',excused:'#60a5fa'};
-let curPeriod='today';
-
+// ── Charts ──
+const C={present:'#10b981',late:'#f59e0b',absent:'#ef4444',excused:'#60a5fa'};
 const donutChart=new Chart(document.getElementById('donutChart'),{
   type:'doughnut',
-  data:{labels:['Present','Late','Absent','Excused'],datasets:[{data:[0,0,0,0],backgroundColor:[COLORS.present,COLORS.late,COLORS.absent,COLORS.excused],borderColor:'transparent',borderWidth:2,hoverOffset:6}]},
-  options:{responsive:true,cutout:'68%',plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11}}},tooltip:{callbacks:{label:ctx=>{const t=ctx.dataset.data.reduce((a,b)=>a+b,0);return ` ${ctx.label}: ${ctx.parsed} (${t?Math.round(ctx.parsed/t*100):0}%)`;}}}}},
+  data:{labels:['Present','Late','Absent','Excused'],datasets:[{data:[0,0,0,0],
+    backgroundColor:[C.present,C.late,C.absent,C.excused],borderColor:'transparent',borderWidth:2,hoverOffset:6}]},
+  options:{responsive:false,cutout:'65%',plugins:{legend:{display:false},
+    tooltip:{callbacks:{label:ctx=>{const t=ctx.dataset.data.reduce((a,b)=>a+b,0);
+    return ` ${ctx.label}: ${ctx.parsed} (${t?Math.round(ctx.parsed/t*100):0}%)`;}}}}}
 });
 const trendChart=new Chart(document.getElementById('trendChart'),{
-  type:'bar',
-  data:{labels:[],datasets:[
-    {label:'Present',data:[],backgroundColor:COLORS.present+'cc',borderRadius:3,borderSkipped:false},
-    {label:'Late',   data:[],backgroundColor:COLORS.late   +'cc',borderRadius:3,borderSkipped:false},
-    {label:'Absent', data:[],backgroundColor:COLORS.absent +'cc',borderRadius:3,borderSkipped:false},
-    {label:'Excused',data:[],backgroundColor:COLORS.excused+'cc',borderRadius:3,borderSkipped:false},
+  type:'bar',data:{labels:[],datasets:[
+    {label:'Present',data:[],backgroundColor:C.present+'cc',borderRadius:3,borderSkipped:false},
+    {label:'Late',   data:[],backgroundColor:C.late   +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Absent', data:[],backgroundColor:C.absent +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Excused',data:[],backgroundColor:C.excused+'cc',borderRadius:3,borderSkipped:false},
   ]},
   options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10}},tooltip:{mode:'index',intersect:false}},
-    scales:{x:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,.04)'}},
-            y:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,.06)'},beginAtZero:true}}},
+    scales:{x:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+            y:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:10}},grid:{color:'rgba(255,255,255,.06)'},beginAtZero:true}}}
 });
 const subjChart=new Chart(document.getElementById('subjChart'),{
-  type:'bar',
-  data:{labels:[],datasets:[
-    {label:'Present',data:[],backgroundColor:COLORS.present+'cc',borderRadius:3,borderSkipped:false},
-    {label:'Late',   data:[],backgroundColor:COLORS.late   +'cc',borderRadius:3,borderSkipped:false},
-    {label:'Absent', data:[],backgroundColor:COLORS.absent +'cc',borderRadius:3,borderSkipped:false},
-    {label:'Excused',data:[],backgroundColor:COLORS.excused+'cc',borderRadius:3,borderSkipped:false},
+  type:'bar',data:{labels:[],datasets:[
+    {label:'Present',data:[],backgroundColor:C.present+'cc',borderRadius:3,borderSkipped:false},
+    {label:'Late',   data:[],backgroundColor:C.late   +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Absent', data:[],backgroundColor:C.absent +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Excused',data:[],backgroundColor:C.excused+'cc',borderRadius:3,borderSkipped:false},
   ]},
-  options:{responsive:true,indexAxis:'y',plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10}},tooltip:{mode:'index',intersect:false}},
-    scales:{x:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true},
-            y:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,.06)'}}}},
+  options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+    plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10}},tooltip:{mode:'index',intersect:false}},
+    scales:{x:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:10}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true},
+            y:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:10}},grid:{color:'rgba(255,255,255,.06)'}}}
+  }
 });
 
-async function loadStats(p){
-  document.getElementById('sessionCountBadge').innerHTML='<span class="spin"></span>';
-  try{
-    const r=await fetch(`/api/attendance/stats?period=${p}`);
-    const d=await r.json();
-    const tot=d.donut;
-    document.getElementById('sc_present').textContent=tot.present;
-    document.getElementById('sc_late').textContent=tot.late;
-    document.getElementById('sc_absent').textContent=tot.absent;
-    document.getElementById('sc_excused').textContent=tot.excused;
-    document.getElementById('sessionCountBadge').textContent=`${d.session_count} session${d.session_count!==1?'s':''} · ${p}`;
-    document.getElementById('exportBtn').href=`/export/stats.csv?period=${p}`;
-
-    const total=tot.present+tot.late+tot.absent+tot.excused;
-    if(!total){document.getElementById('donutNoData').classList.add('show');document.getElementById('donutContent').style.display='none';}
-    else{document.getElementById('donutNoData').classList.remove('show');document.getElementById('donutContent').style.display='block';
-      donutChart.data.datasets[0].data=[tot.present,tot.late,tot.absent,tot.excused];donutChart.update('active');}
-
-    const tk=Object.keys(d.trend||{});
-    if(!tk.length){document.getElementById('trendNoData').classList.add('show');document.getElementById('trendChart').style.display='none';}
-    else{document.getElementById('trendNoData').classList.remove('show');document.getElementById('trendChart').style.display='block';
-      trendChart.data.labels=tk;['present','late','absent','excused'].forEach((k,i)=>{trendChart.data.datasets[i].data=tk.map(key=>(d.trend[key]||{})[k]||0);});trendChart.update('active');}
-
-    const se=Object.entries(d.subjects||{});
-    if(!se.length){document.getElementById('subjNoData').classList.add('show');document.getElementById('subjChart').style.display='none';}
-    else{document.getElementById('subjNoData').classList.remove('show');document.getElementById('subjChart').style.display='block';
-      subjChart.data.labels=se.map(([k])=>k.length>28?k.substring(0,26)+'…':k);
-      subjChart.data.datasets[0].data=se.map(([,v])=>v.present||0);
-      subjChart.data.datasets[1].data=se.map(([,v])=>v.late||0);
-      subjChart.data.datasets[2].data=se.map(([,v])=>v.absent||0);
-      subjChart.data.datasets[3].data=se.map(([,v])=>v.excused||0);
-      subjChart.update('active');}
-  }catch(e){document.getElementById('sessionCountBadge').textContent='Error loading data.';}
-}
-
+let curPeriod='today';
 function switchPeriod(p,btn){
   curPeriod=p;
-  document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  loadStats(p);
+  document.getElementById('monthPicker').classList.toggle('show',p==='month');
+  document.getElementById('yearPicker').classList.toggle('show',p==='year');
 }
+
+function getPeriodParams(){
+  const p=new URLSearchParams({period:curPeriod});
+  if(curPeriod==='month'){
+    p.append('month',   document.getElementById('pickMonth').value);
+    p.append('year_num',document.getElementById('pickMonthYear').value);
+  } else if(curPeriod==='year'){
+    p.append('year_num',document.getElementById('pickYear').value);
+  }
+  return p;
+}
+
+async function applyFilters(){
+  const params=getPeriodParams();
+  const subj=document.getElementById('f_subject').value;
+  const sec =document.getElementById('f_section').value;
+  const tod =document.getElementById('f_tod').value;
+  if(subj) params.append('subject',    subj);
+  if(sec)  params.append('section_key',sec);
+  if(tod)  params.append('time_of_day',tod);
+
+  // Loading states
+  ['trendLoading','subjLoading'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='flex';});
+  document.getElementById('trendChart').style.display='none';
+  document.getElementById('subjScroll').style.display='none';
+  document.getElementById('donutContent').style.display='none';
+  ['trendNoData','subjNoData','donutNoData'].forEach(id=>document.getElementById(id).classList.remove('show'));
+
+  try{
+    const r=await fetch('/api/attendance/stats?'+params.toString(),{credentials:'same-origin'});
+    const d=await r.json();
+    renderAll(d, subj, sec, tod);
+  }catch(e){console.error(e);}
+  ['trendLoading','subjLoading'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+}
+
+function resetFilters(){
+  document.getElementById('f_subject').value='';
+  document.getElementById('f_section').value='';
+  document.getElementById('f_tod').value='';
+  applyFilters();
+}
+
+function renderAll(data, subj, sec, tod){
+  const d=data.donut; const total=d.present+d.late+d.absent+d.excused;
+  const pct=v=>total?Math.round(v/total*100)+'%':'0%';
+
+  // Totals
+  document.getElementById('sc_present').textContent=d.present;
+  document.getElementById('sc_late').textContent=d.late;
+  document.getElementById('sc_absent').textContent=d.absent;
+  document.getElementById('sc_excused').textContent=d.excused;
+
+  // Session count
+  const cnt=data.session_count;
+  document.getElementById('sessCountLabel').textContent=cnt+' session'+(cnt!==1?'s':'')+' found';
+  document.getElementById('sb_num').textContent=cnt;
+
+  // Showing bar
+  const periods={today:'Today',month:'This Month',year:'This Year',all:'All Time'};
+  const parts=[];
+  if(subj) parts.push('Subject: '+subj);
+  if(sec)  parts.push('Section: '+sec.split('|').pop());
+  if(tod)  parts.push(tod.charAt(0).toUpperCase()+tod.slice(1));
+  document.getElementById('sb_main').textContent=(periods[curPeriod]||curPeriod)+(parts.length?' — Filtered':'');
+  document.getElementById('sb_sub').textContent=parts.length?parts.join(' · '):'Showing all your sessions';
+  document.getElementById('showingBar').style.display='flex';
+  document.getElementById('showingSub').textContent=cnt+' session'+(cnt!==1?'s':'')+' · '+document.getElementById('sb_sub').textContent;
+
+  // Donut
+  if(!total){document.getElementById('donutNoData').classList.add('show');}
+  else{
+    document.getElementById('donutNoData').classList.remove('show');
+    document.getElementById('donutContent').style.display='block';
+    donutChart.data.datasets[0].data=[d.present,d.late,d.absent,d.excused];
+    donutChart.update('active');
+    ['present','late','absent','excused'].forEach(k=>{
+      document.getElementById('leg_'+k).textContent=d[k];
+      document.getElementById('pct_'+k).textContent='('+pct(d[k])+')';
+    });
+  }
+
+  // Trend
+  const keys=Object.keys(data.trend||{});
+  if(!keys.length){document.getElementById('trendNoData').classList.add('show');}
+  else{
+    const tc=document.getElementById('trendChart');
+    tc.style.display='block';
+    trendChart.data.labels=keys;
+    ['present','late','absent','excused'].forEach((k,i)=>{
+      trendChart.data.datasets[i].data=keys.map(key=>(data.trend[key]||{})[k]||0);
+    });
+    trendChart.update('active');
+  }
+
+  // By Subject
+  const entries=Object.entries(data.subjects||{}).sort((a,b)=>a[0].localeCompare(b[0]));
+  if(!entries.length){document.getElementById('subjNoData').classList.add('show');}
+  else{
+    const sc=document.getElementById('subjScroll');
+    sc.style.display='block';
+    const labels=entries.map(([k])=>k.length>28?k.substring(0,26)+'…':k);
+    const vals=entries.map(([,v])=>v);
+    const h=Math.max(180,entries.length*40+60);
+    subjChart.canvas.style.height=h+'px'; subjChart.canvas.height=h;
+    subjChart.data.labels=labels;
+    subjChart.data.datasets[0].data=vals.map(v=>v.present||0);
+    subjChart.data.datasets[1].data=vals.map(v=>v.late||0);
+    subjChart.data.datasets[2].data=vals.map(v=>v.absent||0);
+    subjChart.data.datasets[3].data=vals.map(v=>v.excused||0);
+    subjChart.update('active');
+  }
+}
+
 function switchChart(id,btn){
-  document.querySelectorAll('.chart-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.cpane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ctab').forEach(b=>b.classList.remove('active'));
   document.getElementById('pane-'+id).classList.add('active');
   btn.classList.add('active');
-  if(id==='trend')trendChart.resize();
-  if(id==='subject')subjChart.resize();
+  if(id==='trend')   trendChart.resize();
+  if(id==='subject') subjChart.update();
 }
 
-loadStats('today');
-setInterval(()=>loadStats(curPeriod),60000);
+// Set month picker default
+(function(){document.getElementById('pickMonth').value=new Date().getMonth()+1;})();
+// Auto-load today
+applyFilters();
 </script>
 {% endblock %}

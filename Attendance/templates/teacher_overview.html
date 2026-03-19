@@ -1,0 +1,703 @@
+{% extends "base.html" %}
+{% block title %}Sessions & Students — DAVS{% endblock %}
+{% block page_title %}SESSIONS & STUDENTS{% endblock %}
+{% block content %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ── Page tabs ── */
+.main-tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:20px;}
+.main-tab{flex:1;padding:10px;border:none;background:transparent;color:var(--muted);border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px;}
+.main-tab.active{background:rgba(45,106,39,.12);color:var(--accent);}
+.main-tab:hover:not(.active){background:rgba(45,106,39,.06);color:var(--text);}
+.main-pane{display:none;}.main-pane.active{display:block;}
+
+/* ── Session list ── */
+.sess-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0;margin-bottom:8px;overflow:hidden;transition:border-color .2s;}
+.sess-row:hover{border-color:rgba(45,106,39,.3);}
+.sess-row.live-row{border-color:rgba(45,106,39,.4);}
+.sess-header{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;user-select:none;}
+.sess-chevron{color:var(--muted);transition:transform .25s;font-size:13px;flex-shrink:0;}
+.sess-row.open .sess-chevron{transform:rotate(90deg);}
+.sess-title{font-weight:700;font-size:14px;flex:1;min-width:0;}
+.sess-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.sess-body{display:none;border-top:1px solid var(--border);padding:14px 16px 16px;}
+.sess-row.open .sess-body{display:block;}
+
+/* ── Status badges ── */
+.badge-live{background:rgba(45,106,39,.12);color:var(--success);border:1px solid rgba(45,106,39,.25);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;}
+.badge-done{background:rgba(100,116,139,.08);color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:2px 9px;font-size:10px;}
+.live-dot{width:7px;height:7px;background:var(--success);border-radius:50%;animation:pulse 1.5s infinite;flex-shrink:0;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+/* ── Attendance rows inside session ── */
+.att-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.att-row:last-child{border-bottom:none;}
+.att-name{font-weight:600;flex:1;min-width:0;}
+.att-nfc{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);}
+.tx-chip{font-family:'Space Mono',monospace;font-size:9px;color:rgba(45,106,39,.7);background:rgba(45,106,39,.06);border:1px solid rgba(45,106,39,.15);border-radius:4px;padding:2px 6px;margin-top:2px;display:inline-block;word-break:break-all;}
+.st-present{background:rgba(45,106,39,.1);color:var(--success);border:1px solid rgba(45,106,39,.2);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.st-late{background:rgba(245,197,24,.1);color:var(--warning);border:1px solid rgba(245,197,24,.2);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.st-absent{background:rgba(192,57,43,.08);color:var(--danger);border:1px solid rgba(192,57,43,.15);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.st-excused{background:rgba(96,165,250,.08);color:#60a5fa;border:1px solid rgba(96,165,250,.2);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+
+/* ── Session summary chips ── */
+.sum-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.sum-chip{padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;}
+
+/* ── Filter bar ── */
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;}
+.fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px;}
+.fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+
+/* ── Custom searchable dropdown ── */
+.search-select-wrap{position:relative;}
+.search-select-display{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 32px 7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;transition:border-color .2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.search-select-display:hover,.search-select-display.open{border-color:var(--accent);}
+.search-select-display .arrow{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--muted);pointer-events:none;transition:transform .2s;}
+.search-select-display.open .arrow{transform:translateY(-50%) rotate(180deg);}
+.search-select-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--accent);border-radius:9px;z-index:999;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.18);display:none;}
+.search-select-dropdown.open{display:block;}
+.search-select-input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:9px 12px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;}
+.search-select-input::placeholder{color:var(--muted);}
+.search-select-options{max-height:180px;overflow-y:auto;scrollbar-width:thin;}
+.sso{padding:8px 12px;font-size:12px;cursor:pointer;transition:background .15s;color:var(--text);}
+.sso:hover,.sso.highlighted{background:rgba(45,106,39,.1);color:var(--accent);}
+.sso.selected{background:rgba(45,106,39,.15);color:var(--accent);font-weight:600;}
+.sso.no-match{color:var(--muted);font-style:italic;cursor:default;}
+.sso.no-match:hover{background:transparent;}
+
+/* ── Student card ── */
+.student-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:14px;transition:border-color .2s;flex-wrap:wrap;margin-bottom:8px;}
+.student-card:hover{border-color:var(--accent);}
+.student-card.good{border-left:3px solid var(--success);}
+.student-card.at-risk{border-left:3px solid var(--warning);}
+.student-card.critical{border-left:3px solid var(--danger);}
+
+/* ── Rate bar ── */
+.rate-bar-bg{height:6px;background:var(--border);border-radius:999px;overflow:hidden;flex:1;min-width:100px;max-width:160px;}
+.rate-bar-fill{height:100%;border-radius:999px;transition:width .8s ease;}
+
+/* ── Quick detail panel ── */
+.detail-panel{display:none;margin-top:10px;background:rgba(45,106,39,.03);border:1px solid rgba(45,106,39,.12);border-radius:10px;padding:12px 14px;}
+.student-card.expanded .detail-panel{display:block;}
+.detail-sess-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap;}
+.detail-sess-row:last-child{border-bottom:none;}
+
+/* ── Export btn ── */
+.btn-export{background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.25);color:var(--accent);border-radius:7px;padding:6px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-weight:600;transition:all .2s;white-space:nowrap;}
+.btn-export:hover{background:rgba(45,106,39,.2);}
+.btn-monitor{background:rgba(45,106,39,.15);border:1px solid rgba(45,106,39,.3);color:var(--success);border-radius:7px;padding:6px 14px;font-size:12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all .2s;white-space:nowrap;}
+.btn-monitor:hover{background:rgba(45,106,39,.25);color:var(--success);}
+
+/* ── Misc ── */
+.btn-rst{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;align-self:flex-end;transition:all .2s;}
+.btn-rst:hover{border-color:var(--danger);color:var(--danger);}
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted);}
+.empty-state i{font-size:40px;opacity:.2;display:block;margin-bottom:10px;}
+.sec-mono{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+</style>
+
+<!-- Page header -->
+<div style="margin-bottom:20px;">
+  <div class="sec-mono">// TEACHER OVERVIEW</div>
+  <h2 style="font-size:20px;font-weight:600;margin:0;">Sessions & Students</h2>
+  <p style="font-size:12px;color:var(--muted);margin-top:3px;">
+    View your class sessions and monitor student attendance standing.
+  </p>
+</div>
+
+<!-- Main tabs -->
+<div class="main-tabs">
+  <button class="main-tab active" onclick="switchMain('sessions',this)">
+    <i class="bi bi-journal-text"></i> My Sessions
+    <span style="background:rgba(45,106,39,.15);color:var(--accent);border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;">{{ sessions_data|length }}</span>
+  </button>
+  <button class="main-tab" onclick="switchMain('students',this)">
+    <i class="bi bi-people"></i> Student Standing
+    <span style="background:rgba(45,106,39,.15);color:var(--accent);border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;">{{ students|length }}</span>
+  </button>
+</div>
+
+<!-- ══════════════════════════════════
+     SESSIONS TAB
+══════════════════════════════════ -->
+<div class="main-pane active" id="pane-sessions">
+
+  <!-- Live sessions always on top -->
+  {% set live_sessions = {} %}
+  {% for sid, s in sessions_data.items() %}{% if not s.ended_at %}{% set _ = live_sessions.update({sid: s}) %}{% endif %}{% endfor %}
+  {% if live_sessions %}
+  <div class="sec-mono" style="color:var(--success);">// LIVE NOW</div>
+  {% for sid, s in live_sessions.items() %}
+  <div class="sess-row live-row open" id="sess_{{ sid }}">
+    <div class="sess-header" onclick="toggleSess('{{ sid }}')">
+      <div class="live-dot"></div>
+      <i class="bi bi-chevron-right sess-chevron"></i>
+      <div style="flex:1;min-width:0;">
+        <div class="sess-title">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif %}{{ s.subject_name }}</div>
+        <div class="sess-meta">{{ s.section_key.replace('|',' · ') }} · {{ s.time_slot or '—' }} · Started {{ fmt_time(s.started_at) }}</div>
+      </div>
+      <span class="badge-live">LIVE</span>
+      <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-monitor" onclick="event.stopPropagation()"><i class="bi bi-broadcast"></i> Monitor</a>
+    </div>
+    <div class="sess-body">
+      {% include '_session_body.html' ignore missing %}
+      {{ _render_session_body(sid, s, all_students) }}
+    </div>
+  </div>
+  {% endfor %}
+  <div style="margin-bottom:20px;"></div>
+  {% endif %}
+
+  <!-- Completed sessions -->
+  {% set ended_sessions = {} %}
+  {% for sid, s in sessions_data.items() %}{% if s.ended_at %}{% set _ = ended_sessions.update({sid: s}) %}{% endif %}{% endfor %}
+
+  {% if ended_sessions %}
+  <div class="sec-mono">// COMPLETED SESSIONS ({{ ended_sessions|length }})</div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <div class="fg" style="flex:2;min-width:160px;">
+      <span class="fl"><i class="bi bi-search"></i> Search</span>
+      <input type="text" id="sf_search" placeholder="Subject name…" oninput="filterSessions()"
+             style="background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;appearance:none;outline:none;transition:border-color .2s;"
+             onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+    </div>
+    <div class="fg">
+      <span class="fl">Subject</span>
+      <div class="search-select-wrap" id="wrap_sf_subject">
+        <div class="search-select-display" id="disp_sf_subject" onclick="toggleSearchSelect('sf_subject')">
+          <span id="label_sf_subject">All Subjects</span>
+          <span class="arrow"><i class="bi bi-chevron-down"></i></span>
+        </div>
+        <div class="search-select-dropdown" id="drop_sf_subject">
+          <input class="search-select-input" type="text" placeholder="Search subject…" oninput="filterOptions('sf_subject',this.value)" autocomplete="off"/>
+          <div class="search-select-options" id="opts_sf_subject">
+            <div class="sso selected" data-value="" onclick="selectOpt('sf_subject','','All Subjects')">All Subjects</div>
+            {% for subj in subjects %}
+            <div class="sso" data-value="{{ subj }}" onclick="selectOpt('sf_subject','{{ subj }}','{{ subj }}')">{{ subj }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fg">
+      <span class="fl">Year</span>
+      <div class="search-select-wrap" id="wrap_sf_year">
+        <div class="search-select-display" id="disp_sf_year" onclick="toggleSearchSelect('sf_year')">
+          <span id="label_sf_year">All Years</span>
+          <span class="arrow"><i class="bi bi-chevron-down"></i></span>
+        </div>
+        <div class="search-select-dropdown" id="drop_sf_year">
+          <input class="search-select-input" type="text" placeholder="Search year…" oninput="filterOptions('sf_year',this.value)" autocomplete="off"/>
+          <div class="search-select-options" id="opts_sf_year">
+            <div class="sso selected" data-value="" onclick="selectOpt('sf_year','','All Years')">All Years</div>
+            <div class="sso" data-value="{{ now[:4] }}" onclick="selectOpt('sf_year','{{ now[:4] }}','{{ now[:4] }}')">{{ now[:4] }}</div>
+            <div class="sso" data-value="{{ (now[:4]|int - 1)|string }}" onclick="selectOpt('sf_year','{{ (now[:4]|int - 1)|string }}','{{ (now[:4]|int - 1)|string }}')">{{ (now[:4]|int - 1)|string }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button class="btn-rst" onclick="resetSessionFilters()"><i class="bi bi-x-circle"></i> Reset</button>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="sf_count">{{ ended_sessions|length }} shown</span>
+  </div>
+
+  <div style="max-height:640px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="sessionsList">
+    {% for sid, s in ended_sessions.items()|sort(attribute='1.started_at', reverse=True) %}
+    {% set present_ids = s.present %}
+    {% set late_ids = s.late|default([]) %}
+    {% set excused_ids = s.excused|default([]) %}
+    {% set section_students = all_students | selectattr('nfcId') | list %}
+    {% set enrolled = all_students | selectattr('course') | list %}
+
+    <div class="sess-row" id="sess_{{ sid }}"
+         data-subj="{{ s.subject_name|lower }}"
+         data-year="{{ s.started_at[:4] if s.started_at else '' }}">
+      <div class="sess-header" onclick="toggleSess('{{ sid }}')">
+        <i class="bi bi-chevron-right sess-chevron"></i>
+        <div style="flex:1;min-width:0;">
+          <div class="sess-title">
+            {% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif %}{{ s.subject_name }}
+          </div>
+          <div class="sess-meta">
+            {{ s.section_key.replace('|',' · ') }} · {{ s.time_slot or '—' }} · {{ fmt_time(s.started_at) }}
+          </div>
+        </div>
+        <!-- Summary badges on the row -->
+        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+          <span style="background:rgba(45,106,39,.1);color:var(--success);border:1px solid rgba(45,106,39,.2);border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700;">✓ {{ present_ids|length }}</span>
+          <span style="background:rgba(245,197,24,.1);color:var(--warning);border:1px solid rgba(245,197,24,.2);border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700;">⏱ {{ late_ids|length }}</span>
+          <span style="background:rgba(96,165,250,.08);color:#60a5fa;border:1px solid rgba(96,165,250,.2);border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700;">◎ {{ excused_ids|length }}</span>
+        </div>
+        <span class="badge-done"><i class="bi bi-check-circle"></i> Done</span>
+        <!-- Export button directly on the row -->
+        <button class="btn-export" onclick="event.stopPropagation();exportSession('{{ sid }}','{{ s.subject_name|e }}','{{ s.section_key }}')" title="Export to Excel">
+          <i class="bi bi-file-earmark-excel"></i> Export
+        </button>
+      </div>
+
+      <!-- Expanded body -->
+      <div class="sess-body" id="body_{{ sid }}">
+        <div id="content_{{ sid }}">
+          <!-- Loaded lazily via JS -->
+          <div style="text-align:center;color:var(--muted);padding:20px;font-size:12px;">
+            <div style="width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;"></div>
+            Loading attendance…
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div id="sf_empty" style="display:none;" class="empty-state">
+      <i class="bi bi-search"></i>No sessions match your filters.
+    </div>
+  </div>
+  {% else %}
+  {% if not live_sessions %}
+  <div class="empty-state">
+    <i class="bi bi-journal-x"></i>No sessions yet.
+    <a href="{{ url_for('teacher_create_session') }}" style="color:var(--accent);display:block;margin-top:6px;">Start your first session →</a>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+
+<!-- ══════════════════════════════════
+     STUDENTS TAB
+══════════════════════════════════ -->
+<div class="main-pane" id="pane-students">
+
+  {% if students %}
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <div class="fg" style="flex:2;min-width:160px;">
+      <span class="fl"><i class="bi bi-search"></i> Search</span>
+      <input type="text" id="stf_search" placeholder="Name or NFC ID…" oninput="filterStudents()"
+             style="background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;appearance:none;outline:none;"
+             onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"/>
+    </div>
+    <div class="fg">
+      <span class="fl">Year Level</span>
+      <div class="search-select-wrap" id="wrap_stf_year">
+        <div class="search-select-display" id="disp_stf_year" onclick="toggleSearchSelect('stf_year')">
+          <span id="label_stf_year">All Years</span>
+          <span class="arrow"><i class="bi bi-chevron-down"></i></span>
+        </div>
+        <div class="search-select-dropdown" id="drop_stf_year">
+          <input class="search-select-input" type="text" placeholder="Search year…" oninput="filterOptions('stf_year',this.value)" autocomplete="off"/>
+          <div class="search-select-options" id="opts_stf_year">
+            <div class="sso selected" data-value="" onclick="selectOpt('stf_year','','All Years')">All Years</div>
+            <div class="sso" data-value="1st Year" onclick="selectOpt('stf_year','1st Year','1st Year')">1st Year</div>
+            <div class="sso" data-value="2nd Year" onclick="selectOpt('stf_year','2nd Year','2nd Year')">2nd Year</div>
+            <div class="sso" data-value="3rd Year" onclick="selectOpt('stf_year','3rd Year','3rd Year')">3rd Year</div>
+            <div class="sso" data-value="4th Year" onclick="selectOpt('stf_year','4th Year','4th Year')">4th Year</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fg">
+      <span class="fl">Section</span>
+      <div class="search-select-wrap" id="wrap_stf_section">
+        <div class="search-select-display" id="disp_stf_section" onclick="toggleSearchSelect('stf_section')">
+          <span id="label_stf_section">All Sections</span>
+          <span class="arrow"><i class="bi bi-chevron-down"></i></span>
+        </div>
+        <div class="search-select-dropdown" id="drop_stf_section">
+          <input class="search-select-input" type="text" placeholder="Search section…" oninput="filterOptions('stf_section',this.value)" autocomplete="off"/>
+          <div class="search-select-options" id="opts_stf_section">
+            <div class="sso selected" data-value="" onclick="selectOpt('stf_section','','All Sections')">All Sections</div>
+            <div class="sso" data-value="A" onclick="selectOpt('stf_section','A','Section A')">Section A</div>
+            <div class="sso" data-value="B" onclick="selectOpt('stf_section','B','Section B')">Section B</div>
+            <div class="sso" data-value="C" onclick="selectOpt('stf_section','C','Section C')">Section C</div>
+            <div class="sso" data-value="D" onclick="selectOpt('stf_section','D','Section D')">Section D</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fg">
+      <span class="fl">Standing</span>
+      <div class="search-select-wrap" id="wrap_stf_standing">
+        <div class="search-select-display" id="disp_stf_standing" onclick="toggleSearchSelect('stf_standing')">
+          <span id="label_stf_standing">All Students</span>
+          <span class="arrow"><i class="bi bi-chevron-down"></i></span>
+        </div>
+        <div class="search-select-dropdown" id="drop_stf_standing">
+          <input class="search-select-input" type="text" placeholder="Search standing…" oninput="filterOptions('stf_standing',this.value)" autocomplete="off"/>
+          <div class="search-select-options" id="opts_stf_standing">
+            <div class="sso selected" data-value="" onclick="selectOpt('stf_standing','','All Students')">All Students</div>
+            <div class="sso" data-value="good" onclick="selectOpt('stf_standing','good','Good (≥75%)')">Good (≥75%)</div>
+            <div class="sso" data-value="at-risk" onclick="selectOpt('stf_standing','at-risk','At Risk (50–74%)')">At Risk (50–74%)</div>
+            <div class="sso" data-value="critical" onclick="selectOpt('stf_standing','critical','Critical (&lt;50%)')">Critical (&lt;50%)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button class="btn-rst" onclick="resetStudentFilters()"><i class="bi bi-x-circle"></i> Reset</button>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="stf_count">{{ students|length }} students</span>
+  </div>
+
+  <!-- Legend -->
+  <div style="display:flex;gap:14px;margin-bottom:12px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);"><div style="width:9px;height:9px;border-radius:2px;background:var(--success);"></div>Good (≥75%)</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);"><div style="width:9px;height:9px;border-radius:2px;background:var(--warning);"></div>At Risk (50–74%)</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);"><div style="width:9px;height:9px;border-radius:2px;background:var(--danger);"></div>Critical (&lt;50%)</div>
+    <div style="margin-left:auto;font-size:11px;color:var(--muted);"><i class="bi bi-hand-index"></i> Click a student to see session breakdown</div>
+  </div>
+
+  <div id="studentList" style="max-height:640px;overflow-y:auto;padding-right:4px;" class="scroll-container">
+    {% for s in students %}
+    {% set rate = s.rate %}
+    {% set standing = 'good' if rate >= 75 else ('at-risk' if rate >= 50 else 'critical') %}
+    <div class="student-card {{ standing }}" id="stcard_{{ loop.index0 }}"
+         data-name="{{ s.name|lower }}" data-nfc="{{ s.nfcId|lower }}"
+         data-year="{{ s.year_level|default('') }}" data-section="{{ s.section|default('') }}"
+         data-standing="{{ standing }}" onclick="toggleStudentDetail({{ loop.index0 }}, '{{ s.nfcId }}')">
+      <div style="min-width:160px;">
+        <div style="font-weight:700;font-size:14px;">{{ s.name }}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+          <code>{{ s.nfcId }}</code>
+          &nbsp;·&nbsp; {{ s.course.replace('BS ','') if s.course else '—' }} · {{ s.year_level.replace(' Year','Y') if s.year_level else '—' }} · Sec {{ s.section }}
+        </div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+        <div style="text-align:center;">
+          <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:700;">{{ s.total }}</div>
+          <div style="font-size:10px;color:var(--muted);">Classes</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--success);">{{ s.present }}</div>
+          <div style="font-size:10px;color:var(--muted);">Present</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--danger);">{{ s.total - s.present }}</div>
+          <div style="font-size:10px;color:var(--muted);">Missed</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:180px;max-width:240px;">
+        <div style="flex:1;height:6px;background:var(--border);border-radius:999px;overflow:hidden;">
+          <div style="height:100%;width:{{ rate }}%;background:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};border-radius:999px;transition:width .8s;"></div>
+        </div>
+        <span style="font-family:'Space Mono',monospace;font-size:14px;font-weight:700;flex-shrink:0;color:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ rate }}%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button onclick="event.stopPropagation();exportStudentAttendance('{{ s.nfcId }}','{{ s.name|e }}')"
+                style="background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);color:var(--accent);border-radius:7px;padding:6px 12px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-family:'DM Sans',sans-serif;font-weight:600;transition:all .2s;"
+                onmouseover="this.style.background='rgba(45,106,39,.18)'" onmouseout="this.style.background='rgba(45,106,39,.08)'"
+                title="Export attendance">
+          <i class="bi bi-file-earmark-excel"></i>
+        </button>
+        <i class="bi bi-chevron-down" id="stchev_{{ loop.index0 }}" style="color:var(--muted);font-size:12px;transition:transform .25s;"></i>
+      </div>
+
+      <!-- Inline session breakdown -->
+      <div class="detail-panel" id="detail_{{ loop.index0 }}" onclick="event.stopPropagation()">
+        <div id="detail_content_{{ loop.index0 }}" style="font-size:12px;color:var(--muted);text-align:center;padding:10px;">
+          <div style="width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 6px;"></div>
+          Loading sessions…
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div id="stf_empty" style="display:none;" class="empty-state">
+      <i class="bi bi-search"></i>No students match your filters.
+    </div>
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-people"></i>No students in your sections yet.
+  </div>
+  {% endif %}
+</div>
+
+<style>@keyframes sp{to{transform:rotate(360deg);}}</style>
+
+<script>
+const allStudentsData = {{ students | tojson }};
+const sessionsData    = {{ sessions_json | tojson }};
+
+// ── Main tab switching ──
+function switchMain(id, btn) {
+  document.querySelectorAll('.main-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.main-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('pane-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Session accordion toggle ──
+function toggleSess(sid) {
+  const row  = document.getElementById('sess_' + sid);
+  const body = document.getElementById('body_' + sid);
+  const cont = document.getElementById('content_' + sid);
+  if (!row || !body) return;
+  const isOpen = row.classList.contains('open');
+  row.classList.toggle('open', !isOpen);
+  if (!isOpen && cont && cont.dataset.loaded !== 'true') {
+    loadSessionAttendance(sid, cont);
+  }
+}
+
+// ── Load session attendance lazily ──
+function loadSessionAttendance(sid, container) {
+  fetch(`/api/session_attendance/${sid}`, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+      container.dataset.loaded = 'true';
+      if (!data.students || !data.students.length) {
+        container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;font-size:12px;">No enrolled students found for this section.</div>';
+        return;
+      }
+      const stColors = {
+        present: ['var(--success)', 'rgba(45,106,39,.1)', 'rgba(45,106,39,.2)'],
+        late:    ['var(--warning)', 'rgba(245,197,24,.1)', 'rgba(245,197,24,.2)'],
+        absent:  ['var(--danger)',  'rgba(192,57,43,.08)', 'rgba(192,57,43,.15)'],
+        excused: ['#60a5fa',        'rgba(96,165,250,.08)','rgba(96,165,250,.2)'],
+      };
+      const stLabels = { present: '✓ Present', late: '⏱ Late', absent: '✕ Absent', excused: '◎ Excused' };
+      // Summary chips
+      const cnt = { present:0, late:0, absent:0, excused:0 };
+      data.students.forEach(s => { if(cnt[s.status] !== undefined) cnt[s.status]++; });
+      const chipsHtml = Object.entries(cnt).map(([k,v]) => {
+        const c = stColors[k];
+        return `<span style="background:${c[1]};color:${c[0]};border:1px solid ${c[2]};border-radius:7px;padding:4px 10px;font-size:11px;font-weight:600;">${stLabels[k]}: ${v}</span>`;
+      }).join('');
+      // Rows
+      const rowsHtml = data.students.map(s => {
+        const c = stColors[s.status] || stColors.absent;
+        const tx = s.tx_hash ? `<div class="tx-chip"><i class="bi bi-link-45deg"></i> TX: ${s.tx_hash.substring(0,20)}…</div>` : '';
+        return `<div class="att-row">
+          <div style="flex:1;min-width:0;">
+            <div class="att-name">${s.name}</div>
+            <div class="att-nfc">${s.student_id || s.nfc_id}</div>
+            ${tx}
+          </div>
+          <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;color:${c[0]};background:${c[1]};border:1px solid ${c[2]};">${stLabels[s.status]}</span>
+        </div>`;
+      }).join('');
+      container.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">${chipsHtml}</div>
+          <button class="btn-export" onclick="exportSession('${sid}','${data.subject_name}','${data.section_key}')">
+            <i class="bi bi-file-earmark-excel"></i> Export Excel
+          </button>
+        </div>
+        <div style="max-height:280px;overflow-y:auto;" class="scroll-container">${rowsHtml}</div>`;
+    })
+    .catch(() => {
+      container.innerHTML = '<div style="color:var(--danger);text-align:center;padding:16px;font-size:12px;">Failed to load attendance.</div>';
+    });
+}
+
+// ── Session filter ──
+const searchSelValues = {};
+function filterSessions() {
+  const q    = document.getElementById('sf_search').value.toLowerCase();
+  const subj = searchSelValues['sf_subject'] || '';
+  const yr   = searchSelValues['sf_year'] || '';
+  let shown  = 0;
+  document.querySelectorAll('#sessionsList .sess-row').forEach(r => {
+    const m = (!q    || r.dataset.subj.includes(q))
+           && (!subj || r.dataset.subj === subj.toLowerCase())
+           && (!yr   || r.dataset.year === yr);
+    r.style.display = m ? '' : 'none';
+    if (m) shown++;
+  });
+  const cnt = document.getElementById('sf_count');
+  if (cnt) cnt.textContent = shown + ' shown';
+  const emp = document.getElementById('sf_empty');
+  if (emp) emp.style.display = shown === 0 ? 'block' : 'none';
+}
+function resetSessionFilters() {
+  document.getElementById('sf_search').value = '';
+  selectOpt('sf_subject', '', 'All Subjects');
+  selectOpt('sf_year', '', 'All Years');
+  filterSessions();
+}
+
+// ── Student filter ──
+function filterStudents() {
+  const q   = document.getElementById('stf_search').value.toLowerCase();
+  const yr  = searchSelValues['stf_year'] || '';
+  const sec = searchSelValues['stf_section'] || '';
+  const st  = searchSelValues['stf_standing'] || '';
+  let shown = 0;
+  document.querySelectorAll('#studentList .student-card').forEach(c => {
+    const m = (!q   || c.dataset.name.includes(q) || c.dataset.nfc.includes(q))
+           && (!yr  || c.dataset.year === yr)
+           && (!sec || c.dataset.section === sec)
+           && (!st  || c.dataset.standing === st);
+    c.style.display = m ? '' : 'none';
+    if (m) shown++;
+  });
+  const cnt = document.getElementById('stf_count');
+  if (cnt) cnt.textContent = shown + ' students';
+  const emp = document.getElementById('stf_empty');
+  if (emp) emp.style.display = shown === 0 ? 'block' : 'none';
+}
+function resetStudentFilters() {
+  document.getElementById('stf_search').value = '';
+  selectOpt('stf_year', '', 'All Years');
+  selectOpt('stf_section', '', 'All Sections');
+  selectOpt('stf_standing', '', 'All Students');
+  filterStudents();
+}
+
+// ── Student inline detail ──
+const openStudents = {};
+function toggleStudentDetail(idx, nfcId) {
+  const card  = document.getElementById('stcard_' + idx);
+  const panel = document.getElementById('detail_' + idx);
+  const chev  = document.getElementById('stchev_' + idx);
+  const cont  = document.getElementById('detail_content_' + idx);
+  if (!card || !panel) return;
+  const isOpen = openStudents[idx];
+  if (isOpen) {
+    card.classList.remove('expanded');
+    panel.style.display = 'none';
+    if (chev) chev.style.transform = '';
+    openStudents[idx] = false;
+  } else {
+    card.classList.add('expanded');
+    panel.style.display = 'block';
+    if (chev) chev.style.transform = 'rotate(180deg)';
+    openStudents[idx] = true;
+    if (!cont.dataset.loaded) {
+      loadStudentDetail(nfcId, cont);
+    }
+  }
+}
+
+function loadStudentDetail(nfcId, container) {
+  fetch(`/api/student_sessions/${nfcId}`, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(sessions => {
+      container.dataset.loaded = 'true';
+      if (!sessions.length) {
+        container.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:4px 0;">No session records yet.</div>';
+        return;
+      }
+      const stColors = {
+        present: 'var(--success)', late: 'var(--warning)',
+        absent: 'var(--danger)', excused: '#60a5fa'
+      };
+      const stBg = {
+        present: 'rgba(45,106,39,.1)', late: 'rgba(245,197,24,.1)',
+        absent: 'rgba(192,57,43,.08)', excused: 'rgba(96,165,250,.08)'
+      };
+      const rows = sessions.map(s => `
+        <div class="detail-sess-row">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;">${s.subject_name}${s.course_code ? ' <code style="font-size:9px;">['+s.course_code+']</code>' : ''}</div>
+            <div style="color:var(--muted);font-size:11px;"><i class="bi bi-calendar3"></i> ${s.date} &nbsp;·&nbsp; <i class="bi bi-clock"></i> ${s.time_slot || '—'}</div>
+          </div>
+          <span style="padding:2px 9px;border-radius:20px;font-size:10px;font-weight:600;color:${stColors[s.status]};background:${stBg[s.status]};border:1px solid ${stColors[s.status]}33;flex-shrink:0;">
+            ${s.status.charAt(0).toUpperCase()+s.status.slice(1)}
+          </span>
+        </div>`).join('');
+      container.innerHTML = `
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Session History (${sessions.length})</div>
+        <div style="max-height:200px;overflow-y:auto;" class="scroll-container">${rows}</div>`;
+    })
+    .catch(() => {
+      container.innerHTML = '<div style="color:var(--danger);font-size:12px;">Failed to load.</div>';
+    });
+}
+
+// ── Export functions ──
+function exportSession(sessId, subjName, sectionKey) {
+  const subjSlug = subjName.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase().substring(0,20);
+  const secSlug  = sectionKey.split('|').slice(1).join('_').replace(/ /g,'').toLowerCase();
+  const now      = new Date();
+  const dateSlug = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}`;
+  const fname    = `session_${subjSlug}_${secSlug}_${dateSlug}.xlsx`;
+  window.location.href = `/export/session/${sessId}?filename=${encodeURIComponent(fname)}`;
+}
+
+function exportStudentAttendance(nfcId, name) {
+  const nameParts = name.split(' ');
+  const lastName  = (nameParts[nameParts.length-1]||'student').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const firstName = (nameParts[0]||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  const now       = new Date();
+  const fname     = `${lastName}_${firstName}_attendance_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}.xlsx`;
+  window.location.href = `/export/student_sessions/${nfcId}?name=${encodeURIComponent(name)}&filename=${encodeURIComponent(fname)}`;
+}
+
+// ══════════════════════════════════
+// CUSTOM SEARCHABLE DROPDOWN ENGINE
+// ══════════════════════════════════
+function toggleSearchSelect(id) {
+  const drop = document.getElementById('drop_' + id);
+  const disp = document.getElementById('disp_' + id);
+  const isOpen = drop.classList.contains('open');
+  // Close all others first
+  document.querySelectorAll('.search-select-dropdown.open').forEach(d => {
+    d.classList.remove('open');
+    const dId = d.id.replace('drop_','');
+    const dDisp = document.getElementById('disp_' + dId);
+    if (dDisp) dDisp.classList.remove('open');
+  });
+  if (!isOpen) {
+    drop.classList.add('open');
+    disp.classList.add('open');
+    const inp = drop.querySelector('.search-select-input');
+    if (inp) { inp.value = ''; inp.focus(); filterOptions(id, ''); }
+  }
+}
+
+function filterOptions(id, query) {
+  const q    = query.toLowerCase();
+  const opts = document.querySelectorAll(`#opts_${id} .sso`);
+  let any    = false;
+  opts.forEach(o => {
+    if (o.classList.contains('no-match')) return;
+    const m = !q || o.textContent.toLowerCase().includes(q);
+    o.style.display = m ? '' : 'none';
+    if (m) any = true;
+  });
+  // Show no-match message
+  let noMatch = document.querySelector(`#opts_${id} .no-match`);
+  if (!any) {
+    if (!noMatch) {
+      noMatch = document.createElement('div');
+      noMatch.className = 'sso no-match';
+      noMatch.textContent = 'No matches found';
+      document.getElementById('opts_' + id).appendChild(noMatch);
+    }
+    noMatch.style.display = '';
+  } else if (noMatch) {
+    noMatch.style.display = 'none';
+  }
+}
+
+function selectOpt(id, value, label) {
+  searchSelValues[id] = value;
+  const labelEl = document.getElementById('label_' + id);
+  if (labelEl) labelEl.textContent = label;
+  // Mark selected
+  document.querySelectorAll(`#opts_${id} .sso`).forEach(o => {
+    o.classList.toggle('selected', o.dataset.value === value);
+  });
+  // Close dropdown
+  const drop = document.getElementById('drop_' + id);
+  const disp = document.getElementById('disp_' + id);
+  if (drop) drop.classList.remove('open');
+  if (disp) disp.classList.remove('open');
+  // Trigger relevant filter
+  if (id.startsWith('sf_'))  filterSessions();
+  if (id.startsWith('stf_')) filterStudents();
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.search-select-wrap')) {
+    document.querySelectorAll('.search-select-dropdown.open').forEach(d => {
+      d.classList.remove('open');
+      const dId = d.id.replace('drop_','');
+      const dDisp = document.getElementById('disp_' + dId);
+      if (dDisp) dDisp.classList.remove('open');
+    });
+  }
+});
+</script>
+{% endblock %}

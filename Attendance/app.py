@@ -1279,11 +1279,89 @@ def _build_teacher_context(user):
 @app.route('/teacher')
 @login_required
 def teacher_dashboard():
+    """Teacher home page — overview stats, live sessions, quick actions."""
     if session.get('role') == 'admin': return redirect(url_for('index'))
     user = get_current_user()
     sections, my_subjects, _ = _build_teacher_context(user)
-    return render_template('teacher_dashboard.html', user=user, sections=sections,
-                           my_subjects=my_subjects)
+
+    # Live sessions for this teacher
+    live_sessions = {sid: s for sid, s in get_active_sessions().items()
+                     if s.get('teacher') == session['username']}
+
+    # Total completed sessions
+    with get_db() as conn:
+        total_sessions = conn.execute(
+            "SELECT COUNT(*) FROM sessions WHERE teacher=? AND ended_at IS NOT NULL",
+            (session['username'],)
+        ).fetchone()[0]
+
+    # Total students across all sections
+    all_teacher_students = teacher_students(user)
+    total_students = len(all_teacher_students)
+
+    return render_template('teacher_dashboard.html',
+        user=user,
+        sections=sections,
+        my_subjects=my_subjects,
+        live_sessions=live_sessions,
+        total_sessions=total_sessions,
+        total_students=total_students,
+        fmt_time=fmt_time,
+        fmt_time_short=fmt_time_short,
+    )
+
+
+@app.route('/teacher/sessions-students')
+@login_required
+def teacher_sessions_students():
+    """Combined Sessions & Students page — separate from dashboard."""
+    if session.get('role') == 'admin': return redirect(url_for('index'))
+    user = get_current_user()
+
+    # All sessions for this teacher
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM sessions WHERE teacher=? ORDER BY started_at DESC",
+            (session['username'],)
+        ).fetchall()
+    sessions_data = {r['sess_id']: _row_to_dict(r) for r in rows}
+
+    # Subject names for filter dropdown
+    subjects = sorted(set(
+        s.get('subject_name', '') for s in sessions_data.values() if s.get('subject_name')
+    ))
+
+    # Student standing data
+    report = []
+    for s in teacher_students(user):
+        stats = get_student_attendance_stats(s['nfcId'])
+        report.append({**s, **stats})
+    students = sorted(report, key=lambda x: -x['rate'])
+
+    now_str = datetime.now().strftime('%Y')
+
+    return render_template('teacher_sessions_students.html',
+        user=user,
+        sessions_data=sessions_data,
+        sessions_json={sid: {
+            'subject_name': s.get('subject_name', ''),
+            'course_code':  s.get('course_code', ''),
+            'section_key':  s.get('section_key', ''),
+            'teacher_name': s.get('teacher_name', ''),
+            'started_at':   s.get('started_at', ''),
+            'ended_at':     s.get('ended_at', ''),
+            'time_slot':    s.get('time_slot', ''),
+            'present':      s.get('present', []),
+            'late':         s.get('late', []),
+            'excused':      s.get('excused', []),
+            'tx_hashes':    s.get('tx_hashes', {}),
+        } for sid, s in sessions_data.items()},
+        subjects=subjects,
+        students=students,
+        now=now_str,
+        fmt_time=fmt_time,
+        fmt_time_short=fmt_time_short,
+    )
 
 @app.route('/teacher/create-session')
 @login_required
@@ -1310,6 +1388,58 @@ def teacher_records():
     return render_template('teacher_records.html', user=user,
                            sessions_data=teacher_sessions_data, subjects=subjects,
                            all_students=all_students, fmt_time=fmt_time)
+
+@app.route('/api/session_attendance/<sess_id>')
+@login_required
+def api_session_attendance(sess_id):
+    """
+    Returns full attendance list for a session — all enrolled students
+    with their present/late/absent/excused status and tx hash.
+    Used by teacher_sessions_students.html modal loader.
+    """
+    sess = load_session(sess_id)
+    if sess is None:
+        return jsonify({'error': 'Session not found'}), 404
+    if session.get('role') != 'admin' and sess.get('teacher') != session.get('username'):
+        return jsonify({'error': 'Access denied'}), 403
+
+    all_students = get_all_students()
+    section_key  = normalize_section_key(sess.get('section_key', ''))
+    enrolled     = [s for s in all_students if build_student_section_key(s) == section_key]
+
+    present_ids = set(sess.get('present', []))
+    late_ids    = set(sess.get('late',    []))
+    excused_ids = set(sess.get('excused', []))
+    tx_hashes   = sess.get('tx_hashes', {})
+
+    students_out = []
+    for s in sorted(enrolled, key=lambda x: x['name']):
+        nid = s['nfcId']
+        if   nid in excused_ids: status = 'excused'
+        elif nid in late_ids:    status = 'late'
+        elif nid in present_ids: status = 'present'
+        else:                    status = 'absent'
+        tx_info = tx_hashes.get(nid, {})
+        students_out.append({
+            'nfc_id':     nid,
+            'name':       s['name'],
+            'student_id': s.get('student_id', ''),
+            'status':     status,
+            'tx_hash':    tx_info.get('tx_hash', ''),
+            'block':      str(tx_info.get('block', '')),
+            'time':       tx_info.get('time', ''),
+        })
+
+    return jsonify({
+        'students':     students_out,
+        'subject_name': sess.get('subject_name', ''),
+        'course_code':  sess.get('course_code', ''),
+        'section_key':  section_key,
+        'time_slot':    sess.get('time_slot', ''),
+        'started_at':   sess.get('started_at', ''),
+        'ended_at':     sess.get('ended_at', ''),
+    })
+
 
 @app.route('/teacher/subjects/add', methods=['POST'])
 @login_required

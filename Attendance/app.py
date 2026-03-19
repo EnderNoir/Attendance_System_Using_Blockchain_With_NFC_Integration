@@ -1054,31 +1054,51 @@ def update_student():
 def update_faculty():
     data     = request.get_json()
     username = data.get('username','').strip()
-    user     = db_get_user(username)
-    if not user: return jsonify({'error':'User not found'}), 404
+ 
+    # Security: non-admins can only edit their own account
+    if session.get('role') != 'admin' and session.get('username') != username:
+        return jsonify({'error': 'Access denied'}), 403
+ 
+    user = db_get_user(username)
+    if not user: return jsonify({'error': 'User not found'}), 404
+ 
     if data.get('full_name'):  user['full_name'] = data['full_name'].strip()
     if data.get('email') is not None: user['email'] = data['email'].strip()
-    if data.get('role') in ('admin','teacher'): user['role'] = data['role']
-    if data.get('status') in ('approved','pending','rejected'): user['status'] = data['status']
-    if 'sections' in data and isinstance(data['sections'], list):
-        # FIX #1: Normalize sections on save
+ 
+    # Admins can change role/status; teachers cannot change their own role/status
+    if session.get('role') == 'admin':
+        if data.get('role') in ('admin','teacher'):   user['role']   = data['role']
+        if data.get('status') in ('approved','pending','rejected'): user['status'] = data['status']
+ 
+    # Sections — admin only
+    if session.get('role') == 'admin' and 'sections' in data and isinstance(data['sections'], list):
         user['sections'] = [normalize_section_key(s) for s in data['sections']]
+ 
     new_pw = (data.get('new_password') or '').strip()
     if new_pw:
         if len(new_pw) < 6:
-            return jsonify({'error':'Password must be at least 6 characters'}), 400
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
         user['password'] = hash_password(new_pw)
+ 
     new_username = (data.get('new_username') or '').strip().lower()
     if new_username and new_username != username:
         if db_get_user(new_username):
-            return jsonify({'error':f'Username "{new_username}" is already taken'}), 409
+            return jsonify({'error': f'Username "{new_username}" is already taken'}), 409
         user['username'] = new_username
         db_save_user(new_username, user)
         db_delete_user(username)
         db_rename_photo_key(username, new_username)
+        # Update session if the user is editing their own profile
+        if session.get('username') == username:
+            session['username']  = new_username
+            session['full_name'] = user['full_name']
     else:
         db_save_user(username, user)
-    return jsonify({'ok':True})
+        if session.get('username') == username:
+            session['full_name'] = user['full_name']
+ 
+    # Return full_name so the frontend can update the sidebar immediately
+    return jsonify({'ok': True, 'full_name': user['full_name']})
 
 @app.route('/export')
 @login_required

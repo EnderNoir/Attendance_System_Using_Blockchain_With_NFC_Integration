@@ -239,15 +239,43 @@
   {% if ended %}
   <div class="sec-mono">// COMPLETED SESSIONS</div>
   <div class="filter-bar">
-    <div class="fg" style="flex:2;min-width:160px;">
+    <div class="fg" style="flex:2;min-width:140px;">
       <span class="fl"><i class="bi bi-search"></i> Search</span>
-      <input type="text" class="fi" id="sf_q" placeholder="Subject or section…" oninput="filterSessions()"/>
+      <input type="text" class="fi" id="sf_q" placeholder="Subject name…" oninput="filterSessions()"/>
+    </div>
+    <div class="fg">
+      <span class="fl">Program</span>
+      <select class="fi" id="sf_program" onchange="filterSessions()">
+        <option value="">All Programs</option>
+        <option value="bs computer science">BS Computer Science</option>
+        <option value="bs information technology">BS Information Technology</option>
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Year Level</span>
+      <select class="fi" id="sf_year" onchange="filterSessions()">
+        <option value="">All Years</option>
+        <option value="1st year">1st Year</option>
+        <option value="2nd year">2nd Year</option>
+        <option value="3rd year">3rd Year</option>
+        <option value="4th year">4th Year</option>
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Section</span>
+      <select class="fi" id="sf_sec" onchange="filterSessions()">
+        <option value="">All Sections</option>
+        <option value="|a">Section A</option>
+        <option value="|b">Section B</option>
+        <option value="|c">Section C</option>
+        <option value="|d">Section D</option>
+      </select>
     </div>
     <div class="fg">
       <span class="fl">Subject</span>
       <select class="fi" id="sf_subj" onchange="filterSessions()">
         <option value="">All Subjects</option>
-        {% for subj in subjects %}<option value="{{ subj }}">{{ subj }}</option>{% endfor %}
+        {% for subj in subjects %}<option value="{{ subj|lower }}">{{ subj }}</option>{% endfor %}
       </select>
     </div>
     <button class="btn-rst" onclick="resetSessionFilters()"><i class="bi bi-x-circle"></i> Reset</button>
@@ -256,9 +284,13 @@
   <div style="max-height:580px;overflow-y:auto;padding-right:4px;" id="sessions_list">
     {% for sid,s in ended.items()|sort(attribute='1.started_at',reverse=True) %}
     {% set pc=s.present|length %}{% set lc=s.late|default([])|length %}{% set ec=s.excused|default([])|length %}
+    {% set sparts = s.section_key.split('|') %}
     <div class="session-card" id="sc_{{ sid }}"
          data-subj="{{ s.subject_name|lower }}"
          data-section="{{ s.section_key|lower }}"
+         data-program="{{ (sparts[0] if sparts|length > 0 else '')|lower }}"
+         data-year="{{ (sparts[1] if sparts|length > 1 else '')|lower }}"
+         data-sec="{{ ('|' ~ sparts[2]|lower) if sparts|length > 2 else '' }}"
          onclick="openSessModal('{{ sid }}')">
       <div class="sc-top">
         <div class="sc-info">
@@ -564,17 +596,30 @@ function exportCurrentStudent() {
 
 // ── Filters ──
 function filterSessions() {
-  const q=document.getElementById('sf_q').value.toLowerCase();
-  const v=document.getElementById('sf_subj').value.toLowerCase();
-  let n=0;
-  document.querySelectorAll('#sessions_list .session-card').forEach(c=>{
-    const ok=(!q||c.dataset.subj.includes(q)||c.dataset.section.includes(q))&&(!v||c.dataset.subj===v);
-    c.style.display=ok?'':'none'; if(ok)n++;
+  const q    = document.getElementById('sf_q').value.toLowerCase();
+  const prog = document.getElementById('sf_program').value;
+  const yr   = document.getElementById('sf_year').value;
+  const sec  = document.getElementById('sf_sec').value;
+  const subj = document.getElementById('sf_subj').value;
+  let n = 0;
+  document.querySelectorAll('#sessions_list .session-card').forEach(c => {
+    const ok = (!q    || c.dataset.subj.includes(q) || c.dataset.section.includes(q))
+            && (!prog || c.dataset.program === prog)
+            && (!yr   || c.dataset.year === yr)
+            && (!sec  || c.dataset.sec === sec)
+            && (!subj || c.dataset.subj === subj);
+    c.style.display = ok ? '' : 'none';
+    if (ok) n++;
   });
-  document.getElementById('sf_count').textContent=n+' sessions';
-  document.getElementById('sf_empty').style.display=n===0?'block':'none';
+  document.getElementById('sf_count').textContent = n + ' sessions';
+  document.getElementById('sf_empty').style.display = n === 0 ? 'block' : 'none';
 }
-function resetSessionFilters(){document.getElementById('sf_q').value='';document.getElementById('sf_subj').value='';filterSessions();}
+function resetSessionFilters() {
+  ['sf_q','sf_program','sf_year','sf_sec','sf_subj'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  filterSessions();
+}
 
 function filterStudents(){
   const q=document.getElementById('stf_q').value.toLowerCase();

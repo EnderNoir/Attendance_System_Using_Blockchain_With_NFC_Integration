@@ -7,133 +7,71 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet"/>
   <style>
-    /* CvSU Light Mode */
-    :root{--bg:#F0F2F0;--surface:#FFFFFF;--border:#D4DDD4;--accent:#2D6A27;--accent2:#F5C518;--accent3:#3A7D32;--success:#2D6A27;--danger:#C0392B;--warning:#D4A017;--text:#1A1A1A;--muted:#5A6B5A;}
-    /* CvSU Dark Mode */
-    [data-theme="dark"]{--bg:#0F1A0F;--surface:#162016;--border:#243524;--accent:#F5C518;--accent2:#4CAF50;--accent3:#3A7D32;--success:#4CAF50;--danger:#EF5350;--warning:#FFC107;--text:#E8F5E9;--muted:#81A881;}
+    :root{--bg:#F0F2F0;--surface:#FFFFFF;--border:#D4DDD4;--accent:#2D6A27;--success:#2D6A27;--danger:#C0392B;--warning:#D4A017;--text:#1A1A1A;--muted:#5A6B5A;}
+    [data-theme="dark"]{--bg:#0F1A0F;--surface:#162016;--border:#243524;--accent:#F5C518;--success:#4CAF50;--danger:#EF5350;--warning:#FFC107;--text:#E8F5E9;--muted:#81A881;}
     [data-theme="dark"] body{background:var(--bg);color:var(--text);}
-    .theme-toggle{position:fixed;top:16px;right:16px;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;z-index:100;}
+    .theme-toggle{position:fixed;top:14px;right:14px;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;z-index:100;}
     [data-theme="dark"] .theme-toggle{color:#000;}
     *{box-sizing:border-box;margin:0;padding:0;}
-    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:32px 20px;}
-
-    .auth-wrap{width:100%;max-width:620px;}
-
-    .auth-logo{text-align:center;margin-bottom:28px;}
-    .auth-logo .logo-box{width:48px;height:48px;background:linear-gradient(135deg,#2D6A27,#F5C518);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 10px;}
+    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:28px 16px 40px;}
+    .auth-wrap{width:100%;max-width:640px;}
+    .auth-logo{text-align:center;margin-bottom:24px;}
+    .auth-logo .logo-box{width:46px;height:46px;background:linear-gradient(135deg,#2D6A27,#F5C518);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 10px;}
     .auth-logo .app-name{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:var(--accent);letter-spacing:2px;}
     .auth-logo .app-sub{font-size:11px;color:var(--muted);margin-top:3px;}
-
-    .auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;}
-    .auth-title{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;margin-bottom:24px;}
-
-    .section-label{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin:20px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border);}
-
-    .form-label{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;}
-    .form-control{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:14px;font-family:'DM Sans',sans-serif;transition:all .2s;}
+    .auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 22px;}
+    @media(min-width:500px){.auth-card{padding:28px 28px;}}
+    .auth-title{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;margin-bottom:20px;}
+    .section-label{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin:18px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+    .form-label{display:block;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px;}
+    .form-control{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 13px;font-size:13px;font-family:'DM Sans',sans-serif;transition:all .2s;}
     .form-control:focus{outline:none;border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(45,106,39,.12);}
     .form-control::placeholder{color:var(--muted);}
-    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .form-hint{font-size:11px;color:var(--muted);margin-top:4px;}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
     @media(max-width:500px){.two-col{grid-template-columns:1fr;}}
-    .field-wrap{margin-bottom:16px;}
-
+    .field-wrap{margin-bottom:14px;}
     /* Role toggle */
     .role-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px;}
     .role-option{position:relative;}
     .role-option input{position:absolute;opacity:0;width:0;}
-    .role-label{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px;border:2px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;text-align:center;}
-    .role-label .role-icon{font-size:24px;}
+    .role-label{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;border:2px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;text-align:center;}
+    .role-label .role-icon{font-size:22px;}
     .role-label .role-name{font-family:'Space Mono',monospace;font-size:12px;font-weight:700;}
     .role-label .role-desc{font-size:11px;color:var(--muted);}
-    .role-option input:checked + .role-label{border-color:var(--accent);background:rgba(45,106,39,.08);}
-
-    /* ── Section tree ── */
-    .course-block{
-      border:1px solid var(--border);
-      border-radius:10px;
-      overflow:hidden;
-      margin-bottom:12px;
-    }
-    .course-header{
-      display:flex;align-items:center;gap:10px;
-      padding:13px 16px;
-      background:rgba(255,255,255,.03);
-      border-bottom:1px solid var(--border);
-      font-weight:600;font-size:14px;
-    }
-    .course-header .course-icon{font-size:18px;}
-
-    .year-row{
-      display:flex;align-items:center;justify-content:space-between;
-      padding:13px 16px;
-      border-bottom:1px solid var(--border);
-      gap:12px;
-    }
+    .role-option input:checked+.role-label{border-color:var(--accent);background:rgba(45,106,39,.08);}
+    /* Section tree */
+    .course-block{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px;}
+    .course-header{display:flex;align-items:center;gap:10px;padding:12px 14px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);font-weight:600;font-size:14px;}
+    .course-header .course-icon{font-size:17px;}
+    .year-row{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border);gap:10px;}
     .year-row:last-child{border-bottom:none;}
     .year-row:hover{background:rgba(255,255,255,.02);}
-
-    .year-label{
-      font-size:14px;
-      color:var(--text);
-      font-weight:500;
-      min-width:80px;
-    }
-
-    .section-checks{display:flex;gap:8px;flex-wrap:wrap;}
-
-    /* Custom checkbox pill */
+    .year-label{font-size:13px;font-weight:500;min-width:72px;}
+    .section-checks{display:flex;gap:7px;flex-wrap:wrap;}
     .check-pill{position:relative;}
     .check-pill input{position:absolute;opacity:0;width:0;height:0;}
-    .check-pill label{
-      display:flex;align-items:center;justify-content:center;
-      width:36px;height:36px;
-      border:1px solid var(--border);
-      border-radius:8px;
-      cursor:pointer;
-      font-size:13px;
-      font-weight:600;
-      color:var(--muted);
-      transition:all .2s;
-      font-family:'Space Mono',monospace;
-    }
+    .check-pill label{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);transition:all .2s;font-family:'Space Mono',monospace;}
     .check-pill label:hover{border-color:var(--accent);color:var(--text);}
-    .check-pill input:checked + label{
-      border-color:var(--accent);
-      background:rgba(0,229,255,.15);
-      color:var(--accent);
-      box-shadow:0 0 0 2px rgba(0,229,255,.2);
-    }
-
-    /* Select all row */
-    .select-all-row{
-      display:flex;align-items:center;justify-content:space-between;
-      padding:10px 16px;
-      background:rgba(0,229,255,.04);
-      border-bottom:1px solid var(--border);
-    }
-    .select-all-row span{font-size:12px;color:var(--muted);}
-    .select-all-btn{
-      background:none;border:1px solid var(--border);color:var(--muted);
-      border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;
-      font-family:'DM Sans',sans-serif;transition:all .2s;
-    }
+    .check-pill input:checked+label{border-color:var(--accent);background:rgba(45,106,39,.12);color:var(--accent);}
+    @media(max-width:360px){.year-row{flex-direction:column;align-items:flex-start;gap:6px;}.section-checks{width:100%;}}
+    .select-all-row{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(45,106,39,.04);border-bottom:1px solid var(--border);}
+    .select-all-row span{font-size:11px;color:var(--muted);}
+    .select-all-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;}
     .select-all-btn:hover{border-color:var(--accent);color:var(--accent);}
-
-    .teacher-only{display:none;}
-    .teacher-only.visible{display:block;}
-
-    .btn-primary{width:100%;background:var(--accent);border:none;color:#000;font-weight:700;border-radius:8px;padding:12px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;}
-    .btn-primary:hover{background:#00bcd4;transform:translateY(-1px);}
-
-    .auth-footer{text-align:center;margin-top:20px;font-size:13px;color:var(--muted);}
+    .teacher-only{display:none;}.teacher-only.visible{display:block;}
+    .btn-primary{width:100%;background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:9px;padding:13px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;}
+    .btn-primary:hover{opacity:.88;}
+    [data-theme="dark"] .btn-primary{color:#000;}
+    .auth-footer{text-align:center;margin-top:18px;font-size:13px;color:var(--muted);}
     .auth-footer a{color:var(--accent);text-decoration:none;}
-
-    .flash-item{border-radius:8px;padding:11px 14px;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+    .flash-item{border-radius:8px;padding:10px 13px;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:14px;}
     .flash-item.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--danger);}
-    .flash-item.success{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:var(--success);}
-
-    .note-box{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--warning);margin-top:12px;display:flex;align-items:flex-start;gap:8px;}
+    .flash-item.success{background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.25);color:var(--success);}
+    .note-box{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:11px 13px;font-size:12px;color:var(--warning);margin-top:12px;display:flex;align-items:flex-start;gap:7px;}
     .selected-count{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);margin-top:8px;margin-bottom:4px;}
+    /* Username field hint */
+    .username-preview{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);margin-top:4px;min-height:16px;}
   </style>
 </head>
 <body>
@@ -141,6 +79,7 @@
   <i class="bi bi-moon-fill" id="themeIcon"></i>
   <span id="themeLabel">Dark Mode</span>
 </button>
+
 <div class="auth-wrap">
   <div class="auth-logo">
     <div class="logo-box">⛓</div>
@@ -181,22 +120,39 @@
         </div>
       </div>
 
-      <!-- Account info -->
+      <!-- FIX #4: Separate Full Name and Username fields with clear labels -->
       <div class="section-label">// Account Information</div>
+
+      <!-- Full Name — full row -->
       <div class="field-wrap">
-        <label class="form-label">Full Name <span style="color:var(--danger)">*</span></label>
-        <input type="text" class="form-control" name="full_name" placeholder="e.g. Prof. Maria Santos" required/>
+        <label class="form-label" for="inp_fullname">Full Name <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" name="full_name" id="inp_fullname"
+               placeholder="e.g. Maria Santos"
+               oninput="suggestUsername(this.value)"
+               required/>
+        <div class="form-hint">Your real name — shown in the system and reports.</div>
       </div>
+
+      <!-- Username + Email side by side -->
       <div class="two-col">
         <div class="field-wrap">
-          <label class="form-label">Username <span style="color:var(--danger)">*</span></label>
-          <input type="text" class="form-control" name="username" placeholder="e.g. msantos" required/>
+          <label class="form-label" for="inp_username">Username <span style="color:var(--danger)">*</span></label>
+          <input type="text" class="form-control" name="username" id="inp_username"
+                 placeholder="e.g. msantos"
+                 required
+                 oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'')"/>
+          <div class="form-hint">Used to log in. Letters, numbers, underscore only.</div>
+          <div class="username-preview" id="usernameSuggest"></div>
         </div>
         <div class="field-wrap">
-          <label class="form-label">Email Address</label>
-          <input type="email" class="form-control" name="email" placeholder="e.g. msantos@school.edu"/>
+          <label class="form-label" for="inp_email">Email Address</label>
+          <input type="email" class="form-control" name="email" id="inp_email"
+                 placeholder="e.g. msantos@cvsu.edu.ph"/>
+          <div class="form-hint">Optional — for account recovery.</div>
         </div>
       </div>
+
+      <!-- Password -->
       <div class="two-col">
         <div class="field-wrap">
           <label class="form-label">Password <span style="color:var(--danger)">*</span></label>
@@ -208,35 +164,29 @@
         </div>
       </div>
 
-      <!-- Teacher: section assignment -->
+      <!-- Teacher section assignment -->
       <div class="teacher-only visible" id="teacherSection">
         <div class="section-label">// Sections You Handle</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">
-          Tick the sections you are assigned to. Each letter (A, B, C…) is a section under that year level.
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">
+          Tick the sections you are assigned to teach. You will only see students in these sections.
         </p>
-
         <div id="selectedCount" class="selected-count">0 sections selected</div>
 
         <!-- BS Computer Science -->
-        <div class="course-block" id="block_cs">
-          <div class="course-header">
-            <span class="course-icon">💻</span>
-            BS Computer Science
-          </div>
+        <div class="course-block">
+          <div class="course-header"><span class="course-icon">💻</span> BS Computer Science</div>
           <div class="select-all-row">
             <span>Select individual sections below</span>
             <button type="button" class="select-all-btn" onclick="selectAll('cs')">Select All</button>
           </div>
-          {% set cs_years = [('1st Year','1'), ('2nd Year','2'), ('3rd Year','3'), ('4th Year','4')] %}
-          {% for year_label, yr in cs_years %}
+          {% for year_label, yr in [('1st Year','1'),('2nd Year','2'),('3rd Year','3'),('4th Year','4')] %}
           <div class="year-row">
             <div class="year-label">{{ year_label }}</div>
             <div class="section-checks">
               {% for sec in ['A','B','C','D'] %}
               {% set uid = 'cs_y' ~ yr ~ '_' ~ sec %}
-              {% set val = 'BS Computer Science|' ~ year_label ~ '|' ~ sec %}
               <div class="check-pill">
-                <input type="checkbox" name="sections" id="{{ uid }}" value="{{ val }}" class="sec-cb cs-cb" onchange="updateCount()"/>
+                <input type="checkbox" name="sections" id="{{ uid }}" value="BS Computer Science|{{ year_label }}|{{ sec }}" class="sec-cb cs-cb" onchange="updateCount()"/>
                 <label for="{{ uid }}">{{ sec }}</label>
               </div>
               {% endfor %}
@@ -246,25 +196,20 @@
         </div>
 
         <!-- BS Information Technology -->
-        <div class="course-block" id="block_it">
-          <div class="course-header">
-            <span class="course-icon">🖥️</span>
-            BS Information Technology
-          </div>
+        <div class="course-block">
+          <div class="course-header"><span class="course-icon">🖥️</span> BS Information Technology</div>
           <div class="select-all-row">
             <span>Select individual sections below</span>
             <button type="button" class="select-all-btn" onclick="selectAll('it')">Select All</button>
           </div>
-          {% set it_years = [('1st Year','1'), ('2nd Year','2'), ('3rd Year','3'), ('4th Year','4')] %}
-          {% for year_label, yr in it_years %}
+          {% for year_label, yr in [('1st Year','1'),('2nd Year','2'),('3rd Year','3'),('4th Year','4')] %}
           <div class="year-row">
             <div class="year-label">{{ year_label }}</div>
             <div class="section-checks">
               {% for sec in ['A','B','C','D'] %}
               {% set uid = 'it_y' ~ yr ~ '_' ~ sec %}
-              {% set val = 'BS Information Technology|' ~ year_label ~ '|' ~ sec %}
               <div class="check-pill">
-                <input type="checkbox" name="sections" id="{{ uid }}" value="{{ val }}" class="sec-cb it-cb" onchange="updateCount()"/>
+                <input type="checkbox" name="sections" id="{{ uid }}" value="BS Information Technology|{{ year_label }}|{{ sec }}" class="sec-cb it-cb" onchange="updateCount()"/>
                 <label for="{{ uid }}">{{ sec }}</label>
               </div>
               {% endfor %}
@@ -275,87 +220,100 @@
 
         <div class="note-box">
           <i class="bi bi-info-circle" style="flex-shrink:0;margin-top:1px;"></i>
-          <span>Your account will be reviewed by an admin before you can log in. You will only see students enrolled in the sections you selected.</span>
+          <span>Your account needs admin approval before you can log in.</span>
         </div>
       </div>
 
-      <!-- Profile photo upload -->
-      <div style="margin-top:20px;padding:16px;background:rgba(0,229,255,.03);border:1px dashed rgba(0,229,255,.2);border-radius:10px;">
-        <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:1.5px;margin-bottom:12px;">// PROFILE PHOTO <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:9px;">(optional)</span></div>
-        <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <!-- Profile photo -->
+      <div style="margin-top:18px;padding:14px;background:rgba(45,106,39,.03);border:1px dashed rgba(45,106,39,.2);border-radius:10px;">
+        <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:1.5px;margin-bottom:10px;">// PROFILE PHOTO <span style="color:var(--muted);font-weight:400;text-transform:none;font-size:9px;">(optional)</span></div>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <div id="signupPhotoWrap" onclick="document.getElementById('signupPhotoInput').click()"
-               style="width:72px;height:72px;border-radius:50%;background:rgba(0,229,255,.08);border:2px dashed rgba(0,229,255,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;transition:border-color .2s;position:relative;">
-            <div id="signupPhotoInit" style="text-align:center;"><i class="bi bi-camera" style="font-size:20px;color:var(--muted);display:block;"></i><span style="font-size:9px;color:var(--muted);">Upload</span></div>
-            <img id="signupPhotoImg" src="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0;" />
+               style="width:66px;height:66px;border-radius:50%;background:rgba(45,106,39,.08);border:2px dashed rgba(45,106,39,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;position:relative;">
+            <div id="signupPhotoInit" style="text-align:center;"><i class="bi bi-camera" style="font-size:18px;color:var(--muted);display:block;"></i><span style="font-size:9px;color:var(--muted);">Upload</span></div>
+            <img id="signupPhotoImg" src="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"/>
           </div>
           <div>
             <input type="file" id="signupPhotoInput" name="profile_photo" accept="image/*" style="display:none;" onchange="previewSignupPhoto(this)">
-            <button type="button" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 13px;font-size:12px;cursor:pointer;" onclick="document.getElementById('signupPhotoInput').click()"><i class="bi bi-cloud-upload"></i> Choose Photo</button>
-            <div style="font-size:10px;color:var(--muted);margin-top:5px;">JPG, PNG · Max 5 MB<br>Shown on your profile and in the admin directory.</div>
+            <button type="button" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 13px;font-size:12px;cursor:pointer;" onclick="document.getElementById('signupPhotoInput').click()">
+              <i class="bi bi-cloud-upload"></i> Choose Photo
+            </button>
+            <div style="font-size:10px;color:var(--muted);margin-top:5px;">JPG, PNG · Max 5 MB</div>
           </div>
         </div>
       </div>
 
-      <button type="submit" class="btn-primary" style="margin-top:20px;">
+      <button type="submit" class="btn-primary">
         <i class="bi bi-person-plus"></i> Create Account
       </button>
     </form>
   </div>
 
-  <div class="auth-footer" style="margin-top:20px;">
+  <div class="auth-footer" style="margin-top:16px;">
     Already have an account? <a href="{{ url_for('login') }}">Sign in here</a>
   </div>
 </div>
 
 <script>
-  function toggleTeacher() {
-    const isTeacher = document.getElementById('role_teacher').checked;
-    document.getElementById('teacherSection').classList.toggle('visible', isTeacher);
-  }
+function toggleTeacher(){
+  document.getElementById('teacherSection').classList.toggle('visible',document.getElementById('role_teacher').checked);
+}
+function updateCount(){
+  const total=document.querySelectorAll('.sec-cb:checked').length;
+  document.getElementById('selectedCount').textContent=total===0?'0 sections selected':total+' section'+(total>1?'s':'')+' selected';
+}
+function selectAll(course){
+  const cbs=document.querySelectorAll('.'+course+'-cb');
+  const allChecked=[...cbs].every(cb=>cb.checked);
+  cbs.forEach(cb=>cb.checked=!allChecked);
+  updateCount();
+}
+function previewSignupPhoto(input){
+  if(!input.files||!input.files[0])return;
+  const reader=new FileReader();
+  reader.onload=e=>{const img=document.getElementById('signupPhotoImg'),init=document.getElementById('signupPhotoInit');img.src=e.target.result;img.style.display='block';init.style.display='none';document.getElementById('signupPhotoWrap').style.borderStyle='solid';document.getElementById('signupPhotoWrap').style.borderColor='var(--accent)';};
+  reader.readAsDataURL(input.files[0]);
+}
 
-  function updateCount() {
-    const total = document.querySelectorAll('.sec-cb:checked').length;
-    document.getElementById('selectedCount').textContent =
-      total === 0 ? '0 sections selected' : total + ' section' + (total > 1 ? 's' : '') + ' selected';
+// FIX #4: Auto-suggest username from full name
+function suggestUsername(fullName) {
+  const userInput = document.getElementById('inp_username');
+  const suggest   = document.getElementById('usernameSuggest');
+  if (!fullName.trim()) { suggest.textContent = ''; return; }
+  // Build suggestion: first initial + last name, lowercase, no spaces
+  const parts    = fullName.trim().split(/\s+/);
+  const last     = parts[parts.length - 1] || '';
+  const first    = parts[0] || '';
+  const suggested = (first.charAt(0) + last).toLowerCase().replace(/[^a-z0-9]/g, '');
+  // Only auto-fill if user hasn't typed their own username yet
+  if (!userInput.dataset.userModified) {
+    userInput.value = suggested;
+    suggest.textContent = suggested ? '→ Suggested: ' + suggested : '';
+  } else {
+    suggest.textContent = '';
   }
+}
+// Once user manually edits username, stop auto-filling
+document.addEventListener('DOMContentLoaded', () => {
+  const userInput = document.getElementById('inp_username');
+  if (userInput) {
+    userInput.addEventListener('input', function() {
+      this.dataset.userModified = 'true';
+      document.getElementById('usernameSuggest').textContent = '';
+    });
+  }
+});
 
-  function selectAll(course) {
-    const cbs = document.querySelectorAll('.' + course + '-cb');
-    const allChecked = [...cbs].every(cb => cb.checked);
-    cbs.forEach(cb => cb.checked = !allChecked);
-    // Update button text
-    updateCount();
-  }
-
-  function previewSignupPhoto(input){
-    if(!input.files||!input.files[0]) return;
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const img=document.getElementById('signupPhotoImg');
-      const init=document.getElementById('signupPhotoInit');
-      img.src=e.target.result; img.style.display='block'; init.style.display='none';
-      document.getElementById('signupPhotoWrap').style.borderStyle='solid';
-      document.getElementById('signupPhotoWrap').style.borderColor='var(--accent)';
-    };
-    reader.readAsDataURL(input.files[0]);
-  }
 function toggleTheme(){
-  const html=document.documentElement;
-  const isDark=html.getAttribute('data-theme')==='dark';
-  html.setAttribute('data-theme',isDark?'light':'dark');
-  localStorage.setItem('davs_theme',isDark?'light':'dark');
-  updateThemeIcon();
+  const html=document.documentElement;const isDark=html.getAttribute('data-theme')==='dark';
+  html.setAttribute('data-theme',isDark?'light':'dark');localStorage.setItem('davs_theme',isDark?'light':'dark');updateThemeIcon();
 }
 function updateThemeIcon(){
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   document.getElementById('themeIcon').className=isDark?'bi bi-sun-fill':'bi bi-moon-fill';
   document.getElementById('themeLabel').textContent=isDark?'Light Mode':'Dark Mode';
 }
-(function(){
-  const saved=localStorage.getItem('davs_theme')||'light';
-  document.documentElement.setAttribute('data-theme',saved);
-  updateThemeIcon();
-})();
+(function(){const saved=localStorage.getItem('davs_theme')||'light';document.documentElement.setAttribute('data-theme',saved);updateThemeIcon();})();
 </script>
 </body>
 </html>

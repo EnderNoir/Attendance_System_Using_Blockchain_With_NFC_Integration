@@ -40,11 +40,15 @@
     select option,select optgroup{background:var(--surface)!important;color:var(--text)!important;}
     select option:checked{background:var(--bg)!important;color:var(--accent)!important;}
 
-    .scroll-container{overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(45,106,39,.2) transparent;}
+    /* ── Scroll helpers ── */
+    .scroll-container{overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:rgba(45,106,39,.2) transparent;}
     .scroll-container::-webkit-scrollbar{width:5px;}
     .scroll-container::-webkit-scrollbar-thumb{background:rgba(45,106,39,.2);border-radius:99px;}
     [data-theme="dark"] .scroll-container{scrollbar-color:rgba(245,197,24,.2) transparent;}
     [data-theme="dark"] .scroll-container::-webkit-scrollbar-thumb{background:rgba(245,197,24,.2);}
+
+    /* ── Table responsive wrapper ── */
+    .table-responsive-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;}
 
     /* ══ SIDEBAR ══ */
     .sidebar{width:var(--sidebar-w);background:var(--sidebar-bg);border-right:1px solid var(--sidebar-border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;transition:transform .3s ease;}
@@ -53,33 +57,33 @@
     .sidebar-logo .logo-row{display:flex;align-items:center;gap:10px;}
     .sidebar-logo .logo-icon{width:28px;height:28px;background:rgba(245,197,24,.2);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#F5C518;flex-shrink:0;}
     .sidebar-logo .app-name{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#F5C518;letter-spacing:2px;text-transform:uppercase;}
-    /* Close X for mobile sidebar */
     .sidebar-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:18px;cursor:pointer;margin-left:auto;padding:2px 6px;display:none;}
-    .sidebar-nav{padding:10px 10px;flex:1;overflow-y:auto;}
+    .sidebar-nav{padding:10px;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
     .nav-section-label{font-size:9px;font-weight:600;color:var(--sidebar-muted);letter-spacing:1.5px;text-transform:uppercase;padding:10px 8px 5px;}
     .nav-link{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:8px;color:var(--sidebar-text)!important;font-size:13px;font-weight:500;text-decoration:none;transition:all .2s;margin-bottom:2px;border-left:3px solid transparent;}
-    .nav-link i{font-size:15px;width:17px;}
+    .nav-link i{font-size:15px;width:17px;flex-shrink:0;}
     .nav-link:hover{background:var(--sidebar-hover-bg);color:#F5C518!important;}
     .nav-link.active{background:var(--sidebar-active-bg);color:var(--sidebar-active-color)!important;border-left-color:#F5C518;}
     .sidebar-footer{padding:10px 12px;border-top:1px solid rgba(255,255,255,.08);}
-    .chain-badge{display:flex;align-items:center;gap:8px;background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.2);border-radius:8px;padding:7px 11px;font-size:11px;color:#F5C518;}
+    .chain-badge{display:flex;align-items:center;gap:8px;background:rgba(245,197,24,.1);border:1px solid rgba(245,197,24,.2);border-radius:8px;padding:7px 10px;font-size:11px;color:#F5C518;white-space:nowrap;overflow:hidden;}
+    .chain-badge span{overflow:hidden;text-overflow:ellipsis;}
     .chain-dot{width:7px;height:7px;background:#F5C518;border-radius:50%;animation:spulse 2s infinite;flex-shrink:0;}
     @keyframes spulse{0%,100%{opacity:1;}50%{opacity:.3;}}
     .sidebar-user{display:flex;align-items:center;gap:9px;padding:8px 4px;margin-bottom:8px;border-radius:8px;transition:background .2s;cursor:pointer;}
     .sidebar-user:hover{background:rgba(255,255,255,.06);}
-    .u-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .u-name{font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
     .u-role{font-size:9px;color:var(--sidebar-muted);text-transform:uppercase;letter-spacing:.5px;}
     .s-avatar-init{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;flex-shrink:0;}
 
     /* ══ MAIN CONTENT ══ */
-    .main-content{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin-left .3s;}
+    .main-content{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin-left .3s;min-width:0;}
     .topbar{height:56px;background:var(--surface);border-bottom:2px solid var(--accent2);display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.06);}
-    .topbar-left{display:flex;align-items:center;gap:12px;}
-    .hamburger{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px;display:none;line-height:1;}
-    .topbar-title{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1px;font-weight:700;}
-    .topbar-right{display:flex;align-items:center;gap:10px;}
+    .topbar-left{display:flex;align-items:center;gap:12px;min-width:0;}
+    .hamburger{background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;padding:4px;display:none;line-height:1;flex-shrink:0;}
+    .topbar-title{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .topbar-right{display:flex;align-items:center;gap:8px;flex-shrink:0;}
     .topbar-time{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);}
-    .page-body{padding:24px;flex:1;}
+    .page-body{padding:20px;flex:1;min-width:0;}
 
     /* ── Responsive breakpoints ── */
     @media(max-width:900px){
@@ -89,49 +93,50 @@
       .sidebar-close{display:block;}
       .main-content{margin-left:0;}
       .hamburger{display:block;}
-      .page-body{padding:16px;}
+      .page-body{padding:14px;}
     }
-    @media(max-width:480px){
-      .page-body{padding:12px;}
-      .topbar{padding:0 12px;}
+    @media(max-width:600px){
+      .page-body{padding:10px;}
+      .topbar{padding:0 10px;height:50px;}
       .topbar-time{display:none;}
+      .topbar-title{font-size:9px;}
     }
 
     /* ══ CARDS / LAYOUT ══ */
     .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;}
-    .card-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+    .card-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
     .card-icon.cyan{background:rgba(45,106,39,.1);color:var(--accent);}
     .card-icon.purple{background:rgba(245,197,24,.1);color:#C8960C;}
     .card-icon.green{background:rgba(45,106,39,.1);color:var(--accent);}
     .card-icon.amber{background:rgba(245,197,24,.1);color:#C8960C;}
-    .stat-chip{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:14px;}
-    .stat-chip .value{font-family:'Space Mono',monospace;font-size:26px;font-weight:700;color:var(--text);line-height:1;}
+    .stat-chip{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;}
+    .stat-chip .value{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;color:var(--text);line-height:1;}
     .stat-chip .label{font-size:11px;color:var(--muted);margin-top:3px;}
-    .card-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+    .card-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
     @media(max-width:900px){.card-grid-3{grid-template-columns:repeat(2,1fr);}}
-    @media(max-width:560px){.card-grid-3{grid-template-columns:1fr;}}
+    @media(max-width:480px){.card-grid-3{grid-template-columns:1fr;}}
 
     /* ══ TABLES ══ */
     .table{color:var(--text);margin:0;}
-    .table thead th{background:rgba(45,106,39,.06);border-color:var(--border);color:var(--accent);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:11px 14px;}
-    .table tbody td{border-color:var(--border);padding:12px 14px;font-size:13px;vertical-align:middle;}
+    .table thead th{background:rgba(45,106,39,.06);border-color:var(--border);color:var(--accent);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:10px 12px;white-space:nowrap;}
+    .table tbody td{border-color:var(--border);padding:10px 12px;font-size:13px;vertical-align:middle;}
     .table tbody tr:hover{background:rgba(245,197,24,.04);}
 
     /* ══ FORMS ══ */
     .form-label{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px;}
-    .form-control,.form-select{background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:9px 13px;font-size:13px;transition:all .2s;}
-    .form-control:focus,.form-select:focus{background:var(--surface);border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,106,39,.12);color:var(--text);}
+    .form-control,.form-select{background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:9px 13px;font-size:13px;transition:all .2s;width:100%;}
+    .form-control:focus,.form-select:focus{background:var(--surface);border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,106,39,.12);color:var(--text);outline:none;}
     [data-theme="dark"] .form-control,[data-theme="dark"] .form-select{background:rgba(255,255,255,.04);border-color:var(--border);}
     .form-control::placeholder{color:var(--muted);}
     .form-control.is-invalid,.form-control.invalid{border-color:var(--danger)!important;}
 
     /* ══ BUTTONS ══ */
-    .btn-primary{background:var(--accent);border:none;color:#fff;font-weight:600;border-radius:8px;padding:9px 18px;font-size:13px;transition:all .2s;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+    .btn-primary{background:var(--accent);border:none;color:#fff;font-weight:600;border-radius:8px;padding:9px 16px;font-size:13px;transition:all .2s;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;}
     .btn-primary:hover{background:var(--accent3);color:#fff;}
     [data-theme="dark"] .btn-primary{color:#000;}
-    .btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:9px 18px;font-size:13px;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;}
+    .btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:9px 16px;font-size:13px;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;}
     .btn-outline:hover{border-color:var(--accent);color:var(--accent);}
-    .btn-success-custom{background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.25);color:var(--success);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all .2s;cursor:pointer;}
+    .btn-success-custom{background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.25);color:var(--success);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all .2s;cursor:pointer;white-space:nowrap;}
     .btn-success-custom:hover{background:rgba(45,106,39,.2);color:var(--success);}
     .hamburger-icon{display:none;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer;}
 
@@ -141,29 +146,29 @@
     .card-title-text{font-size:14px;font-weight:700;}
 
     /* ══ FLASH ══ */
-    .flash-wrap{padding:0 0 14px;}
-    .flash-item{border-radius:10px;padding:11px 14px;font-size:13px;display:flex;align-items:center;gap:10px;margin-bottom:7px;animation:slideIn .3s ease;}
+    .flash-wrap{padding:0 0 12px;}
+    .flash-item{border-radius:10px;padding:10px 14px;font-size:13px;display:flex;align-items:center;gap:10px;margin-bottom:7px;animation:slideIn .3s ease;}
     .flash-item.success{background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);color:var(--success);}
     .flash-item.error{background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.2);color:var(--danger);}
     .flash-item.info{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);color:var(--warning);}
     @keyframes slideIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
 
     /* ══ TOAST ══ */
-    .toast-stack{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:300px;}
-    .custom-toast{background:var(--surface);border:1px solid var(--success);border-radius:12px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;animation:toastIn .3s ease;box-shadow:0 8px 32px rgba(0,0,0,.15);}
+    .toast-stack{position:fixed;bottom:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:280px;width:calc(100vw - 32px);}
+    .custom-toast{background:var(--surface);border:1px solid var(--success);border-radius:12px;padding:11px 13px;display:flex;align-items:flex-start;gap:9px;animation:toastIn .3s ease;box-shadow:0 8px 32px rgba(0,0,0,.15);}
     .toast-dot{width:7px;height:7px;background:var(--success);border-radius:50%;margin-top:5px;flex-shrink:0;}
     .toast-title{font-size:12px;font-weight:600;color:var(--success);}
-    .toast-body-text{font-size:11px;color:var(--muted);margin-top:2px;}
+    .toast-body-text{font-size:11px;color:var(--muted);margin-top:2px;word-break:break-word;}
     @keyframes toastIn{from{opacity:0;transform:translateX(20px);}to{opacity:1;transform:translateX(0);}}
 
     /* ══ CODE ══ */
-    code{background:rgba(45,106,39,.08);color:var(--accent);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;}
+    code{background:rgba(45,106,39,.08);color:var(--accent);padding:2px 6px;border-radius:4px;font-family:'Space Mono',monospace;font-size:11px;word-break:break-word;}
     [data-theme="dark"] code{background:rgba(245,197,24,.08);color:var(--accent);}
 
-    /* ══ PROFILE MODAL (shared base styles) ══ */
-    .pm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s;padding:16px;}
+    /* ══ PROFILE MODAL ══ */
+    .pm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s;padding:12px;}
     .pm-overlay.show{opacity:1;pointer-events:all;}
-    .pm-modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:460px;width:100%;max-height:90vh;overflow-y:auto;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);}
+    .pm-modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:460px;width:100%;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);}
     .pm-overlay.show .pm-modal{transform:scale(1);}
     .pm-pane{display:none!important;}.pm-pane.active{display:block!important;}
     .pm-tab{transition:all .2s;}.pm-tab.active-tab{color:var(--accent)!important;border-bottom-color:var(--accent)!important;}
@@ -172,9 +177,12 @@
     [data-theme="dark"] .pm-input{background:rgba(255,255,255,.04);}
     .pm-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px;}
     .pm-field{margin-bottom:12px;}
+    /* Password fields stack on small screens */
+    .pm-pw-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+    @media(max-width:420px){.pm-pw-grid{grid-template-columns:1fr;}}
 
     /* Theme toggle */
-    .theme-btn{background:#2D6A27;border:none;color:#F5C518;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:all .3s;display:flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;}
+    .theme-btn{background:#2D6A27;border:none;color:#F5C518;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:600;cursor:pointer;transition:all .3s;display:flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;white-space:nowrap;}
     .theme-btn:hover{opacity:.85;}
     [data-theme="dark"] .theme-btn{background:#F5C518;color:#1A1A1A;}
 
@@ -203,6 +211,172 @@
     [data-theme="dark"] .flash-item.success{background:rgba(76,175,80,.1)!important;border-color:rgba(76,175,80,.2)!important;color:#4CAF50!important;}
     [data-theme="dark"] .flash-item.info{background:rgba(245,197,24,.08)!important;border-color:rgba(245,197,24,.2)!important;color:#FFC107!important;}
     [data-theme="dark"] .flash-item.error{background:rgba(239,83,80,.1)!important;border-color:rgba(239,83,80,.2)!important;color:#EF5350!important;}
+
+    /* ══ GLOBAL RESPONSIVE UTILITY CLASSES ══ */
+    /* Hide on mobile */
+    @media(max-width:600px){
+      .hide-mobile{display:none!important;}
+      /* Stack any flex row on mobile */
+      .stack-mobile{flex-direction:column!important;align-items:stretch!important;}
+      .stack-mobile > *{width:100%!important;min-width:0!important;}
+      /* Full width buttons on mobile */
+      .btn-full-mobile{width:100%!important;justify-content:center!important;}
+    }
+    /* Compact padding on all cards when mobile */
+    @media(max-width:600px){
+      .card{border-radius:10px;}
+      .stat-chip{padding:11px 12px;}
+      .stat-chip .value{font-size:18px;}
+    }
+
+        /* ── session_live.html fixes ── */
+    .two-panel{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    @media(max-width:760px){.two-panel{grid-template-columns:1fr;}}
+    
+    .stat-mini-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+    .stat-mini{flex:1;min-width:70px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;text-align:center;}
+    .stat-mini .sv{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;}
+    .stat-mini .sl{font-size:10px;color:var(--muted);margin-top:2px;}
+    
+    .scroll-list{max-height:360px;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px 12px;}
+    @media(max-width:760px){.scroll-list{max-height:260px;}}
+    
+    .tap-modal{background:var(--surface);border-radius:18px;padding:32px 24px;text-align:center;
+              width:100%;max-width:360px;transform:scale(.88);transition:transform .28s cubic-bezier(.34,1.56,.64,1);border:2px solid transparent;}
+    
+    /* Session header button stack on mobile */
+    @media(max-width:540px){
+      .session-header > div > div:last-child{flex-direction:column!important;width:100%!important;}
+      .session-header > div > div:last-child > *{width:100%!important;justify-content:center!important;}
+      .btn-end{width:100%;justify-content:center;}
+    }
+    /* End session confirmation modal buttons */
+    @media(max-width:420px){
+      .end-box [style*="display:flex"][style*="gap"]:last-child{flex-direction:column!important;}
+      .end-box [style*="display:flex"][style*="gap"]:last-child > *{width:100%!important;}
+    }
+    /* Scan indicator text wrap */
+    .scan-indicator{display:flex;align-items:flex-start;gap:10px;flex-wrap:nowrap;}
+    @media(max-width:480px){.scan-indicator{flex-wrap:wrap;}.scan-icon{display:none;}}
+    
+    /* ── teacher_create_session.html fixes ── */
+    .sess-form-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;align-items:flex-end!important;}
+    @media(max-width:600px){
+      .sess-form-grid{grid-template-columns:1fr!important;}
+      .sess-form-grid > button{width:100%;justify-content:center;}
+    }
+    @media(max-width:480px){
+      .sess-card form{flex-direction:column!important;}
+      .sess-card form > div{min-width:0!important;width:100%!important;}
+      .sess-card form > button[type=submit]{width:100%;justify-content:center;}
+    }
+    
+    /* ── admin_sessions.html fixes ── */
+    .info-row{padding:7px 0;border-bottom:1px solid var(--border);display:grid;grid-template-columns:100px 1fr;gap:8px;}
+    .info-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+    .info-val{font-size:13px;word-break:break-word;}
+    @media(max-width:400px){
+      .info-row{grid-template-columns:1fr;gap:2px;}
+      .info-lbl{font-size:9px;}
+    }
+    .sp-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+            max-width:600px;width:100%;max-height:92vh;overflow-y:auto;
+            -webkit-overflow-scrolling:touch;transform:scale(.92);
+            transition:transform .25s cubic-bezier(.34,1.56,.64,1);scrollbar-width:thin;}
+    @media(max-width:520px){
+      .sess-row{gap:8px;}
+      .sr-name{font-size:13px;}
+      .btn-vr{padding:5px 10px!important;font-size:11px!important;}
+      .att-item{font-size:11px;}
+      .tx-chip{font-size:8px;}
+    }
+    
+    /* ── admin_sessions popup export button mobile ── */
+    @media(max-width:480px){
+      [id^="spAttContent"] > div:first-child{flex-direction:column!important;align-items:flex-start!important;}
+    }
+    
+    /* ── signup.html fixes ── */
+    .year-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);gap:10px;}
+    @media(max-width:360px){
+      .year-row{flex-direction:column;align-items:flex-start;gap:8px;}
+      .section-checks{width:100%;}
+    }
+    .check-pill label{display:flex;align-items:center;justify-content:center;width:34px;height:34px;
+      border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;
+      color:var(--muted);transition:all .2s;font-family:'Space Mono',monospace;}
+    
+    /* ── GLOBAL: Tables always scroll horizontally ── */
+    .table-wrapper{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;}
+    
+    /* ── GLOBAL: Modals always fit screen ── */
+    .sp-overlay,.sess-overlay,.stud-overlay,.end-overlay,.excuse-overlay,.pm-overlay{padding:10px;}
+    @media(max-width:380px){.sp-overlay,.sess-overlay,.stud-overlay,.end-overlay,.excuse-overlay,.pm-overlay{padding:6px;}}
+    
+    /* ── GLOBAL: All filter bars wrap cleanly ── */
+    .filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+    @media(max-width:480px){
+      .filter-bar .fg{min-width:calc(50% - 8px)!important;flex:1 1 calc(50% - 8px)!important;}
+      .filter-bar .btn-rst{align-self:flex-end;}
+    }
+    @media(max-width:360px){
+      .filter-bar .fg{min-width:100%!important;flex:1 1 100%!important;}
+    }
+    
+    /* ── GLOBAL: Main tabs always wrap on mobile ── */
+    .main-tabs{flex-wrap:wrap;}
+    @media(max-width:480px){
+      .main-tab{font-size:12px;padding:9px 6px;}
+      .main-tab .tab-count{padding:1px 5px;font-size:9px;}
+    }
+    
+    /* ── GLOBAL: Stat boxes responsive ── */
+    .stats-row{display:grid;gap:10px;}
+    @media(max-width:480px){
+      .stats-row{grid-template-columns:repeat(2,1fr)!important;}
+      .stat-box{padding:11px 12px;gap:10px;}
+      .stat-box .stat-icon{width:32px;height:32px;font-size:15px;}
+      .stat-val{font-size:18px!important;}
+      .stat-lbl{font-size:10px!important;}
+    }
+    @media(max-width:320px){.stats-row{grid-template-columns:1fr!important;}}
+    
+    /* ── GLOBAL: Buttons in flex rows don't shrink too small ── */
+    .btn-primary,.btn-outline,.btn-success-custom{min-width:0;}
+    
+    /* ── GLOBAL: Page header margins on mobile ── */
+    @media(max-width:600px){
+      .page-body h2{font-size:17px!important;}
+      .page-body h2 + p{font-size:12px!important;}
+    }
+    
+    /* ── GLOBAL: Session cards on mobile ── */
+    .session-card .sc-top{flex-wrap:wrap;}
+    @media(max-width:480px){
+      .session-card{padding:12px;}
+      .session-card .sc-title{font-size:13px;}
+      .session-card .sc-chevron{display:none;}
+    }
+    
+    /* ── GLOBAL: Student cards on mobile ── */
+    @media(max-width:480px){
+      .student-card .sc-st-top{padding:12px;}
+      .sc-st-name{font-size:13px;}
+      .sc-st-sub{font-size:10px;}
+    }
+    
+    /* ── GLOBAL: Session & Student modal tables scroll ── */
+    .att-scroll,.hist-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .att-table,.hist-table{min-width:400px;}
+    
+    /* ── GLOBAL: Topbar theme button compact on mobile ── */
+    @media(max-width:360px){
+      .theme-btn span{display:none;}
+      .theme-btn{padding:7px 9px;}
+    }
+    
+    /* ── GLOBAL: Code blocks don't break layouts ── */
+    code{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle;}
   </style>
 </head>
 <body>
@@ -213,14 +387,13 @@
 {% if session.get('role') == 'admin' %}
 <div class="pm-overlay" id="profileModal" onclick="if(event.target===this)closePM()">
   <div class="pm-modal">
-    <div style="background:var(--accent);padding:14px 18px;display:flex;align-items:center;gap:10px;border-radius:16px 16px 0 0;">
+    <div style="background:var(--accent);padding:13px 16px;display:flex;align-items:center;gap:10px;border-radius:16px 16px 0 0;flex-wrap:wrap;">
       <button onclick="closePM()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;font-weight:600;flex-shrink:0;">
         <i class="bi bi-arrow-left"></i> Back
       </button>
-      <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#fff;flex:1;">My Profile</span>
-      <span id="pmRolePill" style="background:rgba(255,255,255,.2);color:#fff;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;"></span>
+      <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#fff;flex:1;min-width:0;">My Profile</span>
+      <span id="pmRolePill" style="background:rgba(255,255,255,.2);color:#fff;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;flex-shrink:0;"></span>
     </div>
-    <!-- Tabs -->
     <div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface);">
       <button class="pm-tab active" onclick="switchPmTab('info',this)" style="flex:1;padding:10px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:'DM Sans',sans-serif;">
         <i class="bi bi-person-lines-fill"></i> Info
@@ -229,74 +402,61 @@
         <i class="bi bi-pencil-square"></i> Edit
       </button>
     </div>
-
-    <!-- INFO PANE: read-only, photo from SQLite -->
-    <div class="pm-pane active" id="pm-info" style="padding:20px;">
-      <div style="text-align:center;margin-bottom:16px;">
-        <div id="pmInfoAvatarWrap" style="width:72px;height:72px;margin:0 auto 10px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;">
+    <div class="pm-pane active" id="pm-info" style="padding:16px;">
+      <div style="text-align:center;margin-bottom:14px;">
+        <div id="pmInfoAvatarWrap" style="width:68px;height:68px;margin:0 auto 10px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#000;">
           {{ session.get('full_name','?')[0].upper() }}
         </div>
-        <div style="font-size:16px;font-weight:700;" id="pmDisplayName">{{ session.get('full_name','') }}</div>
+        <div style="font-size:15px;font-weight:700;" id="pmDisplayName">{{ session.get('full_name','') }}</div>
         <div style="font-size:11px;color:var(--muted);">System Administrator · CvSU Silang DAVS</div>
-        <div style="font-size:10px;color:rgba(45,106,39,.5);margin-top:4px;"><i class="bi bi-pencil-square"></i> Go to Edit tab to make changes</div>
       </div>
-      <div id="pmInfoRows" style="border-top:1px solid var(--border);padding-top:12px;">
-        <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Full Name</span>
-          <span style="font-size:13px;" id="pm_info_name">{{ session.get('full_name','') }}</span>
+      <div id="pmInfoRows" style="border-top:1px solid var(--border);padding-top:10px;">
+        {% for label, id in [('Full Name','pm_info_name'),('Email','pm_info_email')] %}
+        <div style="display:grid;grid-template-columns:90px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding-top:2px;">{{ label }}</span>
+          <span style="font-size:13px;word-break:break-word;" id="{{ id }}">
+            {% if label=='Full Name' %}{{ session.get('full_name','') }}{% else %}—{% endif %}
+          </span>
         </div>
-        <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Username</span>
+        {% endfor %}
+        <div style="display:grid;grid-template-columns:90px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding-top:2px;">Username</span>
           <span style="font-size:13px;"><code>{{ session.get('username','') }}</code></span>
         </div>
-        <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Email</span>
-          <span style="font-size:13px;" id="pm_info_email">—</span>
-        </div>
-        <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;padding:8px 0;">
-          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Role</span>
-          <span style="font-size:13px;"><span style="background:rgba(45,106,39,.1);color:var(--accent);border:1px solid rgba(45,106,39,.2);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;">Admin</span></span>
+        <div style="display:grid;grid-template-columns:90px 1fr;gap:8px;padding:7px 0;">
+          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding-top:2px;">Role</span>
+          <span><span style="background:rgba(45,106,39,.1);color:var(--accent);border:1px solid rgba(45,106,39,.2);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;">Admin</span></span>
         </div>
       </div>
     </div>
-
-    <!-- EDIT PANE: photo staged locally, only saved on Save Changes -->
-    <div class="pm-pane" id="pm-edit" style="padding:20px;">
-      <!-- Photo section: preview + file picker (NO upload yet) -->
-      <div style="background:rgba(45,106,39,.04);border:1px dashed rgba(45,106,39,.2);border-radius:10px;padding:14px;margin-bottom:16px;">
-        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;"><i class="bi bi-camera-fill"></i> Profile Photo</div>
-        <div style="display:flex;align-items:center;gap:14px;">
-          <!-- Preview: shows staged photo before save, or current saved photo -->
-          <div id="pmEditAvatarWrap" style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
+    <div class="pm-pane" id="pm-edit" style="padding:16px;">
+      <div style="background:rgba(45,106,39,.04);border:1px dashed rgba(45,106,39,.2);border-radius:10px;padding:12px;margin-bottom:14px;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px;"><i class="bi bi-camera-fill"></i> Profile Photo</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div id="pmEditAvatarWrap" style="width:56px;height:56px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
             {{ session.get('full_name','?')[0].upper() }}
           </div>
-          <div>
-            <!-- Hidden file input — selecting file only stages it, does NOT upload yet -->
+          <div style="flex:1;min-width:0;">
             <input type="file" id="pmPhotoInput" accept="image/*" style="display:none" onchange="stageAdminPhoto(this)">
             <button type="button" onclick="document.getElementById('pmPhotoInput').click()"
-                    style="background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.2);color:var(--accent);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-weight:600;">
+                    style="background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.2);color:var(--accent);border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;font-weight:600;">
               <i class="bi bi-upload"></i> Select Photo
             </button>
-            <div id="pmPhotoStagedName" style="font-size:11px;color:var(--muted);margin-top:4px;">No new photo selected</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Photo saves only when you click <strong>Save Changes</strong></div>
+            <div id="pmPhotoStagedName" style="font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;">No new photo selected</div>
           </div>
         </div>
       </div>
-
-      <!-- Fields -->
       <div class="pm-field">
         <span class="pm-label">Full Name *</span>
-        <input class="pm-input" id="pmName" type="text" value="{{ session.get('full_name','') }}"
-               oninput="clearPmErr(this,'pmNameErr')" placeholder="Your full name"/>
+        <input class="pm-input" id="pmName" type="text" value="{{ session.get('full_name','') }}" oninput="clearPmErr(this,'pmNameErr')" placeholder="Your full name"/>
         <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="pmNameErr">Full name is required.</div>
       </div>
       <div class="pm-field">
         <span class="pm-label">Email Address</span>
-        <input class="pm-input" id="pmEmail" type="email" placeholder="admin@cvsu.edu.ph"
-               oninput="clearPmErr(this,'pmEmailErr')"/>
+        <input class="pm-input" id="pmEmail" type="email" placeholder="admin@cvsu.edu.ph" oninput="clearPmErr(this,'pmEmailErr')"/>
         <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="pmEmailErr">Enter a valid email.</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="pm-pw-grid">
         <div class="pm-field" style="margin-bottom:0;">
           <span class="pm-label">New Password</span>
           <input class="pm-input" id="pmPass" type="password" placeholder="Min 6 chars" oninput="clearPmErr(this,'pmPassErr')"/>
@@ -308,11 +468,9 @@
           <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="pmPass2Err">Passwords don't match.</div>
         </div>
       </div>
-
-      <!-- Footer: NO back button, only Save Changes -->
-      <div style="display:flex;gap:8px;align-items:center;padding-top:12px;border-top:1px solid var(--border);">
-        <span style="font-size:12px;flex:1;display:none;" id="pmMsg"></span>
-        <button class="btn-primary" onclick="saveProfileModal()" style="display:flex;align-items:center;gap:6px;width:100%;justify-content:center;">
+      <div style="padding-top:12px;border-top:1px solid var(--border);">
+        <span style="font-size:12px;display:none;" id="pmMsg"></span>
+        <button class="btn-primary" onclick="saveProfileModal()" style="width:100%;justify-content:center;margin-top:8px;">
           <i class="bi bi-check-circle"></i> Save Changes
         </button>
       </div>
@@ -327,12 +485,12 @@
 {% if session.get('role') == 'teacher' %}
 <div class="pm-overlay" id="teacherProfileModal" onclick="if(event.target===this)closeTPM()">
   <div class="pm-modal">
-    <div style="background:var(--accent);padding:14px 18px;display:flex;align-items:center;gap:10px;border-radius:16px 16px 0 0;">
+    <div style="background:var(--accent);padding:13px 16px;display:flex;align-items:center;gap:10px;border-radius:16px 16px 0 0;flex-wrap:wrap;">
       <button onclick="closeTPM()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;font-weight:600;flex-shrink:0;">
         <i class="bi bi-arrow-left"></i> Back
       </button>
-      <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#fff;flex:1;">My Profile</span>
-      <span style="background:rgba(255,255,255,.2);color:#fff;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;">TEACHER</span>
+      <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#fff;flex:1;min-width:0;">My Profile</span>
+      <span style="background:rgba(255,255,255,.2);color:#fff;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;flex-shrink:0;">TEACHER</span>
     </div>
     <div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface);">
       <button class="pm-tab active" onclick="switchTPMTab('info',this)" style="flex:1;padding:10px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font-family:'DM Sans',sans-serif;">
@@ -342,67 +500,57 @@
         <i class="bi bi-pencil-square"></i> Edit
       </button>
     </div>
-
-    <!-- TEACHER INFO PANE -->
-    <div class="pm-pane active" id="tpm-info" style="padding:20px;">
-      <div style="text-align:center;margin-bottom:16px;">
-        <div id="tpmInfoAvatarWrap" style="width:72px;height:72px;margin:0 auto 10px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;">
+    <div class="pm-pane active" id="tpm-info" style="padding:16px;">
+      <div style="text-align:center;margin-bottom:14px;">
+        <div id="tpmInfoAvatarWrap" style="width:68px;height:68px;margin:0 auto 10px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#000;">
           {{ session.get('full_name','?')[0].upper() }}
         </div>
-        <div style="font-size:16px;font-weight:700;" id="tpmDisplayName">{{ session.get('full_name','') }}</div>
+        <div style="font-size:15px;font-weight:700;" id="tpmDisplayName">{{ session.get('full_name','') }}</div>
         <div style="font-size:11px;color:var(--muted);">Faculty · CvSU Silang DAVS</div>
-        <div style="font-size:10px;color:rgba(45,106,39,.5);margin-top:4px;"><i class="bi bi-pencil-square"></i> Go to Edit tab to make changes</div>
       </div>
-      <div style="border-top:1px solid var(--border);padding-top:12px;">
-        <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Full Name</span>
-          <span style="font-size:13px;" id="tpm_info_name">{{ session.get('full_name','') }}</span>
+      <div style="border-top:1px solid var(--border);padding-top:10px;">
+        <div style="display:grid;grid-template-columns:90px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding-top:2px;">Full Name</span>
+          <span style="font-size:13px;word-break:break-word;" id="tpm_info_name">{{ session.get('full_name','') }}</span>
         </div>
-        <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Username</span>
+        <div style="display:grid;grid-template-columns:90px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding-top:2px;">Username</span>
           <span style="font-size:13px;"><code>{{ session.get('username','') }}</code></span>
         </div>
-        <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;padding:8px 0;">
-          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Email</span>
-          <span style="font-size:13px;" id="tpm_info_email">—</span>
+        <div style="display:grid;grid-template-columns:90px 1fr;gap:8px;padding:7px 0;">
+          <span style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;padding-top:2px;">Email</span>
+          <span style="font-size:13px;word-break:break-word;" id="tpm_info_email">—</span>
         </div>
       </div>
     </div>
-
-    <!-- TEACHER EDIT PANE -->
-    <div class="pm-pane" id="tpm-edit" style="padding:20px;">
-      <!-- Photo staged, not uploaded until Save Changes -->
-      <div style="background:rgba(45,106,39,.04);border:1px dashed rgba(45,106,39,.2);border-radius:10px;padding:14px;margin-bottom:16px;">
-        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;"><i class="bi bi-camera-fill"></i> Profile Photo</div>
-        <div style="display:flex;align-items:center;gap:14px;">
-          <div id="tpmEditAvatarWrap" style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
+    <div class="pm-pane" id="tpm-edit" style="padding:16px;">
+      <div style="background:rgba(45,106,39,.04);border:1px dashed rgba(45,106,39,.2);border-radius:10px;padding:12px;margin-bottom:14px;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px;"><i class="bi bi-camera-fill"></i> Profile Photo</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div id="tpmEditAvatarWrap" style="width:56px;height:56px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
             {{ session.get('full_name','?')[0].upper() }}
           </div>
-          <div>
+          <div style="flex:1;min-width:0;">
             <input type="file" id="tpmPhotoInput" accept="image/*" style="display:none" onchange="stageTeacherPhoto(this)">
             <button type="button" onclick="document.getElementById('tpmPhotoInput').click()"
-                    style="background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.2);color:var(--accent);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-weight:600;">
+                    style="background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.2);color:var(--accent);border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;font-weight:600;">
               <i class="bi bi-upload"></i> Select Photo
             </button>
-            <div id="tpmPhotoStagedName" style="font-size:11px;color:var(--muted);margin-top:4px;">No new photo selected</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Photo saves only when you click <strong>Save Changes</strong></div>
+            <div id="tpmPhotoStagedName" style="font-size:10px;color:var(--muted);margin-top:4px;word-break:break-word;">No new photo selected</div>
           </div>
         </div>
       </div>
-
       <div class="pm-field">
         <span class="pm-label">Full Name *</span>
-        <input class="pm-input" id="tpmName" type="text" value="{{ session.get('full_name','') }}"
-               oninput="clearTPMErr(this,'tpmNameErr')" placeholder="Your full name"/>
+        <input class="pm-input" id="tpmName" type="text" value="{{ session.get('full_name','') }}" oninput="clearTPMErr(this,'tpmNameErr')" placeholder="Your full name"/>
         <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="tpmNameErr">Full name is required.</div>
       </div>
       <div class="pm-field">
         <span class="pm-label">Email Address</span>
-        <input class="pm-input" id="tpmEmail" type="email" placeholder="teacher@cvsu.edu.ph"
-               oninput="clearTPMErr(this,'tpmEmailErr')"/>
+        <input class="pm-input" id="tpmEmail" type="email" placeholder="teacher@cvsu.edu.ph" oninput="clearTPMErr(this,'tpmEmailErr')"/>
         <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="tpmEmailErr">Enter a valid email.</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="pm-pw-grid">
         <div class="pm-field" style="margin-bottom:0;">
           <span class="pm-label">New Password</span>
           <input class="pm-input" id="tpmPass" type="password" placeholder="Min 6 chars" oninput="clearTPMErr(this,'tpmPassErr')"/>
@@ -414,9 +562,9 @@
           <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="tpmPass2Err">Passwords don't match.</div>
         </div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;padding-top:12px;border-top:1px solid var(--border);">
-        <span style="font-size:12px;flex:1;display:none;" id="tpmMsg"></span>
-        <button class="btn-primary" onclick="saveTeacherProfile()" style="width:100%;justify-content:center;">
+      <div style="padding-top:12px;border-top:1px solid var(--border);">
+        <span style="font-size:12px;display:none;" id="tpmMsg"></span>
+        <button class="btn-primary" onclick="saveTeacherProfile()" style="width:100%;justify-content:center;margin-top:8px;">
           <i class="bi bi-check-circle"></i> Save Changes
         </button>
       </div>
@@ -463,22 +611,19 @@
     </a>
     {% else %}
     <div class="nav-section-label">My Classroom</div>
-
     <a href="{{ url_for('teacher_dashboard') }}"
-      class="nav-link {% if request.endpoint == 'teacher_dashboard' %}active{% endif %}"
-      onclick="closeSidebar()">
+       class="nav-link {% if request.endpoint == 'teacher_dashboard' %}active{% endif %}"
+       onclick="closeSidebar()">
       <i class="bi bi-house"></i> My Dashboard
     </a>
-
     <a href="{{ url_for('teacher_create_session') }}"
-      class="nav-link {% if request.endpoint == 'teacher_create_session' %}active{% endif %}"
-      onclick="closeSidebar()">
+       class="nav-link {% if request.endpoint == 'teacher_create_session' %}active{% endif %}"
+       onclick="closeSidebar()">
       <i class="bi bi-play-circle"></i> Create Session
     </a>
-
     <a href="{{ url_for('teacher_sessions_students') }}"
-      class="nav-link {% if request.endpoint == 'teacher_sessions_students' %}active{% endif %}"
-      onclick="closeSidebar()">
+       class="nav-link {% if request.endpoint == 'teacher_sessions_students' %}active{% endif %}"
+       onclick="closeSidebar()">
       <i class="bi bi-journal-text"></i> Sessions &amp; Students
     </a>
     {% endif %}
@@ -490,11 +635,11 @@
          onclick="{% if session.get('role')=='admin' %}openPM(){% else %}openTPM(){% endif %}"
          title="Edit your profile">
       <div class="s-avatar-init" id="sidebarAvatarWrap">{{ session.get('full_name','?')[0].upper() }}</div>
-      <div style="min-width:0;flex:1;">
+      <div style="min-width:0;flex:1;overflow:hidden;">
         <div class="u-name" id="sidebarName">{{ session.get('full_name','') }}</div>
         <div class="u-role">{{ session.get('role','') }} <i class="bi bi-pencil" style="font-size:8px;color:var(--accent);"></i></div>
       </div>
-      <a href="{{ url_for('logout') }}" style="margin-left:auto;color:var(--muted);font-size:15px;text-decoration:none;flex-shrink:0;" title="Sign Out" onclick="event.stopPropagation()">
+      <a href="{{ url_for('logout') }}" style="margin-left:auto;color:var(--muted);font-size:15px;text-decoration:none;flex-shrink:0;padding:4px;" title="Sign Out" onclick="event.stopPropagation()">
         <i class="bi bi-box-arrow-right"></i>
       </a>
     </div>
@@ -548,25 +693,21 @@
 /* ══ THEME ══ */
 function toggleTheme(){
   var h=document.documentElement,c=h.getAttribute('data-theme')||'light',n=c==='dark'?'light':'dark';
-  h.setAttribute('data-theme',n);
-  try{localStorage.setItem('davs_theme',n);}catch(e){}
-  updateThemeIcon(n);
+  h.setAttribute('data-theme',n);try{localStorage.setItem('davs_theme',n);}catch(e){}updateThemeIcon(n);
 }
 function updateThemeIcon(t){
   var isDark=(t||document.documentElement.getAttribute('data-theme')||'light')==='dark';
   var i=document.getElementById('themeIcon'),l=document.getElementById('themeLabel');
-  if(i) i.className=isDark?'bi bi-sun-fill':'bi bi-moon-fill';
-  if(l) l.textContent=isDark?'Light':'Dark';
+  if(i)i.className=isDark?'bi bi-sun-fill':'bi bi-moon-fill';
+  if(l)l.textContent=isDark?'Light':'Dark';
 }
-(function(){
-  try{var s=localStorage.getItem('davs_theme')||'light';document.documentElement.setAttribute('data-theme',s);updateThemeIcon(s);}catch(e){}
-})();
+(function(){try{var s=localStorage.getItem('davs_theme')||'light';document.documentElement.setAttribute('data-theme',s);updateThemeIcon(s);}catch(e){}})();
 
 /* ══ CLOCK ══ */
 function updateClock(){var el=document.getElementById('clock');if(el)el.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
 updateClock();setInterval(updateClock,1000);
 
-/* ══ SIDEBAR (responsive) ══ */
+/* ══ SIDEBAR ══ */
 function openSidebar(){
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sidebarOverlay').classList.add('open');
@@ -577,7 +718,6 @@ function closeSidebar(){
   document.getElementById('sidebarOverlay').classList.remove('open');
   document.body.style.overflow='';
 }
-// Close sidebar when pressing Escape
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeSidebar();});
 
 /* ══ TOAST ══ */
@@ -602,43 +742,30 @@ window.addEventListener('load',function(){pollAttendance();setInterval(pollAtten
 (function(){
   fetch('/get_my_photo',{credentials:'same-origin'})
     .then(function(r){return r.json();})
-    .then(function(d){if(d.url)setSidebarPhoto(d.url);})
-    .catch(function(){});
+    .then(function(d){if(d.url)setSidebarPhoto(d.url);}).catch(function(){});
 })();
 function setSidebarPhoto(url){
-  var w=document.getElementById('sidebarAvatarWrap');
-  if(!w)return;
+  var w=document.getElementById('sidebarAvatarWrap');if(!w)return;
   w.innerHTML='';w.style.cssText='width:30px;height:30px;border-radius:50%;overflow:hidden;flex-shrink:0;';
   var img=document.createElement('img');img.src=url+'?t='+Date.now();img.style='width:100%;height:100%;object-fit:cover;';w.appendChild(img);
 }
 
-/* ════════════════════════════════════
-   ADMIN PROFILE MODAL
-   Photo is STAGED locally — only uploaded + saved when Save Changes is clicked
-════════════════════════════════════ */
-var pmStagedFile = null; // holds the File object until Save Changes
-
+/* ════ ADMIN PROFILE MODAL ════ */
+var pmStagedFile=null;
 function openPM(){
   var m=document.getElementById('profileModal');if(!m)return;
-  // Reset to info tab
   document.querySelectorAll('.pm-pane').forEach(function(p){p.classList.remove('active');});
   var ip=document.getElementById('pm-info');if(ip)ip.classList.add('active');
   document.querySelectorAll('.pm-tab').forEach(function(b,i){b.style.color=i===0?'var(--accent)':'var(--muted)';b.style.borderBottomColor=i===0?'var(--accent)':'transparent';b.classList.toggle('active-tab',i===0);});
   pmStagedFile=null;
   document.getElementById('pmPhotoStagedName').textContent='No new photo selected';
   m.classList.add('show');
-  fetch('/api/my_profile',{credentials:'same-origin'})
-    .then(function(r){return r.json();})
+  fetch('/api/my_profile',{credentials:'same-origin'}).then(function(r){return r.json();})
     .then(function(d){
       var em=document.getElementById('pmEmail');if(em&&d.email)em.value=d.email;
       var ie=document.getElementById('pm_info_email');if(ie)ie.textContent=d.email||'—';
       var rp=document.getElementById('pmRolePill');if(rp)rp.textContent=(d.role||'admin').toUpperCase();
-      // Show current saved photo in both Info and Edit tab
-      if(d.photo){
-        var url='/static/uploads/'+d.photo+'?t='+Date.now();
-        setAvatarImg('pmInfoAvatarWrap', url);
-        setAvatarImg('pmEditAvatarWrap', url);
-      }
+      if(d.photo){var url='/static/uploads/'+d.photo+'?t='+Date.now();setAvatarImg('pmInfoAvatarWrap',url);setAvatarImg('pmEditAvatarWrap',url);}
     }).catch(function(){});
 }
 function closePM(){var m=document.getElementById('profileModal');if(m)m.classList.remove('show');pmStagedFile=null;}
@@ -651,10 +778,7 @@ function switchPmTab(id,btn){
 function stageAdminPhoto(input){
   if(!input.files||!input.files[0])return;
   pmStagedFile=input.files[0];
-  // Show LOCAL preview only — does NOT upload yet
-  var reader=new FileReader();
-  reader.onload=function(e){setAvatarImg('pmEditAvatarWrap',e.target.result);};
-  reader.readAsDataURL(pmStagedFile);
+  var reader=new FileReader();reader.onload=function(e){setAvatarImg('pmEditAvatarWrap',e.target.result);};reader.readAsDataURL(pmStagedFile);
   document.getElementById('pmPhotoStagedName').textContent='Selected: '+pmStagedFile.name;
 }
 function setAvatarImg(wrapId,src){
@@ -673,39 +797,21 @@ async function saveProfileModal(){
   var email=document.getElementById('pmEmail')?document.getElementById('pmEmail').value.trim():'';
   var pass=document.getElementById('pmPass')?document.getElementById('pmPass').value:'';
   var pass2=document.getElementById('pmPass2')?document.getElementById('pmPass2').value:'';
-  var msg=document.getElementById('pmMsg');
-  var ok=true;
+  var msg=document.getElementById('pmMsg');var ok=true;
   if(!name){var el=document.getElementById('pmName');if(el)el.style.borderColor='var(--danger)';var er=document.getElementById('pmNameErr');if(er)er.style.display='block';ok=false;}
   if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){var el=document.getElementById('pmEmail');if(el)el.style.borderColor='var(--danger)';var er=document.getElementById('pmEmailErr');if(er)er.style.display='block';ok=false;}
   if(pass&&pass.length<6){var el=document.getElementById('pmPass');if(el)el.style.borderColor='var(--danger)';var er=document.getElementById('pmPassErr');if(er)er.style.display='block';ok=false;}
   if(pass&&pass2&&pass!==pass2){var er=document.getElementById('pmPass2Err');if(er)er.style.display='block';ok=false;}
   if(!ok)return;
-
-  // Step 1: Upload staged photo if any
   if(pmStagedFile){
-    var fd=new FormData();
-    fd.append('photo',pmStagedFile);
-    fd.append('person_id','{{ session.get("username","") }}');
-    try{
-      var pr=await fetch('/upload_photo',{method:'POST',credentials:'same-origin',body:fd});
-      var pd=await pr.json();
-      if(pd.ok){
-        // Update sidebar and Info pane immediately after successful upload
-        setSidebarPhoto(pd.url);
-        setAvatarImg('pmInfoAvatarWrap',pd.url+'?t='+Date.now());
-      }
-    }catch(e){console.warn('Photo upload error:',e);}
-    pmStagedFile=null;
-    document.getElementById('pmPhotoStagedName').textContent='No new photo selected';
+    var fd=new FormData();fd.append('photo',pmStagedFile);fd.append('person_id','{{ session.get("username","") }}');
+    try{var pr=await fetch('/upload_photo',{method:'POST',credentials:'same-origin',body:fd});var pd=await pr.json();if(pd.ok){setSidebarPhoto(pd.url);setAvatarImg('pmInfoAvatarWrap',pd.url+'?t='+Date.now());}}catch(e){console.warn(e);}
+    pmStagedFile=null;document.getElementById('pmPhotoStagedName').textContent='No new photo selected';
   }
-
-  // Step 2: Save profile data to SQLite
   try{
     var r=await fetch('/update_profile',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({full_name:name,email:email,password:pass||undefined})});
-    var d=await r.json();
-    if(msg)msg.style.display='block';
-    if(d.ok){
-      if(msg){msg.style.color='var(--success)';msg.textContent='Profile saved!';}
+    var d=await r.json();if(msg)msg.style.display='block';
+    if(d.ok){if(msg){msg.style.color='var(--success)';msg.textContent='Profile saved!';}
       var sn=document.getElementById('sidebarName');if(sn)sn.textContent=d.full_name;
       var dn=document.getElementById('pmDisplayName');if(dn)dn.textContent=d.full_name;
       var ni=document.getElementById('pm_info_name');if(ni)ni.textContent=d.full_name;
@@ -715,29 +821,20 @@ async function saveProfileModal(){
   }catch(e){if(msg){msg.style.color='var(--danger)';msg.textContent='Network error.';}}
 }
 
-/* ════════════════════════════════════
-   TEACHER PROFILE MODAL
-════════════════════════════════════ */
-var tpmStagedFile = null;
-
+/* ════ TEACHER PROFILE MODAL ════ */
+var tpmStagedFile=null;
 function openTPM(){
   var m=document.getElementById('teacherProfileModal');if(!m)return;
   document.querySelectorAll('#teacherProfileModal .pm-pane').forEach(function(p){p.classList.remove('active');});
   var ip=document.getElementById('tpm-info');if(ip)ip.classList.add('active');
   document.querySelectorAll('#teacherProfileModal .pm-tab').forEach(function(b,i){b.style.color=i===0?'var(--accent)':'var(--muted)';b.style.borderBottomColor=i===0?'var(--accent)':'transparent';b.classList.toggle('active-tab',i===0);});
-  tpmStagedFile=null;
-  document.getElementById('tpmPhotoStagedName').textContent='No new photo selected';
+  tpmStagedFile=null;document.getElementById('tpmPhotoStagedName').textContent='No new photo selected';
   m.classList.add('show');
-  fetch('/api/my_profile',{credentials:'same-origin'})
-    .then(function(r){return r.json();})
+  fetch('/api/my_profile',{credentials:'same-origin'}).then(function(r){return r.json();})
     .then(function(d){
       var em=document.getElementById('tpmEmail');if(em&&d.email)em.value=d.email;
       var ie=document.getElementById('tpm_info_email');if(ie)ie.textContent=d.email||'—';
-      if(d.photo){
-        var url='/static/uploads/'+d.photo+'?t='+Date.now();
-        setAvatarImg('tpmInfoAvatarWrap',url);
-        setAvatarImg('tpmEditAvatarWrap',url);
-      }
+      if(d.photo){var url='/static/uploads/'+d.photo+'?t='+Date.now();setAvatarImg('tpmInfoAvatarWrap',url);setAvatarImg('tpmEditAvatarWrap',url);}
     }).catch(function(){});
 }
 function closeTPM(){var m=document.getElementById('teacherProfileModal');if(m)m.classList.remove('show');tpmStagedFile=null;}
@@ -750,9 +847,7 @@ function switchTPMTab(id,btn){
 function stageTeacherPhoto(input){
   if(!input.files||!input.files[0])return;
   tpmStagedFile=input.files[0];
-  var reader=new FileReader();
-  reader.onload=function(e){setAvatarImg('tpmEditAvatarWrap',e.target.result);};
-  reader.readAsDataURL(tpmStagedFile);
+  var reader=new FileReader();reader.onload=function(e){setAvatarImg('tpmEditAvatarWrap',e.target.result);};reader.readAsDataURL(tpmStagedFile);
   document.getElementById('tpmPhotoStagedName').textContent='Selected: '+tpmStagedFile.name;
 }
 function clearTPMErr(el,errId){el.style.borderColor='';var e=document.getElementById(errId);if(e)e.style.display='none';}
@@ -766,33 +861,21 @@ async function saveTeacherProfile(){
   var email=document.getElementById('tpmEmail')?document.getElementById('tpmEmail').value.trim():'';
   var pass=document.getElementById('tpmPass')?document.getElementById('tpmPass').value:'';
   var pass2=document.getElementById('tpmPass2')?document.getElementById('tpmPass2').value:'';
-  var msg=document.getElementById('tpmMsg');
-  var ok=true;
+  var msg=document.getElementById('tpmMsg');var ok=true;
   if(!name){var el=document.getElementById('tpmName');if(el)el.style.borderColor='var(--danger)';var er=document.getElementById('tpmNameErr');if(er)er.style.display='block';ok=false;}
   if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){var el=document.getElementById('tpmEmail');if(el)el.style.borderColor='var(--danger)';var er=document.getElementById('tpmEmailErr');if(er)er.style.display='block';ok=false;}
   if(pass&&pass.length<6){var el=document.getElementById('tpmPass');if(el)el.style.borderColor='var(--danger)';var er=document.getElementById('tpmPassErr');if(er)er.style.display='block';ok=false;}
   if(pass&&pass2&&pass!==pass2){var er=document.getElementById('tpmPass2Err');if(er)er.style.display='block';ok=false;}
   if(!ok)return;
-
   if(tpmStagedFile){
-    var fd=new FormData();
-    fd.append('photo',tpmStagedFile);
-    fd.append('person_id','{{ session.get("username","") }}');
-    try{
-      var pr=await fetch('/upload_photo',{method:'POST',credentials:'same-origin',body:fd});
-      var pd=await pr.json();
-      if(pd.ok){setSidebarPhoto(pd.url);setAvatarImg('tpmInfoAvatarWrap',pd.url+'?t='+Date.now());}
-    }catch(e){console.warn('Photo upload error:',e);}
-    tpmStagedFile=null;
-    document.getElementById('tpmPhotoStagedName').textContent='No new photo selected';
+    var fd=new FormData();fd.append('photo',tpmStagedFile);fd.append('person_id','{{ session.get("username","") }}');
+    try{var pr=await fetch('/upload_photo',{method:'POST',credentials:'same-origin',body:fd});var pd=await pr.json();if(pd.ok){setSidebarPhoto(pd.url);setAvatarImg('tpmInfoAvatarWrap',pd.url+'?t='+Date.now());}}catch(e){console.warn(e);}
+    tpmStagedFile=null;document.getElementById('tpmPhotoStagedName').textContent='No new photo selected';
   }
-
   try{
     var r=await fetch('/update_profile',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({full_name:name,email:email,password:pass||undefined})});
-    var d=await r.json();
-    if(msg)msg.style.display='block';
-    if(d.ok){
-      if(msg){msg.style.color='var(--success)';msg.textContent='Profile saved!';}
+    var d=await r.json();if(msg)msg.style.display='block';
+    if(d.ok){if(msg){msg.style.color='var(--success)';msg.textContent='Profile saved!';}
       var sn=document.getElementById('sidebarName');if(sn)sn.textContent=d.full_name;
       var dn=document.getElementById('tpmDisplayName');if(dn)dn.textContent=d.full_name;
       var ni=document.getElementById('tpm_info_name');if(ni)ni.textContent=d.full_name;

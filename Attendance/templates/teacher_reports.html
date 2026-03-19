@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Attendance Reports — DAVS{% endblock %}
+{% block page_title %}MY CLASS ATTENDANCE REPORTS{% endblock %}
+{% block content %}
+<style>
+  .student-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;transition:border-color .2s;flex-wrap:wrap;}
+  .student-card:hover{border-color:var(--accent);}
+  .student-card.good{border-left:3px solid var(--success);}
+  .student-card.at-risk{border-left:3px solid var(--warning);}
+  .student-card.critical{border-left:3px solid var(--danger);}
+  .rate-bar-bg{height:6px;background:var(--border);border-radius:999px;overflow:hidden;flex:1;min-width:100px;max-width:180px;}
+  .rate-bar-fill{height:100%;border-radius:999px;transition:width .8s ease;}
+  .rate-label{font-family:'Space Mono',monospace;font-size:12px;font-weight:700;}
+  .hidden-card{display:none!important;}
+  .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+  .filter-group{display:flex;flex-direction:column;gap:5px;flex:1;min-width:130px;}
+  .filter-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+  .filter-select{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;appearance:none;transition:border-color .2s;}
+  .filter-select:focus{outline:none;border-color:var(--accent);}
+  .filter-select option{background:#1a1d24;}
+  .btn-reset{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:8px 14px;font-size:12px;cursor:pointer;align-self:flex-end;transition:all .2s;}
+  .btn-reset:hover{border-color:var(--danger);color:var(--danger);}
+  .filter-count{font-size:12px;color:var(--muted);align-self:flex-end;white-space:nowrap;}
+</style>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">// ATTENDANCE ANALYSIS</div>
+    <h2 style="font-size:22px;font-weight:600;margin-bottom:4px;">Class Attendance Reports</h2>
+    <p style="font-size:13px;color:var(--muted);">
+      <strong style="color:var(--text);">{{ students|length }}</strong> student{{ 's' if students|length != 1 else '' }} across your assigned sections.
+      Rates calculated from all blockchain-recorded classroom sessions.
+    </p>
+  </div>
+  <a href="{{ url_for('teacher_export') }}" class="btn-outline" style="font-size:13px;padding:9px 16px;">
+    <i class="bi bi-download"></i> Export CSV
+  </a>
+</div>
+
+{% if students %}
+<div class="filter-bar">
+  <div class="filter-group" style="flex:2;min-width:180px;">
+    <span class="filter-label"><i class="bi bi-search"></i> Search</span>
+    <input type="text" class="filter-select" id="tr_search" placeholder="Name or NFC ID…" oninput="filterTR()" style="appearance:none;"/>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label"><i class="bi bi-layers"></i> Year Level</span>
+    <select class="filter-select" id="tr_year" onchange="filterTR()">
+      <option value="">All Years</option>
+      <option value="1st Year">1st Year</option>
+      <option value="2nd Year">2nd Year</option>
+      <option value="3rd Year">3rd Year</option>
+      <option value="4th Year">4th Year</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label"><i class="bi bi-grid"></i> Section</span>
+    <select class="filter-select" id="tr_section" onchange="filterTR()">
+      <option value="">All Sections</option>
+      <option value="A">Section A</option>
+      <option value="B">Section B</option>
+      <option value="C">Section C</option>
+      <option value="D">Section D</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label"><i class="bi bi-flag"></i> Standing</span>
+    <select class="filter-select" id="tr_standing" onchange="filterTR()">
+      <option value="">All</option>
+      <option value="good">Good (≥75%)</option>
+      <option value="at-risk">At Risk</option>
+      <option value="critical">Critical</option>
+    </select>
+  </div>
+  <button class="btn-reset" onclick="resetTR()"><i class="bi bi-x-circle"></i> Reset</button>
+  <span class="filter-count" id="tr_count">{{ students|length }} of {{ students|length }}</span>
+</div>
+
+<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;">
+  <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);"><div style="width:10px;height:10px;border-radius:2px;background:var(--success);"></div> Good (≥75%)</div>
+  <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);"><div style="width:10px;height:10px;border-radius:2px;background:var(--warning);"></div> At Risk (50–74%)</div>
+  <div style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);"><div style="width:10px;height:10px;border-radius:2px;background:var(--danger);"></div> Critical (&lt;50%)</div>
+</div>
+
+<div id="trList" style="display:flex;flex-direction:column;gap:10px;">
+  {% for s in students %}
+  {% set rate = s.rate %}
+  {% set standing = 'good' if rate >= 75 else ('at-risk' if rate >= 50 else 'critical') %}
+  <div class="student-card {{ standing }}"
+       data-name="{{ s.name|lower }}"
+       data-nfc="{{ s.nfcId|lower }}"
+       data-year="{{ s.year_level|default('') }}"
+       data-section="{{ s.section|default('') }}"
+       data-standing="{{ standing }}">
+    <div style="min-width:160px;">
+      <div style="font-weight:600;font-size:15px;">{{ s.name }}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px;"><code>{{ s.nfcId }}</code></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">
+        <i class="bi bi-mortarboard"></i> {{ s.course.replace('BS ','') }} · {{ s.year_level.replace(' Year','Y') }} · Sec {{ s.section }}
+      </div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <div style="text-align:center;"><div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:700;">{{ s.total }}</div><div style="font-size:11px;color:var(--muted);">Classes Held</div></div>
+      <div style="text-align:center;"><div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--success);">{{ s.present }}</div><div style="font-size:11px;color:var(--muted);">Attended</div></div>
+      <div style="text-align:center;"><div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--danger);">{{ s.total - s.present }}</div><div style="font-size:11px;color:var(--muted);">Missed</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:200px;max-width:260px;">
+      <div class="rate-bar-bg" style="max-width:180px;">
+        <div class="rate-bar-fill" style="width:{{ rate }}%;background:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};"></div>
+      </div>
+      <span class="rate-label" style="color:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %}">{{ rate }}%</span>
+    </div>
+    <a href="{{ url_for('view_attendance', nfc_id=s.nfcId) }}" class="btn-success-custom" style="font-size:12px;padding:7px 14px;">
+      <i class="bi bi-journal-text"></i> Record
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card" style="text-align:center;padding:60px 20px;">
+  <i class="bi bi-bar-chart" style="font-size:48px;opacity:.2;display:block;margin-bottom:16px;color:var(--muted);"></i>
+  <div style="color:var(--muted);">No students in your sections yet.</div>
+</div>
+{% endif %}
+
+<script>
+  const totalTR={{ students|length }};
+  function filterTR(){
+    const q=document.getElementById('tr_search').value.toLowerCase();
+    const yr=document.getElementById('tr_year').value;
+    const sec=document.getElementById('tr_section').value;
+    const st=document.getElementById('tr_standing').value;
+    let shown=0;
+    document.querySelectorAll('#trList .student-card').forEach(c=>{
+      const m=(!q||c.dataset.name.includes(q)||c.dataset.nfc.includes(q))&&
+              (!yr||c.dataset.year===yr)&&(!sec||c.dataset.section===sec)&&(!st||c.dataset.standing===st);
+      c.classList.toggle('hidden-card',!m); if(m)shown++;
+    });
+    document.getElementById('tr_count').textContent=`${shown} of ${totalTR}`;
+  }
+  function resetTR(){['tr_search','tr_year','tr_section','tr_standing'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});filterTR();}
+</script>
+{% endblock %}

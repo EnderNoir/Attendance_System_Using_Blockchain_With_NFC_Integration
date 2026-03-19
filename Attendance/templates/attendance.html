@@ -1,38 +1,151 @@
-{% extends "base.html" %} {% block content %}
-<h2 class="mt-4">📊 Attendance History</h2>
-<p><strong>NFC ID:</strong> {{ nfc_id }}</p>
+{% extends "base.html" %}
+{% block title %}Attendance Record — DAVS{% endblock %}
+{% block page_title %}STUDENT ATTENDANCE RECORD{% endblock %}
+{% block content %}
+<style>
+  .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:12px;margin-bottom:18px;transition:color .2s;}
+  .back-link:hover{color:var(--accent);}
+  .summary-pill{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;flex:1;min-width:120px;}
+  .summary-pill .val{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;}
+  .summary-pill .lbl{font-size:10px;color:var(--muted);margin-top:2px;}
 
-{% if records %}
-<table class="table table-striped table-hover mt-3">
-  <thead class="table-dark">
-    <tr>
-      <th>Date & Time</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for timestamp, present in records %}
-    <tr>
-      <td>{{ timestamp }}</td>
-      <td>
-        {% if present %}
-        <span class="badge bg-success">Present</span>
-        {% else %}
-        <span class="badge bg-danger">Absent</span>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% else %}
-<div class="alert alert-warning">
-  No attendance records found for this NFC ID.
+  /* Session record card */
+  .sess-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;transition:border-color .2s;}
+  .sess-card:hover{border-color:var(--border);}
+  .sess-card.present{border-left:3px solid var(--success);}
+  .sess-card.late{border-left:3px solid var(--warning);}
+  .sess-card.excused{border-left:3px solid #60a5fa;}
+  .sess-card.absent{border-left:3px solid var(--danger);}
+</style>
+
+<a href="{{ url_for('dashboard') }}" class="back-link"><i class="bi bi-arrow-left"></i> Back to Directory</a>
+
+{% set present_count = records | selectattr('1') | list | length %}
+{% set total = records | length %}
+{% set rate = ((present_count / total * 100) | round(1)) if total > 0 else 0 %}
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">// INDIVIDUAL ATTENDANCE RECORD</div>
+    <h2 style="font-size:20px;font-weight:600;margin-bottom:4px;">
+      {% if student and student.name %}{{ student.name }}{% else %}Attendance History{% endif %}
+    </h2>
+    <p style="font-size:12px;color:var(--muted);">
+      NFC: <code>{{ nfc_id }}</code>
+      {% if student and student.course %}&nbsp;·&nbsp; {{ student.course }} · {{ student.year_level }} · Section {{ student.section }}{% endif %}
+      &nbsp;·&nbsp; All records verified on-chain.
+    </p>
+  </div>
+  <a href="{{ url_for('export_page') }}?nfc_id={{ nfc_id }}" class="btn-outline" style="font-size:12px;">
+    <i class="bi bi-download"></i> Export CSV
+  </a>
+</div>
+
+<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+  <div class="summary-pill"><div class="card-icon cyan"><i class="bi bi-calendar-check"></i></div><div><div class="val">{{ total }}</div><div class="lbl">Classes Held</div></div></div>
+  <div class="summary-pill"><div class="card-icon green"><i class="bi bi-check-circle"></i></div><div><div class="val" style="color:var(--success);">{{ present_count }}</div><div class="lbl">Attended</div></div></div>
+  <div class="summary-pill"><div class="card-icon" style="background:rgba(239,68,68,.1);color:var(--danger)"><i class="bi bi-x-circle"></i></div><div><div class="val" style="color:var(--danger);">{{ total - present_count }}</div><div class="lbl">Missed</div></div></div>
+  <div class="summary-pill"><div class="card-icon amber"><i class="bi bi-percent"></i></div>
+    <div><div class="val" style="color:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ rate }}%</div><div class="lbl">Rate</div></div></div>
+</div>
+
+{% if total > 0 %}
+<div class="card" style="padding:16px 20px;margin-bottom:20px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <div>
+      <div style="font-size:12px;font-weight:600;">Overall Attendance Standing</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:1px;">
+        {% if rate >= 75 %}✅ Good standing — meets 75% requirement
+        {% elif rate >= 50 %}⚠️ At risk — below the 75% requirement
+        {% else %}❌ Critical — significantly below required threshold{% endif %}
+      </div>
+    </div>
+    <span style="font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ rate }}%</span>
+  </div>
+  <div style="height:7px;background:var(--border);border-radius:999px;overflow:hidden;">
+    <div style="height:100%;width:{{ rate }}%;background:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};border-radius:999px;transition:width .8s;"></div>
+  </div>
 </div>
 {% endif %}
 
-<div class="mt-3">
-  <a href="{{ url_for('dashboard') }}" class="btn btn-info">📊 Dashboard</a>
-  <a href="{{ url_for('index') }}" class="btn btn-secondary">🏠 Back to Home</a>
+<!-- Session-by-session detail (from sessions_db) -->
+<div class="card" style="margin-bottom:20px;">
+  <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div class="card-title-text">Classroom Session Log</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">Subject · Instructor · Date · Time · Status for each recorded session</div>
+    </div>
+    <span style="font-size:11px;color:var(--muted);" id="sessCount">Loading…</span>
+  </div>
+  <!-- Scrollable session list -->
+  <div style="max-height:480px;overflow-y:auto;padding:14px 18px;" class="scroll-container" id="sessionDetailList">
+    <div style="text-align:center;color:var(--muted);padding:32px;font-size:12px;">
+      <div class="spin" style="margin:0 auto 10px;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;"></div>
+      Loading session records…
+    </div>
+  </div>
 </div>
+
+<!-- Legacy blockchain tap log (timestamp only) -->
+{% if records %}
+<div class="card">
+  <div style="padding:16px 20px;border-bottom:1px solid var(--border);">
+    <div class="card-title-text">Raw Blockchain Tap Log</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px;">Raw on-chain attendance timestamps — immutable records from the Ethereum blockchain</div>
+  </div>
+  <div style="max-height:320px;overflow-y:auto;padding:10px 20px 16px;" class="scroll-container">
+    {% for timestamp, present in records %}
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);" class="timeline-item">
+      <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);width:20px;text-align:right;flex-shrink:0;">{{ loop.index }}</div>
+      <div style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:{% if present %}var(--success){% else %}var(--danger){% endif %};"></div>
+      <div style="flex:1;font-size:12px;">
+        {{ timestamp.split(' ')[1] if ' ' in timestamp else timestamp }}
+        <div style="font-size:10px;color:var(--muted);margin-top:1px;"><i class="bi bi-calendar3"></i> {{ timestamp.split(' ')[0] if ' ' in timestamp else '' }}</div>
+      </div>
+      {% if present %}
+        <span class="badge-present"><i class="bi bi-check"></i> Attended</span>
+      {% else %}
+        <span class="badge-absent"><i class="bi bi-x"></i> Absent</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+// Load detailed session records
+fetch('/api/student_sessions/{{ nfc_id }}', {credentials:'same-origin'})
+.then(r=>r.json()).then(sessions=>{
+  const list=document.getElementById('sessionDetailList');
+  document.getElementById('sessCount').textContent=`${sessions.length} session${sessions.length!==1?'s':''}`;
+  if(!sessions.length){
+    list.innerHTML='<div style="text-align:center;color:var(--muted);padding:32px;font-size:12px;"><i class="bi bi-calendar-x" style="font-size:28px;display:block;opacity:.2;margin-bottom:8px;"></i>No detailed session records found.</div>';
+    return;
+  }
+  list.innerHTML=sessions.map((s,i)=>`
+    <div class="sess-card ${s.status}" style="${i>0?'margin-top:8px':''}">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;font-size:13px;">${s.subject_name}${s.course_code?' <span style=\\"font-family:monospace;font-size:10px;color:var(--accent);\\">['+s.course_code+']</span>':''}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:12px;">
+          <span><i class="bi bi-person-badge"></i> ${s.teacher_name}</span>
+          <span><i class="bi bi-grid"></i> ${s.section_key.replace(/\|/g,' · ')}</span>
+          <span><i class="bi bi-clock"></i> ${s.time_slot}</span>
+          <span><i class="bi bi-calendar3"></i> ${s.date}</span>
+          ${s.units?`<span><i class="bi bi-layers"></i> ${s.units} units</span>`:''}
+        </div>
+      </div>
+      <span style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0;
+        ${s.status==='present'?'background:rgba(16,185,129,.12);color:var(--success);border:1px solid rgba(16,185,129,.25);':
+          s.status==='late'?'background:rgba(245,158,11,.1);color:var(--warning);border:1px solid rgba(245,158,11,.25);':
+          s.status==='excused'?'background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.25);':
+          'background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2);'}">
+        ${s.status.charAt(0).toUpperCase()+s.status.slice(1)}
+      </span>
+    </div>
+  `).join('');
+}).catch(()=>{
+  document.getElementById('sessionDetailList').innerHTML='<div style="color:var(--danger);text-align:center;padding:24px;font-size:12px;">Failed to load session records.</div>';
+});
+</script>
 {% endblock %}

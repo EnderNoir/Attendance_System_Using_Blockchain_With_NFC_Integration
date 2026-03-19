@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+{% block title %}Class History — DAVS{% endblock %}
+{% block page_title %}CLASS HISTORY{% endblock %}
+{% block content %}
+<style>
+  /* ── Session row ── */
+  .sess-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 16px;display:flex;align-items:center;gap:12px;margin-bottom:7px;transition:border-color .2s;}
+  .sess-row:hover{border-color:rgba(45,106,39,.3);}
+  .sess-row.live-row{border-color:rgba(45,106,39,.4);box-shadow:0 0 0 1px rgba(45,106,39,.06);}
+  .sr-name{font-weight:700;font-size:14px;flex:1;min-width:0;}
+  .sr-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .btn-vr{background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);color:var(--accent);font-weight:600;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .2s;flex-shrink:0;white-space:nowrap;}
+  .btn-vr:hover{background:rgba(45,106,39,.18);}
+  .live-dot{width:7px;height:7px;background:var(--success);border-radius:50%;animation:pulse 1.5s infinite;flex-shrink:0;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+  .badge-live{background:rgba(45,106,39,.12);color:var(--success);border:1px solid rgba(45,106,39,.25);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;}
+  .badge-done{background:rgba(100,116,139,.08);color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:2px 9px;font-size:10px;}
+
+  /* ── Filter bar ── */
+  .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;}
+  .fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px;}
+  .fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .fs{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;appearance:none;}
+  .fs:focus{outline:none;border-color:var(--accent);}
+  .btn-rst{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;align-self:flex-end;transition:all .2s;}
+  .btn-rst:hover{border-color:var(--danger);color:var(--danger);}
+
+  /* ── Session detail modal ── */
+  .sp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .sp-overlay.show{opacity:1;pointer-events:all;}
+  .sp-box{background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:620px;width:96%;max-height:92vh;overflow-y:auto;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);scrollbar-width:thin;}
+  .sp-overlay.show .sp-box{transform:scale(1);}
+  .sp-topbar{padding:14px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+  .sp-topbar h3{font-size:15px;font-weight:700;margin:0;flex:1;min-width:0;}
+  .back-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+  .back-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .sp-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 20px;overflow-x:auto;}
+  .sptab{padding:9px 14px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;white-space:nowrap;}
+  .sptab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .sppane{display:none;padding:16px 20px 18px;}.sppane.active{display:block;}
+  .info-row{padding:7px 0;border-bottom:1px solid var(--border);display:grid;grid-template-columns:130px 1fr;gap:8px;}
+  .info-row:last-child{border-bottom:none;}
+  .info-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .info-val{font-size:13px;word-break:break-word;}
+  .sec-title{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin:12px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border);}
+  .att-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap;gap:6px;}
+  .att-item:last-child{border-bottom:none;}
+  .tx-chip{font-family:'Space Mono',monospace;font-size:9px;color:rgba(45,106,39,.7);background:rgba(45,106,39,.06);border:1px solid rgba(45,106,39,.15);border-radius:4px;padding:2px 6px;margin-top:2px;display:inline-block;word-break:break-all;}
+
+  /* ── Excuse modal ── */
+  .excuse-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:10000;opacity:0;pointer-events:none;transition:opacity .2s;}
+  .excuse-overlay.show{opacity:1;pointer-events:all;}
+  .excuse-box{background:var(--surface);border:1px solid rgba(96,165,250,.3);border-radius:14px;padding:24px 26px;max-width:360px;width:92%;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);}
+  .excuse-overlay.show .excuse-box{transform:scale(1);}
+
+  /* Responsive */
+  @media(max-width:600px){
+    .sp-box{width:100%;max-height:100vh;border-radius:0;}
+    .info-row{grid-template-columns:100px 1fr;}
+  }
+</style>
+
+<!-- ── Session Detail Modal ── -->
+<div class="sp-overlay" id="spModal" onclick="if(event.target===this)closeSp()">
+  <div class="sp-box">
+    <div class="sp-topbar">
+      <button class="back-btn" onclick="closeSp()"><i class="bi bi-arrow-left"></i> Back</button>
+      <h3 id="spTitle">—</h3>
+      <span id="spStatusBadge"></span>
+    </div>
+    <div class="sp-tabs">
+      <button class="sptab active"  onclick="switchSp('info',this)"><i class="bi bi-info-circle"></i> Info</button>
+      <button class="sptab"         onclick="switchSp('attendance',this)"><i class="bi bi-people"></i> Attendance</button>
+      <button class="sptab" id="spActionsTab" onclick="switchSp('actions',this)"><i class="bi bi-gear"></i> Actions</button>
+    </div>
+    <div class="sppane active" id="sppane-info">    <div id="spInfoContent"></div></div>
+    <div class="sppane"         id="sppane-attendance"><div id="spAttContent"></div></div>
+    <div class="sppane"         id="sppane-actions">  <div id="spActionsContent"></div></div>
+  </div>
+</div>
+
+<!-- ── Excuse Modal ── -->
+<div class="excuse-overlay" id="excuseOverlay">
+  <div class="excuse-box">
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Mark as Excused</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Student: <strong id="excuseName" style="color:var(--text);"></strong></div>
+    <input type="hidden" id="excuseNfc"/>
+    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:5px;">Reason / Note (optional)</label>
+    <input type="text" id="excuseNote" placeholder="e.g. Medical leave, Official business…"
+           style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;font-family:'DM Sans',sans-serif;margin-bottom:14px;"/>
+    <div style="display:flex;gap:8px;">
+      <button onclick="submitExcuse()" style="background:#3b82f6;border:none;color:#fff;font-weight:700;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;"><i class="bi bi-check"></i> Mark Excused</button>
+      <button onclick="closeExcuse()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Page header -->
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;">
+  <div>
+    <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">// SESSION LOG</div>
+    <h2 style="font-size:20px;font-weight:600;margin-bottom:3px;">Class History</h2>
+    <p style="font-size:12px;color:var(--muted);">All your classroom sessions — live and completed.</p>
+  </div>
+  <a href="{{ url_for('teacher_dashboard') }}" class="btn-outline" style="font-size:13px;padding:8px 14px;text-decoration:none;">
+    <i class="bi bi-arrow-left"></i> Dashboard
+  </a>
+</div>
+
+<!-- ══ LIVE SESSIONS (always visible at top) ══ -->
+{% set live_sessions = {} %}
+{% for sid, s in my_sessions.items() %}{% if not s.ended_at %}{% set _ = live_sessions.update({sid: s}) %}{% endif %}{% endfor %}
+
+{% if live_sessions %}
+<div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--success);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">// LIVE NOW</div>
+{% for sid, s in live_sessions.items() %}
+<div class="sess-row live-row">
+  <div class="live-dot"></div>
+  <div style="flex:1;min-width:0;">
+    <div class="sr-name">
+      {% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif %}{{ s.subject_name }}
+    </div>
+    <div class="sr-sub">{{ s.section_key.replace('|',' · ') }} · {{ s.time_slot or '—' }}</div>
+  </div>
+  <span class="badge-live">LIVE</span>
+  <button class="btn-vr" onclick='openSp({{ {"sid":sid,"subject":s.subject_name,"code":s.get("course_code",""),"section":s.section_key,"teacher":s.teacher_name,"started":s.started_at,"ended":s.ended_at,"time_slot":s.get("time_slot",""),"present":s.present,"late":s.get("late",[]),"excused":s.get("excused",[]),"tx_hashes":s.get("tx_hashes",{}),"is_live":true}|tojson|e }})'>
+    <i class="bi bi-eye"></i> View
+  </button>
+  <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-vr" style="text-decoration:none;background:rgba(45,106,39,.15);">
+    <i class="bi bi-broadcast"></i> Monitor
+  </a>
+</div>
+{% endfor %}
+<div style="margin-bottom:20px;"></div>
+{% endif %}
+
+<!-- ══ COMPLETED SESSIONS ══ -->
+<div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:10px;">// COMPLETED SESSIONS</div>
+
+{% set ended_sessions = {} %}
+{% for sid, s in my_sessions.items() %}{% if s.ended_at %}{% set _ = ended_sessions.update({sid: s}) %}{% endif %}{% endfor %}
+
+{% if ended_sessions %}
+<div class="filter-bar">
+  <div class="fg" style="flex:2;min-width:160px;">
+    <span class="fl"><i class="bi bi-search"></i> Search</span>
+    <input type="text" class="fs" id="hf_search" placeholder="Subject name…" oninput="filterHistory()" style="appearance:none;"/>
+  </div>
+  <div class="fg">
+    <span class="fl">Year</span>
+    <select class="fs" id="hf_year" onchange="filterHistory()">
+      <option value="">All Years</option>
+      {% set years=[] %}
+      {% for sid,s in ended_sessions.items() %}{% if s.started_at %}{% set yr=s.started_at[:4] %}{% if yr not in years %}{% set _=years.append(yr) %}<option value="{{ yr }}">{{ yr }}</option>{% endif %}{% endif %}{% endfor %}
+    </select>
+  </div>
+  <button class="btn-rst" onclick="resetHistory()"><i class="bi bi-x-circle"></i> Reset</button>
+  <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="hf_count">{{ ended_sessions|length }} shown</span>
+</div>
+
+<div style="max-height:580px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="historyList">
+  {% for sid, s in ended_sessions.items()|sort(attribute='1.started_at',reverse=True) %}
+  <div class="sess-row"
+       id="hrow_{{ sid }}"
+       data-subj="{{ s.subject_name|lower }} {{ s.course_code|default('')|lower }}"
+       data-year="{{ s.started_at[:4] if s.started_at else '' }}">
+    <div style="flex:1;min-width:0;">
+      <div class="sr-name">
+        {% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif %}{{ s.subject_name }}
+      </div>
+      <div class="sr-sub">{{ s.section_key.replace('|',' · ') }} · {{ fmt_time(s.started_at) }}</div>
+    </div>
+    <span class="badge-done"><i class="bi bi-check-circle"></i> Done</span>
+    <button class="btn-vr" onclick='openSp({{ {"sid":sid,"subject":s.subject_name,"code":s.get("course_code",""),"section":s.section_key,"teacher":s.teacher_name,"started":s.started_at,"ended":s.ended_at,"time_slot":s.get("time_slot",""),"present":s.present,"late":s.get("late",[]),"excused":s.get("excused",[]),"tx_hashes":s.get("tx_hashes",{}),"is_live":false}|tojson|e }})'>
+      <i class="bi bi-eye"></i> View
+    </button>
+  </div>
+  {% endfor %}
+  <div id="hf_empty" style="display:none;text-align:center;padding:40px;color:var(--muted);">
+    <i class="bi bi-search" style="font-size:32px;opacity:.2;display:block;margin-bottom:8px;"></i>No sessions match.
+  </div>
+</div>
+
+{% else %}
+{% if not live_sessions %}
+<div class="card" style="text-align:center;padding:48px 20px;">
+  <i class="bi bi-journal-x" style="font-size:44px;opacity:.2;display:block;margin-bottom:14px;color:var(--muted);"></i>
+  <div style="color:var(--muted);font-size:14px;margin-bottom:6px;">No sessions on record yet.</div>
+  <a href="{{ url_for('teacher_dashboard') }}" style="color:var(--accent);text-decoration:none;">Start your first session →</a>
+</div>
+{% else %}
+<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px;"><i class="bi bi-journal-check" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>No completed sessions yet.</div>
+{% endif %}
+{% endif %}
+
+<script>
+let curSess = null;
+
+/* ── Filter completed sessions ── */
+function filterHistory(){
+  const q  = document.getElementById('hf_search').value.toLowerCase();
+  const yr = document.getElementById('hf_year').value;
+  let shown = 0;
+  document.querySelectorAll('#historyList .sess-row').forEach(r=>{
+    const m = (!q||r.dataset.subj.includes(q)) && (!yr||r.dataset.year===yr);
+    r.style.display = m ? '' : 'none'; if(m) shown++;
+  });
+  const cnt = document.getElementById('hf_count');
+  if(cnt) cnt.textContent = shown + ' shown';
+  const empty = document.getElementById('hf_empty');
+  if(empty) empty.style.display = shown===0 ? 'block' : 'none';
+}
+function resetHistory(){
+  document.getElementById('hf_search').value='';
+  document.getElementById('hf_year').value='';
+  filterHistory();
+}
+
+/* ── Open session modal ── */
+function openSp(s){
+  curSess = s;
+  const isLive = !!s.is_live;
+  document.getElementById('spTitle').textContent = (s.code ? '['+s.code+'] ' : '') + s.subject;
+  document.getElementById('spStatusBadge').innerHTML = isLive
+    ? '<span style="background:rgba(45,106,39,.12);color:var(--success);border:1px solid rgba(45,106,39,.25);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;">LIVE</span>'
+    : '<span style="background:rgba(100,116,139,.08);color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:2px 9px;font-size:10px;">Completed</span>';
+
+  // ── INFO tab ──
+  document.getElementById('spInfoContent').innerHTML = `
+    <div>
+      <div class="sec-title">// Session Details</div>
+      <div class="info-row"><span class="info-lbl">Subject</span><span class="info-val">${s.subject}${s.code?' <code style=\\"font-size:10px;\\">['+s.code+']</code>':''}</span></div>
+      <div class="info-row"><span class="info-lbl">Section</span><span class="info-val">${s.section.replace(/\|/g,' · ')}</span></div>
+      <div class="info-row"><span class="info-lbl">Time Slot</span><span class="info-val">${s.time_slot||'—'}</span></div>
+      <div class="info-row"><span class="info-lbl">Started</span><span class="info-val">${s.started||'—'}</span></div>
+      <div class="info-row"><span class="info-lbl">Ended</span><span class="info-val">${s.ended||'Still running'}</span></div>
+      <div class="sec-title">// Attendance Summary</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+        <div style="text-align:center;padding:10px 16px;background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);border-radius:8px;">
+          <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--success);">${s.present.length}</div>
+          <div style="font-size:10px;color:var(--muted);">Present</div>
+        </div>
+        <div style="text-align:center;padding:10px 16px;background:rgba(245,197,24,.07);border:1px solid rgba(245,197,24,.2);border-radius:8px;">
+          <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--warning);">${(s.late||[]).length}</div>
+          <div style="font-size:10px;color:var(--muted);">Late</div>
+        </div>
+        <div style="text-align:center;padding:10px 16px;background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.2);border-radius:8px;">
+          <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:#60a5fa;">${(s.excused||[]).length}</div>
+          <div style="font-size:10px;color:var(--muted);">Excused</div>
+        </div>
+      </div>
+    </div>`;
+
+  // ── ATTENDANCE tab ──
+  const txH = s.tx_hashes || {};
+  const allTapped = [...new Set([...s.present,...(s.late||[]),...(s.excused||[])])];
+  const rows = allTapped.map(nfc=>{
+    const status = (s.excused||[]).includes(nfc)?'Excused':(s.late||[]).includes(nfc)?'Late':'Present';
+    const stColor = status==='Present'?'var(--success)':status==='Late'?'var(--warning)':'#60a5fa';
+    const tx = txH[nfc]||{};
+    return `<div class="att-item">
+      <div>
+        <div style="font-weight:600;font-family:'Space Mono',monospace;font-size:12px;">${nfc}</div>
+        ${tx.tx_hash?`<div class="tx-chip"><i class="bi bi-link-45deg"></i> TX: ${tx.tx_hash.substring(0,22)}… Block #${tx.block}</div>`:''}
+      </div>
+      <span style="padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;color:${stColor};background:${stColor}18;border:1px solid ${stColor}33;">${status}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('spAttContent').innerHTML = allTapped.length
+    ? `<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">${allTapped.length} student${allTapped.length!==1?'s':''} tapped in this session</div>${rows}`
+    : `<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;"><i class="bi bi-people" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>No students tapped yet.</div>`;
+
+  // ── ACTIONS tab ──
+  document.getElementById('spActionsContent').innerHTML = `
+    <div>
+      <div class="sec-title">// Session Actions</div>
+      ${isLive ? `
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <a href="/teacher/session/${s.sid}" class="btn-primary" style="text-decoration:none;"><i class="bi bi-broadcast"></i> Monitor Live</a>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px;"><i class="bi bi-journal-check"></i> Mark a Student Excused</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input type="text" id="excuseNfcInline" placeholder="Enter NFC ID to excuse…"
+                   style="flex:1;min-width:160px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;"/>
+            <button onclick="openExcuseFromModal()" style="background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.3);color:#60a5fa;border-radius:7px;padding:8px 14px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;white-space:nowrap;">
+              <i class="bi bi-journal-check"></i> Excuse
+            </button>
+          </div>
+        </div>
+        <div style="padding-top:12px;border-top:1px solid var(--border);">
+          <div style="font-size:11px;color:var(--danger);font-weight:600;margin-bottom:8px;"><i class="bi bi-stop-circle"></i> End Session</div>
+          <form method="POST" action="/teacher/session/${s.sid}/end" onsubmit="return confirm('End this session? Students will no longer be able to tap in.')">
+            <button type="submit" style="background:var(--danger);border:none;color:#fff;font-weight:700;border-radius:8px;padding:9px 18px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:7px;"><i class="bi bi-stop-fill"></i> End Session</button>
+          </form>
+        </div>` : `
+        <div style="font-size:13px;color:var(--muted);padding:8px 0;">
+          This session has ended. All attendance records are stored on the blockchain.
+        </div>
+        <div style="margin-top:12px;">
+          <a href="/teacher/session/${s.sid}" class="btn-outline" style="text-decoration:none;font-size:12px;"><i class="bi bi-journal-text"></i> View Full Report</a>
+        </div>`}
+      <div id="spActionMsg" style="font-size:12px;display:none;padding:8px 12px;border-radius:8px;margin-top:12px;"></div>
+    </div>`;
+
+  // Reset to info tab
+  document.querySelectorAll('.sppane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sptab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sppane-info').classList.add('active');
+  document.querySelector('.sptab').classList.add('active');
+  document.getElementById('spModal').classList.add('show');
+}
+
+function closeSp(){
+  document.getElementById('spModal').classList.remove('show');
+  curSess = null;
+}
+
+function switchSp(id,btn){
+  document.querySelectorAll('.sppane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sptab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sppane-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ── Excuse from Actions tab inline ── */
+function openExcuseFromModal(){
+  const nfc = (document.getElementById('excuseNfcInline').value||'').trim().toUpperCase();
+  if(!nfc){ alert('Enter a student NFC ID first.'); return; }
+  document.getElementById('excuseNfc').value = nfc;
+  document.getElementById('excuseName').textContent = nfc;
+  document.getElementById('excuseNote').value = '';
+  document.getElementById('excuseOverlay').classList.add('show');
+}
+
+/* ── Excuse modal ── */
+function closeExcuse(){ document.getElementById('excuseOverlay').classList.remove('show'); }
+async function submitExcuse(){
+  if(!curSess) return;
+  const nfc_id = document.getElementById('excuseNfc').value;
+  const note   = document.getElementById('excuseNote').value||'Excused';
+  try {
+    const r = await fetch(`/teacher/session/${curSess.sid}/excuse`,{
+      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:`nfc_id=${encodeURIComponent(nfc_id)}&note=${encodeURIComponent(note)}`
+    });
+    const d = await r.json();
+    const msg = document.getElementById('spActionMsg');
+    if(d.status==='ok'){
+      if(msg){ msg.style.display='block'; msg.style.background='rgba(45,106,39,.1)'; msg.style.color='var(--success)'; msg.textContent=`✓ ${nfc_id} marked as excused.`; }
+      if(!curSess.excused) curSess.excused=[];
+      if(!curSess.excused.includes(nfc_id)) curSess.excused.push(nfc_id);
+    }
+  } catch(e){ console.warn(e); }
+  closeExcuse();
+}
+</script>
+{% endblock %}

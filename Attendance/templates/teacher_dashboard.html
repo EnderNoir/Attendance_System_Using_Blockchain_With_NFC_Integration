@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard — DAVS{% endblock %}
+{% block page_title %}MY DASHBOARD{% endblock %}
+{% block content %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  .stat-chip-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+  @media(max-width:640px){.stat-chip-row{grid-template-columns:repeat(2,1fr);}}
+  .stat-chip-mini{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:10px;}
+  .chip-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+  .chip-val{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;line-height:1;}
+  .chip-lbl{font-size:11px;color:var(--muted);margin-top:2px;}
+  .period-tabs{display:flex;gap:3px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:4px;flex-wrap:wrap;}
+  .ptab{padding:6px 12px;border:none;background:transparent;color:var(--muted);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+  .ptab.active{background:rgba(45,106,39,.12);color:var(--accent);}
+  .chart-tabs{display:flex;border-bottom:1px solid var(--border);gap:0;}
+  .ctab{padding:10px 16px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+  .ctab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .chart-pane{display:none;padding:16px 20px;}.chart-pane.active{display:block;}
+  .no-data{display:none;text-align:center;padding:32px;color:var(--muted);font-size:13px;}
+  .no-data.show{display:block;}
+  .live-dot{width:7px;height:7px;background:var(--success);border-radius:50%;animation:pulse 1.5s infinite;flex-shrink:0;display:inline-block;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+  .spin{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;display:inline-block;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .btn-exp{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:11px;display:inline-flex;align-items:center;gap:5px;text-decoration:none;transition:all .2s;cursor:pointer;}
+  .btn-exp:hover{border-color:var(--accent);color:var(--accent);}
+</style>
+
+<!-- Greeting -->
+<div style="margin-bottom:20px;">
+  <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">// WELCOME BACK</div>
+  <h2 style="font-size:20px;font-weight:600;margin:0;">{{ user.full_name }}</h2>
+  <p style="font-size:12px;color:var(--muted);margin-top:3px;">
+    {{ sections|length }} section{{ 's' if sections|length!=1 else '' }} assigned &nbsp;·&nbsp;
+    {{ my_subjects|length }} subject{{ 's' if my_subjects|length!=1 else '' }} in schedule
+    &nbsp;·&nbsp; <span id="liveClock" style="font-family:'Space Mono',monospace;color:var(--accent);"></span>
+  </p>
+</div>
+
+<!-- Live sessions banner -->
+{% set live_subjects = my_subjects | selectattr('active_session_id') | list %}
+{% if live_subjects %}
+<div style="margin-bottom:20px;">
+  <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--success);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">// LIVE NOW</div>
+  {% for ms in live_subjects %}
+  <div style="background:rgba(45,106,39,.06);border:1px solid rgba(45,106,39,.3);border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="live-dot"></div>
+      <div>
+        <div style="font-weight:700;font-size:14px;">{% if ms.course_code %}<code style="font-size:10px;">[{{ ms.course_code }}]</code> {% endif %}{{ ms.subject_name }}</div>
+        <div style="font-size:11px;color:var(--muted);">{{ ms.section_key.replace('|',' · ') }}</div>
+      </div>
+    </div>
+    <a href="{{ url_for('live_session', sess_id=ms.active_session_id) }}" class="btn-primary" style="text-decoration:none;padding:8px 16px;font-size:13px;">
+      <i class="bi bi-broadcast"></i> Monitor Live
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ══ ANALYTICS ══ -->
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+  <div style="padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:3px;">// ATTENDANCE ANALYTICS</div>
+      <div style="font-size:15px;font-weight:700;">My Class Overview</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;" id="sessionCountBadge">Select a period to load.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <div class="period-tabs">
+        <button class="ptab active" onclick="switchPeriod('today',this)">Today</button>
+        <button class="ptab"        onclick="switchPeriod('month',this)">Month</button>
+        <button class="ptab"        onclick="switchPeriod('year',this)">Year</button>
+        <button class="ptab"        onclick="switchPeriod('all',this)">All Time</button>
+      </div>
+      <a id="exportBtn" href="#" class="btn-exp"><i class="bi bi-download"></i> Export CSV</a>
+    </div>
+  </div>
+
+  <div style="padding:14px 20px 0;">
+    <div class="stat-chip-row">
+      <div class="stat-chip-mini" style="border-color:rgba(45,106,39,.25);"><div class="chip-dot" style="background:#10b981;"></div><div><div class="chip-val" id="sc_present">—</div><div class="chip-lbl">Present</div></div></div>
+      <div class="stat-chip-mini" style="border-color:rgba(245,197,24,.25);"><div class="chip-dot" style="background:#f59e0b;"></div><div><div class="chip-val" id="sc_late">—</div><div class="chip-lbl">Late</div></div></div>
+      <div class="stat-chip-mini" style="border-color:rgba(239,68,68,.25);"><div class="chip-dot" style="background:#ef4444;"></div><div><div class="chip-val" id="sc_absent">—</div><div class="chip-lbl">Absent</div></div></div>
+      <div class="stat-chip-mini" style="border-color:rgba(96,165,250,.25);"><div class="chip-dot" style="background:#60a5fa;"></div><div><div class="chip-val" id="sc_excused">—</div><div class="chip-lbl">Excused</div></div></div>
+    </div>
+  </div>
+
+  <div class="chart-tabs">
+    <button class="ctab active" onclick="switchChart('donut',this)"><i class="bi bi-pie-chart"></i> Status</button>
+    <button class="ctab"        onclick="switchChart('trend',this)"><i class="bi bi-graph-up"></i> Trend</button>
+    <button class="ctab"        onclick="switchChart('subject',this)"><i class="bi bi-bar-chart-steps"></i> By Subject</button>
+  </div>
+
+  <div class="chart-pane active" id="pane-donut">
+    <div class="no-data show" id="donutNoData"><i class="bi bi-pie-chart" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>Select a period above.</div>
+    <div id="donutContent" style="display:none;max-width:480px;"><canvas id="donutChart" height="200"></canvas></div>
+  </div>
+  <div class="chart-pane" id="pane-trend">
+    <div class="no-data show" id="trendNoData"><i class="bi bi-bar-chart" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>No sessions in this period yet.</div>
+    <canvas id="trendChart" height="200" style="display:none;"></canvas>
+  </div>
+  <div class="chart-pane" id="pane-subject">
+    <div class="no-data show" id="subjNoData"><i class="bi bi-bar-chart-steps" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>No subject data.</div>
+    <canvas id="subjChart" height="200" style="display:none;"></canvas>
+  </div>
+</div>
+
+<script>
+function tick(){ const el=document.getElementById('liveClock'); if(el) el.textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+tick(); setInterval(tick,1000);
+
+const COLORS={present:'#10b981',late:'#f59e0b',absent:'#ef4444',excused:'#60a5fa'};
+let curPeriod='today';
+
+const donutChart=new Chart(document.getElementById('donutChart'),{
+  type:'doughnut',
+  data:{labels:['Present','Late','Absent','Excused'],datasets:[{data:[0,0,0,0],backgroundColor:[COLORS.present,COLORS.late,COLORS.absent,COLORS.excused],borderColor:'transparent',borderWidth:2,hoverOffset:6}]},
+  options:{responsive:true,cutout:'68%',plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11}}},tooltip:{callbacks:{label:ctx=>{const t=ctx.dataset.data.reduce((a,b)=>a+b,0);return ` ${ctx.label}: ${ctx.parsed} (${t?Math.round(ctx.parsed/t*100):0}%)`;}}}}},
+});
+const trendChart=new Chart(document.getElementById('trendChart'),{
+  type:'bar',
+  data:{labels:[],datasets:[
+    {label:'Present',data:[],backgroundColor:COLORS.present+'cc',borderRadius:3,borderSkipped:false},
+    {label:'Late',   data:[],backgroundColor:COLORS.late   +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Absent', data:[],backgroundColor:COLORS.absent +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Excused',data:[],backgroundColor:COLORS.excused+'cc',borderRadius:3,borderSkipped:false},
+  ]},
+  options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10}},tooltip:{mode:'index',intersect:false}},
+    scales:{x:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,.04)'}},
+            y:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,.06)'},beginAtZero:true}}},
+});
+const subjChart=new Chart(document.getElementById('subjChart'),{
+  type:'bar',
+  data:{labels:[],datasets:[
+    {label:'Present',data:[],backgroundColor:COLORS.present+'cc',borderRadius:3,borderSkipped:false},
+    {label:'Late',   data:[],backgroundColor:COLORS.late   +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Absent', data:[],backgroundColor:COLORS.absent +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Excused',data:[],backgroundColor:COLORS.excused+'cc',borderRadius:3,borderSkipped:false},
+  ]},
+  options:{responsive:true,indexAxis:'y',plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10}},tooltip:{mode:'index',intersect:false}},
+    scales:{x:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true},
+            y:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:9}},grid:{color:'rgba(255,255,255,.06)'}}}},
+});
+
+async function loadStats(p){
+  document.getElementById('sessionCountBadge').innerHTML='<span class="spin"></span>';
+  try{
+    const r=await fetch(`/api/attendance/stats?period=${p}`);
+    const d=await r.json();
+    const tot=d.donut;
+    document.getElementById('sc_present').textContent=tot.present;
+    document.getElementById('sc_late').textContent=tot.late;
+    document.getElementById('sc_absent').textContent=tot.absent;
+    document.getElementById('sc_excused').textContent=tot.excused;
+    document.getElementById('sessionCountBadge').textContent=`${d.session_count} session${d.session_count!==1?'s':''} · ${p}`;
+    document.getElementById('exportBtn').href=`/export/stats.csv?period=${p}`;
+
+    const total=tot.present+tot.late+tot.absent+tot.excused;
+    if(!total){document.getElementById('donutNoData').classList.add('show');document.getElementById('donutContent').style.display='none';}
+    else{document.getElementById('donutNoData').classList.remove('show');document.getElementById('donutContent').style.display='block';
+      donutChart.data.datasets[0].data=[tot.present,tot.late,tot.absent,tot.excused];donutChart.update('active');}
+
+    const tk=Object.keys(d.trend||{});
+    if(!tk.length){document.getElementById('trendNoData').classList.add('show');document.getElementById('trendChart').style.display='none';}
+    else{document.getElementById('trendNoData').classList.remove('show');document.getElementById('trendChart').style.display='block';
+      trendChart.data.labels=tk;['present','late','absent','excused'].forEach((k,i)=>{trendChart.data.datasets[i].data=tk.map(key=>(d.trend[key]||{})[k]||0);});trendChart.update('active');}
+
+    const se=Object.entries(d.subjects||{});
+    if(!se.length){document.getElementById('subjNoData').classList.add('show');document.getElementById('subjChart').style.display='none';}
+    else{document.getElementById('subjNoData').classList.remove('show');document.getElementById('subjChart').style.display='block';
+      subjChart.data.labels=se.map(([k])=>k.length>28?k.substring(0,26)+'…':k);
+      subjChart.data.datasets[0].data=se.map(([,v])=>v.present||0);
+      subjChart.data.datasets[1].data=se.map(([,v])=>v.late||0);
+      subjChart.data.datasets[2].data=se.map(([,v])=>v.absent||0);
+      subjChart.data.datasets[3].data=se.map(([,v])=>v.excused||0);
+      subjChart.update('active');}
+  }catch(e){document.getElementById('sessionCountBadge').textContent='Error loading data.';}
+}
+
+function switchPeriod(p,btn){
+  curPeriod=p;
+  document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  loadStats(p);
+}
+function switchChart(id,btn){
+  document.querySelectorAll('.chart-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ctab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='trend')trendChart.resize();
+  if(id==='subject')subjChart.resize();
+}
+
+loadStats('today');
+setInterval(()=>loadStats(curPeriod),60000);
+</script>
+{% endblock %}

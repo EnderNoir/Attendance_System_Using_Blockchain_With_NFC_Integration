@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}Classroom Sessions — DAVS{% endblock %}
+{% block page_title %}CLASSROOM SESSIONS{% endblock %}
+{% block content %}
+<style>
+  .sess-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 16px;display:flex;align-items:center;gap:12px;margin-bottom:7px;transition:border-color .2s;flex-wrap:wrap;}
+  .sess-row:hover{border-color:rgba(45,106,39,.3);}
+  .sess-row.live-row{border-color:rgba(45,106,39,.4);box-shadow:0 0 0 1px rgba(45,106,39,.08);}
+  .sr-name{font-weight:700;font-size:14px;flex:1;min-width:0;}
+  .sr-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .btn-vr{background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);color:var(--accent);font-weight:600;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .2s;flex-shrink:0;white-space:nowrap;}
+  .btn-vr:hover{background:rgba(45,106,39,.18);}
+  .live-dot{width:7px;height:7px;background:var(--success);border-radius:50%;animation:pulse 1.5s infinite;flex-shrink:0;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+  .badge-live{background:rgba(45,106,39,.12);color:var(--success);border:1px solid rgba(45,106,39,.25);border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700;}
+  .badge-done{background:rgba(100,116,139,.08);color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:2px 9px;font-size:10px;}
+  .tab-row{display:flex;gap:4px;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;flex-wrap:wrap;}
+  .tab-btn{flex:1;min-width:80px;padding:9px;border:none;background:transparent;color:var(--muted);border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;}
+  .tab-btn.active{background:rgba(45,106,39,.1);color:var(--accent);}
+  .tab-pane{display:none;}.tab-pane.active{display:block;}
+  .sp-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s;padding:16px;}
+  .sp-overlay.show{opacity:1;pointer-events:all;}
+  .sp-box{background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);scrollbar-width:thin;}
+  .sp-overlay.show .sp-box{transform:scale(1);}
+  .sp-topbar{padding:14px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .sp-topbar h3{font-size:14px;font-weight:700;margin:0;flex:1;min-width:0;}
+  .back-btn{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+  .back-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .sp-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 18px;overflow-x:auto;}
+  .sptab{padding:9px 14px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;white-space:nowrap;}
+  .sptab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .sppane{display:none;padding:14px 18px 18px;}.sppane.active{display:block;}
+  .info-row{padding:7px 0;border-bottom:1px solid var(--border);display:grid;grid-template-columns:120px 1fr;gap:8px;}
+  .info-row:last-child{border-bottom:none;}
+  .info-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .info-val{font-size:13px;word-break:break-word;}
+  .sec-title{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin:12px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border);}
+  .att-item{display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;gap:8px;flex-wrap:wrap;}
+  .att-item:last-child{border-bottom:none;}
+  .tx-chip{font-family:'Space Mono',monospace;font-size:9px;color:rgba(45,106,39,.7);background:rgba(45,106,39,.06);border:1px solid rgba(45,106,39,.15);border-radius:4px;padding:2px 6px;margin-top:2px;display:inline-block;word-break:break-all;}
+  .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;}
+  .fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px;}
+  .fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .fs{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;appearance:none;}
+  .fs:focus{outline:none;border-color:var(--accent);}
+  .btn-rst{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;align-self:flex-end;white-space:nowrap;}
+  .btn-rst:hover{border-color:var(--danger);color:var(--danger);}
+  @media(max-width:480px){.sr-name{font-size:13px;}.btn-vr{padding:6px 10px;font-size:11px;}}
+</style>
+
+<!-- Session Detail Modal -->
+<div class="sp-overlay" id="spModal" onclick="if(event.target===this)closeSp()">
+  <div class="sp-box">
+    <div class="sp-topbar">
+      <button class="back-btn" onclick="closeSp()"><i class="bi bi-arrow-left"></i> Back</button>
+      <h3 id="spTitle">—</h3>
+      <span id="spStatusBadge"></span>
+    </div>
+    <div class="sp-tabs">
+      <button class="sptab active" onclick="switchSp('info',this)"><i class="bi bi-info-circle"></i> Info</button>
+      <button class="sptab"        onclick="switchSp('attendance',this)"><i class="bi bi-people"></i> Attendance</button>
+    </div>
+    <div class="sppane active" id="sppane-info"><div id="spInfoContent"></div></div>
+    <div class="sppane"         id="sppane-attendance"><div id="spAttContent"></div></div>
+  </div>
+</div>
+
+<!-- Page header -->
+<div style="margin-bottom:18px;">
+  <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">// SESSION MONITORING</div>
+  <h2 style="font-size:20px;font-weight:600;margin-bottom:3px;">Classroom Sessions</h2>
+  <p style="font-size:12px;color:var(--muted);">Monitor all active and completed classroom attendance sessions.</p>
+</div>
+
+<!-- Stats -->
+<div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+  <div style="background:var(--surface);border:1px solid rgba(45,106,39,.3);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;flex:1;min-width:130px;">
+    <div class="card-icon green"><i class="bi bi-broadcast"></i></div>
+    <div><div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--success);">{{ active|length }}</div><div style="font-size:11px;color:var(--muted);">Live Sessions</div></div>
+  </div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;flex:1;min-width:130px;">
+    <div class="card-icon cyan"><i class="bi bi-journal-check"></i></div>
+    <div><div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;">{{ ended|length }}</div><div style="font-size:11px;color:var(--muted);">Completed</div></div>
+  </div>
+</div>
+
+<div class="tab-row">
+  <button class="tab-btn active" onclick="switchTab('live',this)">📡 Live ({{ active|length }})</button>
+  <button class="tab-btn" onclick="switchTab('ended',this)">📋 Completed ({{ ended|length }})</button>
+</div>
+
+<!-- ── LIVE TAB ── -->
+<div class="tab-pane active" id="tab-live">
+  {% if active %}
+  <div class="filter-bar">
+    <div class="fg" style="flex:2;min-width:160px;">
+      <span class="fl"><i class="bi bi-search"></i> Search Live Sessions</span>
+      <input type="text" class="fs" id="lf_search" placeholder="Subject or instructor…" oninput="filterLive()" style="appearance:none;"/>
+    </div>
+    <button class="btn-rst" onclick="resetLive()"><i class="bi bi-x-circle"></i> Reset</button>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="lf_count">{{ active|length }} shown</span>
+  </div>
+  {% endif %}
+  <div style="max-height:540px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="liveList">
+    {% for sid, s in active.items() %}
+    <div class="sess-row live-row" id="lrow_{{ sid }}" data-subject="{{ s.subject_name|lower }}" data-teacher="{{ s.teacher_name|lower }}">
+      <div class="live-dot"></div>
+      <div style="flex:1;min-width:0;">
+        <div class="sr-name">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif %}{{ s.subject_name }}</div>
+        <div class="sr-sub">{{ s.section_key.replace('|',' · ') }} · {{ s.teacher_name }}</div>
+      </div>
+      <span class="badge-live">LIVE</span>
+      <button class="btn-vr" onclick='openSp({{ {"sid":sid,"subject":s.subject_name,"code":s.get("course_code",""),"section":s.section_key,"teacher":s.teacher_name,"started":s.started_at,"ended":s.ended_at,"time_slot":s.get("time_slot",""),"present":s.present,"late":s.get("late",[]),"excused":s.get("excused",[]),"tx_hashes":s.get("tx_hashes",{})}|tojson|e }})'>
+        <i class="bi bi-eye"></i> View
+      </button>
+      <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-vr" style="text-decoration:none;"><i class="bi bi-broadcast"></i> Monitor</a>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:48px;color:var(--muted);">
+      <i class="bi bi-broadcast" style="font-size:36px;opacity:.2;display:block;margin-bottom:10px;"></i>No live sessions right now.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── COMPLETED TAB ── -->
+<div class="tab-pane" id="tab-ended">
+  {% if ended %}
+  <div class="filter-bar">
+    <div class="fg" style="flex:2;min-width:160px;">
+      <span class="fl"><i class="bi bi-search"></i> Search Completed Sessions</span>
+      <input type="text" class="fs" id="ef_search" placeholder="Subject, instructor…" oninput="filterEnded()" style="appearance:none;"/>
+    </div>
+    <div class="fg">
+      <span class="fl">Instructor</span>
+      <select class="fs" id="ef_teacher" onchange="filterEnded()">
+        <option value="">All Instructors</option>
+        {% set seen=[] %}{% for sid,s in ended.items() %}{% if s.teacher_name not in seen %}
+        <option value="{{ s.teacher_name|lower }}">{{ s.teacher_name }}</option>
+        {% set _=seen.append(s.teacher_name) %}{% endif %}{% endfor %}
+      </select>
+    </div>
+    <button class="btn-rst" onclick="resetEnded()"><i class="bi bi-x-circle"></i> Reset</button>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="ef_count">{{ ended|length }} shown</span>
+  </div>
+  {% endif %}
+  <div style="max-height:540px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="endedList">
+    {% for sid, s in ended.items()|sort(attribute='1.ended_at',reverse=True) %}
+    <div class="sess-row" id="erow_{{ sid }}" data-subject="{{ s.subject_name|lower }}" data-teacher="{{ s.teacher_name|lower }}">
+      <div style="flex:1;min-width:0;">
+        <div class="sr-name">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif %}{{ s.subject_name }}</div>
+        <div class="sr-sub">{{ s.section_key.replace('|',' · ') }} · {{ s.teacher_name }} · {{ fmt_time(s.ended_at) }}</div>
+      </div>
+      <span class="badge-done"><i class="bi bi-check-circle"></i> Done</span>
+      <button class="btn-vr" onclick='openSp({{ {"sid":sid,"subject":s.subject_name,"code":s.get("course_code",""),"section":s.section_key,"teacher":s.teacher_name,"started":s.started_at,"ended":s.ended_at,"time_slot":s.get("time_slot",""),"present":s.present,"late":s.get("late",[]),"excused":s.get("excused",[]),"tx_hashes":s.get("tx_hashes",{})}|tojson|e }})'>
+        <i class="bi bi-eye"></i> View
+      </button>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:48px;color:var(--muted);">
+      <i class="bi bi-journal-check" style="font-size:36px;opacity:.2;display:block;margin-bottom:10px;"></i>No completed sessions yet.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+let curSess = null;
+
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+function switchSp(id,btn){
+  document.querySelectorAll('.sppane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sptab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sppane-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+function closeSp(){ document.getElementById('spModal').classList.remove('show'); curSess=null; }
+
+function openSp(s){
+  curSess = s;
+  const isLive = !s.ended;
+  document.getElementById('spTitle').textContent = (s.code?'['+s.code+'] ':'')+s.subject;
+  document.getElementById('spStatusBadge').innerHTML = isLive
+    ? '<span class="badge-live">LIVE</span>'
+    : '<span class="badge-done">Completed</span>';
+
+  // ── Info pane ──
+  document.getElementById('spInfoContent').innerHTML = `
+    <div>
+      <div class="sec-title">// Session Details</div>
+      <div class="info-row"><span class="info-lbl">Subject</span><span class="info-val">${s.subject}${s.code?' <code style=\\"font-size:10px;\\">['+s.code+']</code>':''}</span></div>
+      <div class="info-row"><span class="info-lbl">Section</span><span class="info-val">${s.section.replace(/\|/g,' · ')}</span></div>
+      <div class="info-row"><span class="info-lbl">Instructor</span><span class="info-val">${s.teacher}</span></div>
+      <div class="info-row"><span class="info-lbl">Time Slot</span><span class="info-val">${s.time_slot||'—'}</span></div>
+      <div class="info-row"><span class="info-lbl">Started</span><span class="info-val">${s.started||'—'}</span></div>
+      <div class="info-row"><span class="info-lbl">Ended</span><span class="info-val">${s.ended||'Still running'}</span></div>
+      <div class="sec-title">// Attendance Summary</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;">
+        <div style="text-align:center;padding:10px 14px;background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);border-radius:8px;">
+          <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--success);">${s.present.length}</div><div style="font-size:10px;color:var(--muted);">Present</div>
+        </div>
+        <div style="text-align:center;padding:10px 14px;background:rgba(245,197,24,.07);border:1px solid rgba(245,197,24,.2);border-radius:8px;">
+          <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--warning);">${(s.late||[]).length}</div><div style="font-size:10px;color:var(--muted);">Late</div>
+        </div>
+        <div style="text-align:center;padding:10px 14px;background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.2);border-radius:8px;">
+          <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:#60a5fa;">${(s.excused||[]).length}</div><div style="font-size:10px;color:var(--muted);">Excused</div>
+        </div>
+      </div>
+      ${isLive?`<div style="margin-top:14px;"><a href="/teacher/session/${s.sid}" class="btn-primary" style="text-decoration:none;"><i class="bi bi-broadcast"></i> &nbsp;Monitor Live Session</a></div>`:''}
+    </div>`;
+
+  // ── Attendance pane — with Export button ──
+  const txH   = s.tx_hashes || {};
+  const allTapped = [...new Set([...s.present,...(s.late||[]),...(s.excused||[])])];
+  const rows  = allTapped.map(nfc=>{
+    const status = (s.excused||[]).includes(nfc)?'Excused':(s.late||[]).includes(nfc)?'Late':'Present';
+    const stColor = status==='Present'?'var(--success)':status==='Late'?'var(--warning)':'#60a5fa';
+    const tx = txH[nfc]||{};
+    return `<div class="att-item">
+      <div>
+        <div style="font-weight:600;font-family:'Space Mono',monospace;font-size:12px;">${nfc}</div>
+        ${tx.tx_hash?`<div class="tx-chip"><i class="bi bi-link-45deg"></i> TX: ${tx.tx_hash.substring(0,22)}… Block #${tx.block}</div>`:''}
+      </div>
+      <span style="padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;color:${stColor};background:${stColor}18;border:1px solid ${stColor}33;">${status}</span>
+    </div>`;
+  }).join('');
+
+  // Build informative export filename
+  const subjectSlug = s.subject.replace(/[^a-zA-Z0-9]/g,'_').toLowerCase().substring(0,20);
+  const sectionSlug = s.section.split('|').slice(1).join('_').replace(/ /g,'').toLowerCase();
+  const dateSlug    = (s.started||'').substring(0,10).replace(/-/g,'');
+  const exportFname = `session_attendance_${subjectSlug}_${sectionSlug}_${dateSlug}.xlsx`;
+
+  document.getElementById('spAttContent').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:11px;color:var(--muted);">${allTapped.length} student${allTapped.length!==1?'s':''} tapped in this session</div>
+      <button onclick="exportSessionAttendance('${s.sid}','${exportFname}')"
+              style="background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.25);color:var(--accent);border-radius:7px;padding:6px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-weight:600;transition:all .2s;"
+              onmouseover="this.style.background='rgba(45,106,39,.2)'" onmouseout="this.style.background='rgba(45,106,39,.1)'">
+        <i class="bi bi-file-earmark-excel"></i> Export Excel
+      </button>
+    </div>
+    ${allTapped.length ? rows : '<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;"><i class="bi bi-people" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>No students tapped yet.</div>'}`;
+
+  switchSp('info', document.querySelector('.sptab'));
+  document.getElementById('spModal').classList.add('show');
+}
+
+function exportSessionAttendance(sessId, filename) {
+  window.location.href = `/export/session/${sessId}?filename=${encodeURIComponent(filename)}`;
+}
+
+function filterLive(){
+  const q=document.getElementById('lf_search').value.toLowerCase();
+  let shown=0;
+  document.querySelectorAll('#liveList .sess-row').forEach(r=>{
+    const m=!q||r.dataset.subject.includes(q)||r.dataset.teacher.includes(q);
+    r.style.display=m?'':'none';if(m)shown++;
+  });
+  document.getElementById('lf_count').textContent=shown+' shown';
+}
+function resetLive(){document.getElementById('lf_search').value='';filterLive();}
+
+function filterEnded(){
+  const q=document.getElementById('ef_search').value.toLowerCase();
+  const t=document.getElementById('ef_teacher').value;
+  let shown=0;
+  document.querySelectorAll('#endedList .sess-row').forEach(r=>{
+    const m=(!q||r.dataset.subject.includes(q)||r.dataset.teacher.includes(q))&&(!t||r.dataset.teacher===t);
+    r.style.display=m?'':'none';if(m)shown++;
+  });
+  document.getElementById('ef_count').textContent=shown+' shown';
+}
+function resetEnded(){document.getElementById('ef_search').value='';document.getElementById('ef_teacher').value='';filterEnded();}
+</script>
+{% endblock %}

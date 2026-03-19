@@ -1,72 +1,627 @@
-{% extends "base.html" %} {% block content %}
-<div class="text-center mt-5">
-  <h1 class="display-4">📌 Blockchain Attendance System</h1>
-  <p class="lead">Secure, immutable attendance tracking with NFC + Ethereum</p>
-  <hr class="my-4" />
-  <div class="row mt-5">
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">👨‍🏫 Admin</h5>
-          <p class="card-text">Register new students and assign NFC cards.</p>
-          <a href="{{ url_for('register') }}" class="btn btn-primary"
-            >Register Student</a
-          >
-        </div>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">📊 View Dashboard</h5>
-          <p class="card-text">
-            See all registered students and their attendance.
-          </p>
-          <a href="{{ url_for('dashboard') }}" class="btn btn-info"
-            >Go to Dashboard
-          </a>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-body">
-          <h5 class="card-title">📅 View Attendance</h5>
-          <p class="card-text">Check attendance history for any NFC ID.</p>
-          <form
-            action="{{ url_for('view_attendance', nfc_id='') }}"
-            method="GET"
-            id="viewForm"
-            class="d-flex"
-          >
-            <input
-              type="text"
-              name="nfc_id"
-              class="form-control me-2"
-              placeholder="Enter NFC UID"
-              required
-            />
-            <button type="submit" class="btn btn-success">View</button>
-          </form>
-        </div>
-      </div>
-    </div>
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — DAVS{% endblock %}
+{% block page_title %}ADMIN DASHBOARD{% endblock %}
+{% block content %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ── Quick stats ── */
+  .stat-chip{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;}
+  .stat-chip .value{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;line-height:1;}
+  .stat-chip .label{font-size:11px;color:var(--muted);margin-top:3px;}
+
+  /* ── Analytics Panel ── */
+  .ap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px;}
+  .ap-head{padding:18px 22px 0;}
+  .ap-head h2{font-size:15px;font-weight:700;margin:0;}
+  .ap-head p{font-size:11px;color:var(--muted);margin:3px 0 0;}
+
+  /* ── Period selector ── */
+  .period-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .pbtn{padding:7px 16px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;}
+  .pbtn:hover{border-color:var(--accent);color:var(--accent);}
+  .pbtn.active{background:rgba(45,106,39,.12);border-color:rgba(45,106,39,.3);color:var(--accent);}
+  .pp-select{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;}
+  .picker{display:none;align-items:center;gap:6px;}.picker.show{display:flex;}
+
+  /* ── Totals row ── */
+  .sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  @media(max-width:580px){.sum-grid{grid-template-columns:repeat(2,1fr);}}
+  .sum-box{border-radius:10px;padding:14px;text-align:center;border:1px solid;}
+  .sum-box .sn{font-family:'Space Mono',monospace;font-size:28px;font-weight:700;line-height:1;}
+  .sum-box .sl{font-size:11px;font-weight:600;margin-top:5px;}
+  .sum-box .sp{font-family:'Space Mono',monospace;font-size:11px;margin-top:3px;opacity:.65;}
+  .sum-present{background:rgba(45,106,39,.07);border-color:rgba(45,106,39,.25);}
+  .sum-late{background:rgba(245,197,24,.07);border-color:rgba(245,197,24,.25);}
+  .sum-absent{background:rgba(192,57,43,.07);border-color:rgba(192,57,43,.2);}
+  .sum-excused{background:rgba(96,165,250,.07);border-color:rgba(96,165,250,.2);}
+
+  /* ── Filter row ── */
+  .filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+  .fg-item{display:flex;flex-direction:column;gap:4px;}
+  .fg-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .fg-select{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:12px;font-family:'DM Sans',sans-serif;width:100%;appearance:none;}
+  .fg-select:focus{outline:none;border-color:var(--accent);}
+  .btn-apply{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:9px 18px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;}
+  [data-theme="dark"] .btn-apply{color:#000;}
+  .btn-reset-f{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px 14px;font-size:12px;cursor:pointer;transition:all .2s;}
+  .btn-reset-f:hover{border-color:var(--danger);color:var(--danger);}
+
+  /* ── Showing bar ── */
+  .showing-bar{background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.12);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .sb-title{font-size:13px;font-weight:700;color:var(--text);}
+  .sb-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .sb-count{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--accent);text-align:right;}
+  .sb-clabel{font-size:10px;color:var(--muted);text-align:right;}
+
+  /* ── Chart tabs ── */
+  .ctabs{display:flex;border-bottom:1px solid var(--border);gap:0;}
+  .ctab{padding:10px 18px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;white-space:nowrap;}
+  .ctab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .cpane{display:none;padding:18px 22px 22px;}.cpane.active{display:block;}
+  .chart-wrap{position:relative;height:300px;}
+  .chart-wrap.tall{height:240px;}
+  .cscroll{height:100%;overflow-y:auto;scrollbar-width:thin;}
+  .cloading{position:absolute;inset:0;background:var(--surface);display:flex;align-items:center;justify-content:center;z-index:10;font-size:12px;color:var(--muted);gap:8px;border-radius:8px;}
+  .cspin{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .cnodata{display:none;position:absolute;inset:0;background:var(--surface);align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--muted);font-size:12px;border-radius:8px;z-index:5;text-align:center;}
+  .cnodata.show{display:flex;}
+
+  /* ── Donut ── */
+  .donut-wrap{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:center;}
+  @media(max-width:540px){.donut-wrap{grid-template-columns:1fr;}}
+  .dleg-row{display:flex;align-items:center;gap:10px;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:6px;}
+  .dleg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .dleg-num{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;white-space:nowrap;}
+  .dleg-pct{font-size:11px;color:var(--muted);white-space:nowrap;}
+
+  /* ── Export btn ── */
+  .btn-exp{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:11px;display:inline-flex;align-items:center;gap:5px;text-decoration:none;transition:all .2s;cursor:pointer;}
+  .btn-exp:hover{border-color:var(--accent);color:var(--accent);}
+
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+  /* ── Section label ── */
+  .section-mono{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+</style>
+
+<!-- Page header -->
+<div style="margin-bottom:20px;">
+  <div class="section-mono">// OVERVIEW</div>
+  <h2 style="font-size:22px;font-weight:700;margin:0 0 3px;">Admin Dashboard</h2>
+  <p style="font-size:12px;color:var(--muted);">System-wide attendance overview, live sessions, and analytics.</p>
+</div>
+
+<!-- Quick stats -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-chip"><div class="card-icon cyan"><i class="bi bi-broadcast"></i></div>
+      <div><div class="value">{{ active_sessions|length }}</div><div class="label">Live Sessions</div></div></div>
   </div>
-  <div class="mt-5">
-    <div class="alert alert-secondary">
-      <strong>NFC Listener Status:</strong> Running – tap your card on the
-      reader to mark attendance.
-    </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-chip"><div class="card-icon purple"><i class="bi bi-person-badge"></i></div>
+      <div><div class="value">{{ users_db.values()|selectattr('status','equalto','pending')|list|length }}</div><div class="label">Pending Faculty</div></div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-chip"><div class="card-icon green"><i class="bi bi-book"></i></div>
+      <div><div class="value">{{ subjects_db|length }}</div><div class="label">Subjects</div></div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-chip"><div class="card-icon amber"><i class="bi bi-boxes"></i></div>
+      <div><div class="value" id="blockNum">—</div><div class="label">Block Height</div></div></div>
   </div>
 </div>
 
+<!-- ══════════════════════════════════
+     LIVE NOW (if any)
+══════════════════════════════════ -->
+{% if active_sessions %}
+<div class="section-mono">// LIVE NOW</div>
+<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px;">
+  {% for sid, s in active_sessions.items() %}
+  <div style="background:var(--surface);border:1px solid rgba(45,106,39,.3);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;flex-shrink:0;"></div>
+      <div>
+        <div style="font-weight:600;font-size:13px;">{{ s.subject_name }}{% if s.course_code %} <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);">[{{ s.course_code }}]</span>{% endif %}</div>
+        <div style="font-size:11px;color:var(--muted);">{{ s.section_key.replace('|',' · ') }} · {{ s.teacher_name }}</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-family:'Space Mono',monospace;font-size:12px;color:var(--success);">{{ s.present|length }} present</span>
+      <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-exp" style="border-color:rgba(45,106,39,.3);color:var(--success);"><i class="bi bi-eye"></i> Monitor</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════════
+     ATTENDANCE ANALYTICS PANEL
+══════════════════════════════════════════════ -->
+<div class="section-mono">// ATTENDANCE ANALYTICS</div>
+<div class="ap">
+
+  <!-- Header -->
+  <div class="ap-head" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--border);">
+    <div>
+      <h2>Attendance Analytics</h2>
+      <p id="showingSub">Select a period and optional filters, then click <strong>Apply Filters</strong>.</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:11px;color:var(--muted);" id="sessionCountNum_label">— sessions</span>
+      <a id="exportBtn" href="/export/stats.xlsx?period=today" class="btn-exp"><i class="bi bi-file-earmark-excel"></i> Export Excel</a>
+    </div>
+  </div>
+
+  <div style="padding:18px 22px;display:flex;flex-direction:column;gap:18px;">
+
+    <!-- ── STEP 1: Time Period ── -->
+    <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">
+        <i class="bi bi-calendar3"></i> &nbsp;Step 1 — Select Time Period
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="period-row">
+          <button class="pbtn active" onclick="switchPeriod('today',this)">Today</button>
+          <button class="pbtn"        onclick="switchPeriod('month',this)">Specific Month</button>
+          <button class="pbtn"        onclick="switchPeriod('year',this)">Specific Year</button>
+          <button class="pbtn"        onclick="switchPeriod('all',this)">All Time</button>
+        </div>
+        <div class="picker" id="monthPicker">
+          <select class="pp-select" id="pickMonth">
+            <option value="1">January</option><option value="2">February</option>
+            <option value="3">March</option><option value="4">April</option>
+            <option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option>
+            <option value="9">September</option><option value="10">October</option>
+            <option value="11">November</option><option value="12">December</option>
+          </select>
+          <select class="pp-select" id="pickMonthYear">
+            <option>2024</option><option>2025</option><option selected>2026</option><option>2027</option>
+          </select>
+        </div>
+        <div class="picker" id="yearPicker">
+          <select class="pp-select" id="pickYear">
+            <option>2024</option><option>2025</option><option selected>2026</option><option>2027</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: Filters (optional) ── -->
+    <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">
+        <i class="bi bi-funnel"></i> &nbsp;Step 2 — Narrow by Filter <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;">(all optional)</span>
+      </div>
+      <div class="filter-grid">
+        <div class="fg-item">
+          <span class="fg-label">Section</span>
+          <select class="fg-select" id="gf_section">
+            <option value="">All Sections</option>
+            <optgroup label="BS Computer Science">
+              {% for yr in ['1st','2nd','3rd','4th'] %}{% for sec in ['A','B','C','D'] %}
+              <option value="BS Computer Science|{{ yr }} Year|{{ sec }}">CS {{ yr[0] }}{{ sec }}</option>
+              {% endfor %}{% endfor %}
+            </optgroup>
+            <optgroup label="BS Information Technology">
+              {% for yr in ['1st','2nd','3rd','4th'] %}{% for sec in ['A','B','C','D'] %}
+              <option value="BS Information Technology|{{ yr }} Year|{{ sec }}">IT {{ yr[0] }}{{ sec }}</option>
+              {% endfor %}{% endfor %}
+            </optgroup>
+          </select>
+        </div>
+        <div class="fg-item">
+          <span class="fg-label">Year Level</span>
+          <select class="fg-select" id="gf_year">
+            <option value="">All Years</option>
+            <option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option>
+          </select>
+        </div>
+        <div class="fg-item">
+          <span class="fg-label">Subject</span>
+          <select class="fg-select" id="gf_subject">
+            <option value="">All Subjects</option>
+            {% for sid, subj in subjects_db.items() %}
+            <option value="{{ subj.name }}">{{ subj.name }}{% if subj.course_code %} [{{ subj.course_code }}]{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="fg-item">
+          <span class="fg-label">Instructor</span>
+          <select class="fg-select" id="gf_instructor">
+            <option value="">All Instructors</option>
+            {% for u, d in users_db.items() %}{% if d.role in ('teacher','admin') %}
+            <option value="{{ d.full_name }}">{{ d.full_name }}</option>
+            {% endif %}{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn-apply" onclick="applyFilters()"><i class="bi bi-search"></i> Apply Filters</button>
+        <button class="btn-reset-f" onclick="resetFilters()"><i class="bi bi-x-circle"></i> Clear Filters</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 3: Results ── -->
+    <div>
+      <!-- Showing bar -->
+      <div class="showing-bar" style="margin-bottom:14px;">
+        <div>
+          <div class="sb-title" id="showingMain">Click "Apply Filters" to load data</div>
+          <div class="sb-sub" id="showingDetail">Choose a time period above, then apply.</div>
+        </div>
+        <div>
+          <div class="sb-count" id="sessionCountNum">—</div>
+          <div class="sb-clabel">sessions found</div>
+        </div>
+      </div>
+
+      <!-- Totals -->
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Attendance Totals</div>
+      <div class="sum-grid" style="margin-bottom:18px;">
+        <div class="sum-box sum-present">
+          <div class="sn" style="color:var(--success);" id="sc_present">—</div>
+          <div class="sl" style="color:var(--success);">✓ Present</div>
+          <div class="sp" style="color:var(--success);" id="pct_present_box"></div>
+        </div>
+        <div class="sum-box sum-late">
+          <div class="sn" style="color:var(--warning);" id="sc_late">—</div>
+          <div class="sl" style="color:var(--warning);">⏱ Late</div>
+          <div class="sp" style="color:var(--warning);" id="pct_late_box"></div>
+        </div>
+        <div class="sum-box sum-absent">
+          <div class="sn" style="color:var(--danger);" id="sc_absent">—</div>
+          <div class="sl" style="color:var(--danger);">✕ Absent</div>
+          <div class="sp" style="color:var(--danger);" id="pct_absent_box"></div>
+        </div>
+        <div class="sum-box sum-excused">
+          <div class="sn" style="color:#60a5fa;" id="sc_excused">—</div>
+          <div class="sl" style="color:#60a5fa;">◎ Excused</div>
+          <div class="sp" style="color:#60a5fa;" id="pct_excused_box"></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /padding wrapper -->
+
+  <!-- ── CHARTS ── -->
+  <div style="border-top:1px solid var(--border);">
+    <div class="ctabs">
+      <button class="ctab active" onclick="switchChart('donut',this)">
+        <i class="bi bi-pie-chart-fill"></i> &nbsp;Status Breakdown
+      </button>
+      <button class="ctab" onclick="switchChart('trend',this)">
+        <i class="bi bi-graph-up-arrow"></i> &nbsp;Daily Trend
+      </button>
+      <button class="ctab" onclick="switchChart('subject',this)">
+        <i class="bi bi-bar-chart-horizontal-fill"></i> &nbsp;By Subject
+      </button>
+    </div>
+
+    <!-- Status Breakdown -->
+    <div class="cpane active" id="pane-donut">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">What percentage of all attendance records in the selected period were present, late, absent, or excused?</div>
+      <div style="position:relative;min-height:40px;">
+        <div class="cloading" id="donutLoading" style="display:none;"><div class="cspin"></div> Loading…</div>
+        <div class="cnodata" id="donutNoData" style="position:relative;height:120px;">
+          <i class="bi bi-pie-chart" style="font-size:32px;opacity:.2;"></i>
+          Apply filters above to see data.
+        </div>
+      </div>
+      <div id="donutContent" style="display:none;">
+        <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+          <div style="flex-shrink:0;width:220px;height:220px;">
+            <canvas id="donutChart" width="220" height="220"></canvas>
+          </div>
+          <div style="flex:1;min-width:160px;display:flex;flex-direction:column;gap:8px;">
+            <div class="dleg-row"><span class="dleg-dot" style="background:#10b981;"></span><span style="flex:1;font-size:13px;">Present</span><span class="dleg-num" id="leg_present" style="color:#10b981;">—</span><span class="dleg-pct" id="pct_present" style="min-width:46px;text-align:right;"></span></div>
+            <div class="dleg-row"><span class="dleg-dot" style="background:#f59e0b;"></span><span style="flex:1;font-size:13px;">Late</span><span class="dleg-num" id="leg_late" style="color:#f59e0b;">—</span><span class="dleg-pct" id="pct_late" style="min-width:46px;text-align:right;"></span></div>
+            <div class="dleg-row"><span class="dleg-dot" style="background:#ef4444;"></span><span style="flex:1;font-size:13px;">Absent</span><span class="dleg-num" id="leg_absent" style="color:#ef4444;">—</span><span class="dleg-pct" id="pct_absent" style="min-width:46px;text-align:right;"></span></div>
+            <div class="dleg-row"><span class="dleg-dot" style="background:#60a5fa;"></span><span style="flex:1;font-size:13px;">Excused</span><span class="dleg-num" id="leg_excused" style="color:#60a5fa;">—</span><span class="dleg-pct" id="pct_excused" style="min-width:46px;text-align:right;"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Trend -->
+    <div class="cpane" id="pane-trend">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Day-by-day view — each bar is one day, showing how many were present, late, absent, or excused on that day.</div>
+      <div class="chart-wrap">
+        <div class="cloading" id="trendLoading" style="display:none;"><div class="cspin"></div> Loading…</div>
+        <div class="cnodata" id="trendNoData">
+          <i class="bi bi-bar-chart" style="font-size:32px;opacity:.2;"></i>
+          Apply filters above to see data.
+        </div>
+        <canvas id="trendChart" height="200" style="display:none;"></canvas>
+      </div>
+    </div>
+
+    <!-- By Subject -->
+    <div class="cpane" id="pane-subject">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Which subjects have the best and worst attendance? Each bar is one subject.</div>
+      <div class="chart-wrap tall" id="subjChartArea">
+        <div class="cloading" id="subjLoading" style="display:none;"><div class="cspin"></div> Loading…</div>
+        <div class="cnodata" id="subjNoData">
+          <i class="bi bi-bar-chart-steps" style="font-size:32px;opacity:.2;"></i>
+          Apply filters above to see data.
+        </div>
+        <div class="cscroll" id="subjChartScroll" style="display:none;">
+          <canvas id="subjChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /analytics panel -->
+
 <script>
-  // Dynamically build the correct URL for the view form
-  document.getElementById("viewForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    let nfcId = this.querySelector('input[name="nfc_id"]').value;
-    window.location.href =
-      "{{ url_for('view_attendance', nfc_id='') }}" + nfcId;
+const COLORS = {present:'#10b981', late:'#f59e0b', absent:'#ef4444', excused:'#60a5fa'};
+let curPeriod = 'today', curFilters = {}, rawData = null;
+
+// ── Chart instances ──
+const donutChart = new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Present','Late','Absent','Excused'],
+    datasets: [{data:[0,0,0,0],
+      backgroundColor:[COLORS.present,COLORS.late,COLORS.absent,COLORS.excused],
+      borderColor:'transparent', borderWidth:2, hoverOffset:6}]
+  },
+  options: {responsive:false, cutout:'65%',
+    plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>{
+        const t=ctx.dataset.data.reduce((a,b)=>a+b,0);
+        return ` ${ctx.label}: ${ctx.parsed} (${t?Math.round(ctx.parsed/t*100):0}%)`;
+      }}}}}
+});
+
+const trendChart = new Chart(document.getElementById('trendChart'), {
+  type: 'bar',
+  data: {labels:[], datasets:[
+    {label:'Present', data:[], backgroundColor:COLORS.present+'cc', borderRadius:3, borderSkipped:false},
+    {label:'Late',    data:[], backgroundColor:COLORS.late   +'cc', borderRadius:3, borderSkipped:false},
+    {label:'Absent',  data:[], backgroundColor:COLORS.absent +'cc', borderRadius:3, borderSkipped:false},
+    {label:'Excused', data:[], backgroundColor:COLORS.excused+'cc', borderRadius:3, borderSkipped:false},
+  ]},
+  options: {responsive:true,
+    plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10}},
+      tooltip:{mode:'index',intersect:false}},
+    scales:{
+      x:{stacked:true, ticks:{color:'#64748b',font:{family:'Space Mono',size:10}}, grid:{color:'rgba(255,255,255,.04)'}},
+      y:{stacked:true, ticks:{color:'#64748b',font:{family:'Space Mono',size:10}}, grid:{color:'rgba(255,255,255,.06)'}, beginAtZero:true}
+    }}
+});
+
+const subjChart = new Chart(document.getElementById('subjChart'), {
+  type: 'bar',
+  data: {labels:[], datasets:[
+    {label:'Present', data:[], backgroundColor:COLORS.present+'cc', borderRadius:3, borderSkipped:false},
+    {label:'Late',    data:[], backgroundColor:COLORS.late   +'cc', borderRadius:3, borderSkipped:false},
+    {label:'Absent',  data:[], backgroundColor:COLORS.absent +'cc', borderRadius:3, borderSkipped:false},
+    {label:'Excused', data:[], backgroundColor:COLORS.excused+'cc', borderRadius:3, borderSkipped:false},
+  ]},
+  options: {responsive:true, maintainAspectRatio:false, indexAxis:'y',
+    plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10}},
+      tooltip:{mode:'index',intersect:false}},
+    scales:{
+      x:{stacked:true, ticks:{color:'#64748b',font:{family:'Space Mono',size:10}}, grid:{color:'rgba(255,255,255,.04)'}, beginAtZero:true},
+      y:{stacked:true, ticks:{color:'#64748b',font:{family:'Space Mono',size:10}}, grid:{color:'rgba(255,255,255,.06)'}}
+    }}
+});
+
+function setLoading(on) {
+  ['donutLoading','trendLoading','subjLoading'].forEach(id => {
+    document.getElementById(id).style.display = on ? 'flex' : 'none';
   });
+}
+
+function getPeriodParams() {
+  const p = new URLSearchParams({period: curPeriod});
+  if (curPeriod === 'month') {
+    p.append('month',    document.getElementById('pickMonth').value);
+    p.append('year_num', document.getElementById('pickMonthYear').value);
+  } else if (curPeriod === 'year') {
+    p.append('year_num', document.getElementById('pickYear').value);
+  }
+  return p;
+}
+
+function buildExportFilename() {
+  const periods = {today:'today', month:'month', year:'year', all:'alltime'};
+  const pLabel  = periods[curPeriod] || curPeriod;
+  const parts   = ['attendance', pLabel];
+  if (curPeriod === 'month') {
+    const mo = document.getElementById('pickMonth');
+    const yr = document.getElementById('pickMonthYear').value;
+    parts.push(mo.options[mo.selectedIndex].text.toLowerCase() + '_' + yr);
+  } else if (curPeriod === 'year') {
+    parts.push(document.getElementById('pickYear').value);
+  }
+  const f = curFilters;
+  if (f.section_key) parts.push(f.section_key.split('|').slice(1).join('_').replace(/ /g,'').toLowerCase());
+  if (f.year)        parts.push(f.year.replace(' ','').toLowerCase());
+  if (f.subject)     parts.push(f.subject.substring(0,15).replace(/ /g,'_').toLowerCase());
+  if (f.instructor)  parts.push(f.instructor.split(' ')[0].toLowerCase());
+  const now = new Date();
+  parts.push(`exported_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`);
+  return parts.join('_') + '.xlsx';
+}
+
+async function loadStats() {
+  setLoading(true);
+  // Show all charts visible, hide no-data
+  document.getElementById('donutContent').style.display = 'none';
+  document.getElementById('donutNoData').classList.remove('show');
+  document.getElementById('trendChart').style.display = 'none';
+  document.getElementById('trendNoData').classList.remove('show');
+  document.getElementById('subjChartScroll').style.display = 'none';
+  document.getElementById('subjNoData').classList.remove('show');
+
+  const params = getPeriodParams();
+  if (curFilters.section_key) params.append('section_key',  curFilters.section_key);
+  if (curFilters.year)        params.append('year',         curFilters.year);
+  if (curFilters.subject)     params.append('subject',      curFilters.subject);
+  if (curFilters.instructor)  params.append('instructor',   curFilters.instructor);
+
+  // Build export URL with informative filename
+  const exportParams = new URLSearchParams(params);
+  const expLink = document.getElementById('exportBtn');
+  expLink.href = `/export/stats.xlsx?${exportParams.toString()}&filename=${encodeURIComponent(buildExportFilename())}`;
+
+  try {
+    const r  = await fetch(`/api/attendance/stats?${params.toString()}`);
+    rawData  = await r.json();
+    renderAll(rawData);
+  } catch(e) { console.warn(e); }
+  setLoading(false);
+}
+
+function renderAll(data) {
+  const d     = data.donut;
+  const total = d.present + d.late + d.absent + d.excused;
+  const pct   = v => total ? Math.round(v/total*100)+'%' : '0%';
+
+  // Update totals
+  document.getElementById('sc_present').textContent      = d.present;
+  document.getElementById('sc_late').textContent         = d.late;
+  document.getElementById('sc_absent').textContent       = d.absent;
+  document.getElementById('sc_excused').textContent      = d.excused;
+  document.getElementById('pct_present_box').textContent = pct(d.present) + ' of total';
+  document.getElementById('pct_late_box').textContent    = pct(d.late)    + ' of total';
+  document.getElementById('pct_absent_box').textContent  = pct(d.absent)  + ' of total';
+  document.getElementById('pct_excused_box').textContent = pct(d.excused) + ' of total';
+
+  // Session count
+  const cnt = data.session_count;
+  document.getElementById('sessionCountNum').textContent       = cnt;
+  document.getElementById('sessionCountNum_label').textContent = `${cnt} session${cnt!==1?'s':''} found`;
+
+  // Showing bar
+  const periods = {today:'Today', month:'This Month', year:'This Year', all:'All Time'};
+  const hasFilter = curFilters.section_key || curFilters.year || curFilters.subject || curFilters.instructor;
+  document.getElementById('showingMain').textContent = (periods[curPeriod] || curPeriod) + (hasFilter ? ' — Filtered' : ' — All Data');
+  const parts = [];
+  if (curFilters.instructor) parts.push('Instructor: ' + curFilters.instructor);
+  if (curFilters.subject)    parts.push('Subject: '    + curFilters.subject);
+  if (curFilters.section_key)parts.push('Section: '    + curFilters.section_key.split('|').pop());
+  if (curFilters.year)       parts.push(curFilters.year);
+  document.getElementById('showingDetail').textContent = parts.length ? parts.join('  ·  ') : 'Showing attendance across every subject, section, and instructor.';
+
+  // Donut chart
+  if (!total) {
+    document.getElementById('donutNoData').classList.add('show');
+    document.getElementById('donutContent').style.display = 'none';
+  } else {
+    document.getElementById('donutNoData').classList.remove('show');
+    document.getElementById('donutContent').style.display = 'block';
+    donutChart.data.datasets[0].data            = [d.present, d.late, d.absent, d.excused];
+    donutChart.data.datasets[0].backgroundColor = [COLORS.present, COLORS.late, COLORS.absent, COLORS.excused];
+    donutChart.update('active');
+    ['present','late','absent','excused'].forEach(k => {
+      document.getElementById('leg_'+k).textContent = d[k];
+      document.getElementById('pct_'+k).textContent = '(' + pct(d[k]) + ')';
+    });
+  }
+
+  renderTrend(data);
+  renderSubject(data);
+}
+
+function renderTrend(data) {
+  const keys = Object.keys(data.trend || {});
+  const trendCanvas = document.getElementById('trendChart');
+  if (!keys.length) {
+    document.getElementById('trendNoData').classList.add('show');
+    trendCanvas.style.display = 'none';
+    return;
+  }
+  document.getElementById('trendNoData').classList.remove('show');
+  trendCanvas.style.display = 'block';
+  trendChart.data.labels = keys;
+  ['present','late','absent','excused'].forEach((k,i) => {
+    trendChart.data.datasets[i].data = keys.map(key => (data.trend[key]||{})[k] || 0);
+  });
+  trendChart.update('active');
+}
+
+function renderSubject(data) {
+  const entries = Object.entries(data.subjects || {}).sort((a,b)=>a[0].localeCompare(b[0]));
+  const keys    = entries.map(([k]) => k);
+  const vals    = entries.map(([,v]) => v);
+  const labels  = keys.map(k => k.length > 26 ? k.substring(0,24)+'…' : k);
+  const subjScroll = document.getElementById('subjChartScroll');
+
+  if (!keys.length) {
+    document.getElementById('subjNoData').classList.add('show');
+    subjScroll.style.display = 'none';
+    return;
+  }
+  document.getElementById('subjNoData').classList.remove('show');
+  subjScroll.style.display = 'block';
+
+  const canvasH = Math.max(180, keys.length * 38 + 60);
+  subjChart.canvas.style.height = canvasH + 'px';
+  subjChart.canvas.height       = canvasH;
+  subjChart.data.labels = labels;
+  subjChart.data.datasets[0].data = vals.map(v => v.present  || 0);
+  subjChart.data.datasets[1].data = vals.map(v => v.late     || 0);
+  subjChart.data.datasets[2].data = vals.map(v => v.absent   || 0);
+  subjChart.data.datasets[3].data = vals.map(v => v.excused  || 0);
+  subjChart.update('active');
+}
+
+// ── Period switching ──
+function switchPeriod(p, btn) {
+  curPeriod = p;
+  document.querySelectorAll('.pbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('monthPicker').classList.toggle('show', p === 'month');
+  document.getElementById('yearPicker').classList.toggle('show',  p === 'year');
+}
+
+// ── Apply / Clear filters ──
+function applyFilters() {
+  curFilters = {
+    section_key: document.getElementById('gf_section').value,
+    year:        document.getElementById('gf_year').value,
+    subject:     document.getElementById('gf_subject').value,
+    instructor:  document.getElementById('gf_instructor').value,
+  };
+  loadStats();
+}
+
+function resetFilters() {
+  ['gf_section','gf_year','gf_subject','gf_instructor'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  curFilters = {};
+  loadStats();
+}
+
+// ── Chart tab switching ──
+function switchChart(id, btn) {
+  document.querySelectorAll('.cpane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.ctab').forEach(b  => b.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'trend')   trendChart.resize();
+  if (id === 'subject') subjChart.update();
+}
+
+// ── Set month picker default ──
+(function() {
+  const now = new Date();
+  document.getElementById('pickMonth').value = now.getMonth() + 1;
+})();
+
+// Load today on page load
+applyFilters();
+
+fetch('/api/block_number').then(r=>r.json()).then(d => {
+  if (d.block !== undefined) document.getElementById('blockNum').textContent = d.block;
+}).catch(()=>{});
+
+// Auto-refresh every 60 seconds (analytics, not the heavy auto-load)
+setInterval(() => { if (rawData) loadStats(); }, 60000);
 </script>
 {% endblock %}

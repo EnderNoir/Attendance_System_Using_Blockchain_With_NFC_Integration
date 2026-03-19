@@ -1,108 +1,618 @@
-{% extends "base.html" %} {% block content %}
-<h2 class="mt-4">📝 Register New Student</h2>
+{% extends "base.html" %}
+{% block title %}Register Student — DAVS{% endblock %}
+{% block page_title %}REGISTER STUDENT{% endblock %}
 
-<!-- NFC Scan Status -->
-<div id="scanStatus" class="alert alert-info" style="display: none"></div>
+{% block content %}
+<style>
+  /* ── Layout ── */
+  .full-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px 20px;}
+  .span-2{grid-column:span 2;}
+  .span-3{grid-column:1/-1;}
+  @media(max-width:900px){.full-form{grid-template-columns:1fr 1fr;}}
+  @media(max-width:560px){.full-form{grid-template-columns:1fr;}.span-2,.span-3{grid-column:1;}}
+  .field-wrap{display:flex;flex-direction:column;}
+  .field-wrap .form-label{margin-bottom:6px;}
 
-<form method="POST" action="{{ url_for('register') }}">
-  <!-- Student Name -->
-  <div class="mb-3">
-    <label for="name" class="form-label">Student Full Name</label>
-    <input
-      type="text"
-      class="form-control"
-      id="name"
-      name="name"
-      placeholder="John Doe"
-      required
-    />
+  /* Section label */
+  .fsec{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;
+        margin-bottom:4px;padding-bottom:8px;border-bottom:1px solid var(--border);grid-column:1/-1;}
+
+  /* ── Upload banner ── */
+  .upload-banner{background:rgba(0,229,255,.04);border:2px dashed rgba(0,229,255,.25);border-radius:14px;
+                 padding:20px 24px;display:flex;align-items:center;gap:18px;cursor:pointer;transition:all .2s;margin-bottom:24px;}
+  .upload-banner:hover{border-color:var(--accent);background:rgba(0,229,255,.08);}
+  .upload-banner.dragover{border-color:var(--accent);background:rgba(0,229,255,.12);}
+  .upload-banner.loading{border-color:var(--warning);border-style:solid;cursor:default;}
+  .upload-banner.success{border-color:var(--success);border-style:solid;background:rgba(16,185,129,.05);}
+  .upload-banner.error{border-color:var(--danger);border-style:solid;background:rgba(239,68,68,.05);}
+  .ub-icon{font-size:36px;flex-shrink:0;transition:transform .2s;}
+  .upload-banner:hover .ub-icon{transform:scale(1.1);}
+  .ub-title{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;}
+  .ub-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+  .btn-upload{background:var(--accent);border:none;color:#000;font-weight:700;border-radius:8px;
+              padding:10px 20px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;
+              display:flex;align-items:center;gap:7px;white-space:nowrap;transition:all .2s;flex-shrink:0;}
+  .btn-upload:hover{background:#00bcd4;}
+  .spin{width:16px;height:16px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ── Steps / legend ── */
+  .steps-box{background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.12);border-radius:12px;
+             padding:14px 18px;margin-bottom:22px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .step-chip{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);}
+  .step-num{width:18px;height:18px;border-radius:50%;background:var(--accent);color:#000;font-size:10px;
+            font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .sep{color:var(--border);font-size:18px;}
+  .req-note{margin-left:auto;font-size:12px;color:var(--muted);}
+
+  /* ── Catalogue preview ── */
+  .subj-preview{display:none;grid-column:1/-1;}
+  .subj-preview.show{display:block;}
+  .subj-preview-inner{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;
+                      padding:14px 16px;max-height:220px;overflow-y:auto;}
+  .subj-row{display:grid;grid-template-columns:120px 1fr 60px 80px;gap:8px;align-items:center;
+            padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;}
+  .subj-row:last-child{border-bottom:none;}
+  .subj-row.new-badge::after{content:'NEW';font-size:9px;font-weight:700;font-family:'Space Mono',monospace;
+                              background:rgba(16,185,129,.15);color:var(--success);border:1px solid rgba(16,185,129,.3);
+                              border-radius:4px;padding:1px 5px;margin-left:4px;}
+
+  /* ── NFC scan ── */
+  .scan-strip{display:flex;align-items:center;gap:20px;background:rgba(0,229,255,.04);border:2px dashed var(--border);
+              border-radius:14px;padding:18px 22px;transition:all .3s;cursor:pointer;}
+  .scan-strip:hover{border-color:rgba(0,229,255,.4);}
+  .scan-strip.scanning{border-color:var(--accent);animation:borderPulse 1.5s infinite;}
+  .scan-strip.captured{border-color:var(--success);border-style:solid;background:rgba(16,185,129,.05);}
+  @keyframes borderPulse{0%,100%{border-color:var(--accent);}50%{border-color:rgba(0,229,255,.3);}}
+  .scan-strip-icon{font-size:30px;flex-shrink:0;}
+  .scan-strip-text .scan-title{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;}
+  .scan-strip-text .scan-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+</style>
+
+<div style="margin-bottom:20px;">
+  <h2 style="font-size:22px;font-weight:700;margin-bottom:4px;">Register New Student</h2>
+  <p style="font-size:13px;color:var(--muted);">Upload a CvSU registration form PDF to auto-fill, or fill in manually. NFC card required to complete.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     STEP LEGEND (on top)
+══════════════════════════════════════════════ -->
+<div class="steps-box">
+  <div class="step-chip"><div class="step-num">1</div><span>Upload PDF <em style="color:var(--accent)">or</em> fill manually</span></div>
+  <div class="sep">·</div>
+  <div class="step-chip"><div class="step-num">2</div><span>Check &amp; complete all fields</span></div>
+  <div class="sep">·</div>
+  <div class="step-chip"><div class="step-num">3</div><span>Click <strong style="color:var(--accent)">Scan NFC</strong> &amp; tap card</span></div>
+  <div class="sep">·</div>
+  <div class="step-chip"><div class="step-num">4</div><span>Click <strong style="color:var(--success)">Register</strong></span></div>
+  <div class="req-note"><span style="color:var(--danger);font-weight:700;">*</span> = Required field</div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PDF UPLOAD BANNER
+══════════════════════════════════════════════ -->
+<div class="upload-banner" id="uploadBanner"
+     ondragover="event.preventDefault();this.classList.add('dragover')"
+     ondragleave="this.classList.remove('dragover')"
+     ondrop="handleDrop(event)">
+  <div class="ub-icon" id="ubIcon">📄</div>
+  <div style="flex:1;">
+    <div class="ub-title" id="ubTitle">Auto-fill from CvSU Registration Form PDF</div>
+    <div class="ub-sub" id="ubSub">Drop a PDF here, or click the button to browse · Supports CvSU Silang enrollment forms</div>
   </div>
+  <button type="button" class="btn-upload" onclick="document.getElementById('pdfFileInput').click()" id="btnUpload">
+    <i class="bi bi-cloud-upload"></i> Upload PDF
+  </button>
+  <input type="file" id="pdfFileInput" accept=".pdf" style="display:none;" onchange="handlePdfUpload(this)">
+</div>
 
-  <!-- NFC UID with Scan Button -->
-  <div class="mb-3">
-    <label for="nfc_id" class="form-label">NFC Tag UID</label>
-    <div class="input-group">
-      <input
-        type="text"
-        class="form-control"
-        id="nfc_id"
-        name="nfc_id"
-        placeholder="Tap card or click Scan"
-        required
-      />
-      <button type="button" class="btn btn-primary" onclick="scanNFC()">
-        📱 Scan NFC
-      </button>
+<!-- ── Subjects preview (shown after upload) ── -->
+<div class="subj-preview" id="subjPreview">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+    <div>
+      <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;">// SUBJECTS FOUND IN PDF</span>
+      <span style="font-size:12px;color:var(--muted);margin-left:10px;" id="subjPreviewNote"></span>
     </div>
-    <div class="form-text">
-      Click "Scan NFC" and tap the card on the reader.
-    </div>
+    <span style="font-size:11px;color:var(--muted);">These have been added to your Subject Catalogue automatically (no duplicates).</span>
   </div>
+  <div class="subj-preview-inner" id="subjPreviewList"></div>
+</div>
 
-  <button type="submit" class="btn btn-success">Register</button>
-  <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
-</form>
+<!-- ══════════════════════════════════════════════
+     REGISTRATION FORM
+══════════════════════════════════════════════ -->
+<div class="card" style="padding:28px 32px;margin-top:20px;">
+  <form method="POST" action="{{ url_for('register') }}" id="registerForm" enctype="multipart/form-data" onsubmit="return validateRegisterForm()">
+    <div class="full-form">
+
+      <!-- ── ENROLLMENT DETAILS ── -->
+      <div class="fsec">// Enrollment Details</div>
+
+      <div class="field-wrap">
+        <label class="form-label">Semester <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" name="semester" id="f_semester" required>
+          <option value="" disabled selected>Select semester…</option>
+          <option value="First">First Semester</option>
+          <option value="Second">Second Semester</option>
+          <option value="Summer">Summer</option>
+          <option value="Mid-Year">Mid-Year</option>
+        </select>
+      </div>
+
+      <div class="field-wrap">
+        <label class="form-label">School Year <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" name="school_year" id="f_school_year"
+               placeholder="e.g. 2024-2025" required />
+      </div>
+
+      <div class="field-wrap">
+        <label class="form-label">Date of Admission</label>
+        <input type="month" class="form-control" name="date_registered" id="f_date_registered"
+               title="Select month and year only" />
+      </div>
+
+      <!-- ── PERSONAL INFORMATION ── -->
+      <div class="fsec" style="margin-top:8px;">// Personal Information</div>
+
+      <!-- ── Student photo upload ── -->
+      <div class="field-wrap span-3" style="margin-bottom:4px;">
+        <label class="form-label">Student Photo <span style="font-size:10px;font-weight:400;color:var(--muted);text-transform:none;">(optional — used in directory & attendance records)</span></label>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div id="photoPreviewWrap" style="width:80px;height:80px;border-radius:50%;background:rgba(0,229,255,.08);border:2px dashed rgba(0,229,255,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;transition:border-color .2s;" onclick="document.getElementById('studentPhotoInput').click()" title="Click to upload photo">
+            <div id="photoPreviewInit" style="text-align:center;"><i class="bi bi-camera" style="font-size:22px;color:var(--muted);display:block;"></i><span style="font-size:10px;color:var(--muted);">Upload</span></div>
+            <img id="photoPreviewImg" src="" style="display:none;width:100%;height:100%;object-fit:cover;" />
+          </div>
+          <div>
+            <input type="file" id="studentPhotoInput" name="student_photo" accept="image/*" style="display:none;" onchange="previewStudentPhoto(this)">
+            <button type="button" class="btn-outline" style="font-size:12px;padding:7px 14px;" onclick="document.getElementById('studentPhotoInput').click()"><i class="bi bi-cloud-upload"></i> Choose Photo</button>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px;">JPG, PNG, WEBP · Max 5 MB<br>Will be displayed on student cards and attendance records.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-wrap span-2">
+        <label class="form-label">Student Full Name <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" name="name" id="f_name"
+               placeholder="e.g. Juan Dela Cruz" required />
+      </div>
+
+      <div class="field-wrap">
+        <label class="form-label">Student ID Number <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" name="student_id" id="f_student_id"
+               placeholder="e.g. 2021-00123" required />
+      </div>
+
+      <div class="field-wrap span-2">
+        <label class="form-label">Email Address</label>
+        <input type="email" class="form-control" name="email" id="f_email"
+               placeholder="e.g. juan@school.edu" />
+      </div>
+
+      <div class="field-wrap">
+        <label class="form-label">Contact Number</label>
+        <input type="text" class="form-control" name="contact" id="f_contact"
+               placeholder="e.g. 09XX-XXX-XXXX" />
+      </div>
+
+      <!-- ── ACADEMIC INFORMATION ── -->
+      <div class="fsec" style="margin-top:8px;">// Academic Information</div>
+
+      <div class="field-wrap span-2">
+        <label class="form-label">Course / Program <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" name="course" id="f_course" required>
+          <option value="" disabled selected>Select course…</option>
+          <option>BS Computer Science</option>
+          <option>BS Information Technology</option>
+          <option>BS Information Systems</option>
+          <option>BS Computer Engineering</option>
+          <option>BS Electronics Engineering</option>
+          <option>BS Electrical Engineering</option>
+          <option>BS Civil Engineering</option>
+          <option>BS Mechanical Engineering</option>
+          <option>BS Education</option>
+          <option>BS Nursing</option>
+          <option>BS Accountancy</option>
+          <option>BS Business Administration</option>
+          <option value="__other__">Other…</option>
+        </select>
+      </div>
+
+      <div class="field-wrap" id="f_course_other_wrap" style="display:none;">
+        <label class="form-label">Specify Course</label>
+        <input type="text" class="form-control" id="f_course_other" placeholder="Type course name…" />
+      </div>
+
+      <div class="field-wrap">
+        <label class="form-label">Major / Specialization</label>
+        <input type="text" class="form-control" name="major" id="f_major"
+               placeholder="e.g. Software Engineering" value="N/A" />
+      </div>
+
+      <div class="field-wrap">
+        <label class="form-label">Year Level <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" name="year_level" id="f_year_level" required>
+          <option value="" disabled selected>Select year…</option>
+          <option>1st Year</option>
+          <option>2nd Year</option>
+          <option>3rd Year</option>
+          <option>4th Year</option>
+          <option>5th Year</option>
+        </select>
+      </div>
+
+      <div class="field-wrap">
+        <label class="form-label">Section <span style="color:var(--danger)">*</span></label>
+        <select class="form-control" name="section" id="f_section" required>
+          <option value="" disabled selected>Select section…</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+        </select>
+      </div>
+
+      <div class="field-wrap">
+        <label class="form-label">Adviser Name <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" name="adviser" id="f_adviser"
+               placeholder="Type or pick a teacher name…" list="adviserList" required
+               autocomplete="off"/>
+        <datalist id="adviserList">
+          {% for u, d in users_db.items() %}{% if d.role in ('teacher','admin') %}
+          <option value="{{ d.full_name }}">{{ d.full_name }}</option>
+          {% endif %}{% endfor %}
+        </datalist>
+      </div>
+
+      <!-- ── NFC CARD ── -->
+      <div class="fsec" style="margin-top:8px;">// NFC Card</div>
+
+      <div class="span-3">
+        <div class="scan-strip" id="scanArea" onclick="scanNFC()">
+          <div class="scan-strip-icon" id="scanEmoji">📱</div>
+          <div class="scan-strip-text" style="flex:1;">
+            <div class="scan-title" id="scanTitle">Click here to scan NFC card</div>
+            <div class="scan-sub"   id="scanDesc">Or tap the Scan button — hold card near the reader</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+            <input type="text" class="form-control" id="nfc_id" name="nfc_id"
+                   placeholder="UID will appear here" required
+                   onclick="event.stopPropagation()"
+                   style="width:180px;" />
+            <button type="button" class="btn-primary" onclick="event.stopPropagation();scanNFC()" id="scanBtn"
+                    style="white-space:nowrap;padding:10px 18px;">
+              <i class="bi bi-wifi"></i> Scan NFC
+            </button>
+          </div>
+        </div>
+        <div id="scanStatus" style="display:none;margin-top:10px;"></div>
+      </div>
+
+      <!-- ── SUBMIT ── -->
+      <div class="span-3" style="display:flex;gap:12px;margin-top:8px;">
+        <button type="submit" class="btn-primary" style="flex:1;padding:13px;font-size:15px;">
+          <i class="bi bi-check-circle"></i> Register Student on Blockchain
+        </button>
+        <a href="{{ url_for('index') }}" class="btn-outline" style="padding:13px 24px;">
+          Cancel
+        </a>
+      </div>
+
+    </div><!-- end .full-form -->
+  </form>
+</div>
 
 <script>
-  function scanNFC() {
-    const scanBtn = document.querySelector('button[onclick="scanNFC()"]');
-    scanBtn.disabled = true;
-    scanBtn.innerHTML = "⏳ Scanning...";
+// ══════════════════════════════════════════════
+// PDF UPLOAD & AUTOFILL
+// ══════════════════════════════════════════════
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadBanner').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') processPdf(file);
+  else showBannerError('Please drop a PDF file.');
+}
 
-    const statusDiv = document.getElementById("scanStatus");
-    statusDiv.style.display = "block";
-    statusDiv.className = "alert alert-info";
-    statusDiv.innerHTML =
-      "🔄 Ready to scan. Please tap your NFC card on the reader...";
+function handlePdfUpload(input) {
+  if (input.files && input.files[0]) processPdf(input.files[0]);
+}
 
-    fetch("/request_registration_scan", { method: "POST" })
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.status === "ready") {
-          pollForUID();
-        } else {
-          throw new Error("Server not ready");
-        }
-      })
-      .catch((error) => {
-        statusDiv.className = "alert alert-danger";
-        statusDiv.innerHTML =
-          "❌ Could not connect to NFC listener. Make sure it is running.";
-        resetButton();
-      });
-  }
+function processPdf(file) {
+  // Set loading state
+  const banner = document.getElementById('uploadBanner');
+  banner.className = 'upload-banner loading';
+  document.getElementById('ubIcon').textContent = '⏳';
+  document.getElementById('ubTitle').textContent = 'Reading PDF…';
+  document.getElementById('ubSub').textContent   = 'Extracting student information from ' + file.name;
+  document.getElementById('btnUpload').disabled  = true;
+  document.getElementById('btnUpload').innerHTML = '<span class="spin"></span> Parsing…';
 
-  function pollForUID() {
-    let attempts = 0;
-    const maxAttempts = 30;
-    const poll = setInterval(() => {
-      fetch("/get_scanned_uid")
-        .then((response) => response.json())
-        .then((data) => {
-          if (data.uid) {
-            clearInterval(poll);
-            document.getElementById("nfc_id").value = data.uid;
-            document.getElementById("scanStatus").style.display = "none";
-            resetButton();
-          } else {
-            attempts++;
-            if (attempts >= maxAttempts) {
-              clearInterval(poll);
-              document.getElementById("scanStatus").className =
-                "alert alert-warning";
-              document.getElementById("scanStatus").innerHTML =
-                "⏰ Timeout. Please try again.";
-              resetButton();
-            }
-          }
+  const formData = new FormData();
+  formData.append('file', file);
+
+  fetch('/parse_registration_pdf', {
+    method: 'POST',
+    credentials: 'same-origin',   // ← send session cookie
+    body: formData
+  })
+    .then(r => {
+      if (!r.ok && r.status === 302) {
+        throw new Error('Session expired — please refresh the page and log in again.');
+      }
+      const ct = r.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        return r.text().then(txt => {
+          throw new Error('Server returned non-JSON response (status ' + r.status + '). Check Flask console for details.');
         });
-    }, 500);
+      }
+      return r.json();
+    })
+    .then(data => {
+      if (data.error) { showBannerError(data.error + (data.traceback ? '\n\nSee Flask console for full traceback.' : '')); return; }
+      autofill(data);
+      showBannerSuccess(file.name, data.added_to_catalogue || []);
+      if (data.subjects && data.subjects.length) showSubjectPreview(data.subjects, data.added_to_catalogue || []);
+    })
+    .catch(err => showBannerError('Error: ' + err.message));
+}
+
+function autofill(d) {
+  const map = {
+    f_student_id:    d.student_id,
+    f_name:          d.name,
+    f_email:         d.email,
+    f_contact:       d.contact,
+    f_section:       d.section,
+    f_adviser:       d.adviser,
+    f_major:         d.major,
+    f_school_year:   d.school_year,
+    f_date_registered: d.date_registered,
+  };
+  for (const [id, val] of Object.entries(map)) {
+    const el = document.getElementById(id);
+    if (el && val) { el.value = val; highlight(el); }
   }
 
-  function resetButton() {
-    const scanBtn = document.querySelector('button[onclick="scanNFC()"]');
-    scanBtn.disabled = false;
-    scanBtn.innerHTML = "📱 Scan NFC";
+  // Semester select
+  if (d.semester) {
+    const sel = document.getElementById('f_semester');
+    for (const opt of sel.options) {
+      if (opt.value.toLowerCase().includes(d.semester.toLowerCase())) {
+        sel.value = opt.value; highlight(sel); break;
+      }
+    }
   }
+
+  // Course select
+  if (d.course) {
+    const sel = document.getElementById('f_course');
+    let matched = false;
+    for (const opt of sel.options) {
+      if (opt.value.toLowerCase() === d.course.toLowerCase()) {
+        sel.value = opt.value; matched = true; highlight(sel); break;
+      }
+    }
+    if (!matched) {
+      sel.value = '__other__';
+      document.getElementById('f_course_other_wrap').style.display = 'block';
+      const oth = document.getElementById('f_course_other');
+      oth.value = d.course; highlight(oth);
+      // Also set the hidden name input
+      oth.oninput = () => { document.querySelector('[name=course]').value = oth.value; };
+    }
+  }
+
+  // Year level select
+  if (d.year_level) {
+    const sel = document.getElementById('f_year_level');
+    for (const opt of sel.options) {
+      if (opt.value.toLowerCase() === d.year_level.toLowerCase()) {
+        sel.value = opt.value; highlight(sel); break;
+      }
+    }
+  }
+}
+
+// Flash-highlight filled fields
+function highlight(el) {
+  el.style.transition = 'box-shadow .3s, border-color .3s';
+  el.style.borderColor = 'var(--success)';
+  el.style.boxShadow   = '0 0 0 3px rgba(16,185,129,.15)';
+  setTimeout(() => {
+    el.style.borderColor = '';
+    el.style.boxShadow   = '';
+  }, 2000);
+}
+
+function showBannerSuccess(filename, added) {
+  const banner = document.getElementById('uploadBanner');
+  banner.className = 'upload-banner success';
+  document.getElementById('ubIcon').textContent = '✅';
+  document.getElementById('ubTitle').textContent = 'Form filled from: ' + filename;
+  const note = added.length
+    ? `Fields auto-populated · ${added.length} new subject${added.length>1?'s':''} added to catalogue`
+    : 'All fields auto-populated · No new subjects (all already in catalogue)';
+  document.getElementById('ubSub').textContent = note;
+  const btn = document.getElementById('btnUpload');
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Re-upload';
+}
+
+function showBannerError(msg) {
+  const banner = document.getElementById('uploadBanner');
+  banner.className = 'upload-banner error';
+  document.getElementById('ubIcon').textContent = '❌';
+  document.getElementById('ubTitle').textContent = 'Could not read PDF';
+  document.getElementById('ubSub').textContent = msg;
+  const btn = document.getElementById('btnUpload');
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-cloud-upload"></i> Try Again';
+}
+
+function showSubjectPreview(subjects, addedCodes) {
+  const wrap = document.getElementById('subjPreview');
+  const list = document.getElementById('subjPreviewList');
+  const note = document.getElementById('subjPreviewNote');
+  const addedSet = new Set(addedCodes.map(c => c.toUpperCase()));
+
+  note.textContent = `${subjects.length} subject${subjects.length>1?'s':''} · ${addedCodes.length} new`;
+
+  list.innerHTML = subjects.map(s => {
+    const isNew = addedSet.has(s.course_code.toUpperCase());
+    return `<div class="subj-row${isNew?' new-badge':''}">
+      <code style="font-size:12px;color:var(--accent);">${s.course_code}</code>
+      <span style="color:var(--text);">${s.name}</span>
+      <span style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.units} units</span>
+      <span style="font-size:11px;color:${isNew?'var(--success)':'var(--muted)'};">
+        ${isNew?'<i class="bi bi-plus-circle"></i> Added':'<i class="bi bi-check-circle"></i> Exists'}
+      </span>
+    </div>`;
+  }).join('');
+
+  wrap.classList.add('show');
+}
+
+// "Other" course handler
+document.getElementById('f_course').addEventListener('change', function() {
+  const otherWrap = document.getElementById('f_course_other_wrap');
+  otherWrap.style.display = this.value === '__other__' ? 'block' : 'none';
+});
+
+// ══════════════════════════════════════════════
+// NFC SCAN
+// ══════════════════════════════════════════════
+function scanNFC() {
+  const btn    = document.getElementById('scanBtn');
+  const area   = document.getElementById('scanArea');
+  const emoji  = document.getElementById('scanEmoji');
+  const title  = document.getElementById('scanTitle');
+  const desc   = document.getElementById('scanDesc');
+  const status = document.getElementById('scanStatus');
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Scanning…';
+  area.className = 'scan-strip scanning';
+  emoji.textContent = '⏳';
+  title.textContent = 'Waiting for card…';
+  desc.textContent  = 'Hold your NFC card near the reader now';
+  status.style.display = 'block';
+  status.className = 'flash-item info';
+  status.innerHTML = '<i class="bi bi-wifi"></i> Ready — tap your NFC card on the reader';
+
+  fetch('/request_registration_scan', {method:'POST'})
+    .then(r => r.json())
+    .then(data => { if (data.status === 'ready') pollForUID(); else throw new Error('Not ready'); })
+    .catch(() => { status.className='flash-item error'; status.innerHTML='❌ NFC listener not running.'; resetScan(); });
+}
+
+function pollForUID() {
+  let attempts = 0; const max = 30;
+  const interval = setInterval(() => {
+    fetch('/get_scanned_uid').then(r=>r.json()).then(data => {
+      if (data.uid) {
+        clearInterval(interval);
+        document.getElementById('nfc_id').value = data.uid;
+        document.getElementById('scanArea').className = 'scan-strip captured';
+        document.getElementById('scanEmoji').textContent = '✅';
+        document.getElementById('scanTitle').textContent = 'Card Captured!';
+        document.getElementById('scanDesc').textContent  = 'UID: ' + data.uid + ' — ready to register';
+        document.getElementById('scanStatus').className  = 'flash-item success';
+        document.getElementById('scanStatus').innerHTML  = '✅ NFC UID captured: <code>' + data.uid + '</code>';
+        resetScan(true);
+      } else {
+        if (++attempts >= max) { clearInterval(interval); document.getElementById('scanStatus').className='flash-item error'; document.getElementById('scanStatus').innerHTML='⏰ Timeout. Please try again.'; resetScan(); }
+      }
+    });
+  }, 500);
+}
+
+function resetScan(success=false) {
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = false; btn.innerHTML = '<i class="bi bi-wifi"></i> Scan NFC';
+  if (!success) {
+    document.getElementById('scanArea').className = 'scan-strip';
+    document.getElementById('scanEmoji').textContent = '📱';
+    document.getElementById('scanTitle').textContent = 'Click here to scan NFC card';
+    document.getElementById('scanDesc').textContent  = 'Or tap the Scan button — hold card near the reader';
+  }
+}
+
+  function previewStudentPhoto(input){
+    if(!input.files||!input.files[0]) return;
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=document.getElementById('photoPreviewImg');
+      const init=document.getElementById('photoPreviewInit');
+      img.src=e.target.result;
+      img.style.display='block';
+      init.style.display='none';
+      document.getElementById('photoPreviewWrap').style.borderStyle='solid';
+      document.getElementById('photoPreviewWrap').style.borderColor='var(--accent)';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+
+// ── Form Validation ──────────────────────────────────────────────────────────
+function validateRegisterForm(){
+  let ok = true;
+  const required = [
+    {id:'f_name',        msg:'Student full name is required.'},
+    {id:'f_student_id',  msg:'Student ID number is required.'},
+    {id:'f_course',      msg:'Please select a course.'},
+    {id:'f_year_level',  msg:'Please select a year level.'},
+    {id:'f_section',     msg:'Please select a section.'},
+    {id:'f_adviser',     msg:'Class adviser name is required.'},
+    {id:'f_school_year', msg:'School year is required.'},
+    {id:'nfc_id',        msg:'NFC Card UID is required. Scan the card first.'},
+  ];
+  // Clear previous errors
+  document.querySelectorAll('.form-control.is-invalid').forEach(el=>el.classList.remove('is-invalid'));
+  document.querySelectorAll('.reg-err').forEach(el=>el.remove());
+
+  required.forEach(({id,msg})=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    if(!el.value||!el.value.trim()){
+      el.classList.add('is-invalid');
+      const err=document.createElement('div');
+      err.className='reg-err';
+      err.style.cssText='font-size:11px;color:#C0392B;margin-top:3px;';
+      err.textContent=msg;
+      el.parentNode.insertBefore(err, el.nextSibling);
+      ok=false;
+    }
+  });
+
+  // Email validation
+  const emailEl=document.getElementById('f_email');
+  if(emailEl && emailEl.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value)){
+    emailEl.classList.add('is-invalid');
+    const err=document.createElement('div');
+    err.className='reg-err';
+    err.style.cssText='font-size:11px;color:#C0392B;margin-top:3px;';
+    err.textContent='Enter a valid email address.';
+    emailEl.parentNode.insertBefore(err, emailEl.nextSibling);
+    ok=false;
+  }
+
+  if(!ok){
+    // Scroll to first error
+    const first=document.querySelector('.form-control.is-invalid');
+    if(first) first.scrollIntoView({behavior:'smooth',block:'center'});
+    return false;
+  }
+  return true;
+}
+
+// Clear invalid on input
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('#registerForm .form-control').forEach(el=>{
+    el.addEventListener('input',()=>{
+      el.classList.remove('is-invalid');
+      const next=el.nextSibling;
+      if(next && next.classList && next.classList.contains('reg-err')) next.remove();
+    });
+  });
+});
 </script>
 {% endblock %}

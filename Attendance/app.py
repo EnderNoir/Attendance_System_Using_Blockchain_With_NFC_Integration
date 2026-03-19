@@ -18,7 +18,8 @@ def inject_globals():
     return dict(
         photos_db     = db_get_all_photos(),
         pending_count = db_pending_count(),
-        fmt_time      = fmt_time
+        fmt_time      = fmt_time,
+        fmt_time_short= fmt_time_short,
     )
 
 hardhat_url = "http://127.0.0.1:8545"
@@ -30,18 +31,49 @@ print("Connected to Hardhat Network")
 contract_data_path = os.path.join(os.path.dirname(__file__), 'attendance-contract.json')
 with open(contract_data_path) as f:
     contract_data = json.load(f)
-contract    = web3.eth.contract(address=contract_data['address'], abi=contract_data['abi'])
+contract      = web3.eth.contract(address=contract_data['address'], abi=contract_data['abi'])
 admin_account = web3.eth.accounts[0]
 
 BASE_DIR      = os.path.dirname(__file__)
 DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
-FLAG_FILE     = "registration_mode.flag"
-UID_FILE      = "scanned_uid.txt"
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def hash_password(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
+
+# ── SECTION KEY NORMALIZER ────────────────────────────────────────────────────
+# FIX #1, #2, #3: Normalize all section keys to consistent format
+# "BS Computer Science|1st Year|A" — no extra spaces, consistent casing
+
+def normalize_section_key(key):
+    """Normalize a section key to consistent format: 'Course|Year Level|Section'"""
+    if not key:
+        return key
+    parts = [p.strip() for p in key.split('|')]
+    if len(parts) == 3:
+        course    = parts[0].strip()
+        year      = parts[1].strip()
+        section   = parts[2].strip().upper()
+        # Normalize year level format
+        year_map = {
+            '1': '1st Year', '2': '2nd Year', '3': '3rd Year', '4': '4th Year', '5': '5th Year',
+            '1st': '1st Year', '2nd': '2nd Year', '3rd': '3rd Year', '4th': '4th Year',
+            '1st year': '1st Year', '2nd year': '2nd Year', '3rd year': '3rd Year',
+            '4th year': '4th Year', '5th year': '5th Year',
+        }
+        year_normalized = year_map.get(year.lower(), year)
+        return f"{course}|{year_normalized}|{section}"
+    return key
+
+def build_student_section_key(student):
+    """Build normalized section key from student data."""
+    course     = (student.get('course') or '').strip()
+    year_level = (student.get('year_level') or '').strip()
+    section    = (student.get('section') or '').strip().upper()
+    if not course or not year_level or not section:
+        return None
+    return normalize_section_key(f"{course}|{year_level}|{section}")
 
 # ── SQLite ────────────────────────────────────────────────────────────────────
 
@@ -90,26 +122,39 @@ def init_db():
             "  late_cutoff TEXT NOT NULL DEFAULT '', ended_at TEXT,"
             "  present_json TEXT NOT NULL DEFAULT '[]', late_json TEXT NOT NULL DEFAULT '[]',"
             "  excused_json TEXT NOT NULL DEFAULT '[]', warned_json TEXT NOT NULL DEFAULT '[]',"
+            "  absent_json TEXT NOT NULL DEFAULT '[]',"
             "  tap_log_json TEXT NOT NULL DEFAULT '[]', warn_log_json TEXT NOT NULL DEFAULT '[]',"
             "  invalid_log_json TEXT NOT NULL DEFAULT '[]',"
             "  excuse_notes_json TEXT NOT NULL DEFAULT '{}',"
             "  tx_hashes_json TEXT NOT NULL DEFAULT '{}'"
             ");"
-            "CREATE INDEX IF NOT EXISTS idx_sess_teacher ON sessions(teacher);"
-            "CREATE INDEX IF NOT EXISTS idx_sess_ended   ON sessions(ended_at);"
-            "CREATE INDEX IF NOT EXISTS idx_sess_section ON sessions(section_key);"
+            "CREATE INDEX IF NOT EXISTS idx_sess_teacher  ON sessions(teacher);"
+            "CREATE INDEX IF NOT EXISTS idx_sess_ended    ON sessions(ended_at);"
+            "CREATE INDEX IF NOT EXISTS idx_sess_section  ON sessions(section_key);"
+            # FIX #9: Replace flag files with DB table for NFC registration mode
+            "CREATE TABLE IF NOT EXISTS nfc_registration ("
+            "  id INTEGER PRIMARY KEY CHECK (id = 1),"
+            "  waiting INTEGER NOT NULL DEFAULT 0,"
+            "  scanned_uid TEXT NOT NULL DEFAULT '',"
+            "  requested_by TEXT NOT NULL DEFAULT '',"
+            "  requested_at TEXT NOT NULL DEFAULT ''"
+            ");"
+            "INSERT OR IGNORE INTO nfc_registration (id, waiting, scanned_uid) VALUES (1, 0, '');"
         )
     print("[DB] SQLite tables ready ->", DB_FILE)
 
 def _row_to_dict(row):
     if row is None: return None
     d = dict(row)
-    for col in ('present_json','late_json','excused_json','warned_json',
+    for col in ('present_json','late_json','excused_json','warned_json','absent_json',
                 'tap_log_json','warn_log_json','invalid_log_json'):
         key = col.replace('_json','')
         d[key] = json.loads(d.pop(col,'[]') or '[]')
     d['excuse_notes'] = json.loads(d.pop('excuse_notes_json','{}') or '{}')
     d['tx_hashes']    = json.loads(d.pop('tx_hashes_json',   '{}') or '{}')
+    # Normalize section_key on read
+    if d.get('section_key'):
+        d['section_key'] = normalize_section_key(d['section_key'])
     return d
 
 def load_sessions():
@@ -128,13 +173,13 @@ def save_session(sess_id, s):
             INSERT INTO sessions (
                 sess_id,subject_id,subject_name,course_code,units,time_slot,
                 section_key,teacher,teacher_name,started_at,late_cutoff,ended_at,
-                present_json,late_json,excused_json,warned_json,
+                present_json,late_json,excused_json,warned_json,absent_json,
                 tap_log_json,warn_log_json,invalid_log_json,
                 excuse_notes_json,tx_hashes_json
             ) VALUES (
                 :sess_id,:subject_id,:subject_name,:course_code,:units,:time_slot,
                 :section_key,:teacher,:teacher_name,:started_at,:late_cutoff,:ended_at,
-                :present_json,:late_json,:excused_json,:warned_json,
+                :present_json,:late_json,:excused_json,:warned_json,:absent_json,
                 :tap_log_json,:warn_log_json,:invalid_log_json,
                 :excuse_notes_json,:tx_hashes_json
             )
@@ -147,6 +192,7 @@ def save_session(sess_id, s):
                 ended_at=excluded.ended_at,
                 present_json=excluded.present_json, late_json=excluded.late_json,
                 excused_json=excluded.excused_json, warned_json=excluded.warned_json,
+                absent_json=excluded.absent_json,
                 tap_log_json=excluded.tap_log_json, warn_log_json=excluded.warn_log_json,
                 invalid_log_json=excluded.invalid_log_json,
                 excuse_notes_json=excluded.excuse_notes_json,
@@ -158,7 +204,7 @@ def save_session(sess_id, s):
             'course_code':   s.get('course_code',''),
             'units':         s.get('units',3),
             'time_slot':     s.get('time_slot',''),
-            'section_key':   s.get('section_key',''),
+            'section_key':   normalize_section_key(s.get('section_key','')),
             'teacher':       s.get('teacher',''),
             'teacher_name':  s.get('teacher_name',''),
             'started_at':    s.get('started_at',''),
@@ -168,6 +214,7 @@ def save_session(sess_id, s):
             'late_json':     json.dumps(s.get('late',[])),
             'excused_json':  json.dumps(s.get('excused',[])),
             'warned_json':   json.dumps(s.get('warned',[])),
+            'absent_json':   json.dumps(s.get('absent',[])),
             'tap_log_json':  json.dumps(s.get('tap_log',[])),
             'warn_log_json': json.dumps(s.get('warn_log',[])),
             'invalid_log_json': json.dumps(s.get('invalid_log',[])),
@@ -213,8 +260,10 @@ def migrate_json_to_sqlite():
 def _user_row(row):
     if row is None: return None
     d = dict(row)
-    d['sections']    = json.loads(d.pop('sections_json','[]') or '[]')
+    raw_sections    = json.loads(d.pop('sections_json','[]') or '[]')
     d['my_subjects'] = json.loads(d.pop('my_subjects_json','[]') or '[]')
+    # FIX #1: Normalize all section keys when loading user
+    d['sections'] = [normalize_section_key(s) for s in raw_sections]
     return d
 
 def db_get_all_users():
@@ -228,6 +277,8 @@ def db_get_user(username):
     return _user_row(row)
 
 def db_save_user(username, u):
+    # Normalize sections before saving
+    sections = [normalize_section_key(s) for s in u.get('sections', [])]
     with get_db() as conn:
         conn.execute(
             "INSERT INTO users (username,password,role,full_name,email,status,"
@@ -239,7 +290,7 @@ def db_save_user(username, u):
             " my_subjects_json=excluded.my_subjects_json, created_at=excluded.created_at",
             (username, u.get('password',''), u.get('role','teacher'),
              u.get('full_name',''), u.get('email',''), u.get('status','pending'),
-             json.dumps(u.get('sections',[])), json.dumps(u.get('my_subjects',[])),
+             json.dumps(sections), json.dumps(u.get('my_subjects',[])),
              u.get('created_at',''))
         )
 
@@ -334,8 +385,42 @@ def db_save_override(nfc_id, fields):
              fields.get('adviser',''), fields.get('major',''),
              fields.get('semester',''), fields.get('school_year',''),
              fields.get('date_registered',''), fields.get('course',''),
-             fields.get('year_level',''), fields.get('section',''))
+             fields.get('year_level',''), fields.get('section','').upper())
         )
+
+# ── NFC REGISTRATION MODE (DB-based, FIX #9) ─────────────────────────────────
+
+def nfc_set_waiting(username):
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE nfc_registration SET waiting=1, scanned_uid='', requested_by=?, requested_at=? WHERE id=1",
+            (username, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        )
+
+def nfc_is_waiting():
+    with get_db() as conn:
+        row = conn.execute("SELECT waiting FROM nfc_registration WHERE id=1").fetchone()
+    return bool(row and row['waiting'])
+
+def nfc_set_uid(uid):
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE nfc_registration SET waiting=0, scanned_uid=? WHERE id=1",
+            (uid,)
+        )
+
+def nfc_get_uid():
+    with get_db() as conn:
+        row = conn.execute("SELECT scanned_uid FROM nfc_registration WHERE id=1").fetchone()
+    if row and row['scanned_uid']:
+        uid = row['scanned_uid']
+        conn.execute("UPDATE nfc_registration SET scanned_uid='' WHERE id=1")
+        return uid
+    return None
+
+def nfc_clear():
+    with get_db() as conn:
+        conn.execute("UPDATE nfc_registration SET waiting=0, scanned_uid='' WHERE id=1")
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 
@@ -407,7 +492,7 @@ def parse_student(raw):
         if   p.startswith('ID:'):       r['student_id']      = p[3:]
         elif p.startswith('Course:'):   r['course']          = p[7:]
         elif p.startswith('Year:'):     r['year_level']      = p[5:]
-        elif p.startswith('Sec:'):      r['section']         = p[4:]
+        elif p.startswith('Sec:'):      r['section']         = p[4:].upper()
         elif p.startswith('Adviser:'):  r['adviser']         = p[8:]
         elif p.startswith('Email:'):    r['email']           = p[6:]
         elif p.startswith('Tel:'):      r['contact']         = p[4:]
@@ -442,7 +527,9 @@ def get_all_students():
         if ov.get('date_registered'): s['date_registered'] = ov['date_registered']
         if ov.get('course'):          s['course']          = ov['course']
         if ov.get('year_level'):      s['year_level']      = ov['year_level']
-        if ov.get('section'):         s['section']         = ov['section']
+        if ov.get('section'):         s['section']         = ov['section'].upper()
+        # FIX #1: Normalize section field to just the letter (A, B, C, D)
+        s['section'] = s['section'].strip().upper()
         students.append(s)
     return students
 
@@ -453,9 +540,51 @@ def get_attendance_records(nfc_id):
     except:
         return []
 
+# FIX #4: Calculate attendance rate from sessions, not raw blockchain taps
+def get_student_attendance_stats(nfc_id):
+    """
+    Calculate attendance stats from SQLite sessions — the real source of truth.
+    Returns dict with total, present, late, excused, absent, rate.
+    """
+    all_students = get_all_students()
+    student = next((s for s in all_students if s['nfcId'] == nfc_id), None)
+    if not student:
+        return {'total': 0, 'present': 0, 'late': 0, 'excused': 0, 'absent': 0, 'rate': 0}
+
+    student_key = build_student_section_key(student)
+    if not student_key:
+        return {'total': 0, 'present': 0, 'late': 0, 'excused': 0, 'absent': 0, 'rate': 0}
+
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM sessions WHERE ended_at IS NOT NULL AND section_key=?",
+            (student_key,)
+        ).fetchall()
+
+    total = late = excused = present = absent = 0
+    for row in rows:
+        s = _row_to_dict(row)
+        total += 1
+        if   nfc_id in s.get('excused', []): excused += 1
+        elif nfc_id in s.get('late',    []): late    += 1
+        elif nfc_id in s.get('present', []): present += 1
+        else:                                absent  += 1
+
+    attended = present + late
+    rate = round(attended / total * 100, 1) if total else 0
+    return {'total': total, 'present': present + late, 'late': late,
+            'excused': excused, 'absent': absent, 'rate': rate}
+
 def teacher_students(user):
-    allowed = set(user.get('sections',[]))
-    return [s for s in get_all_students() if f"{s['course']}|{s['year_level']}|{s['section']}" in allowed]
+    allowed = set(user.get('sections', []))
+    # Normalize allowed sections
+    allowed = {normalize_section_key(s) for s in allowed}
+    result = []
+    for s in get_all_students():
+        key = build_student_section_key(s)
+        if key and key in allowed:
+            result.append(s)
+    return result
 
 def get_active_sessions():
     with get_db() as conn:
@@ -463,10 +592,14 @@ def get_active_sessions():
     return {r['sess_id']: _row_to_dict(r) for r in rows}
 
 def get_active_session_for_nfc(nfc_id):
+    """FIX #3: Use normalized section key matching to find active session."""
     all_students = get_all_students()
-    student = next((s for s in all_students if s['nfcId']==nfc_id), None)
+    student = next((s for s in all_students if s['nfcId'] == nfc_id), None)
     if not student: return None, None
-    student_key = f"{student['course']}|{student['year_level']}|{student['section']}"
+
+    student_key = build_student_section_key(student)
+    if not student_key: return None, None
+
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM sessions WHERE ended_at IS NULL AND section_key=?",
@@ -510,7 +643,10 @@ def signup():
         fullname = request.form['full_name'].strip()
         email    = request.form['email'].strip()
         role     = request.form['role']
-        sections = request.form.getlist('sections')
+        # FIX #1: Normalize sections on signup
+        raw_sections = request.form.getlist('sections')
+        sections = [normalize_section_key(s) for s in raw_sections]
+
         if db_get_user(username):    flash('Username already taken.'); return redirect(url_for('signup'))
         if password != confirm:      flash('Passwords do not match.'); return redirect(url_for('signup'))
         if len(password) < 6:        flash('Password must be at least 6 characters.'); return redirect(url_for('signup'))
@@ -555,14 +691,22 @@ def register():
                 raw_date = d.strftime('%B %Y')
             except:
                 pass
-        for k,prefix in [('student_id','ID'),('course','Course'),('year_level','Year'),('section','Sec'),
+
+        # FIX #1: Normalize section to uppercase single letter on registration
+        section_val = request.form.get('section','').strip().upper()
+
+        for k,prefix in [('student_id','ID'),('course','Course'),('year_level','Year'),
                           ('adviser','Adviser'),('email','Email'),('contact','Tel'),
                           ('semester','Sem'),('school_year','SY')]:
             v = request.form.get(k,'').strip()
             if v: extras.append(f"{prefix}:{v}")
+
+        # Add normalized section
+        if section_val: extras.append(f"Sec:{section_val}")
         if raw_date: extras.append(f"RegDate:{raw_date}")
         major = request.form.get('major','').strip() or 'N/A'
         extras.append(f"Major:{major}")
+
         on_chain = name + (' | ' + ' | '.join(extras) if extras else '')
         pk = "0x" + secrets.token_hex(32)
         addr = web3.eth.account.from_key(pk).address
@@ -635,7 +779,9 @@ def parse_registration_pdf():
         result['student_id']  = grab(r'Student Number:\s*(\S+)')
         result['semester']    = grab(r'Semester:\s*([A-Za-z]+)').title()
         result['school_year'] = grab(r'School Year:\s*(\d{4}-\d{4})')
-        result['section']     = grab(r'Section:\s*(\S+)')
+        # FIX #1: Normalize section to uppercase single letter from PDF
+        raw_section = grab(r'Section:\s*(\S+)')
+        result['section'] = raw_section.strip().upper() if raw_section else ''
 
         m = re.search(r'Student Name:\s*(.+)', full)
         if m:
@@ -648,12 +794,10 @@ def parse_registration_pdf():
                 first = ''.join(p.lower() for p in name_parts[:-1])
                 result['email'] = f"sc.{first}.{last}@cvsu.edu.ph"
 
-        # ── Date extraction — produces YYYY-MM for <input type="month"> ──
         m = re.search(r'Date:\s*(.+)', full)
         if m:
             _raw = m.group(1).strip().split('|')[0].strip()
             _date_val = ''
-            # Try matching "Month YYYY" (e.g. "March 2024")
             _m2 = re.search(r'([A-Za-z]+)\s+(\d{4})', _raw)
             if _m2:
                 try:
@@ -661,7 +805,6 @@ def parse_registration_pdf():
                     _date_val = _d.strftime('%Y-%m')
                 except:
                     pass
-            # Try matching Month Day, YYYY (e.g. "March 15, 2024")
             if not _date_val:
                 _m3 = re.search(r'([A-Za-z]+)\s+(\d{1,2})[,\s]+(\d{4})', _raw)
                 if _m3:
@@ -670,7 +813,6 @@ def parse_registration_pdf():
                         _date_val = _d.strftime('%Y-%m')
                     except:
                         pass
-            # Try MM/DD/YYYY
             if not _date_val:
                 _m4 = re.search(r'(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})', _raw)
                 if _m4:
@@ -692,7 +834,6 @@ def parse_registration_pdf():
             maj = m.group(1).strip()
             result['major'] = '' if maj.upper() in ('N/A','NA','') else maj
 
-        # Subject parsing
         hdr_m  = re.search(r'Units Lec Lab Hour', full)
         fees_m = re.search(r'Laboratory Fees', full)
         new_subjects = []
@@ -831,14 +972,13 @@ def delete_photo():
 @app.route('/reports')
 @admin_required
 def attendance_report():
+    # FIX #4: Use session-based stats instead of raw blockchain taps
     report = []
     for s in get_all_students():
-        rec  = get_attendance_records(s['nfcId'])
-        tot  = len(rec)
-        pres = sum(1 for _,p in rec if p)
-        report.append({**s,'total':tot,'present':pres,'rate':round(pres/tot*100,1) if tot else 0})
+        stats = get_student_attendance_stats(s['nfcId'])
+        report.append({**s, **stats})
     return render_template('attendance_report.html',
-                           students=sorted(report,key=lambda x:-x['rate']),
+                           students=sorted(report, key=lambda x: -x['rate']),
                            subjects_db=db_get_all_subjects(), fmt_time=fmt_time)
 
 @app.route('/view/<nfc_id>')
@@ -860,7 +1000,8 @@ def student_sessions_api(nfc_id):
     student         = next((x for x in all_students if x['nfcId']==nfc_id), None)
     student_section = ''
     if student:
-        student_section = f"{student.get('course','')}|{student.get('year_level','')}|{student.get('section','')}"
+        student_section = build_student_section_key(student) or ''
+
     with get_db() as _conn:
         _all_rows = _conn.execute(
             "SELECT * FROM sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC"
@@ -869,12 +1010,13 @@ def student_sessions_api(nfc_id):
     for row in _all_rows:
         s   = _row_to_dict(row)
         sec = s.get('section_key','')
-        if student_section and sec != student_section: continue
+        # FIX #3: Use normalized key comparison
+        if student_section and normalize_section_key(sec) != student_section: continue
         status = None
-        if   nfc_id in s.get('present',  []): status = 'present'
-        elif nfc_id in s.get('late',     []): status = 'late'
-        elif nfc_id in s.get('excused',  []): status = 'excused'
-        elif student_section == sec:           status = 'absent'
+        if   nfc_id in s.get('excused', []): status = 'excused'
+        elif nfc_id in s.get('late',    []): status = 'late'
+        elif nfc_id in s.get('present', []): status = 'present'
+        elif student_section == normalize_section_key(sec): status = 'absent'
         if not status: continue
         tx_info = s.get('tx_hashes',{}).get(nfc_id,{})
         result.append({
@@ -901,6 +1043,9 @@ def update_student():
     fields = ['full_name','student_id','email','contact','adviser','major',
               'semester','school_year','date_registered','course','year_level','section']
     override_data = {f: data.get(f,'').strip() for f in fields if data.get(f)}
+    # FIX #1: Normalize section to uppercase
+    if 'section' in override_data:
+        override_data['section'] = override_data['section'].upper()
     db_save_override(nfc_id, override_data)
     return jsonify({'ok':True})
 
@@ -915,9 +1060,9 @@ def update_faculty():
     if data.get('email') is not None: user['email'] = data['email'].strip()
     if data.get('role') in ('admin','teacher'): user['role'] = data['role']
     if data.get('status') in ('approved','pending','rejected'): user['status'] = data['status']
-    # Save sections from Update tab
     if 'sections' in data and isinstance(data['sections'], list):
-        user['sections'] = data['sections']
+        # FIX #1: Normalize sections on save
+        user['sections'] = [normalize_section_key(s) for s in data['sections']]
     new_pw = (data.get('new_password') or '').strip()
     if new_pw:
         if len(new_pw) < 6:
@@ -1092,10 +1237,11 @@ def _build_teacher_context(user):
     students = teacher_students(user)
     sections = {}
     for key in user.get('sections', []):
-        parts    = key.split('|')
-        sec_stud = [s for s in students if f"{s['course']}|{s['year_level']}|{s['section']}" == key]
-        sections[key] = {
-            'label':   f"{parts[2]} — {parts[1]}" if len(parts)==3 else key,
+        norm_key = normalize_section_key(key)
+        parts    = norm_key.split('|')
+        sec_stud = [s for s in students if build_student_section_key(s) == norm_key]
+        sections[norm_key] = {
+            'label':   f"{parts[2]} — {parts[1]}" if len(parts)==3 else norm_key,
             'course':  parts[0] if parts else '',
             'year':    parts[1] if len(parts)>1 else '',
             'section': parts[2] if len(parts)>2 else '',
@@ -1104,11 +1250,13 @@ def _build_teacher_context(user):
     all_subj = db_get_all_subjects()
     my_subjects = []
     for ms in user.get('my_subjects', []):
-        sid  = ms.get('subject_id'); skey = ms.get('section_key')
+        sid  = ms.get('subject_id')
+        skey = normalize_section_key(ms.get('section_key',''))
         if sid in all_subj and skey in sections:
             active_sid = None
             for sess_id, sess_obj in get_active_sessions().items():
-                if (sess_obj.get('subject_id')==sid and sess_obj.get('section_key')==skey
+                if (sess_obj.get('subject_id')==sid
+                        and normalize_section_key(sess_obj.get('section_key',''))==skey
                         and sess_obj.get('teacher')==session['username']):
                     active_sid = sess_id; break
             parts = skey.split('|')
@@ -1169,13 +1317,13 @@ def teacher_add_subject():
     if session.get('role') == 'admin': return redirect(url_for('index'))
     user       = get_current_user()
     subject_id = request.form.get('subject_id','').strip()
-    section_key= request.form.get('section_key','').strip()
+    section_key= normalize_section_key(request.form.get('section_key','').strip())
     if not subject_id or not section_key:
         flash('Please select both a subject and a section.'); return redirect(url_for('teacher_create_session'))
     subj = db_get_subject(subject_id)
     if not subj: flash('Subject not found.'); return redirect(url_for('teacher_create_session'))
     for ms in user.get('my_subjects',[]):
-        if ms['subject_id']==subject_id and ms['section_key']==section_key:
+        if ms['subject_id']==subject_id and normalize_section_key(ms['section_key'])==section_key:
             flash('Already assigned.'); return redirect(url_for('teacher_create_session'))
     user.setdefault('my_subjects',[]).append({'subject_id':subject_id,'section_key':section_key})
     db_save_user(session['username'], user)
@@ -1187,8 +1335,10 @@ def teacher_add_subject():
 def teacher_remove_subject(subject_id, section_key):
     if session.get('role') == 'admin': return redirect(url_for('index'))
     user = get_current_user()
+    norm_key = normalize_section_key(section_key)
     user['my_subjects'] = [ms for ms in user.get('my_subjects',[])
-                           if not (ms['subject_id']==subject_id and ms['section_key']==section_key)]
+                           if not (ms['subject_id']==subject_id
+                                   and normalize_section_key(ms['section_key'])==norm_key)]
     db_save_user(session['username'], user)
     flash('Subject removed from your schedule.')
     return redirect(url_for('teacher_create_session'))
@@ -1198,11 +1348,12 @@ def teacher_remove_subject(subject_id, section_key):
 def start_session():
     if session.get('role') == 'admin': return redirect(url_for('index'))
     subject_id  = request.form.get('subject_id','').strip()
-    section_key = request.form.get('section_key','').strip()
+    section_key = normalize_section_key(request.form.get('section_key','').strip())
     if not subject_id or not section_key:
         flash('Missing subject or section.'); return redirect(url_for('teacher_create_session'))
     for s in get_active_sessions().values():
-        if s.get('teacher')==session['username'] and s.get('section_key')==section_key:
+        if (s.get('teacher')==session['username']
+                and normalize_section_key(s.get('section_key',''))==section_key):
             flash('You already have an active session for that section.')
             return redirect(url_for('teacher_create_session'))
     time_slot = request.form.get('time_slot','').strip()
@@ -1224,7 +1375,7 @@ def start_session():
         'started_at':   now.strftime('%Y-%m-%d %H:%M:%S'),
         'late_cutoff':  late_cutoff_dt.strftime('%Y-%m-%d %H:%M:%S'),
         'ended_at':     None,
-        'present':[],'late':[],'excused':[],'warned':[],
+        'present':[],'late':[],'excused':[],'warned':[],'absent':[],
         'tap_log':[],'warn_log':[],'invalid_log':[],'excuse_notes':{},'tx_hashes':{}
     }
     save_session(sess_id, new_sess)
@@ -1239,23 +1390,30 @@ def live_session(sess_id):
     if sess is None: flash('Session not found.'); return redirect(url_for('teacher_dashboard'))
     if session.get('role')!='admin' and sess.get('teacher')!=session['username']:
         flash('Access denied.'); return redirect(url_for('teacher_dashboard'))
-    all_students    = get_all_students()
-    section_students= [s for s in all_students if f"{s['course']}|{s['year_level']}|{s['section']}"==sess['section_key']]
-    present_set     = set(sess.get('present',[]))
-    late_set        = set(sess.get('late',[]))
-    excused_set     = set(sess.get('excused',[]))
+
+    all_students     = get_all_students()
+    section_key      = sess.get('section_key','')
+    # FIX #1, #3: Use normalized key matching for enrolled students
+    section_students = [s for s in all_students
+                        if build_student_section_key(s) == normalize_section_key(section_key)]
+
+    present_set  = set(sess.get('present',[]))
+    late_set     = set(sess.get('late',[]))
+    excused_set  = set(sess.get('excused',[]))
     student_statuses = []
     for s in section_students:
         nid = s['nfcId']
-        if   nid in present_set: status = 'late' if nid in late_set else 'present'
-        elif nid in excused_set: status = 'excused'
+        if   nid in excused_set: status = 'excused'
+        elif nid in late_set:    status = 'late'
+        elif nid in present_set: status = 'present'
         else:                    status = 'absent'
         student_statuses.append({**s,'status':status})
+
     return render_template('session_live.html', sess=sess, sess_id=sess_id,
                            section_students=section_students,
                            student_statuses=student_statuses,
                            present_list=[s for s in section_students if s['nfcId'] in present_set],
-                           absent_list=[s for s in section_students if s['nfcId'] not in present_set],
+                           absent_list=[s for s in section_students if s['nfcId'] not in present_set and s['nfcId'] not in excused_set],
                            tap_log=sess.get('tap_log',[]),
                            is_active=not sess.get('ended_at'),
                            fmt_time=fmt_time, fmt_time_short=fmt_time_short)
@@ -1267,10 +1425,24 @@ def end_session(sess_id):
     sess = sessions_db[sess_id]
     if session.get('role')!='admin' and sess.get('teacher')!=session['username']:
         flash('Access denied.'); return redirect(url_for('teacher_dashboard'))
-    sess['ended_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    # FIX #7: On session end, permanently record absent students
+    all_students    = get_all_students()
+    section_key     = sess.get('section_key','')
+    section_students= [s for s in all_students
+                       if build_student_section_key(s) == normalize_section_key(section_key)]
+    present_set = set(sess.get('present', []))
+    excused_set = set(sess.get('excused', []))
+    absent_list = [s['nfcId'] for s in section_students
+                   if s['nfcId'] not in present_set and s['nfcId'] not in excused_set]
+    sess['absent']    = absent_list
+    sess['ended_at']  = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     save_session(sess_id, sess)
     sessions_db[sess_id] = sess
-    flash(f'Session ended. {len(sess.get("present",[]))} students marked present.')
+
+    present_count = len([n for n in present_set if n not in sess.get('late',[])])
+    late_count    = len(sess.get('late', []))
+    flash(f'Session ended. {present_count} present, {late_count} late, {len(absent_list)} absent.')
     return redirect(url_for('teacher_dashboard'))
 
 @app.route('/teacher/session/<sess_id>/excuse', methods=['POST'])
@@ -1285,6 +1457,9 @@ def excuse_student(sess_id):
     excused       = sess.setdefault('excused', [])
     excuse_notes  = sess.setdefault('excuse_notes', {})
     if nfc_id not in excused: excused.append(nfc_id)
+    # Also remove from absent if already marked
+    if nfc_id in sess.get('absent', []):
+        sess['absent'].remove(nfc_id)
     excuse_notes[nfc_id] = note
     save_session(sess_id, sess)
     sessions_db[sess_id] = sess
@@ -1306,10 +1481,11 @@ def teacher_sessions():
 def teacher_reports():
     if session.get('role') == 'admin': return redirect(url_for('attendance_report'))
     user   = get_current_user()
+    # FIX #4: Use session-based stats for teacher reports
     report = []
     for s in teacher_students(user):
-        rec  = get_attendance_records(s['nfcId']); tot=len(rec); pres=sum(1 for _,p in rec if p)
-        report.append({**s,'total':tot,'present':pres,'rate':round(pres/tot*100,1) if tot else 0})
+        stats = get_student_attendance_stats(s['nfcId'])
+        report.append({**s, **stats})
     return render_template('teacher_reports.html', user=user,
                            students=sorted(report, key=lambda x: -x['rate']))
 
@@ -1320,7 +1496,8 @@ def teacher_export():
     sec_key  = request.args.get('section','')
     students = teacher_students(user)
     if sec_key:
-        students = [s for s in students if f"{s['course']}|{s['year_level']}|{s['section']}"==sec_key]
+        norm_key = normalize_section_key(sec_key)
+        students = [s for s in students if build_student_section_key(s) == norm_key]
     out = io.StringIO(); w = csv.writer(out)
     w.writerow(['Name','NFC ID','Student ID','Course','Year','Section','Date & Time','Status'])
     for s in students:
@@ -1370,9 +1547,10 @@ def poll_session(sess_id):
 @app.route('/api/attendance/stats')
 @login_required
 def attendance_stats():
+    # FIX #3: Corrected parameter names to match what frontend sends
     period     = request.args.get('period',      'today')
     f_month    = request.args.get('month',       '').strip()
-    f_year_num = request.args.get('year_num',    '').strip()
+    f_year_num = request.args.get('year_num',    request.args.get('year', '')).strip()
     f_subject  = request.args.get('subject',     '').strip()
     f_section  = request.args.get('section_key', '').strip()
     f_year_lvl = request.args.get('year',        '').strip()
@@ -1397,6 +1575,9 @@ def attendance_stats():
     with get_db() as _sc:
         all_sess = {r['sess_id']: _row_to_dict(r) for r in _sc.execute("SELECT * FROM sessions").fetchall()}
 
+    # Normalize filter section key
+    f_section_norm = normalize_section_key(f_section) if f_section else ''
+
     filtered = {}
     for sid, s in all_sess.items():
         if not s.get('started_at'): continue
@@ -1405,7 +1586,7 @@ def attendance_stats():
         if sess_dt < start_dt:           continue
         if end_dt and sess_dt > end_dt:  continue
         if role == 'teacher' and s.get('teacher') != username: continue
-        if f_section  and s.get('section_key','') != f_section:  continue
+        if f_section_norm and normalize_section_key(s.get('section_key','')) != f_section_norm: continue
         if f_year_lvl:
             parts = s.get('section_key','').split('|')
             if len(parts)<2 or parts[1] != f_year_lvl: continue
@@ -1424,11 +1605,12 @@ def attendance_stats():
         present_ids = set(s.get('present',  []))
         late_ids    = set(s.get('late',     []))
         excused_ids = set(s.get('excused',  []))
-        section_key = s.get('section_key','')
+        section_key = normalize_section_key(s.get('section_key',''))
         subj_name   = s.get('subject_name','Unknown')
         subj_code   = s.get('course_code','')
         subj_label  = f"[{subj_code}] {subj_name}" if subj_code else subj_name
-        enrolled     = [st for st in all_students if f"{st['course']}|{st['year_level']}|{st['section']}" == section_key]
+        # FIX #10: Correct enrolled student counting using normalized key
+        enrolled     = [st for st in all_students if build_student_section_key(st) == section_key]
         enrolled_ids = set(st['nfcId'] for st in enrolled)
         sess_counts  = {'present':0,'late':0,'absent':0,'excused':0}
         for nid in enrolled_ids:
@@ -1483,7 +1665,7 @@ def export_student_sessions(nfc_id):
 
         all_students    = get_all_students()
         student         = next((x for x in all_students if x['nfcId']==nfc_id), None)
-        student_section = f"{student.get('course','')}|{student.get('year_level','')}|{student.get('section','')}" if student else ''
+        student_section = build_student_section_key(student) if student else ''
 
         with get_db() as conn:
             rows = conn.execute("SELECT * FROM sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC").fetchall()
@@ -1491,11 +1673,11 @@ def export_student_sessions(nfc_id):
         sessions = []
         for row in rows:
             s   = _row_to_dict(row)
-            sec = s.get('section_key','')
+            sec = normalize_section_key(s.get('section_key',''))
             if student_section and sec != student_section: continue
-            if   nfc_id in s.get('present',[]): status='Present'
+            if   nfc_id in s.get('excused',[]): status='Excused'
             elif nfc_id in s.get('late',[]):    status='Late'
-            elif nfc_id in s.get('excused',[]): status='Excused'
+            elif nfc_id in s.get('present',[]): status='Present'
             elif student_section == sec:         status='Absent'
             else: continue
             if f_status  and status.lower() != f_status:  continue
@@ -1519,7 +1701,7 @@ def export_student_sessions(nfc_id):
         c.font=Font(name='Arial',size=14,bold=True,color='2D6A27'); c.fill=_fill(C_DARK); c.alignment=_ctr(); ws.row_dimensions[1].height=32
         for col in range(2,9): ws.cell(row=1,column=col).fill=_fill(C_DARK)
         ws.merge_cells("A2:H2"); c=ws["A2"]
-        filters=[]; 
+        filters=[]
         if f_status: filters.append('Status: '+f_status.capitalize())
         if f_subject: filters.append('Subject: '+f_subject)
         c.value=f"NFC: {nfc_id}  |  Filters: {' | '.join(filters) if filters else 'None'}"
@@ -1564,7 +1746,6 @@ def export_student_sessions(nfc_id):
 @app.route('/export/session/<sess_id>')
 @login_required
 def export_session_attendance(sess_id):
-    """Export a single session's full attendance list as formatted Excel."""
     try:
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -1576,8 +1757,9 @@ def export_session_attendance(sess_id):
             flash('Access denied.'); return redirect(url_for('teacher_sessions'))
 
         all_students = get_all_students()
-        section_key  = sess.get('section_key','')
-        enrolled     = [s for s in all_students if f"{s['course']}|{s['year_level']}|{s['section']}"==section_key]
+        section_key  = normalize_section_key(sess.get('section_key',''))
+        # FIX #10: Use normalized key for enrolled student list
+        enrolled     = [s for s in all_students if build_student_section_key(s) == section_key]
         present_ids  = set(sess.get('present',[]))
         late_ids     = set(sess.get('late',[]))
         excused_ids  = set(sess.get('excused',[]))
@@ -1599,7 +1781,7 @@ def export_session_attendance(sess_id):
             f"Subject: {sess.get('subject_name','')} {'['+sess.get('course_code','')+']' if sess.get('course_code') else ''}",
             f"Section: {section_key.replace('|',' · ')}  |  Instructor: {sess.get('teacher_name','')}",
             f"Time Slot: {sess.get('time_slot','—')}  |  Started: {sess.get('started_at','—')}  |  Ended: {sess.get('ended_at','Still running')}",
-            f"Present: {len(present_ids)}  |  Late: {len(late_ids)}  |  Absent: {len(enrolled)-len(present_ids)-len(late_ids)-len(excused_ids)}  |  Excused: {len(excused_ids)}",
+            f"Present: {len(present_ids)}  |  Late: {len(late_ids)}  |  Absent: {len(enrolled)-len(present_ids)-len(excused_ids)}  |  Excused: {len(excused_ids)}",
         ]
         for ri,text in enumerate(meta,2):
             ws.merge_cells(f'A{ri}:G{ri}'); c=ws.cell(row=ri,column=1,value=text)
@@ -1651,7 +1833,6 @@ def export_stats_xlsx():
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
-        from openpyxl.chart import BarChart, DoughnutChart, Reference
 
         period     = request.args.get('period',      'all')
         f_section  = request.args.get('section_key', '').strip()
@@ -1677,6 +1858,7 @@ def export_stats_xlsx():
             start_dt=datetime(2000,1,1); end_dt=None; period_label='All Time'
 
         all_sess=load_sessions(); all_stud=get_all_students(); filtered={}
+        f_section_norm = normalize_section_key(f_section) if f_section else ''
         for sid,s in all_sess.items():
             if not s.get('started_at'): continue
             try: sess_dt=datetime.strptime(s['started_at'],'%Y-%m-%d %H:%M:%S')
@@ -1684,7 +1866,7 @@ def export_stats_xlsx():
             if sess_dt<start_dt: continue
             if end_dt and sess_dt>end_dt: continue
             if role=='teacher' and s.get('teacher')!=username: continue
-            if f_section and s.get('section_key','')!=f_section: continue
+            if f_section_norm and normalize_section_key(s.get('section_key',''))!=f_section_norm: continue
             if f_year:
                 parts=s.get('section_key','').split('|')
                 if len(parts)<2 or parts[1]!=f_year: continue
@@ -1703,8 +1885,8 @@ def export_stats_xlsx():
         trend_data={}; subject_data={}; sessions_rows=[]; detail_rows=[]
 
         for sid,s in sorted(filtered.items(),key=lambda x:x[1].get('started_at','')):
-            section_key=s.get('section_key','')
-            enrolled=[st for st in all_stud if f"{st['course']}|{st['year_level']}|{st['section']}"==section_key]
+            section_key=normalize_section_key(s.get('section_key',''))
+            enrolled=[st for st in all_stud if build_student_section_key(st) == section_key]
             enrolled_ids={st['nfcId'] for st in enrolled}
             present_ids=set(s.get('present',[])); late_ids=set(s.get('late',[])); excused_ids=set(s.get('excused',[]))
             cnt={'enrolled':len(enrolled_ids),'present':0,'late':0,'absent':0,'excused':0}
@@ -1833,6 +2015,7 @@ def export_stats_csv():
         yr=int(request.args.get('year_num',now.year)); start_dt=datetime(yr,1,1); end_dt=datetime(yr,12,31,23,59,59)
     else: start_dt=datetime(2000,1,1); end_dt=None
     all_sess=load_sessions(); all_stud=get_all_students()
+    f_sec_norm = normalize_section_key(f_sec) if f_sec else ''
     out=io.StringIO(); w=csv.writer(out)
     w.writerow(['Session ID','Subject','Section','Instructor','Date','Time Slot','Enrolled','Present','Late','Absent','Excused','Rate%'])
     for sid,s in sorted(all_sess.items(),key=lambda x:x[1].get('started_at','')):
@@ -1843,8 +2026,9 @@ def export_stats_csv():
         if end_dt and sess_dt>end_dt: continue
         if role=='teacher' and s.get('teacher')!=username: continue
         if f_subj and s.get('subject_name','')!=f_subj: continue
-        if f_sec  and s.get('section_key','')!=f_sec:   continue
-        sec=s.get('section_key',''); enrolled=[st for st in all_stud if f"{st['course']}|{st['year_level']}|{st['section']}"==sec]
+        if f_sec_norm and normalize_section_key(s.get('section_key',''))!=f_sec_norm: continue
+        sec=normalize_section_key(s.get('section_key',''))
+        enrolled=[st for st in all_stud if build_student_section_key(st) == sec]
         p=set(s.get('present',[])); l=set(s.get('late',[])); e=set(s.get('excused',[]))
         pres=len([n for n in p if n not in l]); late=len(l); exc=len(e); tot=len(enrolled); ab=max(0,tot-pres-late-exc)
         rate=round((pres+late)/tot*100,1) if tot else 0
@@ -1853,39 +2037,35 @@ def export_stats_csv():
     fname=f"attendance_{period}_{now.strftime('%Y%m%d')}.csv"
     return Response(out.getvalue(),mimetype='text/csv',headers={'Content-Disposition':f'attachment;filename={fname}'})
 
-# ── NFC / HARDWARE ────────────────────────────────────────────────────────────
+# ── NFC / HARDWARE (FIX #9 — DB-based registration mode) ─────────────────────
 
 @app.route('/request_registration_scan', methods=['POST'])
 @admin_required
 def request_registration_scan():
     try:
-        if os.path.exists(UID_FILE): os.remove(UID_FILE)
-        with open(FLAG_FILE,'w') as f: f.write('waiting')
+        nfc_set_waiting(session.get('username','admin'))
         return jsonify({'status':'ready'})
-    except Exception as e: return jsonify({'status':'error','message':str(e)}), 500
+    except Exception as e:
+        return jsonify({'status':'error','message':str(e)}), 500
 
 @app.route('/get_scanned_uid')
 @login_required
 def get_scanned_uid():
-    if os.path.exists(UID_FILE):
-        with open(UID_FILE) as f: uid=f.read().strip()
-        os.remove(UID_FILE); return jsonify({'uid':uid})
-    return jsonify({'uid':None})
+    uid = nfc_get_uid()
+    if uid:
+        return jsonify({'uid': uid})
+    return jsonify({'uid': None})
 
 @app.route('/registration_status')
 def registration_status():
-    if os.path.exists(FLAG_FILE):
-        with open(FLAG_FILE) as f:
-            if f.read().strip()=='waiting': return jsonify({'waiting':True})
-    return jsonify({'waiting':False})
+    return jsonify({'waiting': nfc_is_waiting()})
 
 @app.route('/receive_pico_uid', methods=['POST'])
 def receive_pico_uid():
     data=request.get_json()
     if not data or 'uid' not in data: return jsonify({'status':'error'}), 400
     uid=data['uid'].strip().upper()
-    with open(UID_FILE,'w') as f: f.write(uid)
-    if os.path.exists(FLAG_FILE): os.remove(FLAG_FILE)
+    nfc_set_uid(uid)
     return jsonify({'status':'ok','uid':uid})
 
 @app.route('/mark_pico', methods=['POST'])
@@ -1894,59 +2074,118 @@ def mark_pico():
     if not data or 'nfc_id' not in data: return jsonify({'status':'error'}), 400
     nfc_id=data['nfc_id'].strip().upper()
     print(f"[NFC TAP] {nfc_id}")
-    if os.path.exists(FLAG_FILE):
-        with open(FLAG_FILE) as f:
-            if f.read().strip()=='waiting':
-                with open(UID_FILE,'w') as uf: uf.write(nfc_id)
-                os.remove(FLAG_FILE)
-                return jsonify({'status':'registration','uid':nfc_id})
-    sess_id,sess=get_active_session_for_nfc(nfc_id)
+
+    # FIX #9: Check DB-based registration mode instead of flag file
+    if nfc_is_waiting():
+        nfc_set_uid(nfc_id)
+        return jsonify({'status':'registration','uid':nfc_id})
+
+    sess_id, sess = get_active_session_for_nfc(nfc_id)
     if not sess:
-        all_s=get_all_students(); student=next((s for s in all_s if s['nfcId']==nfc_id),None)
-        active=get_active_sessions()
-        invalid_entry={'nfc_id':nfc_id,'timestamp':time.time(),'reason':'Student not registered' if not student else 'No active session for this section'}
-        for sid,asess in active.items():
+        all_s   = get_all_students()
+        student = next((s for s in all_s if s['nfcId']==nfc_id), None)
+        active  = get_active_sessions()
+        invalid_entry={'nfc_id':nfc_id,'timestamp':time.time(),
+                       'reason':'Student not registered' if not student else 'No active session for this section'}
+        for sid, asess in active.items():
             asess.setdefault('invalid_log',[]).append(invalid_entry)
-            save_session(sid,asess)
-        return jsonify({'status':'no_session','message':"No active session for this student's section.",
-                        'debug_student':student,'debug_active_sessions':list(active.keys())})
-    name=student_name_map.get(nfc_id,'Unknown')
-    all_s=get_all_students(); student_info=next((s for s in all_s if s['nfcId']==nfc_id),{})
-    student_id=student_info.get('student_id','')
+            save_session(sid, asess)
+        return jsonify({'status':'no_session',
+                        'message':"No active session for this student's section.",
+                        'debug_student':student,
+                        'debug_active_sessions':list(active.keys())})
+
+    name        = student_name_map.get(nfc_id,'Unknown')
+    all_s       = get_all_students()
+    student_info= next((s for s in all_s if s['nfcId']==nfc_id),{})
+    student_id  = student_info.get('student_id','')
+
+    # Check duplicate tap
     if nfc_id in sess.get('present',[]):
         warn_entry={'nfc_id':nfc_id,'name':name,'student_id':student_id,'timestamp':time.time()}
         if nfc_id not in sess.get('warned',[]): sess.setdefault('warned',[]).append(nfc_id)
         sess.setdefault('warn_log',[]).append(warn_entry)
-        save_session(sess_id,sess)
-        return jsonify({'status':'already_marked','name':name,'student_id':student_id,'message':f'{name} is already marked present.'})
+        save_session(sess_id, sess)
+        return jsonify({'status':'already_marked','name':name,'student_id':student_id,
+                        'message':f'{name} is already marked present.'})
+
+    # FIX #5: Determine late status HERE and save it permanently to the session
+    now_dt       = datetime.now()
+    late_cutoff  = sess.get('late_cutoff','')
+    is_late      = False
+    if late_cutoff:
+        try:
+            cutoff_dt = datetime.strptime(late_cutoff, '%Y-%m-%d %H:%M:%S')
+            is_late   = now_dt > cutoff_dt
+        except:
+            is_late = False
+
+    # Record on blockchain
     tx_hash=None; block_num=None
     try:
-        tx=contract.functions.markAttendance(nfc_id).transact({'from':admin_account})
-        receipt=web3.eth.wait_for_transaction_receipt(tx)
-        tx_hash=receipt['transactionHash'].hex(); block_num=receipt['blockNumber']
-    except Exception as e: return jsonify({'status':'error','message':str(e)}), 500
-    tap_time=datetime.now().strftime('%H:%M:%S')
+        tx      = contract.functions.markAttendance(nfc_id).transact({'from':admin_account})
+        receipt = web3.eth.wait_for_transaction_receipt(tx)
+        tx_hash  = receipt['transactionHash'].hex()
+        block_num= receipt['blockNumber']
+    except Exception as e:
+        return jsonify({'status':'error','message':str(e)}), 500
+
+    tap_time = datetime.now().strftime('%H:%M:%S')
+    # Add to present list always
     sess.setdefault('present',[]).append(nfc_id)
-    sess.setdefault('tap_log',[]).append({'nfc_id':nfc_id,'name':name,'time':tap_time,'timestamp':time.time(),'tx_hash':tx_hash,'block':block_num})
+    # FIX #5: Add to late list immediately and save it permanently
+    if is_late and nfc_id not in sess.get('late',[]):
+        sess.setdefault('late',[]).append(nfc_id)
+
+    sess.setdefault('tap_log',[]).append({
+        'nfc_id':nfc_id,'name':name,'time':tap_time,
+        'timestamp':time.time(),'tx_hash':tx_hash,'block':block_num,
+        'student_id':student_id,'is_late':is_late
+    })
     sess.setdefault('tx_hashes',{})[nfc_id]={'tx_hash':tx_hash,'block':block_num,'time':tap_time}
-    save_session(sess_id,sess); sessions_db[sess_id]=sess
-    recent_attendance.append({'nfc_id':nfc_id,'name':name,'timestamp':time.time(),'subject':sess.get('subject_name','')})
-    return jsonify({'status':'ok','name':name,'student_id':student_id,'time':tap_time,'subject':sess.get('subject_name',''),'tx_hash':tx_hash,'block':block_num})
+
+    save_session(sess_id, sess)
+    sessions_db[sess_id] = sess
+
+    recent_attendance.append({
+        'nfc_id':nfc_id,'name':name,'timestamp':time.time(),
+        'subject':sess.get('subject_name',''),'is_late':is_late
+    })
+
+    status_label = 'late' if is_late else 'present'
+    return jsonify({
+        'status':'ok','name':name,'student_id':student_id,
+        'time':tap_time,'subject':sess.get('subject_name',''),
+        'tx_hash':tx_hash,'block':block_num,
+        'attendance_status': status_label,
+        'is_late': is_late
+    })
 
 @app.route('/debug/tap/<nfc_id>')
 def debug_tap(nfc_id):
-    nfc_id=nfc_id.strip().upper(); all_students=get_all_students()
+    nfc_id=nfc_id.strip().upper()
+    all_students=get_all_students()
     student=next((s for s in all_students if s['nfcId']==nfc_id),None)
-    active=get_active_sessions(); student_key=None
-    if student: student_key=f"{student['course']}|{student['year_level']}|{student['section']}"
+    active=get_active_sessions()
+    student_key=build_student_section_key(student) if student else None
     matching_session=None
     for sid,s in active.items():
-        if s.get('section_key')==student_key: matching_session={**s,'session_id':sid}; break
-    result={'1_nfc_id_received':nfc_id,'2_student_found':student is not None,'3_student_info':student,
-            '4_student_section_key':student_key,
-            '5_active_sessions':[{'session_id':sid,'subject':s.get('subject_name'),'section_key':s.get('section_key'),'teacher':s.get('teacher_name')} for sid,s in active.items()],
-            '6_matching_session':matching_session,
-            '7_verdict':('STUDENT NOT REGISTERED' if not student else 'NO ACTIVE SESSION' if not matching_session else 'SHOULD WORK')}
+        if normalize_section_key(s.get('section_key',''))==student_key:
+            matching_session={**s,'session_id':sid}; break
+    result={
+        '1_nfc_id_received':nfc_id,
+        '2_student_found':student is not None,
+        '3_student_info':student,
+        '4_student_section_key':student_key,
+        '5_active_sessions':[{
+            'session_id':sid,'subject':s.get('subject_name'),
+            'section_key':s.get('section_key'),'teacher':s.get('teacher_name')
+        } for sid,s in active.items()],
+        '6_matching_session':matching_session,
+        '7_verdict':('STUDENT NOT REGISTERED' if not student
+                     else 'NO ACTIVE SESSION' if not matching_session
+                     else 'SHOULD WORK')
+    }
     from flask import current_app
     resp=current_app.response_class(json.dumps(result,indent=2),mimetype='application/json')
     return resp

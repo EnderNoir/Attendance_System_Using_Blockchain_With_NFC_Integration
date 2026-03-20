@@ -10,7 +10,7 @@
   .stat-chip .label{font-size:11px;color:var(--muted);margin-top:3px;}
 
   /* ── Analytics Panel ── */
-  .ap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px;}
+  .ap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:visible;margin-bottom:24px;}
   .ap-head{padding:18px 22px 0;}
   .ap-head h2{font-size:15px;font-weight:700;margin:0;}
   .ap-head p{font-size:11px;color:var(--muted);margin:3px 0 0;}
@@ -36,13 +36,14 @@
   .sum-excused{background:rgba(96,165,250,.07);border-color:rgba(96,165,250,.2);}
 
   /* ── Custom searchable dropdown ── */
-  .search-select-wrap{position:relative;}
+  .search-select-wrap{position:relative;z-index:1;}
+  .search-select-wrap:has(.search-select-dropdown.open){z-index:999999;}
   .search-select-display{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 32px 8px 10px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;width:100%;transition:border-color .2s;user-select:none;position:relative;}
   .search-select-display:hover,.search-select-display.open{border-color:var(--accent);}
   .search-select-display .ssd-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .search-select-display .ssd-arrow{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--muted);pointer-events:none;transition:transform .2s;}
   .search-select-display.open .ssd-arrow{transform:translateY(-50%) rotate(180deg);}
-  .search-select-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--accent);border-radius:9px;z-index:9999;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.2);display:none;min-width:180px;}
+  .search-select-dropdown{position:absolute;top:calc(100% + 4px);left:0;min-width:180px;width:max-content;max-width:280px;background:var(--surface);border:1px solid var(--accent);border-radius:9px;z-index:999999;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.28);display:none;}
   .search-select-dropdown.open{display:block;}
   .ssd-input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:9px 12px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;}
   .ssd-input::placeholder{color:var(--muted);}
@@ -54,7 +55,7 @@
   .ssd-opt.no-match:hover{background:transparent;}
 
   /* ── Filter grid ── */
-  .filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;}
+  .filter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;overflow:visible;position:relative;z-index:10;}
   .fg-item{display:flex;flex-direction:column;gap:4px;}
   .fg-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
   .btn-apply{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:9px 18px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;}
@@ -312,18 +313,40 @@
 
         <!-- Time Slot filter -->
         <div class="fg-item">
-          <span class="fg-label">Time of Day</span>
+          <span class="fg-label">Time Slot</span>
           <div class="search-select-wrap" id="wrap_gf_timeofday">
             <div class="search-select-display" id="disp_gf_timeofday" onclick="toggleSSD('gf_timeofday')">
               <span class="ssd-label" id="label_gf_timeofday">Any Time</span>
               <span class="ssd-arrow"><i class="bi bi-chevron-down"></i></span>
             </div>
             <div class="search-select-dropdown" id="drop_gf_timeofday">
-              <input class="ssd-input" type="text" placeholder="Search…" oninput="filterSSDOpts('gf_timeofday',this.value)" autocomplete="off"/>
+              <input class="ssd-input" type="text" placeholder="Search time slot…" oninput="filterSSDOpts('gf_timeofday',this.value)" autocomplete="off"/>
               <div class="ssd-opts" id="opts_gf_timeofday">
                 <div class="ssd-opt selected" data-value="" onclick="selectSSD('gf_timeofday','','Any Time')">Any Time</div>
-                <div class="ssd-opt" data-value="morning" onclick="selectSSD('gf_timeofday','morning','Morning (before 12PM)')">Morning (before 12PM)</div>
-                <div class="ssd-opt" data-value="afternoon" onclick="selectSSD('gf_timeofday','afternoon','Afternoon (12PM+)')">Afternoon (12PM+)</div>
+                <div class="ssd-opt" data-value="morning" onclick="selectSSD('gf_timeofday','morning','Morning (before 12PM)')">🌅 Morning (before 12PM)</div>
+                <div class="ssd-opt" data-value="afternoon" onclick="selectSSD('gf_timeofday','afternoon','Afternoon (12PM+)')">🌇 Afternoon (12PM+)</div>
+                <div class="ssd-opt" style="padding:4px 12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);cursor:default;">— 2-unit slots —</div>
+                <div class="ssd-opt" data-value="7:00 AM – 8:00 AM" onclick="selectSSD('gf_timeofday','7:00 AM – 8:00 AM','7:00 – 8:00 AM')">7:00 AM – 8:00 AM</div>
+                <div class="ssd-opt" data-value="8:00 AM – 9:00 AM" onclick="selectSSD('gf_timeofday','8:00 AM – 9:00 AM','8:00 – 9:00 AM')">8:00 AM – 9:00 AM</div>
+                <div class="ssd-opt" data-value="9:00 AM – 10:00 AM" onclick="selectSSD('gf_timeofday','9:00 AM – 10:00 AM','9:00 – 10:00 AM')">9:00 AM – 10:00 AM</div>
+                <div class="ssd-opt" data-value="10:00 AM – 11:00 AM" onclick="selectSSD('gf_timeofday','10:00 AM – 11:00 AM','10:00 – 11:00 AM')">10:00 AM – 11:00 AM</div>
+                <div class="ssd-opt" data-value="11:00 AM – 12:00 PM" onclick="selectSSD('gf_timeofday','11:00 AM – 12:00 PM','11:00 AM – 12:00 PM')">11:00 AM – 12:00 PM</div>
+                <div class="ssd-opt" data-value="12:00 PM – 1:00 PM" onclick="selectSSD('gf_timeofday','12:00 PM – 1:00 PM','12:00 – 1:00 PM')">12:00 PM – 1:00 PM</div>
+                <div class="ssd-opt" data-value="1:00 PM – 2:00 PM" onclick="selectSSD('gf_timeofday','1:00 PM – 2:00 PM','1:00 – 2:00 PM')">1:00 PM – 2:00 PM</div>
+                <div class="ssd-opt" data-value="2:00 PM – 3:00 PM" onclick="selectSSD('gf_timeofday','2:00 PM – 3:00 PM','2:00 – 3:00 PM')">2:00 PM – 3:00 PM</div>
+                <div class="ssd-opt" data-value="3:00 PM – 4:00 PM" onclick="selectSSD('gf_timeofday','3:00 PM – 4:00 PM','3:00 – 4:00 PM')">3:00 PM – 4:00 PM</div>
+                <div class="ssd-opt" data-value="4:00 PM – 5:00 PM" onclick="selectSSD('gf_timeofday','4:00 PM – 5:00 PM','4:00 – 5:00 PM')">4:00 PM – 5:00 PM</div>
+                <div class="ssd-opt" style="padding:4px 12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);cursor:default;">— 3-unit slots —</div>
+                <div class="ssd-opt" data-value="7:00 AM – 9:00 AM" onclick="selectSSD('gf_timeofday','7:00 AM – 9:00 AM','7:00 – 9:00 AM')">7:00 AM – 9:00 AM</div>
+                <div class="ssd-opt" data-value="8:00 AM – 10:00 AM" onclick="selectSSD('gf_timeofday','8:00 AM – 10:00 AM','8:00 – 10:00 AM')">8:00 AM – 10:00 AM</div>
+                <div class="ssd-opt" data-value="9:00 AM – 11:00 AM" onclick="selectSSD('gf_timeofday','9:00 AM – 11:00 AM','9:00 – 11:00 AM')">9:00 AM – 11:00 AM</div>
+                <div class="ssd-opt" data-value="10:00 AM – 12:00 PM" onclick="selectSSD('gf_timeofday','10:00 AM – 12:00 PM','10:00 AM – 12:00 PM')">10:00 AM – 12:00 PM</div>
+                <div class="ssd-opt" data-value="11:00 AM – 1:00 PM" onclick="selectSSD('gf_timeofday','11:00 AM – 1:00 PM','11:00 AM – 1:00 PM')">11:00 AM – 1:00 PM</div>
+                <div class="ssd-opt" data-value="12:00 PM – 2:00 PM" onclick="selectSSD('gf_timeofday','12:00 PM – 2:00 PM','12:00 – 2:00 PM')">12:00 PM – 2:00 PM</div>
+                <div class="ssd-opt" data-value="1:00 PM – 3:00 PM" onclick="selectSSD('gf_timeofday','1:00 PM – 3:00 PM','1:00 – 3:00 PM')">1:00 PM – 3:00 PM</div>
+                <div class="ssd-opt" data-value="2:00 PM – 4:00 PM" onclick="selectSSD('gf_timeofday','2:00 PM – 4:00 PM','2:00 – 4:00 PM')">2:00 PM – 4:00 PM</div>
+                <div class="ssd-opt" data-value="3:00 PM – 5:00 PM" onclick="selectSSD('gf_timeofday','3:00 PM – 5:00 PM','3:00 – 5:00 PM')">3:00 PM – 5:00 PM</div>
+                <div class="ssd-opt" data-value="4:00 PM – 6:00 PM" onclick="selectSSD('gf_timeofday','4:00 PM – 6:00 PM','4:00 – 6:00 PM')">4:00 PM – 6:00 PM</div>
               </div>
             </div>
           </div>

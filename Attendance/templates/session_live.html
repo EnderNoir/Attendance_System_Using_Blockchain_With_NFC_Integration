@@ -3,7 +3,6 @@
 {% block page_title %}LIVE CLASSROOM SESSION{% endblock %}
 {% block content %}
 <style>
-  /* Header */
   .session-header{background:var(--surface);border:1px solid {% if is_active %}var(--success){% else %}var(--border){% endif %};border-radius:14px;padding:22px 26px;margin-bottom:24px;}
   .live-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:var(--success);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;font-family:'Space Mono',monospace;}
   .ended-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(100,116,139,.1);border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;font-family:'Space Mono',monospace;}
@@ -11,12 +10,8 @@
   @keyframes blink{0%,100%{opacity:1;}50%{opacity:.2;}}
   .progress-bar-bg{height:8px;background:var(--border);border-radius:999px;overflow:hidden;margin-top:8px;}
   .progress-bar-fill{height:100%;background:var(--success);border-radius:999px;transition:width .6s ease;}
-
-  /* Two-panel */
   .two-panel{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
   @media(max-width:800px){.two-panel{grid-template-columns:1fr;}}
-
-  /* Student rows */
   .student-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
   .student-row:last-child{border-bottom:none;}
   .student-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;}
@@ -28,21 +23,15 @@
   .student-info{flex:1;min-width:0;}
   .student-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .student-sub{font-size:11px;color:var(--muted);margin-top:1px;}
-
-  /* Status badges */
   .status-badge{display:inline-flex;align-items:center;gap:4px;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;font-family:'Space Mono',monospace;flex-shrink:0;}
   .sb-present{background:rgba(16,185,129,.12);color:var(--success);border:1px solid rgba(16,185,129,.25);}
   .sb-late{background:rgba(245,158,11,.12);color:var(--warning);border:1px solid rgba(245,158,11,.25);}
   .sb-absent{background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2);}
   .sb-excused{background:rgba(59,130,246,.1);color:#60a5fa;border:1px solid rgba(59,130,246,.25);}
   .sb-unknown{background:rgba(100,116,139,.1);color:var(--muted);border:1px solid var(--border);}
-
-  /* Excuse btn */
   .btn-excuse{background:none;border:1px solid rgba(59,130,246,.3);color:#60a5fa;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;transition:all .2s;display:none;}
   .btn-excuse:hover{background:rgba(59,130,246,.1);}
   .show-excuse{display:inline-flex!important;align-items:center;gap:4px;}
-
-  /* Tap modal */
   .tap-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .25s ease;padding:16px;}
   .tap-modal-overlay.show{opacity:1;pointer-events:all;}
   .tap-modal{background:var(--surface);border-radius:20px;padding:40px 44px;text-align:center;min-width:280px;max-width:380px;width:100%;transform:scale(.88);transition:transform .28s cubic-bezier(.34,1.56,.64,1);border:2px solid transparent;}
@@ -66,8 +55,6 @@
   .modal-message.green{color:var(--success);}.modal-message.yellow{color:var(--warning);}
   .modal-message.orange{color:var(--warning);}.modal-message.red{color:var(--danger);}
   .modal-time{font-family:'Space Mono',monospace;font-size:12px;margin-top:8px;opacity:.6;}
-
-  /* Excuse modal */
   .excuse-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:10000;opacity:0;pointer-events:none;transition:opacity .2s;padding:16px;}
   .excuse-overlay.show{opacity:1;pointer-events:all;}
   .excuse-box{background:var(--surface);border:1px solid rgba(59,130,246,.3);border-radius:16px;padding:28px 32px;max-width:380px;width:100%;transform:scale(.9);transition:transform .25s cubic-bezier(.34,1.56,.64,1);}
@@ -76,13 +63,10 @@
   .excuse-input:focus{outline:none;border-color:#3b82f6;}
   .btn-excuse-submit{background:#3b82f6;border:none;color:#fff;font-weight:700;border-radius:8px;padding:10px 20px;font-size:13px;cursor:pointer;margin-right:8px;}
   .btn-excuse-cancel{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;}
-
-  /* ── END SESSION CONFIRMATION MODAL ── */
   .end-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10001;opacity:0;pointer-events:none;transition:opacity .2s;padding:16px;}
   .end-overlay.show{opacity:1;pointer-events:all;}
   .end-box{background:var(--surface);border:1px solid rgba(192,57,43,.3);border-radius:18px;max-width:420px;width:100%;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);overflow:hidden;}
   .end-overlay.show .end-box{transform:scale(1);}
-
   .scan-indicator{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:20px;}
   .scan-icon{font-size:26px;animation:scanPulse 2s infinite;}
   @keyframes scanPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
@@ -90,28 +74,19 @@
   .btn-end:hover{background:#dc2626;}
   .btn-outline-sm{background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:9px 16px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:7px;transition:all .2s;}
   .btn-outline-sm:hover{border-color:var(--accent);color:var(--accent);}
-
-  /* Summary stat row */
   .stat-mini-row{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
   .stat-mini{flex:1;min-width:90px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px;text-align:center;}
   .stat-mini .sv{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;}
   .stat-mini .sl{font-size:11px;color:var(--muted);margin-top:2px;}
-
   .scroll-list{max-height:460px;overflow-y:auto;padding:0 20px 12px;}
   .slide-in{animation:slideIn .3s ease both;}
   @keyframes slideIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
-
   .list-search{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;margin-bottom:12px;}
   .list-search:focus{outline:none;border-color:var(--accent);}
-
-  @media(max-width:600px){
-    .session-header{padding:16px;}
-    .tap-modal{padding:28px 24px;}
-    .excuse-box{padding:20px;}
-  }
+  @media(max-width:600px){.session-header{padding:16px;}.tap-modal{padding:28px 24px;}.excuse-box{padding:20px;}}
 </style>
 
-<!-- ── TAP MODAL ── -->
+<!-- TAP MODAL -->
 <div class="tap-modal-overlay" id="tapModalOverlay">
   <div class="tap-modal" id="tapModal">
     <div class="modal-icon-ring" id="modalIcon">✔</div>
@@ -124,7 +99,7 @@
   </div>
 </div>
 
-<!-- ── EXCUSE MODAL ── -->
+<!-- EXCUSE MODAL -->
 <div class="excuse-overlay" id="excuseOverlay">
   <div class="excuse-box">
     <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Mark as Excused</div>
@@ -139,10 +114,9 @@
   </div>
 </div>
 
-<!-- ── END SESSION CONFIRMATION MODAL ── -->
+<!-- END SESSION MODAL -->
 <div class="end-overlay" id="endSessionModal" onclick="if(event.target===this)closeEndModal()">
   <div class="end-box">
-    <!-- Header -->
     <div style="background:rgba(192,57,43,.08);padding:20px 22px 16px;border-bottom:1px solid rgba(192,57,43,.15);">
       <div style="display:flex;align-items:center;gap:12px;">
         <div style="width:44px;height:44px;border-radius:50%;background:rgba(192,57,43,.12);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">
@@ -154,11 +128,8 @@
         </div>
       </div>
     </div>
-    <!-- Body -->
     <div style="padding:20px 22px;">
-      <div style="font-size:13px;color:var(--text);line-height:1.7;margin-bottom:14px;">
-        Ending the session will:
-      </div>
+      <div style="font-size:13px;color:var(--text);line-height:1.7;margin-bottom:14px;">Ending the session will:</div>
       <ul style="margin:0 0 14px 18px;font-size:12px;color:var(--muted);line-height:1.8;">
         <li>Stop accepting new NFC card taps immediately</li>
         <li>Lock the attendance record for this class</li>
@@ -168,15 +139,12 @@
         <i class="bi bi-shield-check" style="color:var(--accent);margin-top:1px;flex-shrink:0;"></i>
         <span>All blockchain transaction records are already saved and will not be affected.</span>
       </div>
-      <!-- Buttons -->
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button onclick="closeEndModal()"
-                style="flex:1;min-width:120px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;">
+        <button onclick="closeEndModal()" style="flex:1;min-width:120px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;">
           <i class="bi bi-arrow-left"></i> Keep Live
         </button>
         <form method="POST" action="{{ url_for('end_session', sess_id=sess_id) }}" style="flex:1;min-width:140px;">
-          <button type="submit"
-                  style="width:100%;background:var(--danger);border:none;color:#fff;font-weight:700;border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .2s;">
+          <button type="submit" style="width:100%;background:var(--danger);border:none;color:#fff;font-weight:700;border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .2s;">
             <i class="bi bi-stop-fill"></i> Yes, End Session
           </button>
         </form>
@@ -211,7 +179,6 @@
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <a href="{{ url_for('teacher_dashboard') }}" class="btn-outline-sm"><i class="bi bi-arrow-left"></i> Back</a>
       {% if is_active and session.get('role') != 'admin' %}
-      <!-- ── Replaced form+confirm with modal trigger button ── -->
       <button type="button" class="btn-end" onclick="openEndModal()">
         <i class="bi bi-stop-fill"></i> End Class Session
       </button>
@@ -219,7 +186,6 @@
     </div>
   </div>
 
-  <!-- Progress bar -->
   {% set total   = section_students|length %}
   {% set present = present_list|length %}
   {% set rate    = ((present / total) * 100)|round(1) if total > 0 else 0 %}
@@ -251,33 +217,15 @@
 </div>
 {% endif %}
 
-<!-- Summary stats -->
 <div class="stat-mini-row">
-  <div class="stat-mini">
-    <div class="sv" style="color:var(--success);" id="sc_present">{{ student_statuses|selectattr('status','equalto','present')|list|length }}</div>
-    <div class="sl">Present</div>
-  </div>
-  <div class="stat-mini">
-    <div class="sv" style="color:var(--warning);" id="sc_late">{{ student_statuses|selectattr('status','equalto','late')|list|length }}</div>
-    <div class="sl">Late</div>
-  </div>
-  <div class="stat-mini">
-    <div class="sv" style="color:var(--danger);" id="sc_absent">{{ student_statuses|selectattr('status','equalto','absent')|list|length }}</div>
-    <div class="sl">Absent</div>
-  </div>
-  <div class="stat-mini">
-    <div class="sv" style="color:#60a5fa;" id="sc_excused">{{ student_statuses|selectattr('status','equalto','excused')|list|length }}</div>
-    <div class="sl">Excused</div>
-  </div>
-  <div class="stat-mini">
-    <div class="sv">{{ section_students|length }}</div>
-    <div class="sl">Enrolled</div>
-  </div>
+  <div class="stat-mini"><div class="sv" style="color:var(--success);" id="sc_present">{{ student_statuses|selectattr('status','equalto','present')|list|length }}</div><div class="sl">Present</div></div>
+  <div class="stat-mini"><div class="sv" style="color:var(--warning);" id="sc_late">{{ student_statuses|selectattr('status','equalto','late')|list|length }}</div><div class="sl">Late</div></div>
+  <div class="stat-mini"><div class="sv" style="color:var(--danger);" id="sc_absent">{{ student_statuses|selectattr('status','equalto','absent')|list|length }}</div><div class="sl">Absent</div></div>
+  <div class="stat-mini"><div class="sv" style="color:#60a5fa;" id="sc_excused">{{ student_statuses|selectattr('status','equalto','excused')|list|length }}</div><div class="sl">Excused</div></div>
+  <div class="stat-mini"><div class="sv">{{ section_students|length }}</div><div class="sl">Enrolled</div></div>
 </div>
 
-<!-- Two-panel: Enrolled list | Status list -->
 <div class="two-panel">
-
   <!-- LEFT: Enrolled students -->
   <div class="card">
     <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
@@ -376,157 +324,229 @@
 <script>
   const sessId        = "{{ sess_id }}";
   const totalStudents = {{ section_students|length }};
-  let lastTimestamp   = Date.now() / 1000;
+  // lastTimestamp=0 → first poll syncs state; then uses server_time (not
+  // Date.now()) so browser clock drift never causes taps to be missed.
+  let lastTimestamp   = 0;
+  let pollInitialized = false;
   let modalTimer      = null;
+  // Track nfc_ids already shown to prevent duplicate popups from 2s buffer
+  const shownTaps     = new Set();
 
-  /* ── End Session Modal ── */
-  function openEndModal(){
-    document.getElementById('endSessionModal').classList.add('show');
-  }
-  function closeEndModal(){
-    document.getElementById('endSessionModal').classList.remove('show');
-  }
+  function openEndModal(){ document.getElementById('endSessionModal').classList.add('show'); }
+  function closeEndModal(){ document.getElementById('endSessionModal').classList.remove('show'); }
 
-  /* ── Tap Modal ── */
   function showModal(type, name, studentId, message, time) {
-    const overlay=document.getElementById('tapModalOverlay'),modal=document.getElementById('tapModal'),
-          icon=document.getElementById('modalIcon'),status=document.getElementById('modalStatus'),
-          mName=document.getElementById('modalName'),mId=document.getElementById('modalStudentId'),
-          mMsg=document.getElementById('modalMessage'),mTime=document.getElementById('modalTime');
-    ['green','yellow','orange','red'].forEach(c=>{modal.classList.remove(c);icon.classList.remove(c);status.classList.remove(c);mMsg.classList.remove(c);});
+    const overlay = document.getElementById('tapModalOverlay');
+    const modal   = document.getElementById('tapModal');
+    const icon    = document.getElementById('modalIcon');
+    const status  = document.getElementById('modalStatus');
+    const mName   = document.getElementById('modalName');
+    const mId     = document.getElementById('modalStudentId');
+    const mMsg    = document.getElementById('modalMessage');
+    const mTime   = document.getElementById('modalTime');
+
+    ['green','yellow','orange','red'].forEach(c => {
+      modal.classList.remove(c); icon.classList.remove(c);
+      status.classList.remove(c); mMsg.classList.remove(c);
+    });
+
     const cfg = {
-      'present': {cls:'green', icon:'✔', label:'PRESENT', msg:'Attendance recorded successfully.'},
-      'late':    {cls:'orange',icon:'⏱', label:'LATE',    msg:'Arrived after the 30-minute grace period — marked Late.'},
-      'warning': {cls:'yellow',icon:'⚠', label:'DUPLICATE TAP', msg:'Already marked — this tap was not counted again.'},
-      'invalid': {cls:'red',   icon:'✕', label:'INVALID CARD',  msg:message||'This NFC card is not registered in the system.'},
+      'present': {cls:'green',  icon:'✔', label:'PRESENT',      msg:'Attendance recorded successfully.'},
+      'late':    {cls:'orange', icon:'⏱', label:'LATE',         msg:'Arrived after the 30-minute grace period — marked Late.'},
+      'warning': {cls:'yellow', icon:'⚠', label:'DUPLICATE TAP',msg:'Already marked — this tap was not counted again.'},
+      'invalid': {cls:'red',    icon:'✕', label:'INVALID CARD', msg: message || 'This NFC card is not registered in the system.'},
     };
     const c = cfg[type] || cfg['invalid'];
-    modal.classList.add(c.cls); icon.className='modal-icon-ring '+c.cls; icon.textContent=c.icon;
-    status.className='modal-status '+c.cls; status.textContent=c.label;
-    mMsg.className='modal-message '+c.cls; mMsg.textContent=c.msg;
-    mName.textContent=name||'—'; mId.textContent=studentId?'ID: '+studentId:''; mTime.textContent=time||'';
+
+    modal.classList.add(c.cls); icon.className = 'modal-icon-ring ' + c.cls;
+    icon.textContent = c.icon;
+    status.className = 'modal-status ' + c.cls; status.textContent = c.label;
+    mMsg.className   = 'modal-message '  + c.cls; mMsg.textContent   = c.msg;
+    mName.textContent = name || '—';
+    mId.textContent   = studentId ? 'ID: ' + studentId : '';
+    mTime.textContent = time || '';
+
     overlay.classList.add('show');
     clearTimeout(modalTimer);
-    modalTimer=setTimeout(()=>overlay.classList.remove('show'),3500);
+    modalTimer = setTimeout(() => overlay.classList.remove('show'), 3500);
   }
-  document.getElementById('tapModalOverlay').addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});
 
-  /* ── Update student row status ── */
+  document.getElementById('tapModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+
   function updateStudentStatus(nfc_id, status) {
-    const row   = document.getElementById('srow_'+nfc_id);
-    const badge = document.getElementById('sbadge_'+nfc_id);
-    const avt   = document.getElementById('savt_'+nfc_id);
-    const excBtn= document.getElementById('sexc_'+nfc_id);
+    const row    = document.getElementById('srow_' + nfc_id);
+    const badge  = document.getElementById('sbadge_' + nfc_id);
+    const avt    = document.getElementById('savt_'   + nfc_id);
+    const excBtn = document.getElementById('sexc_'   + nfc_id);
     if (!row) return;
     row.dataset.status = status;
+
     const statusMap = {
-      'present': {avCls:'av-green', badgeCls:'sb-present', label:'✔ Present'},
-      'late':    {avCls:'av-yellow',badgeCls:'sb-late',    label:'⏱ Late'},
-      'excused': {avCls:'av-blue',  badgeCls:'sb-excused', label:'🔵 Excused'},
-      'absent':  {avCls:'av-red',   badgeCls:'sb-absent',  label:'✕ Absent'},
+      'present': {avCls:'av-green',  badgeCls:'sb-present',  label:'✔ Present'},
+      'late':    {avCls:'av-yellow', badgeCls:'sb-late',     label:'⏱ Late'},
+      'excused': {avCls:'av-blue',   badgeCls:'sb-excused',  label:'🔵 Excused'},
+      'absent':  {avCls:'av-red',    badgeCls:'sb-absent',   label:'✕ Absent'},
     };
-    const s = statusMap[status] || {avCls:'av-gray',badgeCls:'sb-unknown',label:'— Unknown'};
-    if(avt){ ['av-green','av-yellow','av-blue','av-red','av-gray'].forEach(c=>avt.classList.remove(c)); avt.classList.add(s.avCls); }
-    if(badge){ badge.className='status-badge '+s.badgeCls; badge.textContent=s.label; }
-    if(excBtn){ excBtn.classList.toggle('show-excuse', status==='absent'); }
+    const s = statusMap[status] || {avCls:'av-gray', badgeCls:'sb-unknown', label:'— Unknown'};
+
+    if (avt) {
+      ['av-green','av-yellow','av-blue','av-red','av-gray'].forEach(c => avt.classList.remove(c));
+      avt.classList.add(s.avCls);
+    }
+    if (badge) { badge.className = 'status-badge ' + s.badgeCls; badge.textContent = s.label; }
+    if (excBtn) { excBtn.classList.toggle('show-excuse', status === 'absent'); }
   }
 
-  /* ── Update summary counts ── */
   function updateCounts() {
     const rows = document.querySelectorAll('#statusList .student-row[data-status]');
-    let present=0,late=0,absent=0,excused=0;
-    rows.forEach(r=>{
-      const st=r.dataset.status;
-      if(st==='present')present++;else if(st==='late')late++;else if(st==='absent')absent++;else if(st==='excused')excused++;
+    let present = 0, late = 0, absent = 0, excused = 0;
+    rows.forEach(r => {
+      const st = r.dataset.status;
+      if (st === 'present') present++;
+      else if (st === 'late') late++;
+      else if (st === 'absent') absent++;
+      else if (st === 'excused') excused++;
     });
-    document.getElementById('sc_present').textContent=present;
-    document.getElementById('sc_late').textContent=late;
-    document.getElementById('sc_absent').textContent=absent;
-    document.getElementById('sc_excused').textContent=excused;
-    const pCount=present+late;
-    const rate=totalStudents>0?((pCount/totalStudents)*100).toFixed(1):0;
-    document.getElementById('presentLabel').textContent=pCount+' students present';
-    document.getElementById('progressFill').style.width=rate+'%';
-    document.getElementById('rateLabel').textContent=rate+'%';
+    document.getElementById('sc_present').textContent = present;
+    document.getElementById('sc_late').textContent    = late;
+    document.getElementById('sc_absent').textContent  = absent;
+    document.getElementById('sc_excused').textContent = excused;
+
+    const pCount = present + late;
+    const rate   = totalStudents > 0 ? ((pCount / totalStudents) * 100).toFixed(1) : 0;
+    document.getElementById('presentLabel').textContent  = pCount + ' students present';
+    document.getElementById('progressFill').style.width  = rate + '%';
+    document.getElementById('rateLabel').textContent     = rate + '%';
   }
 
-  /* ── Poll ── */
   async function poll() {
     try {
-      const r    = await fetch(`/api/session/${sessId}/poll?since=${lastTimestamp}`);
+      const url = `/api/session/${sessId}/poll?since=${lastTimestamp}`;
+      const r   = await fetch(url);
       const data = await r.json();
-      if (!data.active) { document.querySelector('.scan-indicator')?.remove(); return; }
 
-      if (data.new_taps && data.new_taps.length > 0) {
-        lastTimestamp=Math.max(lastTimestamp,...data.new_taps.map(t=>t.timestamp||0));
-        data.new_taps.forEach(tap=>{
-          const isLate = data.late_ids && data.late_ids.includes(tap.nfc_id);
-          updateStudentStatus(tap.nfc_id, isLate ? 'late' : 'present');
-          showModal(isLate?'late':'present', tap.name, tap.student_id, '', tap.time);
+      if (!data.active) {
+        // Session ended — reload page to show ended state
+        if (pollInitialized) {
+          window.location.reload();
+        }
+        return;
+      }
+
+      // On first successful poll, sync all current statuses from server
+      if (!pollInitialized) {
+        pollInitialized = true;
+        // Sync present/late/excused from server state
+        const presentSet  = new Set(data.present_ids  || []);
+        const lateSet     = new Set(data.late_ids     || []);
+        const excusedSet  = new Set(data.excused_ids  || []);
+        document.querySelectorAll('#statusList .student-row[data-nfc]').forEach(row => {
+          const nid = row.dataset.nfc;
+          if      (excusedSet.has(nid)) updateStudentStatus(nid, 'excused');
+          else if (lateSet.has(nid))    updateStudentStatus(nid, 'late');
+          else if (presentSet.has(nid)) updateStudentStatus(nid, 'present');
         });
         updateCounts();
+        // Use server_time so future polls stay in sync with server clock,
+        // not browser clock which may be ahead and cause taps to be missed
+        lastTimestamp = data.server_time || (Date.now() / 1000);
+        setTimeout(poll, 1500);
+        return;
       }
+
+      // Process new taps — skip any already shown (dedup from 2s buffer)
+      if (data.new_taps && data.new_taps.length > 0) {
+        let gotNew = false;
+        data.new_taps.forEach(tap => {
+          // Dedup: if we already showed a popup for this nfc_id+timestamp, skip
+          const tapKey = tap.nfc_id + '_' + tap.timestamp;
+          if (shownTaps.has(tapKey)) return;
+          shownTaps.add(tapKey);
+          gotNew = true;
+          const isLate = (data.late_ids || []).includes(tap.nfc_id);
+          updateStudentStatus(tap.nfc_id, isLate ? 'late' : 'present');
+          showModal(isLate ? 'late' : 'present', tap.name, tap.student_id, '', tap.time);
+          // Advance lastTimestamp past this tap
+          if (tap.timestamp && tap.timestamp > lastTimestamp) {
+            lastTimestamp = tap.timestamp + 0.001;
+          }
+        });
+        if (gotNew) updateCounts();
+      }
+
       if (data.new_warnings && data.new_warnings.length > 0) {
-        lastTimestamp=Math.max(lastTimestamp,...data.new_warnings.map(t=>t.timestamp||0));
-        data.new_warnings.forEach(w=>showModal('warning',w.name,w.student_id,'',''));
+        data.new_warnings.forEach(w => {
+          showModal('warning', w.name, w.student_id, '', '');
+          if (w.timestamp && w.timestamp > lastTimestamp) lastTimestamp = w.timestamp + 0.001;
+        });
       }
+
       if (data.new_invalids && data.new_invalids.length > 0) {
-        lastTimestamp=Math.max(lastTimestamp,...data.new_invalids.map(t=>t.timestamp||0));
-        data.new_invalids.forEach(inv=>showModal('invalid','Unknown Card','',inv.reason||'Not registered',inv.nfc_id));
+        data.new_invalids.forEach(inv => {
+          showModal('invalid', 'Unknown Card', '', inv.reason || 'Not registered', inv.nfc_id);
+          if (inv.timestamp && inv.timestamp > lastTimestamp) lastTimestamp = inv.timestamp + 0.001;
+        });
       }
-    } catch(e){ console.warn('Poll error',e); }
-    setTimeout(poll,1500);
+
+      // When no new events, advance lastTimestamp using SERVER time
+      // (not Date.now()) to prevent clock drift from causing missed taps
+      if ((!data.new_taps || !data.new_taps.length) &&
+          (!data.new_warnings || !data.new_warnings.length) &&
+          (!data.new_invalids || !data.new_invalids.length)) {
+        if (data.server_time) lastTimestamp = data.server_time;
+      }
+
+    } catch(e) {
+      console.warn('Poll error:', e);
+    }
+    setTimeout(poll, 1500);
   }
+
+  // Start polling immediately
   poll();
 
-  /* ── Excuse modal ── */
-  function openExcuse(nfc_id, name){
-    document.getElementById('excuseNfc').value=nfc_id;
-    document.getElementById('excuseName').textContent=name;
-    document.getElementById('excuseNote').value='';
+  function openExcuse(nfc_id, name) {
+    document.getElementById('excuseNfc').value  = nfc_id;
+    document.getElementById('excuseName').textContent = name;
+    document.getElementById('excuseNote').value = '';
     document.getElementById('excuseOverlay').classList.add('show');
   }
-  function closeExcuse(){ document.getElementById('excuseOverlay').classList.remove('show'); }
+  function closeExcuse() { document.getElementById('excuseOverlay').classList.remove('show'); }
 
-  async function submitExcuse(){
-    const nfc_id=document.getElementById('excuseNfc').value;
-    const note  =document.getElementById('excuseNote').value||'Excused';
+  async function submitExcuse() {
+    const nfc_id = document.getElementById('excuseNfc').value;
+    const note   = document.getElementById('excuseNote').value || 'Excused';
     try {
-      const r=await fetch(`/teacher/session/${sessId}/excuse`,{
-        method:'POST',
-        headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:`nfc_id=${encodeURIComponent(nfc_id)}&note=${encodeURIComponent(note)}`
+      const r = await fetch(`/teacher/session/${sessId}/excuse`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `nfc_id=${encodeURIComponent(nfc_id)}&note=${encodeURIComponent(note)}`
       });
-      const d=await r.json();
-      if(d.status==='ok'){
-        updateStudentStatus(nfc_id,'excused');
+      const d = await r.json();
+      if (d.status === 'ok') {
+        updateStudentStatus(nfc_id, 'excused');
         updateCounts();
       }
-    } catch(e){ console.warn(e); }
+    } catch(e) { console.warn(e); }
     closeExcuse();
   }
 
-  /* ── Search & filter lists ── */
-  function filterEnrolled(){
-    const q=document.getElementById('enrolledSearch').value.toLowerCase();
-    document.querySelectorAll('#enrolledList .student-row').forEach(r=>{
-      r.style.display=(!q||r.dataset.enrollName.includes(q))?'':'none';
+  function filterEnrolled() {
+    const q = document.getElementById('enrolledSearch').value.toLowerCase();
+    document.querySelectorAll('#enrolledList .student-row').forEach(r => {
+      r.style.display = (!q || r.dataset.enrollName.includes(q)) ? '' : 'none';
     });
   }
-  function filterByStatus(){
-    const st=document.getElementById('statusFilter').value;
-    const q =document.getElementById('statusSearch').value.toLowerCase();
-    document.querySelectorAll('#statusList .student-row').forEach(r=>{
-      r.style.display=((!st||r.dataset.status===st)&&(!q||r.dataset.statusName.includes(q)))?'':'none';
+  function filterByStatus() {
+    const st = document.getElementById('statusFilter').value;
+    const q  = document.getElementById('statusSearch').value.toLowerCase();
+    document.querySelectorAll('#statusList .student-row').forEach(r => {
+      r.style.display = ((!st || r.dataset.status === st) && (!q || r.dataset.statusName.includes(q))) ? '' : 'none';
     });
   }
-  function filterStatus(){
-    const st=document.getElementById('statusFilter').value;
-    const q =document.getElementById('statusSearch').value.toLowerCase();
-    document.querySelectorAll('#statusList .student-row').forEach(r=>{
-      r.style.display=((!st||r.dataset.status===st)&&(!q||r.dataset.statusName.includes(q)))?'':'none';
-    });
-  }
+  function filterStatus() { filterByStatus(); }
 </script>
 {% endif %}
 {% endblock %}

@@ -20,24 +20,18 @@
   [data-theme="dark"] .btn-monitor{color:#000;}
   .btn-monitor:hover{opacity:.85;color:#fff;}
   .sec-mono{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
-
-  /* ── Analytics panel ── */
   .ap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:visible;margin-bottom:24px;}
   .ap>*:first-child{border-radius:16px 16px 0 0;}
   .ap>*:last-child{border-radius:0 0 16px 16px;}
   .ap-head{padding:18px 22px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;}
   .ap-head h2{font-size:15px;font-weight:700;margin:0;}
   .ap-head p{font-size:11px;color:var(--muted);margin:3px 0 0;}
-
-  /* Period pills */
   .period-row{display:flex;gap:6px;flex-wrap:wrap;}
   .pbtn{padding:7px 14px;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;}
   .pbtn:hover{border-color:var(--accent);color:var(--accent);}
   .pbtn.active{background:rgba(45,106,39,.12);border-color:rgba(45,106,39,.3);color:var(--accent);}
   .pp-sel{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;}
   .picker{display:none;align-items:center;gap:6px;}.picker.show{display:flex;}
-
-  /* Filter row */
   .filter-row{display:flex;gap:8px;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--border);overflow:visible;position:relative;z-index:10;}
   .fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px;}
   .fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
@@ -50,8 +44,6 @@
   .btn-export{background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.25);color:var(--accent);font-weight:700;border-radius:8px;padding:9px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;font-family:'DM Sans',sans-serif;transition:all .2s;}
   .btn-export:hover{background:rgba(45,106,39,.2);}
   [data-theme="dark"] .btn-export{color:var(--accent);}
-
-  /* ── Searchable select (SSD) — shared with admin ── */
   .search-select-wrap{position:relative;z-index:1;}
   .search-select-wrap:has(.search-select-dropdown.open){z-index:999999;}
   .search-select-display{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 30px 7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;width:100%;transition:border-color .2s;user-select:none;position:relative;}
@@ -69,15 +61,11 @@
   .ssd-opt.selected{background:rgba(45,106,39,.15);color:var(--accent);font-weight:600;}
   .ssd-opt.no-match{color:var(--muted);font-style:italic;cursor:default;}
   .ssd-opt.no-match:hover{background:transparent;}
-
-  /* Totals */
   .sum-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 22px;}
   @media(max-width:580px){.sum-grid{grid-template-columns:repeat(2,1fr);}}
   .sum-box{border-radius:10px;padding:14px;text-align:center;border:1px solid;}
   .sum-box .sn{font-family:'Space Mono',monospace;font-size:26px;font-weight:700;line-height:1;}
   .sum-box .sl{font-size:11px;font-weight:600;margin-top:4px;}
-
-  /* Chart tabs */
   .ctabs{display:flex;border-top:1px solid var(--border);}
   .ctab{padding:10px 18px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;}
   .ctab.active{color:var(--accent);border-bottom-color:var(--accent);}
@@ -91,8 +79,6 @@
   .cnodata{display:none;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--muted);font-size:12px;text-align:center;padding:32px 16px;}
   .cnodata.show{display:flex;}
   .chart-wrap>.cnodata{position:absolute;inset:0;background:var(--surface);z-index:5;border-radius:8px;}
-
-  /* Showing bar */
   .showing-bar{background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.12);border-radius:10px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 22px 14px;}
   .sb-main{font-size:13px;font-weight:700;}
   .sb-sub{font-size:11px;color:var(--muted);margin-top:2px;}
@@ -109,12 +95,9 @@
       &nbsp;·&nbsp; {{ my_subjects|length }} subject{{ 's' if my_subjects|length != 1 }} in schedule
     </div>
   </div>
-  <div>
-    <div class="clock-date" id="liveDate">—</div>
-  </div>
+  <div><div class="clock-date" id="liveDate">—</div></div>
 </div>
 
-<!-- Quick stats — no at-risk percentage shown -->
 <div class="stats-row">
   <div class="stat-box">
     <div class="stat-icon" style="background:rgba(45,106,39,.1);color:var(--accent);"><i class="bi bi-broadcast"></i></div>
@@ -128,10 +111,8 @@
     <div class="stat-icon" style="background:rgba(96,165,250,.1);color:#60a5fa;"><i class="bi bi-journal-check"></i></div>
     <div><div class="stat-val">{{ total_sessions }}</div><div class="stat-lbl">Sessions Done</div></div>
   </div>
-
 </div>
 
-<!-- Live sessions -->
 {% if live_sessions %}
 <div class="sec-mono" style="color:var(--success);">// LIVE RIGHT NOW</div>
 <div style="margin-bottom:24px;">
@@ -158,11 +139,8 @@
 </div>
 {% endif %}
 
-<!-- ══ ANALYTICS PANEL ══ -->
 <div class="sec-mono">// MY ATTENDANCE ANALYTICS</div>
 <div class="ap">
-
-  <!-- Header -->
   <div class="ap-head">
     <div>
       <h2>Attendance Analytics</h2>
@@ -171,7 +149,6 @@
     <span style="font-size:11px;color:var(--muted);" id="sessCountLabel"></span>
   </div>
 
-  <!-- Step 1: Period -->
   <div style="padding:14px 22px;border-bottom:1px solid var(--border);">
     <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">
       <i class="bi bi-calendar3"></i> &nbsp;Period
@@ -202,15 +179,12 @@
     </div>
   </div>
 
-  <!-- Step 2: Filters with searchable dropdowns -->
   <div class="filter-row">
-    <!-- Program -->
     <div class="fg">
       <span class="fl">Program</span>
       <div class="search-select-wrap" id="wrap_f_program">
         <div class="search-select-display" id="disp_f_program" onclick="toggleSSD('f_program')">
-          <span class="ssd-label" id="label_f_program">All Programs</span>
-          <span class="ssd-arrow">▼</span>
+          <span class="ssd-label" id="label_f_program">All Programs</span><span class="ssd-arrow">▼</span>
         </div>
         <div class="search-select-dropdown" id="drop_f_program">
           <input class="ssd-input" type="text" placeholder="Search program…" oninput="filterSSDOpts('f_program',this.value)" autocomplete="off"/>
@@ -222,13 +196,11 @@
         </div>
       </div>
     </div>
-    <!-- Year Level -->
     <div class="fg">
       <span class="fl">Year Level</span>
       <div class="search-select-wrap" id="wrap_f_year">
         <div class="search-select-display" id="disp_f_year" onclick="toggleSSD('f_year')">
-          <span class="ssd-label" id="label_f_year">All Years</span>
-          <span class="ssd-arrow">▼</span>
+          <span class="ssd-label" id="label_f_year">All Years</span><span class="ssd-arrow">▼</span>
         </div>
         <div class="search-select-dropdown" id="drop_f_year">
           <input class="ssd-input" type="text" placeholder="Search year…" oninput="filterSSDOpts('f_year',this.value)" autocomplete="off"/>
@@ -242,13 +214,11 @@
         </div>
       </div>
     </div>
-    <!-- Section -->
     <div class="fg">
       <span class="fl">Section</span>
       <div class="search-select-wrap" id="wrap_f_section">
         <div class="search-select-display" id="disp_f_section" onclick="toggleSSD('f_section')">
-          <span class="ssd-label" id="label_f_section">All Sections</span>
-          <span class="ssd-arrow">▼</span>
+          <span class="ssd-label" id="label_f_section">All Sections</span><span class="ssd-arrow">▼</span>
         </div>
         <div class="search-select-dropdown" id="drop_f_section">
           <input class="ssd-input" type="text" placeholder="Search section…" oninput="filterSSDOpts('f_section',this.value)" autocomplete="off"/>
@@ -262,13 +232,11 @@
         </div>
       </div>
     </div>
-    <!-- Subject -->
     <div class="fg">
       <span class="fl">Subject</span>
       <div class="search-select-wrap" id="wrap_f_subject">
         <div class="search-select-display" id="disp_f_subject" onclick="toggleSSD('f_subject')">
-          <span class="ssd-label" id="label_f_subject">All Subjects</span>
-          <span class="ssd-arrow">▼</span>
+          <span class="ssd-label" id="label_f_subject">All Subjects</span><span class="ssd-arrow">▼</span>
         </div>
         <div class="search-select-dropdown" id="drop_f_subject">
           <input class="ssd-input" type="text" placeholder="Search subject…" oninput="filterSSDOpts('f_subject',this.value)" autocomplete="off"/>
@@ -281,13 +249,11 @@
         </div>
       </div>
     </div>
-    <!-- Time Slot -->
     <div class="fg">
       <span class="fl">Time Slot</span>
       <div class="search-select-wrap" id="wrap_f_tod">
         <div class="search-select-display" id="disp_f_tod" onclick="toggleSSD('f_tod')">
-          <span class="ssd-label" id="label_f_tod">Any Time</span>
-          <span class="ssd-arrow">▼</span>
+          <span class="ssd-label" id="label_f_tod">Any Time</span><span class="ssd-arrow">▼</span>
         </div>
         <div class="search-select-dropdown" id="drop_f_tod">
           <input class="ssd-input" type="text" placeholder="Search time slot…" oninput="filterSSDOpts('f_tod',this.value)" autocomplete="off"/>
@@ -321,7 +287,6 @@
         </div>
       </div>
     </div>
-    <!-- Buttons -->
     <div style="display:flex;gap:6px;align-self:flex-end;flex-wrap:wrap;">
       <button class="btn-apply" onclick="applyFilters()"><i class="bi bi-search"></i> Apply</button>
       <button class="btn-reset-f" onclick="resetFilters()" title="Reset filters"><i class="bi bi-x-circle"></i></button>
@@ -331,7 +296,6 @@
     </div>
   </div>
 
-  <!-- Showing bar -->
   <div class="showing-bar" id="showingBar" style="display:none;">
     <div>
       <div class="sb-main" id="sb_main">—</div>
@@ -343,7 +307,6 @@
     </div>
   </div>
 
-  <!-- Totals row -->
   <div class="sum-grid">
     <div class="sum-box" style="background:rgba(45,106,39,.07);border-color:rgba(45,106,39,.25);">
       <div class="sn" style="color:var(--success);" id="sc_present">—</div>
@@ -363,14 +326,12 @@
     </div>
   </div>
 
-  <!-- Chart tabs -->
   <div class="ctabs">
     <button class="ctab active" onclick="switchChart('donut',this)"><i class="bi bi-pie-chart-fill"></i> &nbsp;Status Breakdown</button>
     <button class="ctab"        onclick="switchChart('trend',this)"><i class="bi bi-graph-up-arrow"></i> &nbsp;Daily Trend</button>
     <button class="ctab"        onclick="switchChart('subject',this)"><i class="bi bi-bar-chart-horizontal-fill"></i> &nbsp;By Subject</button>
   </div>
 
-  <!-- Donut chart -->
   <div class="cpane active" id="pane-donut">
     <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Percentage breakdown of all attendance records.</div>
     <div style="position:relative;min-height:60px;">
@@ -411,7 +372,6 @@
     </div>
   </div>
 
-  <!-- Trend chart -->
   <div class="cpane" id="pane-trend">
     <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Day-by-day attendance counts across your sessions.</div>
     <div class="chart-wrap">
@@ -421,7 +381,6 @@
     </div>
   </div>
 
-  <!-- Subject chart -->
   <div class="cpane" id="pane-subject">
     <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Which subjects have the best and worst attendance in your classes?</div>
     <div class="chart-wrap tall" id="subjChartArea">
@@ -431,17 +390,15 @@
     </div>
   </div>
 
-</div><!-- /ap -->
+</div>
 
 <script>
-// ── Date only ──
 function tick(){
   const cd=document.getElementById('liveDate');
   if(cd)cd.textContent=new Date().toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 }
 tick();
 
-// ── Charts ──
 const C={present:'#10b981',late:'#f59e0b',absent:'#ef4444',excused:'#60a5fa'};
 const donutChart=new Chart(document.getElementById('donutChart'),{
   type:'doughnut',
@@ -484,20 +441,14 @@ function switchPeriod(p,btn){
   document.getElementById('monthPicker').classList.toggle('show',p==='month');
   document.getElementById('yearPicker').classList.toggle('show',p==='year');
 }
-
 function getPeriodParams(){
   const p=new URLSearchParams({period:curPeriod});
-  if(curPeriod==='month'){
-    p.append('month',   document.getElementById('pickMonth').value);
-    p.append('year_num',document.getElementById('pickMonthYear').value);
-  } else if(curPeriod==='year'){
-    p.append('year_num',document.getElementById('pickYear').value);
-  }
+  if(curPeriod==='month'){p.append('month',document.getElementById('pickMonth').value);p.append('year_num',document.getElementById('pickMonthYear').value);}
+  else if(curPeriod==='year'){p.append('year_num',document.getElementById('pickYear').value);}
   return p;
 }
 
-// ── SSD engine (searchable dropdowns) ──
-const ssdValues = {};
+const ssdValues={};
 function toggleSSD(id){
   const drop=document.getElementById('drop_'+id),disp=document.getElementById('disp_'+id);
   const isOpen=drop.classList.contains('open');
@@ -526,27 +477,19 @@ document.addEventListener('click',function(e){
 
 async function applyFilters(){
   const params=getPeriodParams();
-  const prog=ssdValues['f_program']||'';
-  const yr  =ssdValues['f_year']   ||'';
-  const sec =ssdValues['f_section']||'';
-  const subj=ssdValues['f_subject']||'';
-  const tod =ssdValues['f_tod']    ||'';
-  if(prog) params.append('program',     prog);
-  if(yr)   params.append('year',        yr);
-  if(sec)  params.append('section_letter', sec);
-  if(subj) params.append('subject',     subj);
-  if(tod)  params.append('time_of_day', tod);
-
+  const prog=ssdValues['f_program']||'';const yr=ssdValues['f_year']||'';
+  const sec=ssdValues['f_section']||'';const subj=ssdValues['f_subject']||'';const tod=ssdValues['f_tod']||'';
+  if(prog)params.append('program',prog);if(yr)params.append('year',yr);
+  if(sec)params.append('section_letter',sec);if(subj)params.append('subject',subj);if(tod)params.append('time_of_day',tod);
   ['trendLoading','subjLoading'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='flex';});
   document.getElementById('trendChart').style.display='none';
   document.getElementById('subjScroll').style.display='none';
   document.getElementById('donutContent').style.display='none';
   ['trendNoData','subjNoData','donutNoData'].forEach(id=>document.getElementById(id).classList.remove('show'));
-
   try{
     const r=await fetch('/api/attendance/stats?'+params.toString(),{credentials:'same-origin'});
     const d=await r.json();
-    renderAll(d, subj, sec, tod);
+    renderAll(d,subj,sec,tod);
   }catch(e){console.error(e);}
   ['trendLoading','subjLoading'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
 }
@@ -561,94 +504,79 @@ function resetFilters(){
   applyFilters();
 }
 
-// ── Export dashboard Excel (with chart images) ──
-async function exportDashboard(){
-  const btn=document.getElementById('btnExport');
-  btn.disabled=true;btn.innerHTML='<i class="bi bi-hourglass-split"></i> Exporting…';
-  try{
-    // Capture chart images
-    const donutImg  = document.getElementById('donutChart') ? document.getElementById('donutChart').toDataURL('image/png') : null;
-    const trendImg  = document.getElementById('trendChart') ? document.getElementById('trendChart').toDataURL('image/png') : null;
-    const subjImg   = document.getElementById('subjChart')  ? document.getElementById('subjChart').toDataURL('image/png')  : null;
-    // Build filter params
-    const params=getPeriodParams();
-    const prog=ssdValues['f_program']||'';const yr=ssdValues['f_year']||'';
-    const sec=ssdValues['f_section']||'';const subj=ssdValues['f_subject']||'';const tod=ssdValues['f_tod']||'';
-    if(prog)params.append('program',prog);if(yr)params.append('year',yr);
-    if(sec)params.append('section_letter',sec);if(subj)params.append('subject',subj);if(tod)params.append('time_of_day',tod);
-    const r=await fetch('/export/stats/xlsx',{
-      method:'POST',credentials:'same-origin',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({params:params.toString(),donut_img:donutImg,trend_img:trendImg,subj_img:subjImg})
-    });
-    if(!r.ok)throw new Error('Export failed');
-    const blob=await r.blob();
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;
-    a.download='attendance_report_'+new Date().toISOString().slice(0,10)+'.xlsx';
-    a.click();URL.revokeObjectURL(url);
-  }catch(e){alert('Export failed: '+e.message);}
-  btn.disabled=false;btn.innerHTML='<i class="bi bi-file-earmark-excel"></i> Export';
+// ── Export dashboard — simple GET so the browser download dialog always fires.
+// The old fetch+POST+blob approach silently failed in some browsers.
+// The chart images it was sending were never used server-side anyway —
+// export_stats_xlsx() generates its own charts via openpyxl.
+function exportDashboard(){
+  const btn = document.getElementById('btnExport');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Exporting…';
+
+  const params = getPeriodParams();
+  const prog = ssdValues['f_program'] || '';
+  const yr   = ssdValues['f_year']    || '';
+  const sec  = ssdValues['f_section'] || '';
+  const subj = ssdValues['f_subject'] || '';
+  const tod  = ssdValues['f_tod']     || '';
+  if (prog) params.append('program',        prog);
+  if (yr)   params.append('year',           yr);
+  if (sec)  params.append('section_letter', sec);
+  if (subj) params.append('subject',        subj);
+  if (tod)  params.append('time_of_day',    tod);
+
+  // Create a hidden link and click it — this is the most reliable way to
+  // trigger a file download across all browsers without fetch/blob issues
+  const a = document.createElement('a');
+  a.href = '/export/stats.xlsx?' + params.toString();
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Export';
+  }, 2000);
 }
 
-function renderAll(data, subj, sec, tod){
+function renderAll(data,subj,sec,tod){
   const d=data.donut; const total=d.present+d.late+d.absent+d.excused;
   const pct=v=>total?Math.round(v/total*100)+'%':'0%';
-
-  // Totals
   document.getElementById('sc_present').textContent=d.present;
   document.getElementById('sc_late').textContent=d.late;
   document.getElementById('sc_absent').textContent=d.absent;
   document.getElementById('sc_excused').textContent=d.excused;
-
-  // Session count
   const cnt=data.session_count;
   document.getElementById('sessCountLabel').textContent=cnt+' session'+(cnt!==1?'s':'')+' found';
   document.getElementById('sb_num').textContent=cnt;
-
-  // Showing bar
   const periods={today:'Today',month:'This Month',year:'This Year',all:'All Time'};
   const parts=[];
-  if(subj) parts.push('Subject: '+subj);
-  if(sec)  parts.push('Section: '+sec.split('|').pop());
-  if(tod)  parts.push(tod.charAt(0).toUpperCase()+tod.slice(1));
+  if(subj)parts.push('Subject: '+subj);if(sec)parts.push('Section: '+sec.split('|').pop());if(tod)parts.push(tod.charAt(0).toUpperCase()+tod.slice(1));
   document.getElementById('sb_main').textContent=(periods[curPeriod]||curPeriod)+(parts.length?' — Filtered':'');
   document.getElementById('sb_sub').textContent=parts.length?parts.join(' · '):'Showing all your sessions';
   document.getElementById('showingBar').style.display='flex';
   document.getElementById('showingSub').textContent=cnt+' session'+(cnt!==1?'s':'')+' · '+document.getElementById('sb_sub').textContent;
-
-  // Donut
   if(!total){document.getElementById('donutNoData').classList.add('show');}
   else{
     document.getElementById('donutNoData').classList.remove('show');
     document.getElementById('donutContent').style.display='block';
     donutChart.data.datasets[0].data=[d.present,d.late,d.absent,d.excused];
     donutChart.update('active');
-    ['present','late','absent','excused'].forEach(k=>{
-      document.getElementById('leg_'+k).textContent=d[k];
-      document.getElementById('pct_'+k).textContent='('+pct(d[k])+')';
-    });
+    ['present','late','absent','excused'].forEach(k=>{document.getElementById('leg_'+k).textContent=d[k];document.getElementById('pct_'+k).textContent='('+pct(d[k])+')'});
   }
-
-  // Trend
   const keys=Object.keys(data.trend||{});
   if(!keys.length){document.getElementById('trendNoData').classList.add('show');}
   else{
-    const tc=document.getElementById('trendChart');
-    tc.style.display='block';
+    const tc=document.getElementById('trendChart'); tc.style.display='block';
     trendChart.data.labels=keys;
-    ['present','late','absent','excused'].forEach((k,i)=>{
-      trendChart.data.datasets[i].data=keys.map(key=>(data.trend[key]||{})[k]||0);
-    });
+    ['present','late','absent','excused'].forEach((k,i)=>{trendChart.data.datasets[i].data=keys.map(key=>(data.trend[key]||{})[k]||0);});
     trendChart.update('active');
   }
-
-  // By Subject
   const entries=Object.entries(data.subjects||{}).sort((a,b)=>a[0].localeCompare(b[0]));
   if(!entries.length){document.getElementById('subjNoData').classList.add('show');}
   else{
-    const sc=document.getElementById('subjScroll');
-    sc.style.display='block';
+    const sc=document.getElementById('subjScroll'); sc.style.display='block';
     const labels=entries.map(([k])=>k.length>28?k.substring(0,26)+'…':k);
     const vals=entries.map(([,v])=>v);
     const h=Math.max(180,entries.length*40+60);
@@ -671,9 +599,7 @@ function switchChart(id,btn){
   if(id==='subject') subjChart.update();
 }
 
-// Set month picker default
 (function(){document.getElementById('pickMonth').value=new Date().getMonth()+1;})();
-// Auto-load today
 applyFilters();
 </script>
 {% endblock %}

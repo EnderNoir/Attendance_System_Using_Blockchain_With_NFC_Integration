@@ -84,12 +84,27 @@
 /* Photo upload block */
 .photo-upload-block{background:rgba(45,106,39,.04);border:1px dashed rgba(45,106,39,.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;}
 .photo-avatar-preview{width:64px;height:64px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);cursor:pointer;}
+
+/* Section checkbox grid (for teacher edit tab) */
+.section-course-block{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;}
+.section-course-header{padding:10px 14px;background:rgba(45,106,39,.06);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
+.section-course-title{font-size:13px;font-weight:700;}
+.btn-select-all{background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;}
+.btn-select-all:hover{border-color:var(--accent);color:var(--accent);}
+.year-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.year-row:last-child{border-bottom:none;}
+.year-label{font-size:12px;font-weight:500;min-width:70px;}
+.sec-checks{display:flex;gap:7px;flex-wrap:wrap;}
+.sec-cb-wrap{position:relative;}
+.sec-cb-wrap input{position:absolute;opacity:0;width:0;height:0;}
+.sec-cb-wrap label{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);transition:all .2s;font-family:'Space Mono',monospace;}
+.sec-cb-wrap label:hover{border-color:var(--accent);color:var(--text);}
+.sec-cb-wrap input:checked + label{border-color:var(--accent);background:rgba(45,106,39,.12);color:var(--accent);}
 </style>
 
 <!-- Update Modal -->
 <div class="upd-overlay" id="updModal" onclick="if(event.target===this)closeUpdModal()">
   <div class="upd-box" id="updBox">
-    <!-- Hidden file input — triggered from Edit tab button -->
     <input type="file" id="updPhotoInput" accept="image/*" style="display:none" onchange="handleUpdPhoto(this)">
 
     <div class="upd-topbar">
@@ -106,12 +121,10 @@
       <button class="mtab" onclick="switchMTab('sessions',this)"><i class="bi bi-journal-text"></i> Sessions</button>
     </div>
 
-    <!-- Info tab: read-only, no photo upload here -->
     <div class="mpane active" id="mpane-info">
       <div id="infoContent"></div>
     </div>
 
-    <!-- Update tab: photo upload is HERE -->
     <div class="mpane" id="mpane-edit">
       <div id="editContent"></div>
       <div class="upd-footer">
@@ -121,7 +134,6 @@
       </div>
     </div>
 
-    <!-- Sessions tab -->
     <div class="mpane" id="mpane-sessions">
       <div class="sess-filter-bar">
         <div class="fg" style="flex:2;min-width:140px;">
@@ -322,31 +334,73 @@ const teacherData = {
 
 let curMode=null, curId=null, allSessions=[];
 
+// ── Modal open / close (required by openStudentRecord and openTeacherRecord) ──
+function openUpdModal() {
+  document.getElementById('updModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeUpdModal() {
+  document.getElementById('updModal').classList.remove('show');
+  document.body.style.overflow = '';
+  // Reset message state
+  const msg = document.getElementById('updMsg');
+  if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+  const btn = document.getElementById('updSaveBtn');
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Update'; }
+}
+
 function switchTab(id,btn){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
   btn.classList.add('active');
 }
-function switchMTab(id,btn){
-  document.querySelectorAll('.mpane').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.mtab').forEach(b=>b.classList.remove('active'));
-  document.getElementById('mpane-'+id).classList.add('active');
+
+// FIX 1: switchMTab always reloads sessions when tab clicked — no allSessions guard
+function switchMTab(id, btn) {
+  document.querySelectorAll('.mpane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.mtab').forEach(b => b.classList.remove('active'));
+  document.getElementById('mpane-' + id).classList.add('active');
   btn.classList.add('active');
-  if(id==='sessions' && curMode==='student' && allSessions.length===0) loadStudentSessions(curId);
-}
-function openUpdModal(){ document.getElementById('updModal').classList.add('show'); }
-function closeUpdModal(){
-  document.getElementById('updModal').classList.remove('show');
-  curMode=null; curId=null; allSessions=[];
-  document.getElementById('updMsg').style.display='none';
-  document.querySelectorAll('.mpane').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.mtab').forEach(b=>b.classList.remove('active'));
-  document.querySelector('.mpane').classList.add('active');
-  document.querySelector('.mtab').classList.add('active');
+  if (id === 'sessions' && curMode === 'student') {
+    loadStudentSessions(curId);
+  }
 }
 
-/* ── Photo upload triggered from Edit tab button ── */
+// FIX 2: Single authoritative loadStudentSessions definition
+function loadStudentSessions(nfcId) {
+  if (!nfcId) return;
+  const wrap  = document.getElementById('sessLogWrap');
+  const label = document.getElementById('sessCountLabel');
+  wrap.innerHTML = `<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;">
+    <div style="width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;"></div>
+    Loading sessions…
+  </div>`;
+  if (label) label.textContent = 'Loading…';
+
+  fetch(`/api/student_sessions/${nfcId}`, { credentials: 'same-origin' })
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(data => {
+      allSessions = data;
+      const subjects = [...new Set(data.map(s => s.subject_name).filter(Boolean))].sort();
+      const sel = document.getElementById('sessSubject');
+      if (sel) {
+        sel.innerHTML = '<option value="">All Subjects</option>' +
+          subjects.map(s => `<option value="${s}">${s}</option>`).join('');
+      }
+      renderSessions(data);
+    })
+    .catch(err => {
+      console.error('loadStudentSessions error:', err);
+      if (wrap) wrap.innerHTML = `<div style="color:var(--danger);text-align:center;padding:16px;font-size:12px;">
+        Failed to load sessions: ${err.message}
+      </div>`;
+    });
+}
+
 function handleUpdPhoto(input){
   if(!input.files||!input.files[0]||!curId) return;
   const fd=new FormData();
@@ -355,7 +409,6 @@ function handleUpdPhoto(input){
   fetch('/upload_photo',{method:'POST',credentials:'same-origin',body:fd})
     .then(r=>r.json()).then(d=>{
       if(d.ok){
-        // Update edit tab avatar preview
         const editAv = document.getElementById('editPhotoPreview');
         if(editAv){
           editAv.innerHTML='';
@@ -365,9 +418,8 @@ function handleUpdPhoto(input){
           img.style='width:100%;height:100%;object-fit:cover;border-radius:50%;';
           editAv.appendChild(img);
         }
-        // Update info tab avatar
         const infoAv = document.getElementById('infoPhotoWrap');
-        if(infoAv){
+        if(infoAv && infoAv.tagName==='DIV'){
           infoAv.innerHTML='';
           infoAv.style.overflow='hidden';
           const img=document.createElement('img');
@@ -383,7 +435,6 @@ function handleUpdPhoto(input){
     });
 }
 
-/* ── STUDENT record ── */
 function openStudentRecord(idx){
   const s=studentData[idx];
   curMode='student'; curId=s.nfc; allSessions=[];
@@ -391,7 +442,6 @@ function openStudentRecord(idx){
   document.getElementById('updTitle').textContent = s.name;
   document.getElementById('updSub').textContent   = (s.course||'—')+' · '+(s.year||'—')+' · Section '+(s.section||'—');
 
-  /* Info tab — read-only, no photo upload button */
   const photoHtml = s.photo
     ? `<img src="/static/uploads/${s.photo}?t=${Date.now()}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);" id="infoPhotoWrap"/>`
     : `<div id="infoPhotoWrap" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;">${s.name[0].toUpperCase()}</div>`;
@@ -421,7 +471,6 @@ function openStudentRecord(idx){
       ${infoRow('Email Address', s.email, true)}
     </div>`;
 
-  /* Edit tab — photo upload block is at the TOP */
   const semOpts = ['First','Second','Summer','Mid-Year'].map(v=>
     `<option value="${v}" ${s.semester===v||s.semester===v+' Semester'?'selected':''}>${v} Semester</option>`).join('');
   const yearOpts = ['1st Year','2nd Year','3rd Year','4th Year','5th Year'].map(v=>
@@ -433,13 +482,11 @@ function openStudentRecord(idx){
     `<option value="${v}" ${s.course===v?'selected':''}>${v}</option>`).join('');
   const secOpts = ['A','B','C','D'].map(v=>`<option value="${v}" ${s.section===v?'selected':''}>${v}</option>`).join('');
 
-  // Photo for edit tab avatar
   const editPhotoInner = s.photo
     ? `<img src="/static/uploads/${s.photo}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
     : `<span style="font-size:22px;font-weight:700;color:#000;">${s.name[0].toUpperCase()}</span>`;
 
   document.getElementById('editContent').innerHTML = `
-    <!-- Photo upload block at top of Edit tab -->
     <div class="photo-upload-block">
       <div class="photo-avatar-preview" id="editPhotoPreview" onclick="document.getElementById('updPhotoInput').click()" title="Click to change photo">${editPhotoInner}</div>
       <div>
@@ -502,15 +549,21 @@ function openStudentRecord(idx){
       </div>
     </div>`;
 
-  /* Sessions tab */
+  // Reset sessions tab
   document.getElementById('sessLogWrap').innerHTML =
     `<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;">Switch to this tab to load session history.</div>`;
   document.getElementById('sessCountLabel').textContent = '';
   document.getElementById('sessSubject').innerHTML = '<option value="">All Subjects</option>';
 
-  /* Show sessions tab for students */
+  // Show sessions tab for students
   document.querySelectorAll('.mtab')[2].style.display='';
   document.getElementById('mpane-sessions').style.display='';
+
+  // Reset to Info tab
+  document.querySelectorAll('.mpane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.mtab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('mpane-info').classList.add('active');
+  document.querySelectorAll('.mtab')[0].classList.add('active');
 
   openUpdModal();
 }
@@ -523,27 +576,10 @@ function infoRow(label, val, full=false){
   </div>`;
 }
 
-/* Sessions loading */
-function loadStudentSessions(nfcId){
-  const wrap = document.getElementById('sessLogWrap');
-  wrap.innerHTML = `<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;"><div style="width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;"></div>Loading…</div>`;
-  fetch(`/api/student_sessions/${nfcId}`,{credentials:'same-origin'})
-    .then(r=>r.json()).then(data=>{
-      allSessions = data;
-      const subjects = [...new Set(data.map(s=>s.subject_name).filter(Boolean))].sort();
-      const sel = document.getElementById('sessSubject');
-      sel.innerHTML = '<option value="">All Subjects</option>' +
-        subjects.map(s=>`<option value="${s}">${s}</option>`).join('');
-      renderSessions(data);
-    }).catch(()=>{
-      wrap.innerHTML = '<div style="color:var(--danger);text-align:center;padding:16px;font-size:12px;">Failed to load sessions.</div>';
-    });
-}
-
 function renderSessions(sessions){
   const wrap  = document.getElementById('sessLogWrap');
   const label = document.getElementById('sessCountLabel');
-  label.textContent = `${sessions.length} session${sessions.length!==1?'s':''} found`;
+  if(label) label.textContent = `${sessions.length} session${sessions.length!==1?'s':''} found`;
   if(!sessions.length){
     wrap.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;"><i class="bi bi-calendar-x" style="font-size:24px;display:block;opacity:.2;margin-bottom:6px;"></i>No sessions found.</div>';
     return;
@@ -571,7 +607,7 @@ function filterSessions(){
   const st   = document.getElementById('sessStatus').value;
   const subj = document.getElementById('sessSubject').value;
   const filtered = allSessions.filter(s=>
-    (!q    || s.subject_name.toLowerCase().includes(q) || s.teacher_name.toLowerCase().includes(q)) &&
+    (!q    || s.subject_name.toLowerCase().includes(q) || (s.teacher_name||'').toLowerCase().includes(q)) &&
     (!st   || s.status === st) &&
     (!subj || s.subject_name === subj)
   );
@@ -588,13 +624,11 @@ function resetSessFilters(){
 function exportStudentSessions(){
   const s = studentData.find(x=>x.nfc===curId);
   if(!s) return;
-  // Build informative filename: lastname_firstname_nfc_attendance_month_year.xlsx
   const nameParts = s.name.split(' ');
   const lastName  = (nameParts[nameParts.length-1]||'student').toLowerCase().replace(/[^a-z0-9]/g,'');
   const firstName = (nameParts[0]||'').toLowerCase().replace(/[^a-z0-9]/g,'');
   const now = new Date();
   const fname = `${lastName}_${firstName}_attendance_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}.xlsx`;
-
   const q    = document.getElementById('sessStatus').value;
   const subj = document.getElementById('sessSubject').value;
   let url = `/export/student_sessions/${s.nfc}?name=${encodeURIComponent(s.name)}&filename=${encodeURIComponent(fname)}`;
@@ -603,7 +637,50 @@ function exportStudentSessions(){
   window.location.href = url;
 }
 
-/* Teacher record */
+
+// ── Section grid helpers (mirrors admin_users.html) ──
+const DASH_CS_YEARS = ['1st Year','2nd Year','3rd Year','4th Year'];
+const DASH_IT_YEARS = ['1st Year','2nd Year','3rd Year','4th Year'];
+const DASH_SECS     = ['A','B','C','D'];
+
+function buildSectionGrid(assignedSections) {
+  const assigned = new Set(assignedSections || []);
+  function courseBlock(course, prefix, years) {
+    const rows = years.map(yr => {
+      const checks = DASH_SECS.map(sec => {
+        const val = course + '|' + yr + '|' + sec;
+        const id  = 'dash_sec_' + prefix + '_' + yr.replace(/ /g,'') + '_' + sec;
+        const chk = assigned.has(val) ? 'checked' : '';
+        return '<div class="sec-cb-wrap">'
+          + '<input type="checkbox" id="' + id + '" class="dash-sec-cb" value="' + val + '" ' + chk + '/>'
+          + '<label for="' + id + '">' + sec + '</label>'
+          + '</div>';
+      }).join('');
+      return '<div class="year-row"><span class="year-label">' + yr + '</span>'
+           + '<div class="sec-checks">' + checks + '</div></div>';
+    }).join('');
+    return '<div class="section-course-block">'
+      + '<div class="section-course-header"><span class="section-course-title">' + course + '</span>'
+      + '<button type="button" class="btn-select-all" onclick="dashToggleAllSections(\'' + prefix + '\',this)">Select All</button></div>'
+      + rows + '</div>';
+  }
+  return courseBlock('BS Computer Science','cs',DASH_CS_YEARS)
+       + courseBlock('BS Information Technology','it',DASH_IT_YEARS);
+}
+
+function dashToggleAllSections(prefix, btn) {
+  const course = prefix === 'cs' ? 'BS Computer Science' : 'BS Information Technology';
+  const cbs = document.querySelectorAll('.dash-sec-cb[value^="' + course + '"]');
+  const allChk = [...cbs].every(c => c.checked);
+  cbs.forEach(c => c.checked = !allChk);
+  btn.textContent = allChk ? 'Select All' : 'Deselect All';
+}
+
+function getSelectedSections() {
+  return [...document.querySelectorAll('.dash-sec-cb:checked')].map(c => c.value);
+}
+
+// FIX 3: Teacher record — info pane uses buildSectionAccordion() from base.html
 function openTeacherRecord(username){
   const u=teacherData[username];
   if(!u) return;
@@ -612,11 +689,16 @@ function openTeacherRecord(username){
   document.getElementById('updTitle').textContent = u.name;
   document.getElementById('updSub').textContent   = u.role.charAt(0).toUpperCase()+u.role.slice(1)+' · '+u.status;
 
-  const secHtml = u.sections.length
+  // INFO TAB: use accordion (buildSectionAccordion is defined in base.html)
+  const secAccordion = (u.sections && u.sections.length)
+    ? buildSectionAccordion(u.sections)
+    : '<span style="color:var(--muted);font-size:12px;">No sections assigned</span>';
+
+  // Also used in edit tab as chip spans (read-only display in edit tab header)
+  const secChips = (u.sections && u.sections.length)
     ? u.sections.map(s=>`<span style="background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.15);border-radius:5px;padding:2px 8px;font-size:11px;font-family:'Space Mono',monospace;color:var(--accent);display:inline-block;margin:2px;">${s.replace(/\|/g,' › ')}</span>`).join('')
     : '<span style="color:var(--muted);font-size:12px;">No sections assigned</span>';
 
-  /* Info tab */
   const tPhotoHtml = u.photo
     ? `<img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);" id="infoPhotoWrap"/>`
     : `<div id="infoPhotoWrap" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;">${u.name[0].toUpperCase()}</div>`;
@@ -627,7 +709,7 @@ function openTeacherRecord(username){
       <div>
         <div style="font-size:16px;font-weight:700;">${u.name}</div>
         <div style="font-size:12px;color:var(--muted);margin-top:3px;"><code>@${u.username}</code></div>
-        <div style="font-size:10px;color:rgba(45,106,39,.5);margin-top:5px;"><i class="bi bi-pencil-square"></i> Go to Update tab to change photo</div>
+        <div style="font-size:10px;color:rgba(45,106,39,.5);margin-top:5px;"><i class="bi bi-pencil-square"></i> Go to Update tab to change photo or sections</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;">
@@ -639,9 +721,8 @@ function openTeacherRecord(username){
       ${infoRow('Registered', u.created||'—')}
     </div>
     <div class="sec-title">// Assigned Sections</div>
-    <div style="display:flex;flex-wrap:wrap;gap:4px;">${secHtml}</div>`;
+    <div style="padding:4px 0;">${secAccordion}</div>`;
 
-  /* Edit tab — photo upload at top */
   const roleOpts   = ['teacher','admin'].map(v=>`<option value="${v}" ${u.role===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
   const statusOpts = ['approved','pending','rejected'].map(v=>`<option value="${v}" ${u.status===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
 
@@ -692,16 +773,22 @@ function openTeacherRecord(username){
     </div>
     <div id="tf_pw_err" style="font-size:11px;color:var(--danger);display:none;margin-top:4px;"><i class="bi bi-exclamation-circle"></i> Passwords do not match.</div>
     <div class="sec-title">// Assigned Sections</div>
-    <div style="display:flex;flex-wrap:wrap;gap:4px;padding-bottom:8px;">${secHtml}</div>`;
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">Select which sections this faculty member handles.</p>
+    <div id="dashSectionGrid">${buildSectionGrid(u.sections || [])}</div>`;
 
-  /* Hide sessions tab for teachers */
+  // Hide sessions tab for teachers
   document.querySelectorAll('.mtab')[2].style.display='none';
   document.getElementById('mpane-sessions').style.display='none';
+
+  // Reset to Info tab
+  document.querySelectorAll('.mpane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.mtab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('mpane-info').classList.add('active');
+  document.querySelectorAll('.mtab')[0].classList.add('active');
 
   openUpdModal();
 }
 
-/* Save updates */
 function saveUpdate(){
   if(curMode==='student') saveStudentUpdate();
   else if(curMode==='teacher') saveTeacherUpdate();
@@ -737,7 +824,8 @@ function saveStudentUpdate(){
       }
       document.getElementById('updTitle').textContent = payload.full_name||curId;
       document.getElementById('updSub').textContent   = `${payload.course} · ${payload.year_level} · Section ${payload.section}`;
-      const nameEl=document.querySelector(`#strow_${(studentData.find(x=>x.nfc===curId)||{}).idx} .prow-name`);
+      const si = studentData.find(x=>x.nfc===curId);
+      const nameEl = si ? document.querySelector(`#strow_${si.idx} .prow-name`) : null;
       if(nameEl) nameEl.textContent=payload.full_name;
     } else { msg.style.color='var(--danger)'; msg.textContent=d.error||'Error saving changes.'; }
     btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
@@ -757,7 +845,8 @@ function saveTeacherUpdate(){
   if(pwErr) pwErr.style.display='none';
   const g=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
   const payload={username:curId,full_name:g('tf_name'),new_username:g('tf_username'),
-    email:g('tf_email'),role:g('tf_role'),status:g('tf_status'),new_password:pw||null};
+    email:g('tf_email'),role:g('tf_role'),status:g('tf_status'),new_password:pw||null,
+    sections:getSelectedSections()};
   btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass"></i> Saving…';
   fetch('/update_faculty',{method:'POST',credentials:'same-origin',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
@@ -779,14 +868,9 @@ function saveTeacherUpdate(){
   });
 }
 
-/* Sessions tab auto-load */
-document.addEventListener('DOMContentLoaded',()=>{
-  document.querySelectorAll('.mtab')[2].addEventListener('click',()=>{
-    if(curMode==='student' && allSessions.length===0) loadStudentSessions(curId);
-  });
-});
+// FIX 4: NO DOMContentLoaded guard — switchMTab handles this now
+// (the old guard with allSessions.length===0 has been removed)
 
-/* Filters */
 const totalSt={{ students|length }};
 function filterStudents(){
   const q=document.getElementById('st_search').value.toLowerCase();

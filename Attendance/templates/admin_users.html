@@ -80,7 +80,6 @@
 .photo-upload-block{background:rgba(45,106,39,.04);border:1px dashed rgba(45,106,39,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;}
 .photo-av{width:60px;height:60px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);}
 
-/* Responsive */
 @media(max-width:600px){
   .fa-box{width:100%;max-height:100vh;border-radius:0;}
   .info-row{grid-template-columns:100px 1fr;}
@@ -204,13 +203,11 @@
   </div>
 </div>
 
-<!-- Hidden file input for photo upload (only triggers from Update tab) -->
 <input type="file" id="faPhotoInput" accept="image/*" style="display:none" onchange="uploadFaPhoto(this)">
 
 <script>
 let curFaUser = null;
 
-// All section keys available in the system
 const CS_YEARS = ['1st Year','2nd Year','3rd Year','4th Year'];
 const IT_YEARS = ['1st Year','2nd Year','3rd Year','4th Year'];
 const SECS     = ['A','B','C','D'];
@@ -228,9 +225,9 @@ function switchFaTab(id, btn) {
   btn.classList.add('active');
 }
 
+// ── Section grid for UPDATE tab (interactive checkboxes) ──
 function buildSectionGrid(assignedSections) {
   const assigned = new Set(assignedSections || []);
-
   function courseBlock(course, prefix, years) {
     const rows = years.map(yr => {
       const checks = SECS.map(sec => {
@@ -247,7 +244,6 @@ function buildSectionGrid(assignedSections) {
         <div class="sec-checks">${checks}</div>
       </div>`;
     }).join('');
-
     return `<div class="section-course-block">
       <div class="section-course-header">
         <span class="section-course-title">${course}</span>
@@ -256,13 +252,13 @@ function buildSectionGrid(assignedSections) {
       ${rows}
     </div>`;
   }
-
   return courseBlock('BS Computer Science', 'cs', CS_YEARS)
        + courseBlock('BS Information Technology', 'it', IT_YEARS);
 }
 
 function toggleAllSections(prefix, btn) {
-  const cbs    = document.querySelectorAll(`.fa-sec-cb[value^="BS ${prefix==='cs'?'Computer Science':'Information Technology'}"]`);
+  const course = prefix === 'cs' ? 'BS Computer Science' : 'BS Information Technology';
+  const cbs    = document.querySelectorAll(`.fa-sec-cb[value^="${course}"]`);
   const allChk = [...cbs].every(c => c.checked);
   cbs.forEach(c => c.checked = !allChk);
   btn.textContent = allChk ? 'Select All' : 'Deselect All';
@@ -283,13 +279,14 @@ function openFaModal(u) {
     : `<span class="pill-rej">Rejected</span>`;
   document.getElementById('faSubPill').innerHTML = pill;
 
-  // ── INFO TAB (read-only, photo from SQLite) ──
+  // ── INFO TAB: accordion view (read-only, uses buildSectionAccordion from base.html) ──
   const photoHtml = u.photo
     ? `<img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);flex-shrink:0;" id="faInfoAvatar"/>`
     : `<div id="faInfoAvatar" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;flex-shrink:0;">${u.name[0].toUpperCase()}</div>`;
 
-  const secHtml = (u.sections||[]).length
-    ? u.sections.map(s=>`<span style="background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.15);border-radius:5px;padding:2px 8px;font-size:11px;font-family:'Space Mono',monospace;color:var(--accent);display:inline-block;margin:2px;">${s.replace(/\|/g,' › ')}</span>`).join('')
+  // FIX: use buildSectionAccordion (from base.html) instead of flat chips
+  const secAccordionHtml = (u.sections && u.sections.length)
+    ? buildSectionAccordion(u.sections)
     : '<span style="color:var(--muted);font-size:12px;">None assigned</span>';
 
   document.getElementById('faInfoContent').innerHTML = `
@@ -310,10 +307,10 @@ function openFaModal(u) {
       <div class="info-row"><span class="info-lbl">Status</span><span class="info-val">${pill}</span></div>
       <div class="info-row"><span class="info-lbl">Registered</span><span class="info-val">${u.created||'—'}</span></div>
       <div class="sec-title">// Assigned Sections</div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;padding:4px 0;">${secHtml}</div>
+      <div style="padding:4px 0;">${secAccordionHtml}</div>
     </div>`;
 
-  // ── UPDATE TAB (photo upload + all fields including sections) ──
+  // ── UPDATE TAB: photo upload + all fields + editable section checkboxes ──
   const roleOpts  = ['teacher','admin'].map(v=>`<option value="${v}" ${u.role===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
   const stOpts    = ['approved','pending','rejected'].map(v=>`<option value="${v}" ${st===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
 
@@ -322,7 +319,6 @@ function openFaModal(u) {
     : `<span style="font-size:20px;font-weight:700;color:#000;">${u.name[0].toUpperCase()}</span>`;
 
   document.getElementById('faEditContent').innerHTML = `
-    <!-- Photo upload — only available in Update tab -->
     <div class="photo-upload-block">
       <div class="photo-av" id="faEditAvatar" onclick="document.getElementById('faPhotoInput').click()" title="Click to change photo" style="cursor:pointer;">${editPhotoInner}</div>
       <div>
@@ -415,7 +411,6 @@ function closeFaModal() {
   curFaUser = null;
 }
 
-/* ── Photo upload (only from Update tab) ── */
 function uploadFaPhoto(input) {
   if (!input.files || !input.files[0] || !curFaUser) return;
   const fd = new FormData();
@@ -426,10 +421,8 @@ function uploadFaPhoto(input) {
     .then(d => {
       if (d.ok) {
         const url = d.url + '?t=' + Date.now();
-        // Update Edit tab avatar
         const editAv = document.getElementById('faEditAvatar');
         if (editAv) { editAv.innerHTML = ''; editAv.style.overflow='hidden'; const img=document.createElement('img'); img.src=url; img.style='width:100%;height:100%;object-fit:cover;border-radius:50%;'; editAv.appendChild(img); }
-        // Update Info tab avatar
         const infoAv = document.getElementById('faInfoAvatar');
         if (infoAv) { if (infoAv.tagName==='IMG') { infoAv.src=url; } else { const img=document.createElement('img'); img.src=url; img.style='width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);flex-shrink:0;'; infoAv.parentNode.replaceChild(img, infoAv); img.id='faInfoAvatar'; } }
         curFaUser.photo = d.filename;
@@ -438,7 +431,6 @@ function uploadFaPhoto(input) {
   input.value = '';
 }
 
-/* ── Save (Update tab) ── */
 function saveFaculty() {
   if (!curFaUser) return;
   const v1 = validateFaField(document.getElementById('fa_name'),     'fa_name_err',  'required');
@@ -483,7 +475,6 @@ function saveFaculty() {
   });
 }
 
-/* ── Action helpers ── */
 function setActionBtnsDisabled(disabled) {
   ['btnApprove','btnReject','btnRestore','btnDelete'].forEach(id => { const el=document.getElementById(id); if(el) el.disabled=disabled; });
 }
@@ -520,7 +511,6 @@ function doDelete()  {
   doAction('/admin/delete/' + encodeURIComponent(curFaUser.username), 'Account deleted.');
 }
 
-/* ── Validation ── */
 function validateFaField(input, errId, rule) {
   const err = document.getElementById(errId);
   let valid = true;

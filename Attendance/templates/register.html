@@ -22,12 +22,16 @@
   .step-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
   .step-num{width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   [data-theme="dark"] .step-num{color:#000;}.sep{color:var(--border);font-size:14px;}
+
+  /* === SUBJECTS PREVIEW (shown after PDF parse, not saved yet) === */
   .subj-preview{display:none;grid-column:1/-1;}.subj-preview.show{display:block;}
-  .subj-preview-inner{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:12px 14px;max-height:200px;overflow-y:auto;}
+  .subj-preview-inner{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:12px 14px;max-height:220px;overflow-y:auto;}
+  .subj-notice{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--warning);margin-bottom:8px;display:flex;align-items:flex-start;gap:7px;}
   .subj-table{width:100%;border-collapse:collapse;font-size:12px;}
   .subj-table th{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;}
   .subj-table td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;}
   .subj-table tr:last-child td{border-bottom:none;}
+
   .scan-strip{background:rgba(45,106,39,.04);border:2px dashed rgba(45,106,39,.2);border-radius:12px;padding:16px;transition:all .3s;cursor:pointer;}
   .scan-strip:hover{border-color:rgba(45,106,39,.4);}.scan-strip.scanning{border-color:var(--accent);animation:borderPulse 1.5s infinite;}
   .scan-strip.captured{border-color:var(--success);border-style:solid;background:rgba(45,106,39,.05);}
@@ -61,7 +65,7 @@
   <div class="sep">·</div>
   <div class="step-chip"><div class="step-num">3</div><span>Scan NFC card</span></div>
   <div class="sep">·</div>
-  <div class="step-chip"><div class="step-num">4</div><span>Click Register</span></div>
+  <div class="step-chip"><div class="step-num">4</div><span>Click Register to save</span></div>
   <span style="margin-left:auto;font-size:12px;color:var(--muted);"><span style="color:var(--danger);font-weight:700;">*</span> = Required</span>
 </div>
 
@@ -72,7 +76,7 @@
   <div class="ub-icon" id="ubIcon">📄</div>
   <div class="ub-text">
     <div class="ub-title" id="ubTitle">Auto-fill from CvSU Registration PDF</div>
-    <div class="ub-sub" id="ubSub">Drop a PDF here or click Upload</div>
+    <div class="ub-sub" id="ubSub">Drop a PDF here or click Upload — subjects will be saved only when you click Register</div>
   </div>
   <button type="button" class="btn-upload" onclick="document.getElementById('pdfFileInput').click()" id="btnUpload">
     <i class="bi bi-cloud-upload"></i> Upload PDF
@@ -80,7 +84,12 @@
   <input type="file" id="pdfFileInput" accept=".pdf" style="display:none;" onchange="handlePdfUpload(this)">
 </div>
 
+<!-- Subject preview — shown after PDF parse, NOT yet saved to DB -->
 <div class="subj-preview" id="subjPreview">
+  <div class="subj-notice">
+    <i class="bi bi-info-circle" style="flex-shrink:0;margin-top:1px;"></i>
+    <span>These subjects will be added to the catalogue only when you click <strong>Register Student on Blockchain</strong>.</span>
+  </div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
     <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;">// SUBJECTS FOUND IN PDF</span>
     <span style="font-size:11px;color:var(--muted);" id="subjPreviewNote"></span>
@@ -90,8 +99,11 @@
 
 <div class="form-card">
   <form method="POST" action="{{ url_for('register') }}" id="registerForm" enctype="multipart/form-data" onsubmit="return validateRegisterForm()">
-    <div class="full-form">
 
+    <!-- Hidden field: pending subjects from PDF (JSON) — saved to DB on submit -->
+    <input type="hidden" name="pending_subjects_json" id="pendingSubjectsJson" value="[]"/>
+
+    <div class="full-form">
       <div class="fsec">// Enrollment Details</div>
       <div class="field-wrap">
         <label class="form-label">Semester <span style="color:var(--danger)">*</span></label>
@@ -144,8 +156,6 @@
       </div>
 
       <div class="fsec" style="margin-top:6px;">// Academic Information</div>
-
-      <!-- FIX #1: Only two programs -->
       <div class="field-wrap">
         <label class="form-label">Program <span style="color:var(--danger)">*</span></label>
         <select class="form-control" name="course" id="f_course" required>
@@ -154,12 +164,10 @@
           <option value="BS Information Technology">BS Information Technology</option>
         </select>
       </div>
-
       <div class="field-wrap">
         <label class="form-label">Major / Specialization</label>
         <input type="text" class="form-control" name="major" id="f_major" placeholder="e.g. Software Engineering" value="N/A"/>
       </div>
-
       <div class="field-wrap">
         <label class="form-label">Year Level <span style="color:var(--danger)">*</span></label>
         <select class="form-control" name="year_level" id="f_year_level" required>
@@ -170,7 +178,6 @@
           <option value="4th Year">4th Year</option>
         </select>
       </div>
-
       <div class="field-wrap">
         <label class="form-label">Section <span style="color:var(--danger)">*</span></label>
         <select class="form-control" name="section" id="f_section" required>
@@ -181,7 +188,6 @@
           <option value="D">D</option>
         </select>
       </div>
-
       <div class="field-wrap span-2">
         <label class="form-label">Adviser Name <span style="color:var(--danger)">*</span></label>
         <input type="text" class="form-control" name="adviser" id="f_adviser"
@@ -217,14 +223,18 @@
         <button type="submit" class="btn-primary"><i class="bi bi-check-circle"></i> Register Student on Blockchain</button>
         <a href="{{ url_for('index') }}" class="btn-outline">Cancel</a>
       </div>
-
     </div>
   </form>
 </div>
 
 <script>
+// Pending subjects from PDF — stored in memory, NOT yet in DB
+// Only saved to DB when the register form is submitted
+let _pendingSubjects = [];
+
 function handleDrop(e){e.preventDefault();document.getElementById('uploadBanner').classList.remove('dragover');const file=e.dataTransfer.files[0];if(file&&file.type==='application/pdf')processPdf(file);else showBannerError('Please drop a PDF file.');}
 function handlePdfUpload(input){if(input.files&&input.files[0])processPdf(input.files[0]);}
+
 function processPdf(file){
   document.getElementById('uploadBanner').className='upload-banner loading';
   document.getElementById('ubIcon').textContent='⏳';document.getElementById('ubTitle').textContent='Reading PDF…';document.getElementById('ubSub').textContent='Extracting from '+file.name;
@@ -232,9 +242,20 @@ function processPdf(file){
   const fd=new FormData();fd.append('file',file);
   fetch('/parse_registration_pdf',{method:'POST',credentials:'same-origin',body:fd})
     .then(r=>{if(!r.ok&&r.status===302)throw new Error('Session expired.');const ct=r.headers.get('content-type')||'';if(!ct.includes('application/json'))throw new Error('Server error ('+r.status+').');return r.json();})
-    .then(data=>{if(data.error){showBannerError(data.error);return;}autofill(data);showBannerSuccess(file.name,data.added_to_catalogue||[]);if(data.subjects&&data.subjects.length)showSubjectPreview(data.subjects,data.added_to_catalogue||[]);})
+    .then(data=>{
+      if(data.error){showBannerError(data.error);return;}
+      autofill(data);
+      showBannerSuccess(file.name);
+      if(data.subjects&&data.subjects.length){
+        // Store in memory — NOT saved to DB yet
+        _pendingSubjects = data.subjects;
+        document.getElementById('pendingSubjectsJson').value = JSON.stringify(_pendingSubjects);
+        showSubjectPreview(data.subjects);
+      }
+    })
     .catch(err=>showBannerError('Error: '+err.message));
 }
+
 function autofill(d){
   const map={f_student_id:d.student_id,f_name:d.name,f_email:d.email,f_contact:d.contact,f_section:d.section,f_adviser:d.adviser,f_major:d.major,f_school_year:d.school_year,f_date_registered:d.date_registered};
   for(const [id,val] of Object.entries(map)){const el=document.getElementById(id);if(el&&val){el.value=val;highlight(el);}}
@@ -242,15 +263,27 @@ function autofill(d){
   if(d.course){const sel=document.getElementById('f_course');const allowed=['BS Computer Science','BS Information Technology'];const match=allowed.find(c=>c.toLowerCase()===d.course.toLowerCase()||d.course.toLowerCase().includes(c.replace('BS ','').toLowerCase()));if(match){sel.value=match;highlight(sel);}}
   if(d.year_level){const sel=document.getElementById('f_year_level');for(const opt of sel.options){if(opt.value.toLowerCase()===d.year_level.toLowerCase()){sel.value=opt.value;highlight(sel);break;}}}
 }
+
 function highlight(el){el.style.transition='box-shadow .3s,border-color .3s';el.style.borderColor='var(--success)';el.style.boxShadow='0 0 0 3px rgba(45,106,39,.15)';setTimeout(()=>{el.style.borderColor='';el.style.boxShadow='';},2000);}
-function showBannerSuccess(filename,added){document.getElementById('uploadBanner').className='upload-banner success';document.getElementById('ubIcon').textContent='✅';document.getElementById('ubTitle').textContent='Filled from: '+filename;document.getElementById('ubSub').textContent=added.length?added.length+' new subject(s) added':'All fields populated';const btn=document.getElementById('btnUpload');btn.disabled=false;btn.innerHTML='<i class="bi bi-arrow-repeat"></i> Re-upload';}
+
+function showBannerSuccess(filename){
+  document.getElementById('uploadBanner').className='upload-banner success';
+  document.getElementById('ubIcon').textContent='✅';
+  document.getElementById('ubTitle').textContent='Filled from: '+filename;
+  document.getElementById('ubSub').textContent='Fields auto-populated. Subjects will be saved when you click Register.';
+  const btn=document.getElementById('btnUpload');btn.disabled=false;btn.innerHTML='<i class="bi bi-arrow-repeat"></i> Re-upload';
+}
+
 function showBannerError(msg){document.getElementById('uploadBanner').className='upload-banner error';document.getElementById('ubIcon').textContent='❌';document.getElementById('ubTitle').textContent='Could not read PDF';document.getElementById('ubSub').textContent=msg;const btn=document.getElementById('btnUpload');btn.disabled=false;btn.innerHTML='<i class="bi bi-cloud-upload"></i> Try Again';}
-function showSubjectPreview(subjects,addedCodes){
-  const addedSet=new Set(addedCodes.map(c=>c.toUpperCase()));
-  document.getElementById('subjPreviewNote').textContent=subjects.length+' subject(s) · '+addedCodes.length+' new';
-  document.getElementById('subjPreviewList').innerHTML='<table class="subj-table"><thead><tr><th>Code</th><th>Subject Name</th><th>Units</th><th>Status</th></tr></thead><tbody>'+subjects.map(s=>{const isNew=addedSet.has(s.course_code.toUpperCase());return'<tr><td><code>'+s.course_code+'</code></td><td>'+s.name+'</td><td style="color:var(--muted);">'+s.units+'</td><td style="color:'+(isNew?'var(--success)':'var(--muted)')+';">'+(isNew?'<i class="bi bi-plus-circle"></i> Added':'<i class="bi bi-check-circle"></i> Exists')+'</td></tr>';}).join('')+'</tbody></table>';
+
+function showSubjectPreview(subjects){
+  document.getElementById('subjPreviewNote').textContent=subjects.length+' subject(s) will be added on Register';
+  document.getElementById('subjPreviewList').innerHTML='<table class="subj-table"><thead><tr><th>Code</th><th>Subject Name</th><th>Units</th><th>Status</th></tr></thead><tbody>'+subjects.map(s=>{
+    return '<tr><td><code>'+s.course_code+'</code></td><td>'+s.name+'</td><td style="color:var(--muted);">'+s.units+'</td><td style="color:var(--warning);"><i class="bi bi-clock"></i> Pending register</td></tr>';
+  }).join('')+'</tbody></table>';
   document.getElementById('subjPreview').classList.add('show');
 }
+
 function scanNFC(){
   const btn=document.getElementById('scanBtn'),area=document.getElementById('scanArea'),emoji=document.getElementById('scanEmoji'),title=document.getElementById('scanTitle'),desc=document.getElementById('scanDesc'),status=document.getElementById('scanStatus');
   btn.disabled=true;btn.innerHTML='<i class="bi bi-hourglass-split"></i> Scanning…';area.className='scan-strip scanning';emoji.textContent='⏳';title.textContent='Waiting for card…';desc.textContent='Hold your NFC card near the reader now';

@@ -50,12 +50,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def hash_password(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
 
-# ── SECTION KEY NORMALIZER ────────────────────────────────────────────────────
-# FIX #1, #2, #3: Normalize all section keys to consistent format
-# "BS Computer Science|1st Year|A" — no extra spaces, consistent casing
-
 def normalize_section_key(key):
-    """Normalize a section key to consistent format: 'Course|Year Level|Section'"""
     if not key:
         return key
     parts = [p.strip() for p in key.split('|')]
@@ -63,7 +58,6 @@ def normalize_section_key(key):
         course    = parts[0].strip()
         year      = parts[1].strip()
         section   = parts[2].strip().upper()
-        # Normalize year level format
         year_map = {
             '1': '1st Year', '2': '2nd Year', '3': '3rd Year', '4': '4th Year', '5': '5th Year',
             '1st': '1st Year', '2nd': '2nd Year', '3rd': '3rd Year', '4th': '4th Year',
@@ -75,15 +69,12 @@ def normalize_section_key(key):
     return key
 
 def build_student_section_key(student):
-    """Build normalized section key from student data."""
     course     = (student.get('course') or '').strip()
     year_level = (student.get('year_level') or '').strip()
     section    = (student.get('section') or '').strip().upper()
     if not course or not year_level or not section:
         return None
     return normalize_section_key(f"{course}|{year_level}|{section}")
-
-# ── SQLite ────────────────────────────────────────────────────────────────────
 
 def get_db():
     conn = sqlite3.connect(DB_FILE)
@@ -93,16 +84,6 @@ def get_db():
     return conn
 
 def init_db():
-    """
-    DAVS Database Schema — clean separation of concerns:
-      accounts        — system users (admin + teachers). Mutable, SQLite only.
-      subjects        — subject catalogue. Mutable, SQLite only.
-      students        — enrolled students. Mirror of blockchain + profile data.
-      sessions        — classroom session containers. Operational, SQLite only.
-      attendance_logs — one row per tap per session. Mirror of blockchain tx.
-      photos          — profile/student photo filenames.
-      nfc_scanner     — single-row NFC scan state machine.
-    """
     sql = """
     CREATE TABLE IF NOT EXISTS accounts (
         username        TEXT PRIMARY KEY,
@@ -116,7 +97,6 @@ def init_db():
         created_at      TEXT NOT NULL DEFAULT '',
         updated_at      TEXT NOT NULL DEFAULT ''
     );
-
     CREATE TABLE IF NOT EXISTS subjects (
         subject_id  TEXT PRIMARY KEY,
         name        TEXT NOT NULL,
@@ -126,7 +106,6 @@ def init_db():
         created_at  TEXT NOT NULL DEFAULT ''
     );
     CREATE INDEX IF NOT EXISTS idx_subj_code ON subjects(course_code);
-
     CREATE TABLE IF NOT EXISTS students (
         nfc_id          TEXT PRIMARY KEY,
         full_name       TEXT NOT NULL DEFAULT '',
@@ -149,8 +128,6 @@ def init_db():
         created_at      TEXT NOT NULL DEFAULT '',
         updated_at      TEXT NOT NULL DEFAULT ''
     );
-    -- indexes for students created after migration in _migrate_add_missing_columns
-
     CREATE TABLE IF NOT EXISTS sessions (
         sess_id         TEXT PRIMARY KEY,
         subject_id      TEXT NOT NULL DEFAULT '',
@@ -174,8 +151,6 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_sess_ended   ON sessions(ended_at);
     CREATE INDEX IF NOT EXISTS idx_sess_section ON sessions(section_key);
-    -- idx_sess_teacher created after migration in _migrate_add_missing_columns
-
     CREATE TABLE IF NOT EXISTS attendance_logs (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
         sess_id      TEXT NOT NULL,
@@ -193,13 +168,11 @@ def init_db():
     CREATE INDEX IF NOT EXISTS idx_att_sess  ON attendance_logs(sess_id);
     CREATE INDEX IF NOT EXISTS idx_att_nfc   ON attendance_logs(nfc_id);
     CREATE INDEX IF NOT EXISTS idx_att_status ON attendance_logs(status);
-
     CREATE TABLE IF NOT EXISTS photos (
         person_id   TEXT PRIMARY KEY,
         filename    TEXT NOT NULL,
         uploaded_at TEXT NOT NULL DEFAULT ''
     );
-
     CREATE TABLE IF NOT EXISTS nfc_scanner (
         id           INTEGER PRIMARY KEY CHECK (id = 1),
         waiting      INTEGER NOT NULL DEFAULT 0,
@@ -208,8 +181,6 @@ def init_db():
         requested_at TEXT NOT NULL DEFAULT ''
     );
     INSERT OR IGNORE INTO nfc_scanner (id, waiting, scanned_uid) VALUES (1, 0, '');
-
-    -- Keep legacy tables as views/aliases so old code still works during migration
     CREATE TABLE IF NOT EXISTS users (
         username TEXT PRIMARY KEY, password TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'teacher', full_name TEXT NOT NULL DEFAULT '',
@@ -238,23 +209,13 @@ def init_db():
     """
     with get_db() as conn:
         conn.executescript(sql)
-
-    # Run column migrations for existing tables
     _migrate_add_missing_columns()
-    # Migrate accounts: sync users -> accounts
     _migrate_users_to_accounts()
-    # Migrate nfc_registration -> nfc_scanner
     _migrate_nfc_registration()
     print("[DB] Schema ready ->", DB_FILE)
 
 def _migrate_add_missing_columns():
-    """
-    Add any missing columns to existing tables.
-    SQLite does not support DROP COLUMN or RENAME COLUMN in older versions,
-    so we add new columns and copy data from old ones.
-    """
     migrations = [
-        # (table, new_column, type_default)
         ("students", "program",         "TEXT NOT NULL DEFAULT ''"),
         ("students", "full_name",       "TEXT NOT NULL DEFAULT ''"),
         ("students", "reg_tx_hash",     "TEXT NOT NULL DEFAULT ''"),
@@ -272,53 +233,37 @@ def _migrate_add_missing_columns():
         ("accounts", "updated_at",      "TEXT NOT NULL DEFAULT ''"),
         ("photos",   "uploaded_at",     "TEXT NOT NULL DEFAULT ''"),
     ]
-
     with get_db() as conn:
         for table, col, col_def in migrations:
             try:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
                 print(f"[MIGRATION] Added {table}.{col}")
             except Exception:
-                pass  # Column already exists — that's fine
-
-        # Copy data from old column names to new ones
-        # students: course -> program
+                pass
         try:
             existing = [r[1] for r in conn.execute("PRAGMA table_info(students)").fetchall()]
             if 'course' in existing and 'program' in existing:
                 conn.execute("UPDATE students SET program = course WHERE program = '' AND course != ''")
-                print("[MIGRATION] Copied students.course -> students.program")
         except Exception as e:
             print(f"[MIGRATION] course->program copy: {e}")
-
-        # students: name -> full_name  
         try:
             existing = [r[1] for r in conn.execute("PRAGMA table_info(students)").fetchall()]
             if 'name' in existing and 'full_name' in existing:
                 conn.execute("UPDATE students SET full_name = name WHERE full_name = '' AND name != ''")
-                print("[MIGRATION] Copied students.name -> students.full_name")
         except Exception as e:
             print(f"[MIGRATION] name->full_name copy: {e}")
-
-        # students: tx_hash -> reg_tx_hash
         try:
             existing = [r[1] for r in conn.execute("PRAGMA table_info(students)").fetchall()]
             if 'tx_hash' in existing and 'reg_tx_hash' in existing:
                 conn.execute("UPDATE students SET reg_tx_hash = tx_hash WHERE reg_tx_hash = '' AND tx_hash != ''")
-                print("[MIGRATION] Copied students.tx_hash -> students.reg_tx_hash")
         except Exception as e:
             print(f"[MIGRATION] tx_hash->reg_tx_hash copy: {e}")
-
-        # sessions: teacher -> teacher_username
         try:
             existing = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
             if 'teacher' in existing and 'teacher_username' in existing:
                 conn.execute("UPDATE sessions SET teacher_username = teacher WHERE teacher_username = '' AND teacher != ''")
-                print("[MIGRATION] Copied sessions.teacher -> sessions.teacher_username")
         except Exception as e:
             print(f"[MIGRATION] teacher->teacher_username copy: {e}")
-
-        # Create indexes safely (IF NOT EXISTS)
         try:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_stu_program ON students(program)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_stu_section ON students(year_level, section)")
@@ -326,10 +271,7 @@ def _migrate_add_missing_columns():
         except Exception as e:
             print(f"[MIGRATION] Index creation: {e}")
 
-
-
 def _migrate_users_to_accounts():
-    """Copy any rows from legacy users table into accounts if not already there."""
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM users").fetchall()
         for r in rows:
@@ -346,7 +288,6 @@ def _migrate_users_to_accounts():
             )
 
 def _migrate_nfc_registration():
-    """Copy nfc_registration state into nfc_scanner if newer."""
     with get_db() as conn:
         row = conn.execute("SELECT * FROM nfc_registration WHERE id=1").fetchone()
         if row:
@@ -357,12 +298,9 @@ def _migrate_nfc_registration():
                  row['requested_by'], row['requested_at'])
             )
 
-
 def _row_to_dict(row):
-    """Legacy row converter — handles both old JSON-blob schema and new clean schema."""
     if row is None: return None
     d = dict(row)
-    # Handle old JSON columns if present (migration compatibility)
     for col in ('present_json','late_json','excused_json','warned_json','absent_json',
                 'tap_log_json','warn_log_json','invalid_log_json'):
         key = col.replace('_json','')
@@ -372,19 +310,15 @@ def _row_to_dict(row):
             d[key] = []
     d['excuse_notes'] = json.loads(d.pop('excuse_notes_json','{}') or '{}') if 'excuse_notes_json' in d else {}
     d['tx_hashes']    = json.loads(d.pop('tx_hashes_json',   '{}') or '{}') if 'tx_hashes_json'    in d else {}
-    # Rename teacher_username -> teacher for backward compat
     if 'teacher_username' in d and 'teacher' not in d:
         d['teacher'] = d.pop('teacher_username')
     elif 'teacher_username' in d:
         d.pop('teacher_username')
-    # Normalize section_key on read
     if d.get('section_key'):
         d['section_key'] = normalize_section_key(d['section_key'])
     return d
 
 def load_sessions():
-    """Load all sessions from SQLite. Reconstructs present/late/absent/excused
-    lists from attendance_logs for backward compatibility with old code."""
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM sessions").fetchall()
         result = {}
@@ -400,16 +334,11 @@ def load_session(sess_id):
         return _session_row_with_logs(conn, row)
 
 def _session_row_with_logs(conn, row):
-    """Convert a sessions row + its attendance_logs into the dict format
-    that the rest of the code expects (with present/late/absent lists)."""
     d = dict(row)
-    # Rename teacher_username -> teacher for backward compat
     if 'teacher_username' in d:
         d['teacher'] = d.pop('teacher_username')
-    # Normalize section_key
     if d.get('section_key'):
         d['section_key'] = normalize_section_key(d['section_key'])
-    # Load attendance from logs table
     logs = conn.execute(
         "SELECT * FROM attendance_logs WHERE sess_id=?", (d['sess_id'],)
     ).fetchall()
@@ -446,10 +375,9 @@ def _session_row_with_logs(conn, row):
     return d
 
 def save_session(sess_id, s):
-    """Save session metadata to sessions table.
-    Individual attendance records are saved separately via db_save_attendance_log.
-    Also writes to legacy sessions table for backward compatibility."""
-    sk = normalize_section_key(s.get('section_key',''))
+    sk = normalize_section_key(s.get('section_key', ''))
+    teacher_uname = s.get('teacher_username') or s.get('teacher') or ''
+    teacher_name  = s.get('teacher_name', '')
     with get_db() as conn:
         conn.execute(
             "INSERT INTO sessions "
@@ -467,13 +395,12 @@ def save_session(sess_id, s):
             "ended_at=excluded.ended_at, "
             "warn_log_json=excluded.warn_log_json, "
             "invalid_log_json=excluded.invalid_log_json",
-            (sess_id, s.get('subject_id',''), s.get('subject_name',''),
-             s.get('course_code',''), s.get('units',3), s.get('time_slot',''),
-             sk, s.get('teacher',''), s.get('teacher_name',''),
-             s.get('started_at',''), s.get('late_cutoff',''), s.get('ended_at'),
-             json.dumps(s.get('warn_log',[])), json.dumps(s.get('invalid_log',[])))
+            (sess_id, s.get('subject_id', ''), s.get('subject_name', ''),
+             s.get('course_code', ''), s.get('units', 3), s.get('time_slot', ''),
+             sk, teacher_uname, teacher_name,
+             s.get('started_at', ''), s.get('late_cutoff', ''), s.get('ended_at'),
+             json.dumps(s.get('warn_log', [])), json.dumps(s.get('invalid_log', [])))
         )
-        # Recalculate totals from attendance_logs
         counts = conn.execute(
             "SELECT status, COUNT(*) as cnt FROM attendance_logs "
             "WHERE sess_id=? GROUP BY status", (sess_id,)
@@ -482,9 +409,9 @@ def save_session(sess_id, s):
         conn.execute(
             "UPDATE sessions SET total_present=?,total_late=?,total_absent=?,total_excused=? "
             "WHERE sess_id=?",
-            (totals.get('present',0)+totals.get('late',0),
-             totals.get('late',0), totals.get('absent',0),
-             totals.get('excused',0), sess_id)
+            (totals.get('present', 0) + totals.get('late', 0),
+             totals.get('late', 0), totals.get('absent', 0),
+             totals.get('excused', 0), sess_id)
         )
 
 def save_sessions(sessions_dict):
@@ -511,7 +438,6 @@ def migrate_json_to_sqlite():
                     os.rename(fpath, fpath + '.migrated')
             except Exception as e:
                 print(f"[DB] Migration warning for {fname}: {e}")
-
     if db_get_user('admin') is None:
         db_save_user('admin', {
             'username':'admin','password':hash_password('admin123'),'role':'admin',
@@ -520,15 +446,9 @@ def migrate_json_to_sqlite():
             'created_at':datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ACCOUNT HELPERS  (accounts table — all system users)
-# The legacy "users" table is kept in sync for backward compat.
-# ══════════════════════════════════════════════════════════════════════════════
-
 def _account_row(row):
     if row is None: return None
     d = dict(row)
-    # Normalize key names: password_hash -> password for compat
     if 'password_hash' in d:
         d['password'] = d.pop('password_hash')
     raw_sections     = json.loads(d.pop('sections_json',   '[]') or '[]')
@@ -536,7 +456,6 @@ def _account_row(row):
     d['sections']    = [normalize_section_key(s) for s in raw_sections]
     return d
 
-# Alias for old code that calls _user_row
 def _user_row(row):
     return _account_row(row)
 
@@ -570,7 +489,6 @@ def db_save_user(username, u):
              json.dumps(sections), json.dumps(u.get('my_subjects',[])),
              u.get('created_at', now), now)
         )
-        # Keep legacy users table in sync
         conn.execute(
             "INSERT INTO users "
             "(username,password,role,full_name,email,status,"
@@ -596,14 +514,9 @@ def db_pending_count():
     with get_db() as conn:
         return conn.execute("SELECT COUNT(*) FROM accounts WHERE status='pending'").fetchone()[0]
 
-# ══════════════════════════════════════════════════════════════════════════════
-# STUDENT HELPERS  (students table — mirror of blockchain enrollment)
-# ══════════════════════════════════════════════════════════════════════════════
-
 def _student_row(row):
     if row is None: return None
     d = dict(row)
-    # Normalise field names to match old code expectations
     d['nfcId']    = d.get('nfc_id', '')
     d['name']     = d.get('full_name', '')
     d['course']   = d.get('program', '')
@@ -613,7 +526,6 @@ def _student_row(row):
     return d
 
 def db_save_student(s):
-    """Insert or replace a student record."""
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     with get_db() as conn:
         conn.execute(
@@ -653,7 +565,6 @@ def db_save_student(s):
         )
 
 def db_get_all_students():
-    """Load all students from SQLite cache."""
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM students ORDER BY full_name").fetchall()
     return [_student_row(r) for r in rows]
@@ -667,14 +578,9 @@ def db_delete_student(nfc_id):
     with get_db() as conn:
         conn.execute("DELETE FROM students WHERE nfc_id=?", (nfc_id,))
 
-# ══════════════════════════════════════════════════════════════════════════════
-# ATTENDANCE LOG HELPERS  (attendance_logs — one row per tap per session)
-# ══════════════════════════════════════════════════════════════════════════════
-
 def db_save_attendance_log(sess_id, nfc_id, student_name, student_id,
                             status, tap_time, tx_hash='', block_number=0,
                             excuse_note=''):
-    """Upsert an attendance record. Called on every tap and on session end for absents."""
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     with get_db() as conn:
         conn.execute(
@@ -691,7 +597,6 @@ def db_save_attendance_log(sess_id, nfc_id, student_name, student_id,
         )
 
 def db_get_session_attendance(sess_id):
-    """Return all attendance rows for a session."""
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM attendance_logs WHERE sess_id=? ORDER BY tap_time",
@@ -700,7 +605,6 @@ def db_get_session_attendance(sess_id):
     return [dict(r) for r in rows]
 
 def db_update_session_totals(sess_id):
-    """Recalculate and store totals on the sessions row."""
     with get_db() as conn:
         counts = conn.execute(
             "SELECT status, COUNT(*) as cnt FROM attendance_logs "
@@ -715,10 +619,6 @@ def db_update_session_totals(sess_id):
              totals.get('absent',0),  totals.get('excused',0), sess_id)
         )
 
-# ══════════════════════════════════════════════════════════════════════════════
-# NFC SCANNER HELPERS  (nfc_scanner table)
-# ══════════════════════════════════════════════════════════════════════════════
-
 def nfc_is_waiting():
     with get_db() as conn:
         row = conn.execute("SELECT waiting FROM nfc_scanner WHERE id=1").fetchone()
@@ -732,7 +632,6 @@ def nfc_set_waiting(flag, requested_by=''):
             "requested_by=?, requested_at=? WHERE id=1",
             (1 if flag else 0, requested_by, now)
         )
-        # Keep legacy table in sync
         conn.execute(
             "UPDATE nfc_registration SET waiting=?, scanned_uid='', "
             "requested_by=?, requested_at=? WHERE id=1",
@@ -758,8 +657,6 @@ def nfc_clear():
             "UPDATE nfc_scanner SET waiting=0, scanned_uid='' WHERE id=1")
         conn.execute(
             "UPDATE nfc_registration SET waiting=0, scanned_uid='' WHERE id=1")
-
-# ── SUBJECT helpers ───────────────────────────────────────────────────────────
 
 def db_get_all_subjects():
     with get_db() as conn:
@@ -788,8 +685,6 @@ def db_delete_subject(subject_id):
     with get_db() as conn:
         conn.execute("DELETE FROM subjects WHERE subject_id=?", (subject_id,))
 
-# ── PHOTO helpers ─────────────────────────────────────────────────────────────
-
 def db_get_all_photos():
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM photos").fetchall()
@@ -812,32 +707,9 @@ def db_delete_photo(person_id):
     with get_db() as conn:
         conn.execute("DELETE FROM photos WHERE person_id=?", (person_id,))
 
-# ── STUDENT CACHE (SQLite fallback for when Hardhat is offline) ──────────────
-def db_save_student(s):
-    """Save or update a student record in SQLite."""
-    with get_db() as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO students "
-            "(nfc_id,name,student_id,course,year_level,section,adviser,email,"
-            " contact,major,semester,school_year,date_registered,raw_name,"
-            " eth_address,tx_hash,registered_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (s.get('nfcId',''), s.get('name',''), s.get('student_id',''),
-             s.get('course',''), s.get('year_level',''), s.get('section',''),
-             s.get('adviser',''), s.get('email',''), s.get('contact',''),
-             s.get('major',''), s.get('semester',''), s.get('school_year',''),
-             s.get('date_registered',''), s.get('raw_name',''),
-             s.get('address',''), s.get('tx_hash',''),
-             datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        )
-
-# duplicate db_get_all_students removed — see definition above
-
 def db_rename_photo_key(old_key, new_key):
     with get_db() as conn:
         conn.execute("UPDATE photos SET person_id=? WHERE person_id=?", (new_key, old_key))
-
-# ── STUDENT OVERRIDE helpers ──────────────────────────────────────────────────
 
 def db_get_override(nfc_id):
     with get_db() as conn:
@@ -866,64 +738,22 @@ def db_save_override(nfc_id, fields):
              fields.get('year_level',''), fields.get('section','').upper())
         )
 
-# ── NFC REGISTRATION MODE (DB-based, FIX #9) ─────────────────────────────────
-
-def nfc_set_waiting(username):
-    with get_db() as conn:
-        conn.execute(
-            "UPDATE nfc_registration SET waiting=1, scanned_uid='', requested_by=?, requested_at=? WHERE id=1",
-            (username, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        )
-
-def nfc_is_waiting():
-    with get_db() as conn:
-        row = conn.execute("SELECT waiting FROM nfc_scanner WHERE id=1").fetchone()
-    return bool(row and row['waiting'])
-
-def nfc_set_uid(uid):
-    with get_db() as conn:
-        conn.execute("UPDATE nfc_scanner SET waiting=0, scanned_uid=? WHERE id=1", (uid,))
-        conn.execute("UPDATE nfc_registration SET waiting=0, scanned_uid=? WHERE id=1", (uid,))
-
-def nfc_get_uid():
-    with get_db() as conn:
-        row = conn.execute("SELECT scanned_uid FROM nfc_scanner WHERE id=1").fetchone()
-    if row and row['scanned_uid']:
-        uid = row['scanned_uid']
-        with get_db() as conn:
-            conn.execute("UPDATE nfc_scanner SET scanned_uid='' WHERE id=1")
-            conn.execute("UPDATE nfc_registration SET scanned_uid='' WHERE id=1")
-        return uid
-    return None
-
-def nfc_clear():
-    with get_db() as conn:
-        conn.execute("UPDATE nfc_scanner SET waiting=0, scanned_uid='' WHERE id=1")
-        conn.execute("UPDATE nfc_registration SET waiting=0, scanned_uid='' WHERE id=1")
-
-def nfc_set_waiting(requested_by=''):
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    with get_db() as conn:
-        conn.execute("UPDATE nfc_scanner SET waiting=1, scanned_uid='', requested_by=?, requested_at=? WHERE id=1", (requested_by, now))
-        conn.execute("UPDATE nfc_registration SET waiting=1, scanned_uid='' WHERE id=1")
-
-# ── Startup ───────────────────────────────────────────────────────────────────
-
 def load_student_names():
-    # Try blockchain first
+    for s in db_get_all_students():
+        student_name_map[s['nfcId']] = s['name']
+    if student_name_map:
+        print(f"[INFO] Loaded {len(student_name_map)} student names from SQLite cache.")
     if BLOCKCHAIN_ONLINE and contract:
         try:
             ef = contract.events.StudentRegistered.create_filter(
                 from_block=0, to_block=web3.eth.block_number)
             for e in ef.get_all_entries():
-                student_name_map[e['args']['nfcId']] = e['args']['name'].split(' | ')[0]
-            return
+                nid  = e['args']['nfcId']
+                name = e['args']['name'].split(' | ')[0]
+                student_name_map[nid] = name
+            print(f"[INFO] Student names enriched from blockchain ({len(student_name_map)} total).")
         except Exception as ex:
             print(f"[WARNING] load_student_names blockchain error: {ex}")
-    # Fall back to SQLite cache
-    for s in db_get_all_students():
-        student_name_map[s['nfcId']] = s['name']
-    print(f"[INFO] Loaded {len(student_name_map)} student names from SQLite cache.")
 
 init_db()
 migrate_json_to_sqlite()
@@ -936,8 +766,6 @@ recent_attendance = deque(maxlen=50)
 DEPARTMENTS = {'DIT': {'label':'Department of Information Technology','courses':['BS Computer Science','BS Information Technology']}}
 YEAR_LEVELS  = ['1st Year','2nd Year','3rd Year','4th Year']
 SECTIONS     = ['A','B','C','D']
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def fmt_time(dt_str):
     if not dt_str: return '—'
@@ -996,13 +824,12 @@ def parse_student(raw):
     return r
 
 def get_all_students():
-    """
-    Load students from blockchain if Hardhat is online.
-    Falls back to SQLite cache automatically if blockchain is unreachable.
-    Always syncs blockchain data back to SQLite so the cache stays current.
-    """
     global BLOCKCHAIN_ONLINE
-    # Try blockchain first
+    if not BLOCKCHAIN_ONLINE and contract:
+        try:
+            BLOCKCHAIN_ONLINE = web3.is_connected()
+        except Exception:
+            BLOCKCHAIN_ONLINE = False
     if BLOCKCHAIN_ONLINE and contract:
         try:
             ef = contract.events.StudentRegistered.create_filter(
@@ -1032,16 +859,30 @@ def get_all_students():
                 if ov.get('section'):         s['section']         = ov['section'].upper()
                 s['section'] = s['section'].strip().upper()
                 students.append(s)
-                # Always sync to SQLite so cache is up to date
                 db_save_student(s)
             return students
         except Exception as _be:
             print(f"[WARNING] Blockchain unreachable: {_be} — falling back to SQLite cache.")
             BLOCKCHAIN_ONLINE = False
-    # Fallback: load from SQLite cache
     cached = db_get_all_students()
     if not cached:
         print("[WARNING] No students in SQLite cache and blockchain is offline.")
+        return []
+    for s in cached:
+        ov = db_get_override(s['nfcId'])
+        if ov.get('full_name'):       s['name']            = ov['full_name']
+        if ov.get('student_id'):      s['student_id']      = ov['student_id']
+        if ov.get('email'):           s['email']           = ov['email']
+        if ov.get('contact'):         s['contact']         = ov['contact']
+        if ov.get('adviser'):         s['adviser']         = ov['adviser']
+        if ov.get('major'):           s['major']           = ov['major']
+        if ov.get('semester'):        s['semester']        = ov['semester']
+        if ov.get('school_year'):     s['school_year']     = ov['school_year']
+        if ov.get('date_registered'): s['date_registered'] = ov['date_registered']
+        if ov.get('course'):          s['course']          = ov['course']
+        if ov.get('year_level'):      s['year_level']      = ov['year_level']
+        if ov.get('section'):         s['section']         = ov['section'].upper()
+        s['section'] = (s.get('section') or '').strip().upper()
     return cached
 
 def get_attendance_records(nfc_id):
@@ -1051,51 +892,38 @@ def get_attendance_records(nfc_id):
     except:
         return []
 
-# FIX #4: Calculate attendance rate from sessions, not raw blockchain taps
 def get_student_attendance_stats(nfc_id):
-    """
-    Calculate attendance stats from SQLite sessions — the real source of truth.
-    Returns dict with total, present, late, excused, absent, rate.
-    """
-    all_students = get_all_students()
-    student = next((s for s in all_students if s['nfcId'] == nfc_id), None)
-    if not student:
-        return {'total': 0, 'present': 0, 'late': 0, 'excused': 0, 'absent': 0, 'rate': 0}
-
-    student_key = build_student_section_key(student)
-    if not student_key:
-        return {'total': 0, 'present': 0, 'late': 0, 'excused': 0, 'absent': 0, 'rate': 0}
-
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM sessions WHERE ended_at IS NOT NULL AND section_key=?",
-            (student_key,)
+            "SELECT al.status FROM attendance_logs al "
+            "JOIN sessions s ON al.sess_id = s.sess_id "
+            "WHERE al.nfc_id=? AND s.ended_at IS NOT NULL",
+            (nfc_id,)
         ).fetchall()
-
     total = late = excused = present = absent = 0
     for row in rows:
-        s = _row_to_dict(row)
+        status = row['status']
         total += 1
-        if   nfc_id in s.get('excused', []): excused += 1
-        elif nfc_id in s.get('late',    []): late    += 1
-        elif nfc_id in s.get('present', []): present += 1
-        else:                                absent  += 1
-
+        if   status == 'excused': excused += 1
+        elif status == 'late':    late    += 1
+        elif status == 'present': present += 1
+        else:                     absent  += 1
     attended = present + late
     rate = round(attended / total * 100, 1) if total else 0
     return {'total': total, 'present': present + late, 'late': late,
             'excused': excused, 'absent': absent, 'rate': rate}
 
 def teacher_students(user):
-    allowed = set(user.get('sections', []))
-    # Normalize allowed sections
-    allowed = {normalize_section_key(s) for s in allowed}
-    result = []
-    for s in get_all_students():
-        key = build_student_section_key(s)
-        if key and key in allowed:
-            result.append(s)
-    return result
+    if not user: return []
+    allowed = {normalize_section_key(s) for s in user.get('sections', [])}
+    if not allowed:
+        return []
+    all_cached = db_get_all_students()
+    if all_cached:
+        return [s for s in all_cached
+                if build_student_section_key(s) in allowed]
+    return [s for s in get_all_students()
+            if build_student_section_key(s) in allowed]
 
 def get_active_sessions():
     with get_db() as conn:
@@ -1107,21 +935,18 @@ def get_active_sessions():
     return result
 
 def get_active_session_for_nfc(nfc_id):
-    """FIX #3: Use normalized section key matching to find active session."""
     all_students = get_all_students()
     student = next((s for s in all_students if s['nfcId'] == nfc_id), None)
     if not student: return None, None
-
     student_key = build_student_section_key(student)
     if not student_key: return None, None
-
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM sessions WHERE ended_at IS NULL AND section_key=?",
             (student_key,)
         ).fetchone()
     if row:
-        s = _row_to_dict(row)
+        s = _session_row_with_logs(get_db(), row)
         return row['sess_id'], s
     return None, None
 
@@ -1158,10 +983,8 @@ def signup():
         fullname = request.form['full_name'].strip()
         email    = request.form['email'].strip()
         role     = request.form['role']
-        # FIX #1: Normalize sections on signup
         raw_sections = request.form.getlist('sections')
         sections = [normalize_section_key(s) for s in raw_sections]
-
         if db_get_user(username):    flash('Username already taken.'); return redirect(url_for('signup'))
         if password != confirm:      flash('Passwords do not match.'); return redirect(url_for('signup'))
         if len(password) < 6:        flash('Password must be at least 6 characters.'); return redirect(url_for('signup'))
@@ -1192,6 +1015,41 @@ def index():
                            subjects_db=db_get_all_subjects(),
                            users_db=db_get_all_users())
 
+
+def _register_save_pending_subjects(req, sess):
+    import json as _json
+    from datetime import datetime as _dt
+    import uuid as _uuid
+    pending_raw = req.form.get('pending_subjects_json', '[]').strip()
+    try:
+        pending = _json.loads(pending_raw) if pending_raw else []
+    except Exception:
+        pending = []
+    if not pending:
+        return 0
+    all_existing = db_get_all_subjects()
+    existing_codes = {v.get('course_code', '').upper(): k for k, v in all_existing.items()}
+    saved_count = 0
+    for subj in pending:
+        code_upper = (subj.get('course_code') or '').upper().strip()
+        name_val   = (subj.get('name') or '').strip()
+        if not name_val:
+            continue
+        if code_upper and code_upper in existing_codes:
+            continue
+        new_id = str(_uuid.uuid4())[:8]
+        db_save_subject(new_id, {
+            'name':        name_val,
+            'course_code': subj.get('course_code', ''),
+            'units':       str(subj.get('units', '3')),
+            'created_by':  sess.get('username', 'admin'),
+            'created_at':  _dt.now().strftime('%Y-%m-%d %H:%M:%S'),
+        })
+        if code_upper:
+            existing_codes[code_upper] = new_id
+        saved_count += 1
+    return saved_count
+
 @app.route('/register', methods=['GET','POST'])
 @admin_required
 def register():
@@ -1206,46 +1064,51 @@ def register():
                 raw_date = d.strftime('%B %Y')
             except:
                 pass
-
-        # FIX #1: Normalize section to uppercase single letter on registration
         section_val = request.form.get('section','').strip().upper()
-
         for k,prefix in [('student_id','ID'),('course','Course'),('year_level','Year'),
                           ('adviser','Adviser'),('email','Email'),('contact','Tel'),
                           ('semester','Sem'),('school_year','SY')]:
             v = request.form.get(k,'').strip()
             if v: extras.append(f"{prefix}:{v}")
-
-        # Add normalized section
         if section_val: extras.append(f"Sec:{section_val}")
         if raw_date: extras.append(f"RegDate:{raw_date}")
         major = request.form.get('major','').strip() or 'N/A'
         extras.append(f"Major:{major}")
-
         on_chain = name + (' | ' + ' | '.join(extras) if extras else '')
-        pk = "0x" + secrets.token_hex(32)
+        pk   = "0x" + secrets.token_hex(32)
         addr = web3.eth.account.from_key(pk).address
-        try:
-            tx = contract.functions.registerStudent(addr,nfc_id,on_chain).transact({'from':admin_account})
-            receipt = web3.eth.wait_for_transaction_receipt(tx)
-            student_name_map[nfc_id] = name
-            # Save to SQLite cache immediately so student survives restarts
-            p = parse_student(on_chain)
-            db_save_student({
-                **p,
-                'nfcId': nfc_id, 'raw_name': on_chain,
-                'address': addr, 'tx_hash': receipt['transactionHash'].hex(),
-            })
-            photo_file = request.files.get('student_photo')
-            if photo_file and photo_file.filename:
-                ext = os.path.splitext(photo_file.filename)[1].lower()
-                if ext in ('.jpg','.jpeg','.png','.gif','.webp'):
-                    fname = f"photo_{nfc_id.replace(' ','_')}{ext}"
-                    photo_file.save(os.path.join(UPLOAD_FOLDER, fname))
-                    db_save_photo(nfc_id, fname)
-            flash(f'Student {name} registered successfully.')
-        except Exception as e:
-            flash('NFC ID already registered.' if 'already' in str(e).lower() else f'Error: {e}')
+        p = parse_student(on_chain)
+        student_name_map[nfc_id] = name
+        db_save_student({**p, 'nfcId': nfc_id, 'raw_name': on_chain,
+                         'address': addr, 'tx_hash': ''})
+        photo_file = request.files.get('student_photo')
+        if photo_file and photo_file.filename:
+            ext = os.path.splitext(photo_file.filename)[1].lower()
+            if ext in ('.jpg','.jpeg','.png','.gif','.webp'):
+                fname = f"photo_{nfc_id.replace(' ','_')}{ext}"
+                photo_file.save(os.path.join(UPLOAD_FOLDER, fname))
+                db_save_photo(nfc_id, fname)
+        saved_subj = _register_save_pending_subjects(request, session)
+        if saved_subj:
+            print(f"[INFO] {saved_subj} subject(s) added to catalogue from registration.")
+        if BLOCKCHAIN_ONLINE and contract:
+            try:
+                tx = contract.functions.registerStudent(addr, nfc_id, on_chain).transact({'from': admin_account})
+                receipt = web3.eth.wait_for_transaction_receipt(tx)
+                tx_hash = receipt['transactionHash'].hex()
+                with get_db() as _conn:
+                    _conn.execute(
+                        "UPDATE students SET reg_tx_hash=?, eth_address=?, updated_at=? WHERE nfc_id=?",
+                        (tx_hash, addr, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), nfc_id))
+                flash(f'Student {name} registered successfully (blockchain confirmed).')
+            except Exception as e:
+                msg = str(e)
+                if 'already' in msg.lower():
+                    flash(f'Student {name} saved. Note: NFC already on blockchain.')
+                else:
+                    flash(f'Student {name} saved locally. Blockchain error: {e}')
+        else:
+            flash(f'Student {name} registered successfully (offline mode).')
         return redirect(url_for('index'))
     return render_template('register.html', subjects_db=db_get_all_subjects(), users_db=db_get_all_users())
 
@@ -1261,7 +1124,6 @@ def parse_registration_pdf():
     f = request.files['file']
     if not (f.filename or '').lower().endswith('.pdf'):
         return jsonify({'error': 'Only PDF files are supported'}), 400
-
     course_map = {
         'BSCS':'BS Computer Science','BSIT':'BS Information Technology',
         'BSIS':'BS Information Systems','BSCOE':'BS Computer Engineering',
@@ -1272,39 +1134,31 @@ def parse_registration_pdf():
     }
     year_map = {'1st':'1st Year','2nd':'2nd Year','3rd':'3rd Year',
                 '4th':'4th Year','5th':'5th Year'}
-
     result = {
         'student_id':'','name':'','course':'','year_level':'',
         'section':'','adviser':'','email':'','contact':'',
         'semester':'','school_year':'','date_registered':'','major':'',
         'subjects':[]
     }
-
     try:
         raw_bytes = f.read()
         if not raw_bytes:
             return jsonify({'error': 'Uploaded file is empty'}), 400
-
         text = pdf_extract_text(io.BytesIO(raw_bytes))
         if not text or not text.strip():
             return jsonify({'error': 'Could not extract text — PDF may be a scanned image'}), 400
-
         text  = re.sub(r'\t', ' ', text)
         text  = re.sub(r' +', ' ', text)
         lines = [l.strip() for l in text.split('\n') if l.strip()]
         full  = '\n'.join(lines)
-
         def grab(pattern):
             m = re.search(pattern, full, re.IGNORECASE)
             return m.group(1).strip() if m else ''
-
         result['student_id']  = grab(r'Student Number:\s*(\S+)')
         result['semester']    = grab(r'Semester:\s*([A-Za-z]+)').title()
         result['school_year'] = grab(r'School Year:\s*(\d{4}-\d{4})')
-        # FIX #1: Normalize section to uppercase single letter from PDF
         raw_section = grab(r'Section:\s*(\S+)')
         result['section'] = raw_section.strip().upper() if raw_section else ''
-
         m = re.search(r'Student Name:\s*(.+)', full)
         if m:
             raw_name = m.group(1).strip().upper()
@@ -1315,7 +1169,6 @@ def parse_registration_pdf():
                 last  = name_parts[-1].lower()
                 first = ''.join(p.lower() for p in name_parts[:-1])
                 result['email'] = f"sc.{first}.{last}@cvsu.edu.ph"
-
         m = re.search(r'Date:\s*(.+)', full)
         if m:
             _raw = m.group(1).strip().split('|')[0].strip()
@@ -1344,18 +1197,14 @@ def parse_registration_pdf():
                     except:
                         pass
             result['date_registered'] = _date_val or _raw
-
         m = re.search(r'Course:\s*(\S+)', full)
         if m: result['course'] = course_map.get(m.group(1).strip(), m.group(1).strip())
-
         m = re.search(r'(?<!School )Year:\s*(1st|2nd|3rd|4th|5th)', full)
         if m: result['year_level'] = year_map.get(m.group(1).strip(), m.group(1).strip())
-
         m = re.search(r'Major:\s*(.+)', full)
         if m:
             maj = m.group(1).strip()
             result['major'] = '' if maj.upper() in ('N/A','NA','') else maj
-
         hdr_m  = re.search(r'Units Lec Lab Hour', full)
         fees_m = re.search(r'Laboratory Fees', full)
         new_subjects = []
@@ -1374,26 +1223,8 @@ def parse_registration_pdf():
                 try: u_val = str(round(float(units_list[i])))
                 except: u_val = '3'
                 new_subjects.append({'course_code':course_codes[i],'name':descriptions[i].title(),'units':u_val})
-
         result['subjects'] = new_subjects
-
-        added_to_catalogue = []
-        all_s = db_get_all_subjects()
-        existing_codes = {v.get('course_code','').upper():k for k,v in all_s.items()}
-        for subj in new_subjects:
-            code_upper = subj['course_code'].upper()
-            if code_upper not in existing_codes:
-                new_id = str(uuid.uuid4())[:8]
-                db_save_subject(new_id, {
-                    'name':subj['name'],'course_code':subj['course_code'],
-                    'units':subj['units'],'created_by':session.get('username','admin'),
-                    'created_at':datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                })
-                existing_codes[code_upper] = new_id
-                added_to_catalogue.append(subj['course_code'])
-
-        return jsonify({**result, 'added_to_catalogue': added_to_catalogue})
-
+        return jsonify({**result, 'added_to_catalogue': []})
     except Exception as e:
         tb = traceback.format_exc()
         print(f"[parse_registration_pdf ERROR]\n{tb}")
@@ -1419,7 +1250,12 @@ def dashboard():
     students  = get_all_students()
     all_users = db_get_all_users()
     teachers  = {u:d for u,d in all_users.items() if d.get('role') in ('admin','teacher')}
-    return render_template('dashboard.html', students=students, teachers=teachers, fmt_time=fmt_time)
+    with get_db() as _conn:
+        _photo_rows = _conn.execute("SELECT person_id, filename FROM photos").fetchall()
+    photos_db = {r['person_id']: r['filename'] for r in _photo_rows}
+    return render_template('dashboard.html',
+        students=students, teachers=teachers,
+        photos_db=photos_db, fmt_time=fmt_time)
 
 @app.route('/upload_photo', methods=['POST'])
 @login_required
@@ -1475,14 +1311,12 @@ def update_profile():
         user['email'] = data['email'].strip()
     if data.get('password') and len(data['password']) >= 6:
         user['password'] = hash_password(data['password'])
-    # Handle username change
     new_username = (data.get('new_username') or '').strip().lower()
     if new_username and new_username != username:
         if db_get_user(new_username):
             return jsonify({'error': 'Username already taken'}), 409
         db_save_user(new_username, user)
         db_delete_user(username)
-        # Move photo key if exists
         try:
             photo = db_get_photo(username)
             if photo:
@@ -1512,7 +1346,6 @@ def delete_photo():
 @app.route('/reports')
 @admin_required
 def attendance_report():
-    # FIX #4: Use session-based stats instead of raw blockchain taps
     report = []
     for s in get_all_students():
         stats = get_student_attendance_stats(s['nfcId'])
@@ -1536,41 +1369,69 @@ def view_attendance(nfc_id):
 @app.route('/api/student_sessions/<nfc_id>')
 @login_required
 def student_sessions_api(nfc_id):
-    all_students    = get_all_students()
-    student         = next((x for x in all_students if x['nfcId']==nfc_id), None)
-    student_section = ''
-    if student:
-        student_section = build_student_section_key(student) or ''
-
-    with get_db() as _conn:
-        _all_rows = _conn.execute(
-            "SELECT * FROM sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC"
+    with get_db() as conn:
+        log_rows = conn.execute(
+            "SELECT al.nfc_id, al.status, al.tx_hash, al.block_number, "
+            "al.tap_time, al.excuse_note, "
+            "s.sess_id, s.subject_name, s.course_code, s.section_key, "
+            "s.teacher_name, s.time_slot, s.started_at "
+            "FROM attendance_logs al "
+            "JOIN sessions s ON al.sess_id = s.sess_id "
+            "WHERE al.nfc_id = ? "
+            "ORDER BY s.started_at DESC",
+            (nfc_id,)
         ).fetchall()
     result = []
-    for row in _all_rows:
-        s   = _row_to_dict(row)
-        sec = s.get('section_key','')
-        # FIX #3: Use normalized key comparison
-        if student_section and normalize_section_key(sec) != student_section: continue
-        status = None
-        if   nfc_id in s.get('excused', []): status = 'excused'
-        elif nfc_id in s.get('late',    []): status = 'late'
-        elif nfc_id in s.get('present', []): status = 'present'
-        elif student_section == normalize_section_key(sec): status = 'absent'
-        if not status: continue
-        tx_info = s.get('tx_hashes',{}).get(nfc_id,{})
+    seen_sessions = set()
+    for row in log_rows:
+        seen_sessions.add(row['sess_id'])
         result.append({
-            'subject_name': s.get('subject_name',''),
-            'course_code':  s.get('course_code',''),
-            'teacher_name': s.get('teacher_name',''),
-            'section_key':  sec,
-            'time_slot':    s.get('time_slot',''),
-            'date':         s.get('started_at','')[:10] if s.get('started_at') else '',
-            'started_at':   s.get('started_at',''),
-            'status':       status,
-            'tx_hash':      tx_info.get('tx_hash',''),
-            'block':        str(tx_info.get('block','')),
+            'subject_name': row['subject_name'] or '',
+            'course_code':  row['course_code']  or '',
+            'teacher_name': row['teacher_name'] or '',
+            'section_key':  row['section_key']  or '',
+            'time_slot':    row['time_slot']     or '',
+            'date':         (row['started_at'] or '')[:10],
+            'started_at':   row['started_at']   or '',
+            'status':       (row['status'] or 'absent').lower(),
+            'tap_time':     row['tap_time']      or '',
+            'tx_hash':      row['tx_hash']       or '',
+            'block':        str(row['block_number']) if row['block_number'] else '',
+            'excuse_note':  row['excuse_note']   or '',
         })
+    if not result:
+        all_students    = get_all_students()
+        student         = next((x for x in all_students if x['nfcId']==nfc_id), None)
+        student_section = build_student_section_key(student) if student else ''
+        with get_db() as conn:
+            sess_rows = conn.execute(
+                "SELECT * FROM sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC"
+            ).fetchall()
+        for row in sess_rows:
+            s   = _row_to_dict(row)
+            sec = normalize_section_key(s.get('section_key',''))
+            if student_section and sec != student_section: continue
+            if s.get('sess_id') in seen_sessions: continue
+            if   nfc_id in s.get('excused',[]): status = 'excused'
+            elif nfc_id in s.get('late',   []): status = 'late'
+            elif nfc_id in s.get('present',[]): status = 'present'
+            elif student_section == sec:        status = 'absent'
+            else: continue
+            tx_info = s.get('tx_hashes',{}).get(nfc_id,{})
+            result.append({
+                'subject_name': s.get('subject_name',''),
+                'course_code':  s.get('course_code',''),
+                'teacher_name': s.get('teacher_name',''),
+                'section_key':  s.get('section_key',''),
+                'time_slot':    s.get('time_slot',''),
+                'date':         (s.get('started_at','') or '')[:10],
+                'started_at':   s.get('started_at',''),
+                'status':       status,
+                'tap_time':     '',
+                'tx_hash':      tx_info.get('tx_hash',''),
+                'block':        str(tx_info.get('block','')),
+                'excuse_note':  '',
+            })
     result.sort(key=lambda x: x['date'], reverse=True)
     return jsonify(result)
 
@@ -1582,12 +1443,37 @@ def update_student():
     if not nfc_id: return jsonify({'error':'Missing nfc_id'}), 400
     fields = ['full_name','student_id','email','contact','adviser','major',
               'semester','school_year','date_registered','course','year_level','section']
-    override_data = {f: data.get(f,'').strip() for f in fields if data.get(f)}
-    # FIX #1: Normalize section to uppercase
-    if 'section' in override_data:
-        override_data['section'] = override_data['section'].upper()
-    db_save_override(nfc_id, override_data)
-    return jsonify({'ok':True})
+    update_data = {f: (data.get(f) or '').strip() for f in fields}
+    if update_data.get('section'):
+        update_data['section'] = update_data['section'].strip().upper()
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    set_parts = []
+    params    = []
+    db_col_map = {
+        'full_name':'full_name','student_id':'student_id','email':'email',
+        'contact':'contact','adviser':'adviser','major':'major',
+        'semester':'semester','school_year':'school_year',
+        'date_registered':'date_registered','course':'program',
+        'year_level':'year_level','section':'section',
+    }
+    for field, db_col in db_col_map.items():
+        val = update_data.get(field,'')
+        if val:
+            set_parts.append(f"{db_col}=?")
+            params.append(val)
+    if set_parts:
+        set_parts.append("updated_at=?")
+        params.append(now)
+        params.append(nfc_id)
+        with get_db() as conn:
+            conn.execute(
+                f"UPDATE students SET {', '.join(set_parts)} WHERE nfc_id=?",
+                params
+            )
+    override_data = {f: update_data[f] for f in fields if update_data.get(f)}
+    if override_data:
+        db_save_override(nfc_id, override_data)
+    return jsonify({'ok': True})
 
 @app.route('/update_faculty', methods=['POST'])
 @admin_required
@@ -1601,7 +1487,6 @@ def update_faculty():
     if data.get('role') in ('admin','teacher'): user['role'] = data['role']
     if data.get('status') in ('approved','pending','rejected'): user['status'] = data['status']
     if 'sections' in data and isinstance(data['sections'], list):
-        # FIX #1: Normalize sections on save
         user['sections'] = [normalize_section_key(s) for s in data['sections']]
     new_pw = (data.get('new_password') or '').strip()
     if new_pw:
@@ -1652,8 +1537,6 @@ def export_csv_single(nfc_id):
     return Response(out.getvalue(), mimetype='text/csv',
         headers={'Content-Disposition':f'attachment; filename=attendance_{nfc_id}.csv'})
 
-# ── ADMIN USER MANAGEMENT ─────────────────────────────────────────────────────
-
 @app.route('/admin/users')
 @admin_required
 def manage_users():
@@ -1688,8 +1571,6 @@ def delete_user(username):
     if user and username != 'admin':
         db_delete_user(username); flash(f'{user["full_name"]} deleted.')
     return redirect(url_for('manage_users'))
-
-# ── ADMIN SUBJECT MANAGEMENT ──────────────────────────────────────────────────
 
 @app.route('/admin/subjects')
 @admin_required
@@ -1770,10 +1651,8 @@ def admin_sessions():
     return render_template('admin_sessions.html', active=active, ended=ended,
                            subjects_db=db_get_all_subjects(), fmt_time=fmt_time)
 
-# ── TEACHER ───────────────────────────────────────────────────────────────────
-
 def _build_teacher_context(user):
-    """Shared helper: build sections + my_subjects for a teacher."""
+    if not user: return {}, [], []
     students = teacher_students(user)
     sections = {}
     for key in user.get('sections', []):
@@ -1801,9 +1680,7 @@ def _build_teacher_context(user):
                 active_sid = sess_id; break
         parts = skey.split('|')
         subj_info = all_subj[sid]
-        # Student count for this section
         sec_count = sections[skey]['count'] if skey in sections else 0
-        # Section label — build from parts if not in sections dict
         if skey in sections:
             sec_label = sections[skey]['label']
         else:
@@ -1826,71 +1703,54 @@ def _build_teacher_context(user):
 @app.route('/teacher')
 @login_required
 def teacher_dashboard():
-    """Teacher home page — overview stats, live sessions, quick actions."""
-    if session.get('role') == 'admin': return redirect(url_for('index'))
+    if session.get('role') == 'admin':
+        return redirect(url_for('index'))
     user = get_current_user()
+    if not user:
+        session.clear()
+        return redirect(url_for('login'))
     sections, my_subjects, _ = _build_teacher_context(user)
-
-    # Live sessions for this teacher
     live_sessions = {sid: s for sid, s in get_active_sessions().items()
-                     if s.get('teacher') == session['username']}
-
-    # Total completed sessions
+                     if s.get('teacher') == session['username']
+                     or s.get('teacher_name') == session.get('full_name')}
     with get_db() as conn:
         total_sessions = conn.execute(
-            "SELECT COUNT(*) FROM sessions WHERE teacher_username=? AND ended_at IS NOT NULL",
-            (session['username'],)
+            "SELECT COUNT(*) FROM sessions "
+            "WHERE (teacher_username=? OR teacher_name=?) AND ended_at IS NOT NULL",
+            (session['username'], session.get('full_name', ''))
         ).fetchone()[0]
-
-    # Total students across all sections
     all_teacher_students = teacher_students(user)
     total_students = len(all_teacher_students)
-
     return render_template('teacher_dashboard.html',
-        user=user,
-        sections=sections,
-        my_subjects=my_subjects,
-        live_sessions=live_sessions,
-        total_sessions=total_sessions,
-        total_students=total_students,
-        fmt_time=fmt_time,
-        fmt_time_short=fmt_time_short,
-    )
-
+        user=user, sections=sections, my_subjects=my_subjects,
+        live_sessions=live_sessions, total_sessions=total_sessions,
+        total_students=total_students, fmt_time=fmt_time, fmt_time_short=fmt_time_short)
 
 @app.route('/teacher/sessions-students')
 @login_required
 def teacher_sessions_students():
-    """Combined Sessions & Students page — separate from dashboard."""
-    if session.get('role') == 'admin': return redirect(url_for('index'))
+    if session.get('role') == 'admin':
+        return redirect(url_for('index'))
     user = get_current_user()
-
-    # All sessions for this teacher — load via _session_row_with_logs so
-    # attendance lists are rebuilt from attendance_logs table
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM sessions WHERE teacher_username=? ORDER BY started_at DESC",
-            (session['username'],)
+            "SELECT * FROM sessions "
+            "WHERE teacher_username=? OR teacher_name=? "
+            "ORDER BY started_at DESC",
+            (session['username'], session.get('full_name', ''))
         ).fetchall()
         sessions_data = {r['sess_id']: _session_row_with_logs(conn, r) for r in rows}
-
-    # Subject names for filter dropdown
     subjects = sorted(set(
-        s.get('subject_name', '') for s in sessions_data.values() if s.get('subject_name')
+        s.get('subject_name', '') for s in sessions_data.values()
+        if s.get('subject_name')
     ))
-
-    # Student standing data
     report = []
     for s in teacher_students(user):
         stats = get_student_attendance_stats(s['nfcId'])
         report.append({**s, **stats})
     students = sorted(report, key=lambda x: -x['rate'])
-
-    now_str = datetime.now().strftime('%Y')
-
     return render_template('teacher_sessions_students.html',
-        user=user,
-        sessions_data=sessions_data,
+        user=user, sessions_data=sessions_data,
         sessions_json={sid: {
             'subject_name': s.get('subject_name', ''),
             'course_code':  s.get('course_code', ''),
@@ -1904,18 +1764,15 @@ def teacher_sessions_students():
             'excused':      s.get('excused', []),
             'tx_hashes':    s.get('tx_hashes', {}),
         } for sid, s in sessions_data.items()},
-        subjects=subjects,
-        students=students,
-        now=now_str,
-        fmt_time=fmt_time,
-        fmt_time_short=fmt_time_short,
-    )
+        subjects=subjects, students=students,
+        now=str(datetime.now().year), fmt_time=fmt_time, fmt_time_short=fmt_time_short)
 
 @app.route('/teacher/create-session')
 @login_required
 def teacher_create_session():
     if session.get('role') == 'admin': return redirect(url_for('index'))
     user = get_current_user()
+    if not user: session.clear(); return redirect(url_for('login'))
     sections, my_subjects, all_subj = _build_teacher_context(user)
     return render_template('teacher_create_session.html', user=user, sections=sections,
                            my_subjects=my_subjects, subjects_db=all_subj)
@@ -1940,37 +1797,42 @@ def teacher_records():
 @app.route('/api/session_attendance/<sess_id>')
 @login_required
 def api_session_attendance(sess_id):
-    """Returns full attendance list from attendance_logs + enrolled students."""
     sess = load_session(sess_id)
     if sess is None:
         return jsonify({'error': 'Session not found'}), 404
-    if session.get('role') != 'admin' and sess.get('teacher') != session.get('username'):
+    if not _is_my_session(sess):
         return jsonify({'error': 'Access denied'}), 403
-
-    # Get logged taps from attendance_logs
     logs = db_get_session_attendance(sess_id)
     logs_by_nfc = {lg['nfc_id']: lg for lg in logs}
-
-    # Get all enrolled students for this section
-    all_students = get_all_students()
-    section_key  = normalize_section_key(sess.get('section_key', ''))
-    enrolled     = [s for s in all_students if build_student_section_key(s) == section_key]
-
+    section_key = normalize_section_key(sess.get('section_key', ''))
+    sk_parts    = section_key.split('|')
+    program     = sk_parts[0] if len(sk_parts) > 0 else ''
+    year_level  = sk_parts[1] if len(sk_parts) > 1 else ''
+    section_val = sk_parts[2] if len(sk_parts) > 2 else ''
+    with get_db() as _conn:
+        if program and year_level and section_val:
+            _rows = _conn.execute(
+                "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
+                (program, year_level, section_val)
+            ).fetchall()
+        else:
+            _rows = []
+    enrolled = [_student_row(r) for r in _rows]
+    if not enrolled:
+        all_students = get_all_students()
+        enrolled = [s for s in all_students if build_student_section_key(s) == section_key]
     students_out = []
     for s in sorted(enrolled, key=lambda x: x['name']):
         nid = s['nfcId']
         lg  = logs_by_nfc.get(nid)
         status = lg['status'] if lg else 'absent'
         students_out.append({
-            'nfc_id':     nid,
-            'name':       s['name'],
-            'student_id': s.get('student_id', ''),
-            'status':     status,
+            'nfc_id':     nid, 'name': s['name'],
+            'student_id': s.get('student_id', ''), 'status': status,
             'tx_hash':    lg['tx_hash']      if lg else '',
             'block':      str(lg['block_number']) if lg else '',
             'time':       lg['tap_time']     if lg else '',
         })
-
     return jsonify({
         'students':     students_out,
         'subject_name': sess.get('subject_name', ''),
@@ -1980,7 +1842,6 @@ def api_session_attendance(sess_id):
         'started_at':   sess.get('started_at', ''),
         'ended_at':     sess.get('ended_at', ''),
     })
-
 
 @app.route('/teacher/subjects/add', methods=['POST'])
 @login_required
@@ -2068,20 +1929,34 @@ def blockchain_status():
         'message': 'Blockchain online' if BLOCKCHAIN_ONLINE else f'Offline — {student_count} students loaded from cache'
     })
 
+def _is_my_session(sess):
+    """
+    Return True if the current logged-in user owns this session.
+    Checks both teacher_username (new) and teacher_name (fallback for old records),
+    so sessions created before the schema migration still work.
+    """
+    if session.get('role') == 'admin':
+        return True
+    username   = session.get('username', '')
+    full_name  = session.get('full_name', '')
+    # sess['teacher'] is set by _session_row_with_logs from teacher_username column
+    # sess['teacher_name'] is the display name column
+    teacher_u  = sess.get('teacher', '') or ''
+    teacher_n  = sess.get('teacher_name', '') or ''
+    return (teacher_u == username) or (teacher_n and teacher_n == full_name)
+
+
 @app.route('/teacher/session/<sess_id>')
 @login_required
 def live_session(sess_id):
     sess = load_session(sess_id)
     if sess is None: flash('Session not found.'); return redirect(url_for('teacher_dashboard'))
-    if session.get('role')!='admin' and sess.get('teacher')!=session['username']:
+    if not _is_my_session(sess):
         flash('Access denied.'); return redirect(url_for('teacher_dashboard'))
-
     all_students     = get_all_students()
     section_key      = sess.get('section_key','')
-    # FIX #1, #3: Use normalized key matching for enrolled students
     section_students = [s for s in all_students
                         if build_student_section_key(s) == normalize_section_key(section_key)]
-
     present_set  = set(sess.get('present',[]))
     late_set     = set(sess.get('late',[]))
     excused_set  = set(sess.get('excused',[]))
@@ -2093,7 +1968,6 @@ def live_session(sess_id):
         elif nid in present_set: status = 'present'
         else:                    status = 'absent'
         student_statuses.append({**s,'status':status})
-
     return render_template('session_live.html', sess=sess, sess_id=sess_id,
                            section_students=section_students,
                            student_statuses=student_statuses,
@@ -2108,9 +1982,8 @@ def live_session(sess_id):
 def end_session(sess_id):
     if sess_id not in sessions_db: flash('Session not found.'); return redirect(url_for('teacher_dashboard'))
     sess = sessions_db[sess_id]
-    if session.get('role')!='admin' and sess.get('teacher')!=session['username']:
+    if not _is_my_session(sess):
         flash('Access denied.'); return redirect(url_for('teacher_dashboard'))
-
     all_students     = get_all_students()
     section_key      = sess.get('section_key','')
     section_students = [s for s in all_students
@@ -2119,15 +1992,9 @@ def end_session(sess_id):
     excused_set = set(sess.get('excused', []))
     absent_list = [s['nfcId'] for s in section_students
                    if s['nfcId'] not in present_set and s['nfcId'] not in excused_set]
-
     ended_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    # Write absent/excused records to attendance_logs
-    # Also record a blockchain transaction for the session end as immutable proof
-    session_end_tx = None
-    session_end_block = None
     if BLOCKCHAIN_ONLINE and contract and admin_account:
         try:
-            # One blockchain tx per absent student as tamper-proof record
             for s in section_students:
                 nid = s['nfcId']
                 if nid not in present_set and nid not in excused_set:
@@ -2160,16 +2027,13 @@ def end_session(sess_id):
                     student_name=s.get('name',''), student_id=s.get('student_id',''),
                     status='absent', tap_time=ended_time
                 )
-    # Update total_enrolled on the session row
     with get_db() as conn:
         conn.execute("UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
                      (len(section_students), ended_time, sess_id))
-
     sess['absent']   = absent_list
     sess['ended_at'] = ended_time
     save_session(sess_id, sess)
     sessions_db[sess_id] = sess
-
     present_count = len([n for n in present_set if n not in sess.get('late',[])])
     late_count    = len(sess.get('late', []))
     flash(f'Session ended. {present_count} present, {late_count} late, {len(absent_list)} absent.')
@@ -2182,7 +2046,7 @@ def excuse_student(sess_id):
     note   = request.form.get('note','Excused').strip()
     sess   = load_session(sess_id)
     if sess is None: return jsonify({'error':'not found'}), 404
-    if session.get('role')!='admin' and sess.get('teacher')!=session['username']:
+    if not _is_my_session(sess):
         return jsonify({'error':'access denied'}), 403
     excused       = sess.setdefault('excused', [])
     excuse_notes  = sess.setdefault('excuse_notes', {})
@@ -2190,7 +2054,6 @@ def excuse_student(sess_id):
     if nfc_id in sess.get('absent', []):
         sess['absent'].remove(nfc_id)
     excuse_notes[nfc_id] = note
-    # Save to attendance_logs — also record on blockchain as tamper-proof excused record
     exc_tx = ''; exc_block = 0
     if BLOCKCHAIN_ONLINE and contract and admin_account:
         try:
@@ -2228,7 +2091,6 @@ def teacher_sessions():
 def teacher_reports():
     if session.get('role') == 'admin': return redirect(url_for('attendance_report'))
     user   = get_current_user()
-    # FIX #4: Use session-based stats for teacher reports
     report = []
     for s in teacher_students(user):
         stats = get_student_attendance_stats(s['nfcId'])
@@ -2255,8 +2117,6 @@ def teacher_export():
     return Response(out.getvalue(), mimetype='text/csv',
         headers={'Content-Disposition':f'attachment; filename=section_{datetime.now().strftime("%Y%m%d")}.csv'})
 
-# ── SHARED API ────────────────────────────────────────────────────────────────
-
 @app.route('/api/attendance/recent')
 @login_required
 def recent_attendance_api():
@@ -2271,24 +2131,88 @@ def recent_attendance_api():
 @app.route('/api/session/<sess_id>/poll')
 @login_required
 def poll_session(sess_id):
-    sess  = load_session(sess_id)
-    if sess is None: return jsonify({'error':'not found'}), 404
+    """
+    Poll for new taps.
+
+    KEY FIX: Uses server-side time (returned as 'server_time') so the frontend
+    never relies on the browser clock. Browser clocks can be ahead of the server
+    which caused taps to be permanently missed (since_dt > created_at → never found).
+
+    Tap detection uses attendance_logs.created_at (real DB timestamp) instead of
+    tap_log[].timestamp which is always 0 when loaded from DB.
+    """
     since = request.args.get('since', type=float, default=0)
-    new_taps     = [t for t in sess.get('tap_log',[])      if t.get('timestamp',0)>since]
-    new_warnings = [t for t in sess.get('warn_log',[])     if t.get('timestamp',0)>since]
-    new_invalids = [t for t in sess.get('invalid_log',[])  if t.get('timestamp',0)>since]
+    now_ts = time.time()  # server time — returned to client so they stay in sync
+
+    # Reload session from DB so present/late/excused lists are always fresh
+    sess = load_session(sess_id)
+    if sess is None:
+        return jsonify({'error': 'not found', 'active': False}), 404
+    sessions_db[sess_id] = sess
+
+    new_taps     = []
+    new_warnings = []
+    new_invalids = []
+
+    if since > 0:
+        # Subtract 2 seconds as a buffer to handle sub-second timing edge cases
+        # and any minor clock drift between DB writes and poll timing
+        since_buffered = since - 2
+        since_dt = datetime.fromtimestamp(since_buffered).strftime('%Y-%m-%d %H:%M:%S')
+
+        with get_db() as conn:
+            tap_rows = conn.execute(
+                "SELECT al.nfc_id, al.student_name, al.student_id, al.status, "
+                "al.tap_time, al.tx_hash, al.block_number, al.created_at "
+                "FROM attendance_logs al "
+                "WHERE al.sess_id = ? "
+                "  AND al.status IN ('present','late') "
+                "  AND al.created_at > ? "
+                "ORDER BY al.created_at ASC",
+                (sess_id, since_dt)
+            ).fetchall()
+
+        # Track which nfc_ids we already sent this poll to avoid duplicate popups
+        # The frontend deduplicates by advancing lastTimestamp past each tap,
+        # but we also filter server-side using the nfc_id present_ids set
+        already_present = set(sess.get('present', []))
+
+        for row in tap_rows:
+            try:
+                ts = datetime.strptime(row['created_at'], '%Y-%m-%d %H:%M:%S').timestamp()
+            except Exception:
+                ts = since + 1
+            new_taps.append({
+                'nfc_id':     row['nfc_id'],
+                'name':       row['student_name'],
+                'student_id': row['student_id'],
+                'time':       row['tap_time'],
+                'timestamp':  ts,
+                'tx_hash':    row['tx_hash'],
+                'block':      row['block_number'],
+                'is_late':    row['status'] == 'late',
+            })
+
+        # Warnings/invalids from in-memory (not in DB) — use in-memory session
+        mem_sess = sessions_db.get(sess_id, sess)
+        new_warnings = [t for t in mem_sess.get('warn_log', [])
+                        if t.get('timestamp', 0) > since_buffered]
+        new_invalids = [t for t in mem_sess.get('invalid_log', [])
+                        if t.get('timestamp', 0) > since_buffered]
+
     return jsonify({
-        'present_count': len(sess.get('present',[])),
-        'late_count':    len(sess.get('late',[])),
-        'excused_count': len(sess.get('excused',[])),
-        'warned_count':  len(sess.get('warned',[])),
+        'present_count': len(sess.get('present', [])),
+        'late_count':    len(sess.get('late', [])),
+        'excused_count': len(sess.get('excused', [])),
+        'warned_count':  len(sess.get('warned', [])),
         'new_taps':      new_taps,
         'new_warnings':  new_warnings,
         'new_invalids':  new_invalids,
         'active':        not sess.get('ended_at'),
-        'late_ids':      sess.get('late',[]),
-        'excused_ids':   sess.get('excused',[]),
-        'present_ids':   sess.get('present',[]),
+        'late_ids':      sess.get('late', []),
+        'excused_ids':   sess.get('excused', []),
+        'present_ids':   sess.get('present', []),
+        'server_time':   now_ts,   # ← client uses this instead of Date.now()
     })
 
 @app.route('/api/attendance/stats')
@@ -2307,7 +2231,6 @@ def attendance_stats():
     role       = session.get('role')
     username   = session.get('username')
     now        = datetime.now()
-
     if period == 'today':
         start_dt = now.replace(hour=0,minute=0,second=0,microsecond=0); end_dt = None
     elif period == 'month':
@@ -2320,7 +2243,6 @@ def attendance_stats():
         start_dt = datetime(yr,1,1); end_dt = datetime(yr,12,31,23,59,59)
     else:
         start_dt = datetime(2000,1,1); end_dt = None
-
     where  = ["s.started_at >= ?"]
     params = [start_dt.strftime('%Y-%m-%d %H:%M:%S')]
     if end_dt:
@@ -2344,16 +2266,12 @@ def attendance_stats():
     elif f_tod == 'afternoon':
         where.append("CAST(strftime('%H',s.started_at) AS INTEGER) >= 12")
     elif f_tod and ':' in f_tod:
-        # Exact time_slot string match e.g. "7:00 AM – 9:00 AM"
         where.append("s.time_slot = ?"); params.append(f_tod)
-
     wsql = " AND ".join(where)
-
     if period == 'today':   tkey_expr = "strftime('%H:00',s.started_at)"
     elif period == 'month': tkey_expr = "strftime('%m/%d',s.started_at)"
     elif period == 'year':  tkey_expr = "strftime('%m',s.started_at)"
     else:                   tkey_expr = "strftime('%Y',s.started_at)"
-
     with get_db() as conn:
         donut_rows = conn.execute(
             "SELECT al.status, COUNT(*) as cnt "
@@ -2361,34 +2279,28 @@ def attendance_stats():
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "WHERE " + wsql + " GROUP BY al.status", params
         ).fetchall()
-
         trend_rows = conn.execute(
             "SELECT " + tkey_expr + " as tkey, al.status, COUNT(*) as cnt "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "WHERE " + wsql + " GROUP BY tkey, al.status ORDER BY tkey", params
         ).fetchall()
-
         subj_rows = conn.execute(
             "SELECT s.subject_name, s.course_code, al.status, COUNT(*) as cnt "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "WHERE " + wsql + " GROUP BY s.subject_name, s.course_code, al.status", params
         ).fetchall()
-
         sess_count = conn.execute(
             "SELECT COUNT(DISTINCT s.sess_id) as cnt FROM sessions s WHERE " + wsql, params
         ).fetchone()['cnt']
-
         subj_labels_rows = conn.execute(
             "SELECT DISTINCT s.subject_name, s.course_code FROM sessions s "
             "WHERE " + wsql + " ORDER BY s.subject_name", params
         ).fetchall()
-
     donut = {'present':0,'late':0,'absent':0,'excused':0}
     for r in donut_rows:
         if r['status'] in donut: donut[r['status']] = r['cnt']
-
     trend_buckets = {}
     for r in trend_rows:
         k = r['tkey']
@@ -2396,7 +2308,6 @@ def attendance_stats():
             trend_buckets[k] = {'present':0,'late':0,'absent':0,'excused':0}
         if r['status'] in trend_buckets[k]:
             trend_buckets[k][r['status']] = r['cnt']
-
     subjects_breakdown = {}
     for r in subj_rows:
         code  = r['course_code']
@@ -2405,21 +2316,170 @@ def attendance_stats():
             subjects_breakdown[label] = {'present':0,'late':0,'absent':0,'excused':0,'sessions':0}
         if r['status'] in subjects_breakdown[label]:
             subjects_breakdown[label][r['status']] = r['cnt']
-
     subj_labels_out = [
         (f"[{r['course_code']}] {r['subject_name']}" if r['course_code'] else r['subject_name'])
         for r in subj_labels_rows
     ]
-
-    return jsonify({'role':role,'period':period,'donut':donut,'trend':trend_buckets,
-                    'subjects':subjects_breakdown,'all_subjects':subj_labels_out,
-                    'session_count':sess_count})
+    resp = jsonify({
+        'role': role, 'period': period, 'donut': donut,
+        'trend': trend_buckets, 'subjects': subjects_breakdown,
+        'all_subjects': subj_labels_out, 'session_count': sess_count,
+    })
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+    resp.headers['Pragma']        = 'no-cache'
+    resp.headers['Expires']       = '0'
+    return resp
 
 @app.route('/api/block_number')
 def api_block_number():
     try: return jsonify({'block':web3.eth.block_number})
     except: return jsonify({'block':None})
 
+# ── MARK PICO (NFC tap handler) ───────────────────────────────────────────────
+
+@app.route('/mark_pico', methods=['POST'])
+def mark_pico():
+    data=request.get_json()
+    if not data or 'nfc_id' not in data: return jsonify({'status':'error'}), 400
+    nfc_id=data['nfc_id'].strip().upper()
+    print(f"[NFC TAP] {nfc_id}")
+
+    if nfc_is_waiting():
+        nfc_set_uid(nfc_id)
+        return jsonify({'status':'registration','uid':nfc_id})
+
+    sess_id, sess = get_active_session_for_nfc(nfc_id)
+    if not sess:
+        all_s   = get_all_students()
+        student = next((s for s in all_s if s['nfcId']==nfc_id), None)
+        active  = get_active_sessions()
+        invalid_entry={'nfc_id':nfc_id,'timestamp':time.time(),
+                       'reason':'Student not registered' if not student else 'No active session for this section'}
+        for sid, asess in active.items():
+            asess.setdefault('invalid_log',[]).append(invalid_entry)
+            save_session(sid, asess)
+        return jsonify({'status':'no_session',
+                        'message':"No active session for this student's section.",
+                        'debug_student':student,
+                        'debug_active_sessions':list(active.keys())})
+
+    name        = student_name_map.get(nfc_id,'Unknown')
+    all_s       = get_all_students()
+    student_info= next((s for s in all_s if s['nfcId']==nfc_id),{})
+    student_id  = student_info.get('student_id','')
+
+    # Check duplicate tap
+    if nfc_id in sess.get('present',[]):
+        warn_entry={'nfc_id':nfc_id,'name':name,'student_id':student_id,'timestamp':time.time()}
+        if nfc_id not in sess.get('warned',[]): sess.setdefault('warned',[]).append(nfc_id)
+        sess.setdefault('warn_log',[]).append(warn_entry)
+        save_session(sess_id, sess)
+        sessions_db[sess_id] = sess
+        return jsonify({'status':'already_marked','name':name,'student_id':student_id,
+                        'message':f'{name} is already marked present.'})
+
+    # Determine late status
+    now_dt       = datetime.now()
+    late_cutoff  = sess.get('late_cutoff','')
+    is_late      = False
+    if late_cutoff:
+        try:
+            cutoff_dt = datetime.strptime(late_cutoff, '%Y-%m-%d %H:%M:%S')
+            is_late   = now_dt > cutoff_dt
+        except:
+            is_late = False
+
+    # Record on blockchain (skip gracefully if offline)
+    tx_hash=None; block_num=None
+    if BLOCKCHAIN_ONLINE and contract and admin_account:
+        try:
+            tx       = contract.functions.markAttendance(nfc_id).transact({'from':admin_account})
+            receipt  = web3.eth.wait_for_transaction_receipt(tx)
+            tx_hash  = receipt['transactionHash'].hex()
+            block_num= receipt['blockNumber']
+        except Exception as e:
+            print(f"[WARNING] Blockchain mark failed: {e} — attendance saved to SQLite only.")
+    else:
+        print(f"[INFO] Blockchain offline — attendance for {nfc_id} saved to SQLite only.")
+
+    tap_time      = datetime.now().strftime('%H:%M:%S')
+    tap_timestamp = time.time()
+    status_label  = 'late' if is_late else 'present'
+
+    # Save to attendance_logs table
+    db_save_attendance_log(
+        sess_id=sess_id, nfc_id=nfc_id,
+        student_name=name, student_id=student_id,
+        status=status_label, tap_time=tap_time,
+        tx_hash=tx_hash or '', block_number=block_num or 0
+    )
+
+    # Keep in-memory session dict in sync for live polling
+    sess.setdefault('present',[]).append(nfc_id)
+    if is_late and nfc_id not in sess.get('late',[]):
+        sess.setdefault('late',[]).append(nfc_id)
+
+    # FIX: always set tap_timestamp so poll_session can detect new taps
+    sess.setdefault('tap_log',[]).append({
+        'nfc_id':     nfc_id,
+        'name':       name,
+        'time':       tap_time,
+        'timestamp':  tap_timestamp,
+        'tx_hash':    tx_hash,
+        'block':      block_num,
+        'student_id': student_id,
+        'is_late':    is_late,
+    })
+    sess.setdefault('tx_hashes',{})[nfc_id] = {
+        'tx_hash': tx_hash, 'block': block_num, 'time': tap_time
+    }
+    save_session(sess_id, sess)
+    sessions_db[sess_id] = sess
+
+    recent_attendance.append({
+        'nfc_id':    nfc_id,
+        'name':      name,
+        'timestamp': tap_timestamp,
+        'subject':   sess.get('subject_name',''),
+        'is_late':   is_late,
+    })
+
+    return jsonify({
+        'status':'ok','name':name,'student_id':student_id,
+        'time':tap_time,'subject':sess.get('subject_name',''),
+        'tx_hash':tx_hash,'block':block_num,
+        'attendance_status': status_label,
+        'is_late': is_late
+    })
+
+@app.route('/debug/tap/<nfc_id>')
+def debug_tap(nfc_id):
+    nfc_id=nfc_id.strip().upper()
+    all_students=get_all_students()
+    student=next((s for s in all_students if s['nfcId']==nfc_id),None)
+    active=get_active_sessions()
+    student_key=build_student_section_key(student) if student else None
+    matching_session=None
+    for sid,s in active.items():
+        if normalize_section_key(s.get('section_key',''))==student_key:
+            matching_session={**s,'session_id':sid}; break
+    result={
+        '1_nfc_id_received':nfc_id,
+        '2_student_found':student is not None,
+        '3_student_info':student,
+        '4_student_section_key':student_key,
+        '5_active_sessions':[{
+            'session_id':sid,'subject':s.get('subject_name'),
+            'section_key':s.get('section_key'),'teacher':s.get('teacher_name')
+        } for sid,s in active.items()],
+        '6_matching_session':matching_session,
+        '7_verdict':('STUDENT NOT REGISTERED' if not student
+                     else 'NO ACTIVE SESSION' if not matching_session
+                     else 'SHOULD WORK')
+    }
+    from flask import current_app
+    resp=current_app.response_class(json.dumps(result,indent=2),mimetype='application/json')
+    return resp
 
 # ══════════════════════════════════════════════════════════════════════════════
 # EXCEL EXPORT HELPERS — shared colour palette + formatters
@@ -2427,30 +2487,13 @@ def api_block_number():
 def _xl_helpers():
     """Return a dict of reusable Excel style helpers."""
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    # DAVS colour palette
     C = {
-        # System theme colors (matches base.html)
-        'bg':      '1E4A1A',   # sidebar/header bg — dark forest green
-        'header':  '1E4A1A',   # column headers — same dark green
-        'accent':  '2D6A27',   # medium green — section headers
-        'gold':    'F5C518',   # gold accent — main titles
-        'surface': 'FFFFFF',   # cell background
-        'border':  'D4DDD4',   # light border
-        # Status TEXT colors (used as font color only, NOT cell fill)
-        'present': '2D6A27',   # green
-        'late':    'D4A017',   # amber/yellow
-        'absent':  'C0392B',   # red
-        'excused': '2980B9',   # blue
-        # Stat block box fills (these ARE colored — design element)
-        'present_bg': 'E8F5E9',   # very light green
-        'late_bg':    'FFF8E1',   # very light yellow
-        'absent_bg':  'FFEBEE',   # very light red
-        'excused_bg': 'E3F2FD',   # very light blue
-        'white':   'FFFFFF',
-        'row_alt': 'F0F2F0',   # system --bg color for alternating rows
-        'row_def': 'FFFFFF',
-        'muted':   '5A6B5A',   # system --muted
-        'sub_hdr': '2D6A27',   # totals row — accent green
+        'bg':      '1E4A1A', 'header':  '1E4A1A', 'accent':  '2D6A27',
+        'gold':    'F5C518', 'surface': 'FFFFFF',  'border':  'D4DDD4',
+        'present': '2D6A27', 'late':    'D4A017',  'absent':  'C0392B', 'excused': '2980B9',
+        'present_bg': 'E8F5E9', 'late_bg': 'FFF8E1', 'absent_bg': 'FFEBEE', 'excused_bg': 'E3F2FD',
+        'white':   'FFFFFF', 'row_alt': 'F0F2F0', 'row_def': 'FFFFFF',
+        'muted':   '5A6B5A', 'sub_hdr': '2D6A27',
     }
     def fill(h):  return PatternFill('solid', fgColor=h)
     def thin_border():
@@ -2459,14 +2502,12 @@ def _xl_helpers():
     def ctr(wrap=True):  return Alignment(horizontal='center', vertical='center', wrap_text=wrap)
     def lft():  return Alignment(horizontal='left', vertical='center', wrap_text=True)
     def rgt():  return Alignment(horizontal='right', vertical='center', wrap_text=True)
-
     def header_font(size=10):
         return Font(name='Calibri', bold=True, color='FFFFFF', size=size)
     def normal_font(size=10, color='111111', bold=False):
         return Font(name='Calibri', size=size, color=color, bold=bold)
     def title_font(size=16, color=None):
         return Font(name='Calibri', bold=True, size=size, color=color or C['accent'])
-
     def make_header_row(ws, row_num, headers, widths, bg=None):
         bg = bg or C['header']
         for ci, (h, w) in enumerate(zip(headers, widths), 1):
@@ -2476,9 +2517,7 @@ def _xl_helpers():
             c.font = header_font(); c.fill = fill(bg)
             c.alignment = ctr(); c.border = thin_border()
         ws.row_dimensions[row_num].height = 22
-
     def data_row(ws, row_num, values, alt=False, col_formats=None):
-        """Write a data row. col_formats is dict: {col_index: ('status'|'tx'|'num', ...)}"""
         rf = fill(C['row_alt'] if alt else C['row_def'])
         for ci, val in enumerate(values, 1):
             c = ws.cell(row=row_num, column=ci, value=val)
@@ -2486,13 +2525,7 @@ def _xl_helpers():
             cf = (col_formats or {}).get(ci)
             if cf and cf[0] == 'status':
                 status = val
-                # Colored TEXT only — background follows row stripe, not status color
-                status_colors = {
-                    'Present': C['present'],
-                    'Late':    C['late'],
-                    'Absent':  C['absent'],
-                    'Excused': C['excused'],
-                }
+                status_colors = {'Present': C['present'], 'Late': C['late'], 'Absent': C['absent'], 'Excused': C['excused']}
                 fg = status_colors.get(status, '111111')
                 c.font = Font(name='Calibri', size=10, bold=True, color=fg)
                 c.fill = rf; c.alignment = ctr()
@@ -2506,18 +2539,14 @@ def _xl_helpers():
                 c.fill = rf
                 c.alignment = lft() if ci <= 3 else ctr()
         ws.row_dimensions[row_num].height = 17
-
     def title_block(ws, title, subtitle_lines, n_cols):
-        """Write a dark title block at the top of a sheet."""
         ws.sheet_view.showGridLines = False
-        # Row 1: main title
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
         c = ws.cell(row=1, column=1, value=title)
         c.font = title_font(16, C['gold'])
         c.fill = fill(C['bg']); c.alignment = ctr()
         ws.row_dimensions[1].height = 36
         for col in range(2, n_cols+1): ws.cell(row=1, column=col).fill = fill(C['bg'])
-        # Subtitle rows
         for i, sub in enumerate(subtitle_lines, 2):
             ws.merge_cells(start_row=i, start_column=1, end_row=i, end_column=n_cols)
             c = ws.cell(row=i, column=1, value=sub)
@@ -2525,15 +2554,12 @@ def _xl_helpers():
             c.fill = fill(C['bg']); c.alignment = ctr()
             ws.row_dimensions[i].height = 16
             for col in range(2, n_cols+1): ws.cell(row=i, column=col).fill = fill(C['bg'])
-        # Spacer
         next_row = len(subtitle_lines) + 2
         for col in range(1, n_cols+1):
             ws.cell(row=next_row, column=col).fill = fill('F8FAFC')
         ws.row_dimensions[next_row].height = 7
-        return next_row + 1  # first data row
-
+        return next_row + 1
     def stat_block(ws, start_row, donut_data, n_cols=8):
-        """4-box stat summary: Present / Late / Absent / Excused."""
         total = sum(donut_data.values())
         boxes = [
             ('✓  PRESENT',  donut_data.get('present',  donut_data.get('Present',  0)), C['present'],  C['present_bg']),
@@ -2543,13 +2569,10 @@ def _xl_helpers():
         ]
         cols_per = max(1, n_cols // 4)
         for bi, (label, val, fg, bg2) in enumerate(boxes):
-            sc = bi * cols_per + 1
-            ec = sc + cols_per - 1
+            sc = bi * cols_per + 1; ec = sc + cols_per - 1
             pct = f"{round(val/total*100,1)}%" if total else "0%"
             for row_offset, (text, sz, bold, height) in enumerate([
-                (label, 9,  True,  18),
-                (val,   26, True,  40),
-                (pct,   9,  False, 18),
+                (label, 9, True, 18), (val, 26, True, 40), (pct, 9, False, 18),
             ]):
                 r = start_row + row_offset
                 ws.merge_cells(start_row=r, start_column=sc, end_row=r, end_column=ec)
@@ -2557,13 +2580,11 @@ def _xl_helpers():
                 c.font = Font(name='Calibri', size=sz, bold=bold, color=fg)
                 c.fill = fill(bg2); c.alignment = ctr(); ws.row_dimensions[r].height = height
                 for col in range(sc+1, ec+1): ws.cell(row=r, column=col).fill = fill(bg2)
-        # spacer after stat block
         spacer_row = start_row + 3
         for col in range(1, n_cols+1):
             ws.cell(row=spacer_row, column=col).fill = fill('F8FAFC')
         ws.row_dimensions[spacer_row].height = 8
         return spacer_row + 1
-
     def totals_row(ws, row_num, values, n_cols):
         for ci, val in enumerate(values, 1):
             c = ws.cell(row=row_num, column=ci, value=val)
@@ -2571,34 +2592,24 @@ def _xl_helpers():
             c.fill = fill(C['sub_hdr']); c.border = thin_border()
             c.alignment = lft() if ci == 1 else ctr()
         ws.row_dimensions[row_num].height = 20
-
     def add_bar_chart(wb, ws_name, data_ws_name, title,
                       first_data_row, last_data_row, n_series,
                       cat_col, series_cols_start,
                       series_titles, series_colors,
                       chart_anchor, width=18, height=12):
-        """Add a stacked bar chart to ws_name referencing data in data_ws_name."""
         from openpyxl.chart import BarChart, Reference
         from openpyxl.chart.series import SeriesLabel
-        from openpyxl.drawing.spreadsheet_drawing import AnchorMarker
-        chart_ws = wb[ws_name]
-        data_ws  = wb[data_ws_name]
+        chart_ws = wb[ws_name]; data_ws = wb[data_ws_name]
         chart = BarChart()
-        chart.type = 'col'
-        chart.grouping = 'stacked'
-        chart.overlap = 100
-        chart.title = title
-        chart.style = 10
-        chart.y_axis.title = 'Count'
-        chart.x_axis.title = ''
-        chart.width  = width
-        chart.height = height
-        chart.legend.position = 'b'
+        chart.type = 'col'; chart.grouping = 'stacked'; chart.overlap = 100
+        chart.title = title; chart.style = 10
+        chart.y_axis.title = 'Count'; chart.x_axis.title = ''
+        chart.width = width; chart.height = height; chart.legend.position = 'b'
         cats = Reference(data_ws, min_col=cat_col, min_row=first_data_row, max_row=last_data_row)
         for i in range(n_series):
             col = series_cols_start + i
             data_ref = Reference(data_ws, min_col=col, min_row=first_data_row-1, max_row=last_data_row)
-            series = chart.series.append(data_ref)
+            chart.series.append(data_ref)
         chart.set_categories(cats)
         for i, (title_s, color) in enumerate(zip(series_titles, series_colors)):
             if i < len(chart.series):
@@ -2606,28 +2617,18 @@ def _xl_helpers():
                 chart.series[i].graphicalProperties.solidFill = color
                 chart.series[i].graphicalProperties.line.solidFill = color
         chart_ws.add_chart(chart, chart_anchor)
-
     def add_pie_chart(wb, ws_name, data_ws_name, title,
                       first_data_row, last_data_row,
                       label_col, val_col,
                       series_colors, chart_anchor, width=12, height=10):
         from openpyxl.chart import PieChart, Reference
-        chart_ws = wb[ws_name]
-        data_ws  = wb[data_ws_name]
+        chart_ws = wb[ws_name]; data_ws = wb[data_ws_name]
         chart = PieChart()
-        chart.title = title
-        chart.style = 10
-        chart.width  = width
-        chart.height = height
+        chart.title = title; chart.style = 10; chart.width = width; chart.height = height
         labels = Reference(data_ws, min_col=label_col, min_row=first_data_row, max_row=last_data_row)
         data   = Reference(data_ws, min_col=val_col,   min_row=first_data_row, max_row=last_data_row)
-        chart.add_data(data)
-        chart.set_categories(labels)
-        for i, color in enumerate(series_colors):
-            if i < len(chart.series):
-                pt = chart.series[0].dPt
+        chart.add_data(data); chart.set_categories(labels)
         chart_ws.add_chart(chart, chart_anchor)
-
     return dict(
         C=C, fill=fill, thin_border=thin_border, ctr=ctr, lft=lft, rgt=rgt,
         header_font=header_font, normal_font=normal_font, title_font=title_font,
@@ -2653,12 +2654,9 @@ def export_student_sessions(nfc_id):
         stud_name = request.args.get('name','Student').strip()
         now       = datetime.now()
 
-        # Load student info
         all_students = get_all_students()
         student      = next((x for x in all_students if x['nfcId']==nfc_id), None)
-        student_section = build_student_section_key(student) if student else ''
 
-        # Load all sessions this student belongs to, from attendance_logs
         with get_db() as conn:
             log_rows = conn.execute(
                 "SELECT al.*, s.subject_name, s.course_code, s.section_key, "
@@ -2690,24 +2688,18 @@ def export_student_sessions(nfc_id):
                 'excuse':    lg['excuse_note'] or '',
             })
 
-        H = _xl_helpers()
-        C = H['C']
+        H = _xl_helpers(); C = H['C']
         wb = Workbook()
-
-        # ── Sheet 1: Attendance Log ─────────────────────────────────────────
         ws = wb.active; ws.title = 'Attendance Log'
         prog  = student.get('course','') if student else ''
         yr    = student.get('year_level','') if student else ''
         sec   = student.get('section','') if student else ''
         sid_  = student.get('student_id','') if student else ''
-        subs_ = [r['subject'] for r in rows]
         headers = ['#','Subject','Course Code','Section','Instructor',
                    'Date','Time Slot','Status','Tap Time','TX Hash','Block #','Excuse Note']
-        widths  = [4,   32,          12,           24,       22,
-                   14,    16,          10,           12,        52,          10,        22]
-
+        widths  = [4, 32, 12, 24, 22, 14, 16, 10, 12, 52, 10, 22]
         subtitles = [
-            f'Cavite State University — DAVS Attendance Record',
+            'Cavite State University — DAVS Attendance Record',
             f'Student: {stud_name}  |  ID: {sid_}  |  NFC: {nfc_id}',
             f'Program: {prog}  |  Year: {yr}  |  Section: {sec}',
             f'Exported: {now.strftime("%B %d, %Y %I:%M %p")}',
@@ -2716,7 +2708,6 @@ def export_student_sessions(nfc_id):
         first_data = H['stat_block'](ws, first_data, status_counts, len(headers))
         H['make_header_row'](ws, first_data, headers, widths)
         first_data += 1
-
         col_fmt = {8: ('status',), 10: ('tx',), 11: ('num',)}
         for ri, row in enumerate(rows, first_data):
             H['data_row'](ws, ri, [
@@ -2725,7 +2716,6 @@ def export_student_sessions(nfc_id):
                 row['date'], row['time_slot'], row['status'],
                 row['tap_time'], row['tx_hash'], row['block'], row['excuse'],
             ], alt=(ri % 2 == 0), col_formats=col_fmt)
-
         last_data = first_data + len(rows) - 1
         total_vals = ['TOTAL', '', '', '', '', '', '',
                       f"{status_counts['Present']}P / {status_counts['Late']}L / {status_counts['Absent']}A / {status_counts['Excused']}E",
@@ -2735,11 +2725,9 @@ def export_student_sessions(nfc_id):
                 value=f'Generated by DAVS on {now.strftime("%B %d, %Y %I:%M %p")}').font \
             = __import__('openpyxl').styles.Font(name='Calibri', size=9, italic=True, color='94A3B8')
 
-        # ── Sheet 2: Charts ─────────────────────────────────────────────────
         wc = wb.create_sheet('Charts')
         wc.sheet_view.showGridLines = False
         from openpyxl.styles import Font as XFont, PatternFill as XFill, Alignment as XAlign
-        # Title
         wc.merge_cells('A1:N1')
         wc['A1'] = f'Attendance Summary — {stud_name}'
         wc['A1'].font = XFont(name='Calibri', bold=True, size=14, color=C['gold'])
@@ -2747,60 +2735,47 @@ def export_student_sessions(nfc_id):
         wc['A1'].alignment = XAlign(horizontal='center', vertical='center')
         wc.row_dimensions[1].height = 32
         for col in range(2, 15): wc.cell(row=1, column=col).fill = XFill('solid', fgColor=C['bg'])
-
-        # Status summary data for charts (rows 3-6)
         wc.cell(row=3, column=1, value='Status').font = XFont(bold=True, size=9)
         wc.cell(row=3, column=2, value='Count').font  = XFont(bold=True, size=9)
         status_order = ['Present','Late','Absent','Excused']
         for ri, st in enumerate(status_order, 4):
             wc.cell(row=ri, column=1, value=st)
             wc.cell(row=ri, column=2, value=status_counts.get(st, 0))
-
-        # Pie chart — status breakdown
         pie = PieChart()
         pie.title = 'Attendance Status Breakdown'
         pie.style = 10; pie.width = 14; pie.height = 10
-        pie_labels = Reference(wc, min_col=1, min_row=4, max_row=7)
-        pie_data   = Reference(wc, min_col=2, min_row=4, max_row=7)
-        pie.add_data(pie_data); pie.set_categories(pie_labels)
+        pie.add_data(Reference(wc, min_col=2, min_row=4, max_row=7))
+        pie.set_categories(Reference(wc, min_col=1, min_row=4, max_row=7))
         wc.add_chart(pie, 'D3')
-
-        # Subject breakdown data (rows 3+ in cols 9-13)
         subj_counts = {}
         for r in rows: subj_counts[r['subject']] = subj_counts.get(r['subject'], 0) + 1
-        wc.cell(row=3, column=9, value='Subject').font  = XFont(bold=True, size=9)
-        wc.cell(row=3, column=10, value='Count').font   = XFont(bold=True, size=9)
+        wc.cell(row=3, column=9,  value='Subject').font  = XFont(bold=True, size=9)
+        wc.cell(row=3, column=10, value='Count').font    = XFont(bold=True, size=9)
         for ri2, (sn, cnt) in enumerate(sorted(subj_counts.items()), 4):
             wc.cell(row=ri2, column=9,  value=sn[:30])
             wc.cell(row=ri2, column=10, value=cnt)
         if subj_counts:
             bar = BarChart()
             bar.type = 'bar'; bar.grouping = 'clustered'
-            bar.title = 'Sessions by Subject'
-            bar.style = 10; bar.width = 18; bar.height = 10
+            bar.title = 'Sessions by Subject'; bar.style = 10; bar.width = 18; bar.height = 10
             bar.y_axis.title = 'Count'
             cats2 = Reference(wc, min_col=9,  min_row=4, max_row=3+len(subj_counts))
             data2 = Reference(wc, min_col=10, min_row=3, max_row=3+len(subj_counts))
-            bar.add_data(data2, titles_from_data=True)
-            bar.set_categories(cats2)
-            if bar.series:
-                bar.series[0].graphicalProperties.solidFill = C['accent']
+            bar.add_data(data2, titles_from_data=True); bar.set_categories(cats2)
+            if bar.series: bar.series[0].graphicalProperties.solidFill = C['accent']
             wc.add_chart(bar, 'D21')
 
-        # ── File name ───────────────────────────────────────────────────────
         name_slug = stud_name.replace(' ','_')
         fname = (request.args.get('filename') or
                  f"{name_slug}_Attendance_Record_{now.strftime('%Y-%m-%d')}.xlsx")
-
-        output = __import__('io').BytesIO()
+        output = io.BytesIO()
         wb.save(output); output.seek(0)
-        return __import__('flask').Response(output.getvalue(),
+        return Response(output.getvalue(),
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             headers={'Content-Disposition': f'attachment;filename="{fname}"'})
     except Exception:
         import traceback
-        return __import__('flask').Response(f'Export error: {traceback.format_exc()}',
-                                            status=500, mimetype='text/plain')
+        return Response(f'Export error: {traceback.format_exc()}', status=500, mimetype='text/plain')
 
 
 @app.route('/export/session/<sess_id>')
@@ -2818,7 +2793,7 @@ def export_session_attendance(sess_id):
         sess = load_session(sess_id)
         if not sess:
             flash('Session not found.'); return redirect(url_for('admin_sessions'))
-        if session.get('role')!='admin' and sess.get('teacher')!=session.get('username'):
+        if not _is_my_session(sess):
             flash('Access denied.'); return redirect(url_for('teacher_sessions'))
 
         now          = datetime.now()
@@ -2855,11 +2830,8 @@ def export_session_attendance(sess_id):
                 'excuse':     lg.get('excuse_note','') or '',
             })
 
-        H = _xl_helpers()
-        C = H['C']
+        H = _xl_helpers(); C = H['C']
         wb = Workbook()
-
-        # ── Sheet 1: Attendance ─────────────────────────────────────────────
         ws = wb.active; ws.title = 'Attendance'
         subj  = sess.get('subject_name','')
         code  = sess.get('course_code','')
@@ -2869,7 +2841,6 @@ def export_session_attendance(sess_id):
         started = sess.get('started_at','—')
         ended   = sess.get('ended_at','Still running')
         n_cols  = 10
-
         subtitles = [
             'Cavite State University — DAVS Session Attendance Report',
             f'Subject: {subj}  {"["+code+"]" if code else ""}',
@@ -2879,14 +2850,11 @@ def export_session_attendance(sess_id):
         ]
         first_data = H['title_block'](ws, 'Session Attendance Report', subtitles, n_cols)
         first_data = H['stat_block'](ws, first_data, counts, n_cols)
-
         headers = ['#','Student Name','Student ID','NFC Card UID',
                    'Program','Year','Sec','Status','Tap Time','TX Hash','Block #','Excuse']
-        widths  = [4,   28,          14,           14,
-                   28,     10,    6,   10,       12,        52,        10,        20]
+        widths  = [4, 28, 14, 14, 28, 10, 6, 10, 12, 52, 10, 20]
         H['make_header_row'](ws, first_data, headers, widths)
         first_data += 1
-
         col_fmt = {8: ('status',), 10: ('tx',), 11: ('num',)}
         for ri, row in enumerate(rows, first_data):
             H['data_row'](ws, ri, [
@@ -2904,7 +2872,6 @@ def export_session_attendance(sess_id):
                 value=f'Generated by DAVS on {now.strftime("%B %d, %Y %I:%M %p")}') \
             .font = XFont(name='Calibri', size=9, italic=True, color='94A3B8')
 
-        # ── Sheet 2: Charts ─────────────────────────────────────────────────
         wc = wb.create_sheet('Charts')
         wc.sheet_view.showGridLines = False
         wc.merge_cells('A1:N1')
@@ -2914,30 +2881,24 @@ def export_session_attendance(sess_id):
         wc['A1'].alignment = XAlign(horizontal='center', vertical='center')
         wc.row_dimensions[1].height = 32
         for col in range(2,15): wc.cell(row=1,column=col).fill = XFill('solid', fgColor=C['bg'])
-
-        # Status data for pie chart (rows 3-6)
         status_order = ['Present','Late','Absent','Excused']
         wc.cell(row=3,column=1,value='Status').font = XFont(bold=True, size=9, color=C['muted'])
         wc.cell(row=3,column=2,value='Count').font  = XFont(bold=True, size=9, color=C['muted'])
         for ri,st in enumerate(status_order,4):
             wc.cell(row=ri,column=1,value=st)
             wc.cell(row=ri,column=2,value=counts[st])
-
-        # Pie chart — status breakdown
         pie = PieChart()
         pie.title = 'Attendance Status Breakdown'
         pie.style = 10; pie.width = 14; pie.height = 12
         pie.add_data(Reference(wc,min_col=2,min_row=4,max_row=7))
         pie.set_categories(Reference(wc,min_col=1,min_row=4,max_row=7))
         wc.add_chart(pie, 'D3')
-
-        # Bar chart — stacked per program/year if multiple sections
         prog_counts = {}
         for r in rows:
             key = f"{r['year']}"; prog_counts[key] = prog_counts.get(key,{'Present':0,'Late':0,'Absent':0,'Excused':0})
             prog_counts[key][r['status']] += 1
         if len(prog_counts) > 1:
-            r3c  = 9
+            r3c = 9
             wc.cell(row=3,column=r3c,  value='Year Level').font = XFont(bold=True,size=9,color=C['muted'])
             wc.cell(row=3,column=r3c+1,value='Present').font    = XFont(bold=True,size=9,color=C['muted'])
             wc.cell(row=3,column=r3c+2,value='Late').font       = XFont(bold=True,size=9,color=C['muted'])
@@ -2952,38 +2913,30 @@ def export_session_attendance(sess_id):
             n_yl = len(prog_counts)
             bar.add_data(Reference(wc,min_col=r3c+1,min_row=3,max_row=3+n_yl),titles_from_data=True)
             bar.set_categories(Reference(wc,min_col=r3c,min_row=4,max_row=3+n_yl))
-            for i,(clr) in enumerate([C['present'],C['late'],C['absent']]):
-                if i < len(bar.series):
-                    bar.series[i].graphicalProperties.solidFill = clr
+            for i,clr in enumerate([C['present'],C['late'],C['absent']]):
+                if i < len(bar.series): bar.series[i].graphicalProperties.solidFill = clr
             wc.add_chart(bar,'D21')
 
-        # ── File name ───────────────────────────────────────────────────────
         sec_last = section_key.split('|')[-1] if section_key else 'Sec'
         date_str = (started or '')[:10]
         code_part = f'_{code}' if code else ''
         fname = (request.args.get('filename') or
                  f"Session_Attendance{code_part}_{sec_last}_{date_str}.xlsx")
-
         output = _io.BytesIO()
         wb.save(output); output.seek(0)
-        return __import__('flask').Response(output.getvalue(),
+        return Response(output.getvalue(),
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             headers={'Content-Disposition': f'attachment;filename="{fname}"'})
     except Exception:
         import traceback
-        return __import__('flask').Response(f'Export error: {traceback.format_exc()}',
-                                            status=500, mimetype='text/plain')
+        return Response(f'Export error: {traceback.format_exc()}', status=500, mimetype='text/plain')
 
 
 @app.route('/export/stats.xlsx')
 @app.route('/export/stats/xlsx', methods=['POST'])
 @login_required
 def export_stats_xlsx():
-    """
-    Unified analytics export — GET (from admin Export Excel link) or
-    POST (from teacher dashboard with chart images).
-    Produces a rich multi-sheet workbook with embedded charts.
-    """
+    """Unified analytics export — GET or POST. Produces rich multi-sheet workbook."""
     try:
         from openpyxl import Workbook
         from openpyxl.utils import get_column_letter
@@ -2992,7 +2945,6 @@ def export_stats_xlsx():
         from openpyxl.styles import Font as XFont, PatternFill as XFill, Alignment as XAlign
         import io as _io
 
-        # ── Parse params (GET or POST) ────────────────────────────────────
         if request.method == 'POST':
             import base64
             from urllib.parse import parse_qs
@@ -3021,14 +2973,12 @@ def export_stats_xlsx():
             f_sec_ltr  = request.args.get('section_letter','').strip()
             f_tod      = request.args.get('time_of_day','').strip()
 
-        role       = session.get('role')
-        username   = session.get('username')
-        now        = datetime.now()
+        role     = session.get('role')
+        username = session.get('username')
+        now      = datetime.now()
 
-        # ── Date range ────────────────────────────────────────────────────
         if period == 'today':
-            start_dt = now.replace(hour=0,minute=0,second=0,microsecond=0)
-            end_dt   = None
+            start_dt = now.replace(hour=0,minute=0,second=0,microsecond=0); end_dt = None
             period_label = now.strftime('Today — %B %d, %Y')
         elif period == 'month':
             yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
@@ -3043,7 +2993,6 @@ def export_stats_xlsx():
         else:
             start_dt = datetime(2000,1,1); end_dt = None; period_label = 'All Time'
 
-        # ── Filter sessions ───────────────────────────────────────────────
         all_sess = load_sessions(); all_stud = get_all_students(); filtered = {}
         f_section_norm = normalize_section_key(f_section) if f_section else ''
         for sid, s in all_sess.items():
@@ -3071,7 +3020,6 @@ def export_stats_xlsx():
                     except: pass
             filtered[sid] = s
 
-        # Build filter label
         af = []
         if f_program:  af.append('Program: '+f_program)
         if f_year:     af.append('Year: '+f_year)
@@ -3082,13 +3030,8 @@ def export_stats_xlsx():
         if f_tod:      af.append('Time: '+f_tod)
         filter_label = ' | '.join(af) if af else 'All data'
 
-        # ── Aggregate data ────────────────────────────────────────────────
         donut  = {'Present':0,'Late':0,'Absent':0,'Excused':0}
-        trend  = {}
-        subj_d = {}
-        sess_rows  = []
-        detail_rows = []
-        by_section  = {}
+        trend  = {}; subj_d = {}; sess_rows = []; detail_rows = []; by_section = {}
 
         for sid, s in sorted(filtered.items(), key=lambda x: x[1].get('started_at','')):
             sk       = normalize_section_key(s.get('section_key',''))
@@ -3135,12 +3078,10 @@ def export_stats_xlsx():
                 ])
 
         total_all = sum(donut.values())
-
-        H  = _xl_helpers()
-        C  = H['C']
+        H = _xl_helpers(); C = H['C']
         wb = Workbook()
 
-        # ── Sheet 1: Summary ───────────────────────────────────────────────
+        # Sheet 1: Summary
         ws1 = wb.active; ws1.title = 'Summary'
         n_cols = 11
         subtitles = [
@@ -3152,8 +3093,7 @@ def export_stats_xlsx():
         first_row = H['stat_block'](ws1, first_row, donut, n_cols)
         hdrs = ['Subject','Session Date & Time','Section','Instructor','Time Slot',
                 'Enrolled','Present','Late','Absent','Excused','Rate %']
-        wids = [36,        22,                   26,       22,          16,
-                10,        10,    9,     9,       10,       10]
+        wids = [36,22,26,22,16,10,10,9,9,10,10]
         H['make_header_row'](ws1, first_row, hdrs, wids)
         first_row += 1
         for ri, row in enumerate(sess_rows, first_row):
@@ -3176,9 +3116,8 @@ def export_stats_xlsx():
             .font = XFont(name='Calibri', size=9, italic=True, color='94A3B8')
         ws1.freeze_panes = ws1.cell(row=first_row, column=1)
 
-        # ── Sheet 2: Student Detail ────────────────────────────────────────
-        ws2 = wb.create_sheet('Student Detail')
-        n2  = 14
+        # Sheet 2: Student Detail
+        ws2 = wb.create_sheet('Student Detail'); n2 = 14
         subtitles2 = [
             'Cavite State University — DAVS',
             f'Period: {period_label}  |  Filters: {filter_label}',
@@ -3196,9 +3135,8 @@ def export_stats_xlsx():
             H['data_row'](ws2, ri, row, alt=(ri%2==0), col_formats=col_fmt)
         ws2.freeze_panes = ws2.cell(row=dr, column=1)
 
-        # ── Sheet 3: By Date (trend) ───────────────────────────────────────
-        ws3 = wb.create_sheet('By Date')
-        n3  = 5
+        # Sheet 3: By Date
+        ws3 = wb.create_sheet('By Date'); n3 = 5
         subtitles3 = [f'Period: {period_label}  |  Attendance counts per session date']
         tr3 = H['title_block'](ws3, 'Attendance Trend by Date', subtitles3, n3)
         H['make_header_row'](ws3, tr3, ['Date','Present','Late','Absent','Excused'], [18,12,12,12,12])
@@ -3208,15 +3146,13 @@ def export_stats_xlsx():
             H['data_row'](ws3, ri, [date,td['present'],td['late'],td['absent'],td['excused']],
                           alt=(ri%2==0), col_formats=col_fmt)
         last_tr3 = tr3 + len(trend) - 1
-        # Bar chart on this sheet
         if trend:
             bar3 = BarChart(); bar3.type='col'; bar3.grouping='stacked'; bar3.overlap=100
             bar3.title='Daily Attendance Trend'; bar3.style=10; bar3.width=22; bar3.height=14
             bar3.y_axis.title='Count'; bar3.legend.position='b'
             cats3 = Reference(ws3, min_col=1, min_row=tr3, max_row=last_tr3)
             data3 = Reference(ws3, min_col=2, min_row=tr3-1, max_row=last_tr3, max_col=5)
-            bar3.add_data(data3, titles_from_data=True)
-            bar3.set_categories(cats3)
+            bar3.add_data(data3, titles_from_data=True); bar3.set_categories(cats3)
             colors3 = [C['present'],C['late'],C['absent'],C['excused']]
             for i,clr in enumerate(colors3):
                 if i < len(bar3.series):
@@ -3224,9 +3160,8 @@ def export_stats_xlsx():
                     bar3.series[i].graphicalProperties.line.solidFill = clr
             ws3.add_chart(bar3, f'G{tr3}')
 
-        # ── Sheet 4: By Subject ────────────────────────────────────────────
-        ws4 = wb.create_sheet('By Subject')
-        n4  = 7
+        # Sheet 4: By Subject
+        ws4 = wb.create_sheet('By Subject'); n4 = 7
         subtitles4 = [f'Period: {period_label}  |  Aggregate attendance per subject']
         ts4 = H['title_block'](ws4, 'Attendance by Subject', subtitles4, n4)
         H['make_header_row'](ws4, ts4,
@@ -3246,17 +3181,14 @@ def export_stats_xlsx():
             bar4.x_axis.title='Count'; bar4.legend.position='b'
             cats4 = Reference(ws4, min_col=1, min_row=ts4, max_row=last_ts4)
             data4 = Reference(ws4, min_col=3, min_row=ts4-1, max_row=last_ts4, max_col=6)
-            bar4.add_data(data4, titles_from_data=True)
-            bar4.set_categories(cats4)
+            bar4.add_data(data4, titles_from_data=True); bar4.set_categories(cats4)
             colors4 = [C['present'],C['late'],C['absent'],C['excused']]
             for i,clr in enumerate(colors4):
-                if i < len(bar4.series):
-                    bar4.series[i].graphicalProperties.solidFill = clr
+                if i < len(bar4.series): bar4.series[i].graphicalProperties.solidFill = clr
             ws4.add_chart(bar4, f'I{ts4}')
 
-        # ── Sheet 5: By Section ────────────────────────────────────────────
-        ws5 = wb.create_sheet('By Section')
-        n5  = 7
+        # Sheet 5: By Section
+        ws5 = wb.create_sheet('By Section'); n5 = 7
         subtitles5 = [f'Period: {period_label}  |  Aggregate attendance per section']
         ts5 = H['title_block'](ws5, 'Attendance by Section', subtitles5, n5)
         H['make_header_row'](ws5, ts5,
@@ -3271,7 +3203,7 @@ def export_stats_xlsx():
                                     sc['present'],sc['late'],sc['absent'],sc['excused'],rate5],
                           alt=(ri%2==0), col_formats=col_fmt5)
 
-        # ── Sheet 6: Charts Dashboard ──────────────────────────────────────
+        # Sheet 6: Charts Dashboard
         wc = wb.create_sheet('Charts')
         wc.sheet_view.showGridLines = False
         wc.merge_cells('A1:P1')
@@ -3287,22 +3219,17 @@ def export_stats_xlsx():
         wc['A2'].fill = XFill('solid', fgColor=C['bg'])
         wc['A2'].alignment = XAlign(horizontal='center', vertical='center')
         for col in range(2,17): wc.cell(row=2,column=col).fill = XFill('solid',fgColor=C['bg'])
-
-        # Pie chart data in cols 1-2 (hidden area)
         pie_labels = ['Present','Late','Absent','Excused']
         pie_vals   = [donut[k] for k in pie_labels]
         for ri_p, (lbl, val) in enumerate(zip(pie_labels, pie_vals), 4):
             wc.cell(row=ri_p, column=1, value=lbl)
             wc.cell(row=ri_p, column=2, value=val)
-        # Pie
         pie_c = PieChart()
         pie_c.title = f'Overall Attendance Status — {period_label}'
         pie_c.style = 10; pie_c.width = 16; pie_c.height = 12
         pie_c.add_data(Reference(wc, min_col=2, min_row=4, max_row=7))
         pie_c.set_categories(Reference(wc, min_col=1, min_row=4, max_row=7))
         wc.add_chart(pie_c, 'C4')
-
-        # Bar chart (subject summary) in cols 4-8
         if subj_d:
             for ri_s, (sn, sd) in enumerate(sorted(subj_d.items()), 4):
                 wc.cell(row=ri_s, column=4, value=sn[:28])
@@ -3328,7 +3255,6 @@ def export_stats_xlsx():
                     bar_s.series[i].graphicalProperties.line.solidFill = clr
             wc.add_chart(bar_s, 'L4')
 
-        # ── File name ─────────────────────────────────────────────────────
         parts = ['DAVS_Attendance_Report', period_label.replace(' ','_').replace(',','')]
         if f_program:  parts.append(f_program.replace('BS ','BS').replace(' ','_'))
         if f_year:     parts.append(f_year.replace(' ','_'))
@@ -3337,16 +3263,14 @@ def export_stats_xlsx():
         if f_instr:    parts.append(f_instr.split()[0])
         fname = request.args.get('filename') or ('_'.join(parts)+f'_{now.strftime("%Y-%m-%d")}.xlsx')
         fname = re.sub(r'_+','_', fname)
-
         output = _io.BytesIO()
         wb.save(output); output.seek(0)
-        return __import__('flask').Response(output.getvalue(),
+        return Response(output.getvalue(),
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             headers={'Content-Disposition': f'attachment;filename="{fname}"'})
     except Exception:
         import traceback
-        return __import__('flask').Response(f'Export error: {traceback.format_exc()}',
-                                            status=500, mimetype='text/plain')
+        return Response(f'Export error: {traceback.format_exc()}', status=500, mimetype='text/plain')
 
 
 @app.route('/export/stats.csv')
@@ -3387,8 +3311,6 @@ def export_stats_csv():
     fname=f"attendance_{period}_{now.strftime('%Y%m%d')}.csv"
     return Response(out.getvalue(),mimetype='text/csv',headers={'Content-Disposition':f'attachment;filename={fname}'})
 
-# ── NFC / HARDWARE (FIX #9 — DB-based registration mode) ─────────────────────
-
 @app.route('/request_registration_scan', methods=['POST'])
 @admin_required
 def request_registration_scan():
@@ -3417,138 +3339,6 @@ def receive_pico_uid():
     uid=data['uid'].strip().upper()
     nfc_set_uid(uid)
     return jsonify({'status':'ok','uid':uid})
-
-@app.route('/mark_pico', methods=['POST'])
-def mark_pico():
-    data=request.get_json()
-    if not data or 'nfc_id' not in data: return jsonify({'status':'error'}), 400
-    nfc_id=data['nfc_id'].strip().upper()
-    print(f"[NFC TAP] {nfc_id}")
-
-    # FIX #9: Check DB-based registration mode instead of flag file
-    if nfc_is_waiting():
-        nfc_set_uid(nfc_id)
-        return jsonify({'status':'registration','uid':nfc_id})
-
-    sess_id, sess = get_active_session_for_nfc(nfc_id)
-    if not sess:
-        all_s   = get_all_students()
-        student = next((s for s in all_s if s['nfcId']==nfc_id), None)
-        active  = get_active_sessions()
-        invalid_entry={'nfc_id':nfc_id,'timestamp':time.time(),
-                       'reason':'Student not registered' if not student else 'No active session for this section'}
-        for sid, asess in active.items():
-            asess.setdefault('invalid_log',[]).append(invalid_entry)
-            save_session(sid, asess)
-        return jsonify({'status':'no_session',
-                        'message':"No active session for this student's section.",
-                        'debug_student':student,
-                        'debug_active_sessions':list(active.keys())})
-
-    name        = student_name_map.get(nfc_id,'Unknown')
-    all_s       = get_all_students()
-    student_info= next((s for s in all_s if s['nfcId']==nfc_id),{})
-    student_id  = student_info.get('student_id','')
-
-    # Check duplicate tap
-    if nfc_id in sess.get('present',[]):
-        warn_entry={'nfc_id':nfc_id,'name':name,'student_id':student_id,'timestamp':time.time()}
-        if nfc_id not in sess.get('warned',[]): sess.setdefault('warned',[]).append(nfc_id)
-        sess.setdefault('warn_log',[]).append(warn_entry)
-        save_session(sess_id, sess)
-        return jsonify({'status':'already_marked','name':name,'student_id':student_id,
-                        'message':f'{name} is already marked present.'})
-
-    # FIX #5: Determine late status HERE and save it permanently to the session
-    now_dt       = datetime.now()
-    late_cutoff  = sess.get('late_cutoff','')
-    is_late      = False
-    if late_cutoff:
-        try:
-            cutoff_dt = datetime.strptime(late_cutoff, '%Y-%m-%d %H:%M:%S')
-            is_late   = now_dt > cutoff_dt
-        except:
-            is_late = False
-
-    # Record on blockchain (skip gracefully if offline)
-    tx_hash=None; block_num=None
-    if BLOCKCHAIN_ONLINE and contract and admin_account:
-        try:
-            tx       = contract.functions.markAttendance(nfc_id).transact({'from':admin_account})
-            receipt  = web3.eth.wait_for_transaction_receipt(tx)
-            tx_hash  = receipt['transactionHash'].hex()
-            block_num= receipt['blockNumber']
-        except Exception as e:
-            print(f"[WARNING] Blockchain mark failed: {e} — attendance saved to SQLite only.")
-    else:
-        print(f"[INFO] Blockchain offline — attendance for {nfc_id} saved to SQLite only.")
-
-    tap_time = datetime.now().strftime('%H:%M:%S')
-    status_label = 'late' if is_late else 'present'
-
-    # Save to attendance_logs table (the new proper storage)
-    db_save_attendance_log(
-        sess_id=sess_id, nfc_id=nfc_id,
-        student_name=name, student_id=student_id,
-        status=status_label, tap_time=tap_time,
-        tx_hash=tx_hash or '', block_number=block_num or 0
-    )
-
-    # Keep in-memory session dict in sync for live polling
-    sess.setdefault('present',[]).append(nfc_id)
-    if is_late and nfc_id not in sess.get('late',[]):
-        sess.setdefault('late',[]).append(nfc_id)
-    sess.setdefault('tap_log',[]).append({
-        'nfc_id':nfc_id,'name':name,'time':tap_time,
-        'timestamp':time.time(),'tx_hash':tx_hash,'block':block_num,
-        'student_id':student_id,'is_late':is_late
-    })
-    sess.setdefault('tx_hashes',{})[nfc_id]={'tx_hash':tx_hash,'block':block_num,'time':tap_time}
-
-    save_session(sess_id, sess)
-    sessions_db[sess_id] = sess
-
-    recent_attendance.append({
-        'nfc_id':nfc_id,'name':name,'timestamp':time.time(),
-        'subject':sess.get('subject_name',''),'is_late':is_late
-    })
-
-    return jsonify({
-        'status':'ok','name':name,'student_id':student_id,
-        'time':tap_time,'subject':sess.get('subject_name',''),
-        'tx_hash':tx_hash,'block':block_num,
-        'attendance_status': status_label,
-        'is_late': is_late
-    })
-
-@app.route('/debug/tap/<nfc_id>')
-def debug_tap(nfc_id):
-    nfc_id=nfc_id.strip().upper()
-    all_students=get_all_students()
-    student=next((s for s in all_students if s['nfcId']==nfc_id),None)
-    active=get_active_sessions()
-    student_key=build_student_section_key(student) if student else None
-    matching_session=None
-    for sid,s in active.items():
-        if normalize_section_key(s.get('section_key',''))==student_key:
-            matching_session={**s,'session_id':sid}; break
-    result={
-        '1_nfc_id_received':nfc_id,
-        '2_student_found':student is not None,
-        '3_student_info':student,
-        '4_student_section_key':student_key,
-        '5_active_sessions':[{
-            'session_id':sid,'subject':s.get('subject_name'),
-            'section_key':s.get('section_key'),'teacher':s.get('teacher_name')
-        } for sid,s in active.items()],
-        '6_matching_session':matching_session,
-        '7_verdict':('STUDENT NOT REGISTERED' if not student
-                     else 'NO ACTIVE SESSION' if not matching_session
-                     else 'SHOULD WORK')
-    }
-    from flask import current_app
-    resp=current_app.response_class(json.dumps(result,indent=2),mimetype='application/json')
-    return resp
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)

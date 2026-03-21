@@ -10,3 +10,51 @@
 [2026-03-21 11:26:06] ==================================================
 [2026-03-21 11:26:06]   pyscard import failed. Run: pip install pyscard
 [2026-03-21 11:26:06]   No USB reader — keyboard simulator active.
+[2026-03-21 13:02:21] ==================================================
+[2026-03-21 13:02:21]   DAVS NFC Listener starting
+[2026-03-21 13:02:21]   Flask: http://127.0.0.1:5000
+[2026-03-21 13:02:21] ==================================================
+[2026-03-21 13:02:21]   pyscard import failed. Run: pip install pyscard
+[2026-03-21 13:02:21]   No USB reader — keyboard simulator active.
+[2026-03-21 14:32:57] ==================================================
+[2026-03-21 14:32:57]   DAVS NFC Listener starting
+[2026-03-21 14:32:57]   Flask: http://127.0.0.1:5000
+[2026-03-21 14:32:57] ==================================================
+[2026-03-21 14:32:58]   pyscard import failed. Run: pip install pyscard
+[2026-03-21 14:32:58]   No USB reader — keyboard simulator active.
+[2026-03-21 14:48:59] ==================================================
+[2026-03-21 14:48:59]   DAVS NFC Listener starting
+[2026-03-21 14:48:59]   Flask: http://127.0.0.1:5000
+[2026-03-21 14:48:59] ==================================================
+[2026-03-21 14:48:59]   pyscard import failed. Run: pip install pyscard
+[2026-03-21 14:48:59]   No USB reader — keyboard simulator active.
+[2026-03-21 14:51:26] ==================================================
+[2026-03-21 14:51:26]   DAVS NFC Listener starting
+[2026-03-21 14:51:26]   Flask: http://127.0.0.1:5000
+[2026-03-21 14:51:26] ==================================================
+[2026-03-21 14:51:26]   pyscard import failed. Run: pip install pyscard
+[2026-03-21 14:51:26]   No USB reader — keyboard simulator active.
+[2026-03-21 14:59:46] ==================================================
+[2026-03-21 14:59:46]   DAVS NFC Listener starting
+[2026-03-21 14:59:46]   Flask: http://127.0.0.1:5000
+[2026-03-21 14:59:46] ==================================================
+[2026-03-21 14:59:46]   pyscard import failed. Run: pip install pyscard
+[2026-03-21 14:59:46]   No USB reader — keyboard simulator active.
+[2026-03-21 15:03:16] ==================================================
+[2026-03-21 15:03:16]   DAVS NFC Listener starting
+[2026-03-21 15:03:16]   Flask: http://127.0.0.1:5000
+[2026-03-21 15:03:16] ==================================================
+[2026-03-21 15:03:17]   pyscard import failed. Run: pip install pyscard
+[2026-03-21 15:03:17]   No USB reader — keyboard simulator active.
+[2026-03-21 15:06:27] ==================================================
+[2026-03-21 15:06:27]   DAVS NFC Listener starting
+[2026-03-21 15:06:27]   Flask: http://127.0.0.1:5000
+[2026-03-21 15:06:27] ==================================================
+[2026-03-21 15:06:27]   pyscard import failed. Run: pip install pyscard
+[2026-03-21 15:06:27]   No USB reader — keyboard simulator active.
+[2026-03-21 15:13:16] ==================================================
+[2026-03-21 15:13:16]   DAVS NFC Listener starting
+[2026-03-21 15:13:16]   Flask: http://127.0.0.1:5000
+[2026-03-21 15:13:16] ==================================================
+[2026-03-21 15:13:16]   pyscard import failed. Run: pip install pyscard
+[2026-03-21 15:13:16]   No USB reader — keyboard simulator active.

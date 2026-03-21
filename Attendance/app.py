@@ -129,26 +129,28 @@ def init_db():
         updated_at      TEXT NOT NULL DEFAULT ''
     );
     CREATE TABLE IF NOT EXISTS sessions (
-        sess_id         TEXT PRIMARY KEY,
-        subject_id      TEXT NOT NULL DEFAULT '',
-        subject_name    TEXT NOT NULL DEFAULT '',
-        course_code     TEXT NOT NULL DEFAULT '',
-        units           INTEGER NOT NULL DEFAULT 3,
-        time_slot       TEXT NOT NULL DEFAULT '',
-        section_key     TEXT NOT NULL DEFAULT '',
-        teacher_username TEXT NOT NULL DEFAULT '',
-        teacher_name    TEXT NOT NULL DEFAULT '',
-        started_at      TEXT NOT NULL DEFAULT '',
-        late_cutoff     TEXT NOT NULL DEFAULT '',
-        ended_at        TEXT,
-        total_enrolled  INTEGER NOT NULL DEFAULT 0,
-        total_present   INTEGER NOT NULL DEFAULT 0,
-        total_late      INTEGER NOT NULL DEFAULT 0,
-        total_absent    INTEGER NOT NULL DEFAULT 0,
-        total_excused   INTEGER NOT NULL DEFAULT 0,
-        warn_log_json   TEXT NOT NULL DEFAULT '[]',
-        invalid_log_json TEXT NOT NULL DEFAULT '[]'
-    );
+            sess_id         TEXT PRIMARY KEY,
+            subject_id      TEXT NOT NULL DEFAULT '',
+            subject_name    TEXT NOT NULL DEFAULT '',
+            course_code     TEXT NOT NULL DEFAULT '',
+            units           INTEGER NOT NULL DEFAULT 3,
+            time_slot       TEXT NOT NULL DEFAULT '',
+            section_key     TEXT NOT NULL DEFAULT '',
+            teacher_username TEXT NOT NULL DEFAULT '',
+            teacher_name    TEXT NOT NULL DEFAULT '',
+            started_at      TEXT NOT NULL DEFAULT '',
+            late_cutoff     TEXT NOT NULL DEFAULT '',
+            auto_end_at     TEXT,
+            ended_at        TEXT,
+            grace_period    INTEGER NOT NULL DEFAULT 15,
+            total_enrolled  INTEGER NOT NULL DEFAULT 0,
+            total_present   INTEGER NOT NULL DEFAULT 0,
+            total_late      INTEGER NOT NULL DEFAULT 0,
+            total_absent    INTEGER NOT NULL DEFAULT 0,
+            total_excused   INTEGER NOT NULL DEFAULT 0,
+            warn_log_json   TEXT NOT NULL DEFAULT '[]',
+            invalid_log_json TEXT NOT NULL DEFAULT '[]'
+        );
     CREATE INDEX IF NOT EXISTS idx_sess_ended   ON sessions(ended_at);
     CREATE INDEX IF NOT EXISTS idx_sess_section ON sessions(section_key);
     CREATE TABLE IF NOT EXISTS attendance_logs (
@@ -230,6 +232,8 @@ def _migrate_add_missing_columns():
         ("sessions", "total_excused",   "INTEGER NOT NULL DEFAULT 0"),
         ("sessions", "warn_log_json",   "TEXT NOT NULL DEFAULT '[]'"),
         ("sessions", "invalid_log_json","TEXT NOT NULL DEFAULT '[]'"),
+        ("sessions", "grace_period",    "INTEGER NOT NULL DEFAULT 15"),
+        ("sessions", "auto_end_at",     "TEXT"),
         ("accounts", "updated_at",      "TEXT NOT NULL DEFAULT ''"),
         ("photos",   "uploaded_at",     "TEXT NOT NULL DEFAULT ''"),
     ]
@@ -382,9 +386,10 @@ def save_session(sess_id, s):
         conn.execute(
             "INSERT INTO sessions "
             "(sess_id,subject_id,subject_name,course_code,units,time_slot,"
-            " section_key,teacher_username,teacher_name,started_at,late_cutoff,ended_at,"
+            " section_key,teacher_username,teacher_name,started_at,late_cutoff,"
+            " auto_end_at,ended_at,grace_period,"
             " warn_log_json,invalid_log_json) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(sess_id) DO UPDATE SET "
             "subject_id=excluded.subject_id, subject_name=excluded.subject_name, "
             "course_code=excluded.course_code, units=excluded.units, "
@@ -392,13 +397,17 @@ def save_session(sess_id, s):
             "teacher_username=excluded.teacher_username, "
             "teacher_name=excluded.teacher_name, "
             "started_at=excluded.started_at, late_cutoff=excluded.late_cutoff, "
+            "auto_end_at=excluded.auto_end_at, "
             "ended_at=excluded.ended_at, "
+            "grace_period=excluded.grace_period, "
             "warn_log_json=excluded.warn_log_json, "
             "invalid_log_json=excluded.invalid_log_json",
             (sess_id, s.get('subject_id', ''), s.get('subject_name', ''),
              s.get('course_code', ''), s.get('units', 3), s.get('time_slot', ''),
              sk, teacher_uname, teacher_name,
-             s.get('started_at', ''), s.get('late_cutoff', ''), s.get('ended_at'),
+             s.get('started_at', ''), s.get('late_cutoff', ''),
+             s.get('auto_end_at'), s.get('ended_at'),
+             s.get('grace_period', 15),
              json.dumps(s.get('warn_log', [])), json.dumps(s.get('invalid_log', [])))
         )
         counts = conn.execute(
@@ -1875,6 +1884,126 @@ def teacher_remove_subject(subject_id, section_key):
     flash('Subject removed from your schedule.')
     return redirect(url_for('teacher_create_session'))
 
+def _parse_time_slot_end(time_slot_str, reference_dt):
+    """
+    Parse a time slot like '9:00 AM – 11:00 AM' and return
+    a datetime for the END time on the same date as reference_dt.
+    Returns None if parsing fails.
+    """
+    if not time_slot_str:
+        return None
+    try:
+        # Handle both '–' (en-dash) and '-' (hyphen) separators
+        sep = '–' if '–' in time_slot_str else '-'
+        parts = time_slot_str.split(sep)
+        if len(parts) < 2:
+            return None
+        end_str = parts[1].strip()
+        # Parse end time — e.g. "11:00 AM"
+        end_t   = datetime.strptime(end_str, '%I:%M %p').time()
+        return reference_dt.replace(
+            hour=end_t.hour, minute=end_t.minute,
+            second=0, microsecond=0
+        )
+    except Exception as _pe:
+        print(f"[WARN] Could not parse time slot end: {_pe}")
+        return None
+ 
+ 
+def _parse_time_slot_start(time_slot_str, reference_dt):
+    """Parse the START time of a time slot string."""
+    if not time_slot_str:
+        return None
+    try:
+        sep     = '–' if '–' in time_slot_str else '-'
+        parts   = time_slot_str.split(sep)
+        start_s = parts[0].strip()
+        start_t = datetime.strptime(start_s, '%I:%M %p').time()
+        return reference_dt.replace(
+            hour=start_t.hour, minute=start_t.minute,
+            second=0, microsecond=0
+        )
+    except Exception:
+        return None
+ 
+ 
+def _auto_end_session_thread(sess_id, auto_end_at_str, app_context):
+    """
+    Background thread: waits until auto_end_at then ends the session
+    automatically (same logic as end_session route).
+    Teacher can still end early by clicking End Session.
+    """
+    import threading as _th
+    try:
+        auto_end_dt = datetime.strptime(auto_end_at_str, '%Y-%m-%d %H:%M:%S')
+        wait_secs   = (auto_end_dt - datetime.now()).total_seconds()
+        if wait_secs > 0:
+            print(f"[AUTO-END] Session {sess_id} will auto-end in {int(wait_secs)}s at {auto_end_at_str}")
+            _th.Event().wait(timeout=wait_secs)
+ 
+        # Check if already ended manually by teacher
+        with app_context:
+            current = load_session(sess_id)
+            if not current or current.get('ended_at'):
+                print(f"[AUTO-END] Session {sess_id} already ended — skipping auto-end.")
+                return
+ 
+            print(f"[AUTO-END] Auto-ending session {sess_id}...")
+ 
+            # Replicate end_session logic
+            all_students_list = get_all_students()
+            sk               = current.get('section_key', '')
+            section_students = [s for s in all_students_list
+                                 if build_student_section_key(s) == normalize_section_key(sk)]
+            present_set  = set(current.get('present', []))
+            excused_set  = set(current.get('excused', []))
+            ended_time   = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+ 
+            if BLOCKCHAIN_ONLINE and contract and admin_account:
+                for s in section_students:
+                    nid = s['nfcId']
+                    if nid not in present_set and nid not in excused_set:
+                        try:
+                            tx      = contract.functions.markAttendance(nid).transact({'from': admin_account})
+                            receipt = web3.eth.wait_for_transaction_receipt(tx)
+                            db_save_attendance_log(
+                                sess_id=sess_id, nfc_id=nid,
+                                student_name=s.get('name',''), student_id=s.get('student_id',''),
+                                status='absent', tap_time=ended_time,
+                                tx_hash=receipt['transactionHash'].hex(),
+                                block_number=receipt['blockNumber']
+                            )
+                        except Exception as _ae:
+                            db_save_attendance_log(
+                                sess_id=sess_id, nfc_id=nid,
+                                student_name=s.get('name',''), student_id=s.get('student_id',''),
+                                status='absent', tap_time=ended_time
+                            )
+            else:
+                for s in section_students:
+                    nid = s['nfcId']
+                    if nid not in present_set and nid not in excused_set:
+                        db_save_attendance_log(
+                            sess_id=sess_id, nfc_id=nid,
+                            student_name=s.get('name',''), student_id=s.get('student_id',''),
+                            status='absent', tap_time=ended_time
+                        )
+ 
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
+                    (len(section_students), ended_time, sess_id)
+                )
+ 
+            current['ended_at'] = ended_time
+            save_session(sess_id, current)
+            sessions_db[sess_id] = current
+            print(f"[AUTO-END] Session {sess_id} ended automatically at {ended_time}.")
+ 
+    except Exception as _ate:
+        print(f"[AUTO-END] Error in auto-end thread for {sess_id}: {_ate}")
+ 
+ 
 @app.route('/teacher/session/start', methods=['POST'])
 @login_required
 def start_session():
@@ -1888,31 +2017,62 @@ def start_session():
                 and normalize_section_key(s.get('section_key',''))==section_key):
             flash('You already have an active session for that section.')
             return redirect(url_for('teacher_create_session'))
-    time_slot = request.form.get('time_slot','').strip()
+ 
+    time_slot    = request.form.get('time_slot','').strip()
+    grace_period = int(request.form.get('grace_period', 15) or 15)
+    grace_period = max(1, min(grace_period, 120))  # clamp 1–120 min
+ 
     subj_data = db_get_subject(subject_id) or {}
     units     = int(subj_data.get('units', 3))
     now       = datetime.now()
     from datetime import timedelta
-    late_cutoff_dt = now.replace(second=0, microsecond=0) + timedelta(minutes=30)
-    sess_id   = str(uuid.uuid4())[:12]
-    new_sess  = {
-        'subject_id':   subject_id,
-        'subject_name': subj_data.get('name',''),
-        'course_code':  subj_data.get('course_code',''),
-        'units':        units,
-        'time_slot':    time_slot,
-        'section_key':  section_key,
-        'teacher':      session['username'],
-        'teacher_name': session['full_name'],
-        'started_at':   now.strftime('%Y-%m-%d %H:%M:%S'),
-        'late_cutoff':  late_cutoff_dt.strftime('%Y-%m-%d %H:%M:%S'),
-        'ended_at':     None,
+ 
+    # ── Late cutoff: based on actual session start + grace period ─────────────
+    # Teacher sets grace period (default 15 min). Students tapping after
+    # this cutoff are marked LATE instead of PRESENT.
+    late_cutoff_dt = now.replace(second=0, microsecond=0) + timedelta(minutes=grace_period)
+ 
+    # ── Auto-end: derived from time slot end time ─────────────────────────────
+    # If teacher selects "9:00 AM – 11:00 AM", session auto-ends at 11:00 AM.
+    # Teacher can still end early by clicking End Session.
+    auto_end_dt  = _parse_time_slot_end(time_slot, now)
+    auto_end_str = auto_end_dt.strftime('%Y-%m-%d %H:%M:%S') if auto_end_dt else None
+ 
+    sess_id  = str(uuid.uuid4())[:12]
+    new_sess = {
+        'subject_id':    subject_id,
+        'subject_name':  subj_data.get('name',''),
+        'course_code':   subj_data.get('course_code',''),
+        'units':         units,
+        'time_slot':     time_slot,
+        'section_key':   section_key,
+        'teacher':       session['username'],
+        'teacher_name':  session['full_name'],
+        'started_at':    now.strftime('%Y-%m-%d %H:%M:%S'),
+        'late_cutoff':   late_cutoff_dt.strftime('%Y-%m-%d %H:%M:%S'),
+        'auto_end_at':   auto_end_str,
+        'grace_period':  grace_period,
+        'ended_at':      None,
         'present':[],'late':[],'excused':[],'warned':[],'absent':[],
         'tap_log':[],'warn_log':[],'invalid_log':[],'excuse_notes':{},'tx_hashes':{}
     }
     save_session(sess_id, new_sess)
     sessions_db[sess_id] = new_sess
-    flash(f'Classroom session started for {subj_data.get("name","")}.')
+ 
+    # ── Launch auto-end background thread ─────────────────────────────────────
+    if auto_end_str:
+        import threading as _th
+        ctx = app.app_context()
+        t   = _th.Thread(
+            target=_auto_end_session_thread,
+            args=(sess_id, auto_end_str, ctx),
+            daemon=True
+        )
+        t.start()
+        flash(f'Session started. Auto-ends at {auto_end_dt.strftime("%I:%M %p")}. Grace period: {grace_period} min.')
+    else:
+        flash(f'Classroom session started for {subj_data.get("name","")}.')
+ 
     return redirect(url_for('live_session', sess_id=sess_id))
 
 @app.route('/api/blockchain_status')
@@ -2200,7 +2360,7 @@ def poll_session(sess_id):
         new_invalids = [t for t in mem_sess.get('invalid_log', [])
                         if t.get('timestamp', 0) > since_buffered]
 
-    return jsonify({
+        return jsonify({
         'present_count': len(sess.get('present', [])),
         'late_count':    len(sess.get('late', [])),
         'excused_count': len(sess.get('excused', [])),
@@ -2212,7 +2372,9 @@ def poll_session(sess_id):
         'late_ids':      sess.get('late', []),
         'excused_ids':   sess.get('excused', []),
         'present_ids':   sess.get('present', []),
-        'server_time':   now_ts,   # ← client uses this instead of Date.now()
+        'server_time':   now_ts,
+        'auto_end_at':   sess.get('auto_end_at'),
+        'grace_period':  sess.get('grace_period', 15),
     })
 
 @app.route('/api/attendance/stats')
@@ -2392,15 +2554,54 @@ def mark_pico():
     # Record on blockchain (skip gracefully if offline)
     tx_hash=None; block_num=None
     if BLOCKCHAIN_ONLINE and contract and admin_account:
-        try:
-            tx       = contract.functions.markAttendance(nfc_id).transact({'from':admin_account})
-            receipt  = web3.eth.wait_for_transaction_receipt(tx)
-            tx_hash  = receipt['transactionHash'].hex()
-            block_num= receipt['blockNumber']
-        except Exception as e:
-            print(f"[WARNING] Blockchain mark failed: {e} — attendance saved to SQLite only.")
-    else:
-        print(f"[INFO] Blockchain offline — attendance for {nfc_id} saved to SQLite only.")
+            try:
+                # Step 1: Check if student is registered on-chain
+                on_chain = contract.functions.studentsByNfc(nfc_id).call()
+                is_registered_on_chain = on_chain[2]  # isRegistered bool
+    
+                # Step 2: Auto-register on-chain if not registered
+                # This handles students enrolled via SQLite (seed data, offline mode, etc.)
+                if not is_registered_on_chain:
+                    print(f"[BLOCKCHAIN] Student {nfc_id} not on-chain — auto-registering...")
+                    try:
+                        # Generate a deterministic address from nfc_id for offline-enrolled students
+                        import hashlib as _hl
+                        pk_seed   = _hl.sha256(f"davs-student-{nfc_id}".encode()).hexdigest()
+                        pk        = "0x" + pk_seed
+                        addr      = web3.eth.account.from_key(pk).address
+                        raw_name  = student_info.get('raw_name', '') or name
+                        reg_tx    = contract.functions.registerStudent(
+                            addr, nfc_id, raw_name
+                        ).transact({'from': admin_account})
+                        reg_receipt = web3.eth.wait_for_transaction_receipt(reg_tx)
+                        reg_tx_hash = reg_receipt['transactionHash'].hex()
+                        reg_block   = reg_receipt['blockNumber']
+                        # Update SQLite with the on-chain registration proof
+                        with get_db() as _conn:
+                            _conn.execute(
+                                "UPDATE students SET reg_tx_hash=?, eth_address=?, "
+                                "reg_block=?, updated_at=? WHERE nfc_id=?",
+                                (reg_tx_hash, addr,
+                                reg_block,
+                                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                nfc_id)
+                            )
+                        print(f"[BLOCKCHAIN] Auto-registered {name} — TX: {reg_tx_hash} Block: {reg_block}")
+                    except Exception as reg_err:
+                        print(f"[WARNING] Auto-registration failed for {nfc_id}: {reg_err}")
+                        # Continue anyway — markAttendance will fail but we still save to SQLite
+    
+                # Step 3: Mark attendance on blockchain → get TX hash + block number
+                tx        = contract.functions.markAttendance(nfc_id).transact({'from': admin_account})
+                receipt   = web3.eth.wait_for_transaction_receipt(tx)
+                tx_hash   = receipt['transactionHash'].hex()
+                block_num = receipt['blockNumber']
+                print(f"[BLOCKCHAIN] Attendance marked — TX: {tx_hash} Block: {block_num}")
+    
+            except Exception as e:
+                print(f"[WARNING] Blockchain mark failed: {e} — attendance saved to SQLite only.")
+            else:
+                print(f"[INFO] Blockchain offline — attendance for {nfc_id} saved to SQLite only.")
 
     tap_time      = datetime.now().strftime('%H:%M:%S')
     tap_timestamp = time.time()
@@ -2993,7 +3194,20 @@ def export_stats_xlsx():
         else:
             start_dt = datetime(2000,1,1); end_dt = None; period_label = 'All Time'
 
-        all_sess = load_sessions(); all_stud = get_all_students(); filtered = {}
+        all_sess = load_sessions()
+        # Always use SQLite cache for export — get_all_students() may return
+        # empty if blockchain restarted and events are gone. SQLite is the
+        # reliable source of truth for enrolled students.
+        all_stud = db_get_all_students()
+        for _st in all_stud:
+            _ov = db_get_override(_st['nfcId'])
+            if _ov.get('course'):      _st['course']      = _ov['course']
+            if _ov.get('year_level'):  _st['year_level']  = _ov['year_level']
+            if _ov.get('section'):     _st['section']     = _ov['section'].upper()
+            if _ov.get('full_name'):   _st['name']        = _ov['full_name']
+            if _ov.get('student_id'):  _st['student_id']  = _ov['student_id']
+            _st['section'] = (_st.get('section') or '').strip().upper()
+        filtered = {}
         f_section_norm = normalize_section_key(f_section) if f_section else ''
         for sid, s in all_sess.items():
             if not s.get('started_at'): continue
@@ -3187,7 +3401,7 @@ def export_stats_xlsx():
                 if i < len(bar4.series): bar4.series[i].graphicalProperties.solidFill = clr
             ws4.add_chart(bar4, f'I{ts4}')
 
-        # Sheet 5: By Section
+# Sheet 5: By Section
         ws5 = wb.create_sheet('By Section'); n5 = 7
         subtitles5 = [f'Period: {period_label}  |  Aggregate attendance per section']
         ts5 = H['title_block'](ws5, 'Attendance by Section', subtitles5, n5)
@@ -3197,63 +3411,148 @@ def export_stats_xlsx():
         ts5 += 1
         for ri, (sec_k, sc) in enumerate(sorted(by_section.items()), ts5):
             total5 = sc['present']+sc['late']+sc['absent']+sc['excused']
-            rate5  = f"{round((sc['present']+sc['late'])/sc['enrolled']*100,1)}%" if sc['enrolled'] else '—'
+            rate5  = f"{round((sc['present']+sc['late'])/sc['enrolled']*100,1)}%" if sc['enrolled'] else '-'
             col_fmt5 = {2:('num',),3:('num',),4:('num',),5:('num',),6:('num',)}
             H['data_row'](ws5, ri, [sec_k.replace('|',' · '), sc['enrolled'],
                                     sc['present'],sc['late'],sc['absent'],sc['excused'],rate5],
                           alt=(ri%2==0), col_formats=col_fmt5)
-
+        last_ts5 = ts5 + len(by_section) - 1
+        # Add bar chart for By Section sheet
+        if by_section:
+            from openpyxl.chart import BarChart, Reference
+            bar5 = BarChart(); bar5.type='bar'; bar5.grouping='stacked'; bar5.overlap=100
+            bar5.title='Attendance by Section'; bar5.style=10; bar5.width=22; bar5.height=14
+            bar5.x_axis.title='Count'; bar5.legend.position='b'
+            cats5 = Reference(ws5, min_col=1, min_row=ts5, max_row=last_ts5)
+            data5 = Reference(ws5, min_col=3, min_row=ts5-1, max_row=last_ts5, max_col=6)
+            bar5.add_data(data5, titles_from_data=True); bar5.set_categories(cats5)
+            colors5 = [C['present'],C['late'],C['absent'],C['excused']]
+            for i,clr in enumerate(colors5):
+                if i < len(bar5.series):
+                    bar5.series[i].graphicalProperties.solidFill = clr
+                    bar5.series[i].graphicalProperties.line.solidFill = clr
+            ws5.add_chart(bar5, f'I{ts5}')
+ 
         # Sheet 6: Charts Dashboard
+        # ── Layout strategy ────────────────────────────────────────────────
+        # Row 1-2:  Title + subtitle (dark header)
+        # Row 3:    Spacer
+        # Row 4-7:  PIE chart data (cols A-B), Pie chart anchored at C4
+        # Row 10+:  Subject bar data (cols A-E), Subject bar anchored at G10
+        # Row 25+:  Section bar data (cols A-E), Section bar anchored at G25
+        # All data columns are hidden so only charts show.
+        # ──────────────────────────────────────────────────────────────────
+        from openpyxl.chart import BarChart, PieChart, Reference
+        from openpyxl.styles import Font as XFont, PatternFill as XFill, Alignment as XAlign
+ 
         wc = wb.create_sheet('Charts')
         wc.sheet_view.showGridLines = False
-        wc.merge_cells('A1:P1')
+ 
+        # Title rows
+        n_chart_cols = 20
+        wc.merge_cells(f'A1:{chr(64+n_chart_cols)}1')
         wc['A1'] = 'DAVS — Attendance Analytics Charts'
-        wc['A1'].font = XFont(name='Calibri', bold=True, size=16, color=C['gold'])
-        wc['A1'].fill = XFill('solid', fgColor=C['bg'])
+        wc['A1'].font      = XFont(name='Calibri', bold=True, size=16, color=C['gold'])
+        wc['A1'].fill      = XFill('solid', fgColor=C['bg'])
         wc['A1'].alignment = XAlign(horizontal='center', vertical='center')
         wc.row_dimensions[1].height = 36
-        for col in range(2,17): wc.cell(row=1,column=col).fill = XFill('solid',fgColor=C['bg'])
-        wc.merge_cells('A2:P2')
+        for col in range(2, n_chart_cols+1):
+            wc.cell(row=1, column=col).fill = XFill('solid', fgColor=C['bg'])
+ 
+        wc.merge_cells(f'A2:{chr(64+n_chart_cols)}2')
         wc['A2'] = f'Period: {period_label}  |  Filters: {filter_label}  |  Generated: {now.strftime("%B %d, %Y")}'
-        wc['A2'].font = XFont(name='Calibri', size=9, italic=True, color='94A3B8')
-        wc['A2'].fill = XFill('solid', fgColor=C['bg'])
+        wc['A2'].font      = XFont(name='Calibri', size=9, italic=True, color='94A3B8')
+        wc['A2'].fill      = XFill('solid', fgColor=C['bg'])
         wc['A2'].alignment = XAlign(horizontal='center', vertical='center')
-        for col in range(2,17): wc.cell(row=2,column=col).fill = XFill('solid',fgColor=C['bg'])
+        for col in range(2, n_chart_cols+1):
+            wc.cell(row=2, column=col).fill = XFill('solid', fgColor=C['bg'])
+ 
+        # ── 1. Overall Status Pie chart ───────────────────────────────────
+        # Data in cols A-B, rows 4-7 (hidden)
         pie_labels = ['Present','Late','Absent','Excused']
         pie_vals   = [donut[k] for k in pie_labels]
         for ri_p, (lbl, val) in enumerate(zip(pie_labels, pie_vals), 4):
-            wc.cell(row=ri_p, column=1, value=lbl)
-            wc.cell(row=ri_p, column=2, value=val)
+            wc.cell(row=ri_p, column=30, value=lbl)
+            wc.cell(row=ri_p, column=31, value=val)
+ 
         pie_c = PieChart()
-        pie_c.title = f'Overall Attendance Status — {period_label}'
-        pie_c.style = 10; pie_c.width = 16; pie_c.height = 12
-        pie_c.add_data(Reference(wc, min_col=2, min_row=4, max_row=7))
-        pie_c.set_categories(Reference(wc, min_col=1, min_row=4, max_row=7))
-        wc.add_chart(pie_c, 'C4')
+        pie_c.title  = f'Overall Attendance Status — {period_label}'
+        pie_c.style  = 10; pie_c.width = 16; pie_c.height = 14
+        pie_c.add_data(Reference(wc, min_col=31, min_row=4, max_row=7))
+        pie_c.set_categories(Reference(wc, min_col=30, min_row=4, max_row=7))
+        pie_colors = [C['present'], C['late'], C['absent'], C['excused']]
+        for i, clr in enumerate(pie_colors):
+            if i < len(pie_c.series) and pie_c.series[i].dPt:
+                pass  # openpyxl PieChart slice colors require DataPoint — skip per-slice color
+        wc.add_chart(pie_c, 'B4')
+ 
+        # ── 2. Attendance by Subject bar chart ────────────────────────────
+        # Data in cols A-E, rows 10+ (cols A-B already hidden, C-F hidden below)
+        SUBJ_DATA_ROW = 10
         if subj_d:
-            for ri_s, (sn, sd) in enumerate(sorted(subj_d.items()), 4):
-                wc.cell(row=ri_s, column=4, value=sn[:28])
-                wc.cell(row=ri_s, column=5, value=sd['present'])
-                wc.cell(row=ri_s, column=6, value=sd['late'])
-                wc.cell(row=ri_s, column=7, value=sd['absent'])
-                wc.cell(row=ri_s, column=8, value=sd['excused'])
-            wc.cell(row=3,column=4,value='Subject').font   = XFont(bold=True,size=9)
-            wc.cell(row=3,column=5,value='Present').font   = XFont(bold=True,size=9)
-            wc.cell(row=3,column=6,value='Late').font      = XFont(bold=True,size=9)
-            wc.cell(row=3,column=7,value='Absent').font    = XFont(bold=True,size=9)
-            wc.cell(row=3,column=8,value='Excused').font   = XFont(bold=True,size=9)
-            n_subj = len(subj_d)
+            wc.cell(row=SUBJ_DATA_ROW-1, column=33, value='Subject')
+            wc.cell(row=SUBJ_DATA_ROW-1, column=34, value='Present')
+            wc.cell(row=SUBJ_DATA_ROW-1, column=35, value='Late')
+            wc.cell(row=SUBJ_DATA_ROW-1, column=36, value='Absent')
+            wc.cell(row=SUBJ_DATA_ROW-1, column=37, value='Excused')
+            for ri_s, (sn, sd) in enumerate(sorted(subj_d.items()), SUBJ_DATA_ROW):
+                wc.cell(row=ri_s, column=33, value=sn[:30])
+                wc.cell(row=ri_s, column=34, value=sd['present'])
+                wc.cell(row=ri_s, column=35, value=sd['late'])
+                wc.cell(row=ri_s, column=36, value=sd['absent'])
+                wc.cell(row=ri_s, column=37, value=sd['excused'])
+            n_subj      = len(subj_d)
+            subj_last   = SUBJ_DATA_ROW + n_subj - 1
             bar_s = BarChart(); bar_s.type='bar'; bar_s.grouping='stacked'; bar_s.overlap=100
-            bar_s.title='Attendance by Subject'; bar_s.style=10; bar_s.width=20; bar_s.height=14
-            bar_s.legend.position='b'
-            bar_s.add_data(Reference(wc,min_col=5,min_row=3,max_row=3+n_subj,max_col=8),
-                           titles_from_data=True)
-            bar_s.set_categories(Reference(wc,min_col=4,min_row=4,max_row=3+n_subj))
-            for i,clr in enumerate([C['present'],C['late'],C['absent'],C['excused']]):
+            bar_s.title  = 'Attendance by Subject'
+            bar_s.style  = 10; bar_s.width = 20; bar_s.height = max(10, n_subj * 1.2)
+            bar_s.legend.position = 'b'
+            bar_s.add_data(
+                Reference(wc, min_col=34, min_row=SUBJ_DATA_ROW-1,
+                          max_row=subj_last, max_col=37),
+                titles_from_data=True)
+            bar_s.set_categories(
+                Reference(wc, min_col=33, min_row=SUBJ_DATA_ROW, max_row=subj_last))
+            for i, clr in enumerate([C['present'],C['late'],C['absent'],C['excused']]):
                 if i < len(bar_s.series):
                     bar_s.series[i].graphicalProperties.solidFill = clr
                     bar_s.series[i].graphicalProperties.line.solidFill = clr
-            wc.add_chart(bar_s, 'L4')
+            # Anchor subject chart below the pie chart — row 4 + ~20 rows down
+            wc.add_chart(bar_s, 'B36')
+ 
+        # ── 3. Attendance by Section bar chart ───────────────────────────
+        # Data in cols H-L, rows 10+
+        SEC_DATA_ROW = 10
+        if by_section:
+            wc.cell(row=SEC_DATA_ROW-1, column=38, value='Section')
+            wc.cell(row=SEC_DATA_ROW-1, column=39, value='Present')
+            wc.cell(row=SEC_DATA_ROW-1, column=40, value='Late')
+            wc.cell(row=SEC_DATA_ROW-1, column=41, value='Absent')
+            wc.cell(row=SEC_DATA_ROW-1, column=42, value='Excused')
+            for ri_sc, (sec_k, sc) in enumerate(sorted(by_section.items()), SEC_DATA_ROW):
+                wc.cell(row=ri_sc, column=38, value=sec_k.replace('|',' · ')[:30])
+                wc.cell(row=ri_sc, column=39, value=sc['present'])
+                wc.cell(row=ri_sc, column=40, value=sc['late'])
+                wc.cell(row=ri_sc, column=41, value=sc['absent'])
+                wc.cell(row=ri_sc, column=42, value=sc['excused'])
+            n_sec     = len(by_section)
+            sec_last  = SEC_DATA_ROW + n_sec - 1
+            bar_sc = BarChart(); bar_sc.type='bar'; bar_sc.grouping='stacked'; bar_sc.overlap=100
+            bar_sc.title  = 'Attendance by Section'
+            bar_sc.style  = 10; bar_sc.width = 20; bar_sc.height = max(10, n_sec * 1.4)
+            bar_sc.legend.position = 'b'
+            bar_sc.add_data(
+                Reference(wc, min_col=39, min_row=SEC_DATA_ROW-1,
+                          max_row=sec_last, max_col=42),
+                titles_from_data=True)
+            bar_sc.set_categories(
+                Reference(wc, min_col=38, min_row=SEC_DATA_ROW, max_row=sec_last))
+            for i, clr in enumerate([C['present'],C['late'],C['absent'],C['excused']]):
+                if i < len(bar_sc.series):
+                    bar_sc.series[i].graphicalProperties.solidFill = clr
+                    bar_sc.series[i].graphicalProperties.line.solidFill = clr
+            # Anchor section chart to the right of the pie chart
+            wc.add_chart(bar_sc, 'N4')
 
         parts = ['DAVS_Attendance_Report', period_label.replace(' ','_').replace(',','')]
         if f_program:  parts.append(f_program.replace('BS ','BS').replace(' ','_'))
@@ -3263,11 +3562,20 @@ def export_stats_xlsx():
         if f_instr:    parts.append(f_instr.split()[0])
         fname = request.args.get('filename') or ('_'.join(parts)+f'_{now.strftime("%Y-%m-%d")}.xlsx')
         fname = re.sub(r'_+','_', fname)
+        # Strip characters outside latin-1 range — the em dash (—) in
+        # period_label e.g. "Today — March 21, 2026" causes UnicodeEncodeError
+        # when Werkzeug encodes the Content-Disposition HTTP header.
+        fname = fname.replace('\u2014','-').replace('\u2013','-')  # em/en dash
+        fname = fname.encode('ascii','ignore').decode('ascii')      # drop rest
+        fname = re.sub(r'[^\w\-.]','_', fname)
+        fname = re.sub(r'_+','_', fname).strip('_')
+        if not fname.endswith('.xlsx'):
+            fname += '.xlsx'
         output = _io.BytesIO()
         wb.save(output); output.seek(0)
         return Response(output.getvalue(),
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            headers={'Content-Disposition': f'attachment;filename="{fname}"'})
+            headers={'Content-Disposition': f'attachment; filename="{fname}"'})
     except Exception:
         import traceback
         return Response(f'Export error: {traceback.format_exc()}', status=500, mimetype='text/plain')

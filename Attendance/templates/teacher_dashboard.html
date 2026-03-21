@@ -8,8 +8,8 @@
   .welcome-name{font-size:22px;font-weight:700;margin:0;}
   .welcome-sub{font-size:12px;color:var(--muted);margin-top:4px;}
   .clock-date{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:var(--accent);text-align:right;}
-  .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;}
-  @media(max-width:640px){.stats-row{grid-template-columns:repeat(2,1fr);}}
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+  @media(max-width:700px){.stats-row{grid-template-columns:repeat(2,1fr);}}
   .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px;}
   .stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
   .stat-val{font-family:'Space Mono',monospace;font-size:24px;font-weight:700;line-height:1;}
@@ -98,6 +98,7 @@
   <div><div class="clock-date" id="liveDate">—</div></div>
 </div>
 
+<!-- Stats row — now 4 boxes including Block Height -->
 <div class="stats-row">
   <div class="stat-box">
     <div class="stat-icon" style="background:rgba(45,106,39,.1);color:var(--accent);"><i class="bi bi-broadcast"></i></div>
@@ -110,6 +111,14 @@
   <div class="stat-box">
     <div class="stat-icon" style="background:rgba(96,165,250,.1);color:#60a5fa;"><i class="bi bi-journal-check"></i></div>
     <div><div class="stat-val">{{ total_sessions }}</div><div class="stat-lbl">Sessions Done</div></div>
+  </div>
+  <!-- Block Height — mirrors admin dashboard -->
+  <div class="stat-box">
+    <div class="stat-icon" style="background:rgba(168,85,247,.1);color:#a855f7;"><i class="bi bi-boxes"></i></div>
+    <div>
+      <div class="stat-val" style="color:#a855f7;" id="blockHeightVal">—</div>
+      <div class="stat-lbl">Block Height</div>
+    </div>
   </div>
 </div>
 
@@ -290,7 +299,7 @@
     <div style="display:flex;gap:6px;align-self:flex-end;flex-wrap:wrap;">
       <button class="btn-apply" onclick="applyFilters()"><i class="bi bi-search"></i> Apply</button>
       <button class="btn-reset-f" onclick="resetFilters()" title="Reset filters"><i class="bi bi-x-circle"></i></button>
-      <button class="btn-export" onclick="exportDashboard()" id="btnExport" title="Export Excel with charts">
+      <button class="btn-export" onclick="exportDashboard()" id="btnExport" title="Export to Excel">
         <i class="bi bi-file-earmark-excel"></i> Export
       </button>
     </div>
@@ -393,12 +402,26 @@
 </div>
 
 <script>
+// ── Clock ──────────────────────────────────────────────────────────────────
 function tick(){
   const cd=document.getElementById('liveDate');
   if(cd)cd.textContent=new Date().toLocaleDateString([],{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 }
 tick();
 
+// ── Block height ───────────────────────────────────────────────────────────
+async function fetchBlockHeight(){
+  try{
+    const r=await fetch('/api/block_number');
+    const d=await r.json();
+    const el=document.getElementById('blockHeightVal');
+    if(el) el.textContent = d.block !== null && d.block !== undefined ? d.block : '—';
+  }catch(e){ /* silent */ }
+}
+fetchBlockHeight();
+setInterval(fetchBlockHeight, 10000); // refresh every 10s
+
+// ── Charts setup ───────────────────────────────────────────────────────────
 const C={present:'#10b981',late:'#f59e0b',absent:'#ef4444',excused:'#60a5fa'};
 const donutChart=new Chart(document.getElementById('donutChart'),{
   type:'doughnut',
@@ -433,7 +456,13 @@ const subjChart=new Chart(document.getElementById('subjChart'),{
   }
 });
 
+// ── Period / filter state ──────────────────────────────────────────────────
 let curPeriod='today';
+
+// lastAppliedParams stores the exact params used in the last applyFilters()
+// so exportDashboard() exports exactly what is currently displayed on screen.
+let lastAppliedParams = null;
+
 function switchPeriod(p,btn){
   curPeriod=p;
   document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('active'));
@@ -475,12 +504,17 @@ document.addEventListener('click',function(e){
   }
 });
 
+// ── Apply filters → fetch stats → render charts ────────────────────────────
 async function applyFilters(){
   const params=getPeriodParams();
   const prog=ssdValues['f_program']||'';const yr=ssdValues['f_year']||'';
   const sec=ssdValues['f_section']||'';const subj=ssdValues['f_subject']||'';const tod=ssdValues['f_tod']||'';
   if(prog)params.append('program',prog);if(yr)params.append('year',yr);
   if(sec)params.append('section_letter',sec);if(subj)params.append('subject',subj);if(tod)params.append('time_of_day',tod);
+
+  // Save params so export matches exactly what is on screen
+  lastAppliedParams = params.toString();
+
   ['trendLoading','subjLoading'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='flex';});
   document.getElementById('trendChart').style.display='none';
   document.getElementById('subjScroll').style.display='none';
@@ -504,42 +538,39 @@ function resetFilters(){
   applyFilters();
 }
 
-// ── Export dashboard — simple GET so the browser download dialog always fires.
-// The old fetch+POST+blob approach silently failed in some browsers.
-// The chart images it was sending were never used server-side anyway —
-// export_stats_xlsx() generates its own charts via openpyxl.
+// ── Export — uses EXACTLY the same params that were last applied ───────────
+// This guarantees the Excel file matches what is displayed on screen.
+// Uses a simple anchor click (most reliable cross-browser download method).
 function exportDashboard(){
   const btn = document.getElementById('btnExport');
   btn.disabled = true;
   btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Exporting…';
 
-  const params = getPeriodParams();
-  const prog = ssdValues['f_program'] || '';
-  const yr   = ssdValues['f_year']    || '';
-  const sec  = ssdValues['f_section'] || '';
-  const subj = ssdValues['f_subject'] || '';
-  const tod  = ssdValues['f_tod']     || '';
-  if (prog) params.append('program',        prog);
-  if (yr)   params.append('year',           yr);
-  if (sec)  params.append('section_letter', sec);
-  if (subj) params.append('subject',        subj);
-  if (tod)  params.append('time_of_day',    tod);
+  // Use lastAppliedParams if available (matches current screen),
+  // otherwise build from current filter state
+  const qs = lastAppliedParams || (() => {
+    const p = getPeriodParams();
+    const prog=ssdValues['f_program']||'';const yr=ssdValues['f_year']||'';
+    const sec=ssdValues['f_section']||'';const subj=ssdValues['f_subject']||'';const tod=ssdValues['f_tod']||'';
+    if(prog)p.append('program',prog);if(yr)p.append('year',yr);
+    if(sec)p.append('section_letter',sec);if(subj)p.append('subject',subj);if(tod)p.append('time_of_day',tod);
+    return p.toString();
+  })();
 
-  // Create a hidden link and click it — this is the most reliable way to
-  // trigger a file download across all browsers without fetch/blob issues
   const a = document.createElement('a');
-  a.href = '/export/stats.xlsx?' + params.toString();
+  a.href = '/export/stats.xlsx?' + qs;
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
 
-  setTimeout(() => {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-file-earmark-excel"></i> Export';
+  setTimeout(()=>{
+    btn.disabled=false;
+    btn.innerHTML='<i class="bi bi-file-earmark-excel"></i> Export';
   }, 2000);
 }
 
+// ── Render all charts with data from API ───────────────────────────────────
 function renderAll(data,subj,sec,tod){
   const d=data.donut; const total=d.present+d.late+d.absent+d.excused;
   const pct=v=>total?Math.round(v/total*100)+'%':'0%';

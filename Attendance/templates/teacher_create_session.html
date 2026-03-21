@@ -15,17 +15,21 @@
   .fs:focus{outline:none;border-color:var(--accent);}
   .btn-rst{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;align-self:flex-end;transition:all .2s;white-space:nowrap;}
   .btn-rst:hover{border-color:var(--danger);color:var(--danger);}
-  /* Add subject form grid — responsive */
   .add-subj-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:flex-end;}
   @media(max-width:860px){.add-subj-grid{grid-template-columns:1fr 1fr;}}
   @media(max-width:540px){.add-subj-grid{grid-template-columns:1fr;}}
   .add-subj-grid .btn-primary{height:40px;white-space:nowrap;}
-  /* Start session form */
+
+  /* Start session form — now 3 fields + button */
   .start-form{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
-  .start-form > div{flex:1;min-width:160px;}
+  .start-form > .sf-field{flex:1;min-width:140px;}
+  .start-form > .sf-field-sm{flex:0 0 110px;}
   .start-form > button{flex-shrink:0;height:40px;}
-  @media(max-width:480px){.start-form > button{width:100%;justify-content:center;}}
+  @media(max-width:540px){.start-form > button{width:100%;justify-content:center;}.start-form > .sf-field-sm{flex:1;}}
+
   .sec-mono{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:8px;}
+  .slot-past{color:var(--muted) !important;font-style:italic;}
+  .grace-hint{font-size:10px;color:var(--muted);margin-top:3px;}
 </style>
 
 <div style="margin-bottom:18px;">
@@ -34,14 +38,12 @@
   <p style="font-size:12px;color:var(--muted);margin-top:3px;">Add subjects to your schedule, then start a classroom session.</p>
 </div>
 
-<!-- ── ADD SUBJECT TO SCHEDULE ── -->
+<!-- ADD SUBJECT TO SCHEDULE -->
 <div class="sec-mono">// ADD SUBJECT TO SCHEDULE</div>
 <div style="background:rgba(45,106,39,.04);border:1px dashed rgba(45,106,39,.2);border-radius:12px;padding:18px;margin-bottom:24px;">
   {% if subjects_db %}
   <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">Select a subject, program, year level, and section to add to your schedule.</p>
   <form method="POST" action="{{ url_for('teacher_add_subject') }}" class="add-subj-grid">
-
-    <!-- Subject -->
     <div>
       <label style="display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;"><i class="bi bi-book"></i> Subject</label>
       <select name="subject_id" class="fs" required>
@@ -51,8 +53,6 @@
         {% endfor %}
       </select>
     </div>
-
-    <!-- FIX #2: Program (shows both CS and IT) -->
     <div>
       <label style="display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;"><i class="bi bi-mortarboard"></i> Program</label>
       <select class="fs" id="add_program" onchange="updateAddSectionKey()" required>
@@ -61,8 +61,6 @@
         <option value="BS Information Technology">BS Information Technology</option>
       </select>
     </div>
-
-    <!-- FIX #2: Year Level (always shows 1st–4th) -->
     <div>
       <label style="display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;"><i class="bi bi-layers"></i> Year Level</label>
       <select class="fs" id="add_year" onchange="updateAddSectionKey()" required>
@@ -73,8 +71,6 @@
         <option value="4th Year">4th Year</option>
       </select>
     </div>
-
-    <!-- FIX #2: Section (always shows A–D) -->
     <div>
       <label style="display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;"><i class="bi bi-grid"></i> Section</label>
       <select class="fs" id="add_section" onchange="updateAddSectionKey()" required>
@@ -84,10 +80,8 @@
         <option value="C">C</option>
         <option value="D">D</option>
       </select>
-      <!-- Hidden field that builds the full section_key -->
       <input type="hidden" name="section_key" id="add_section_key"/>
     </div>
-
     <button type="submit" class="btn-primary" id="addBtn" disabled>
       <i class="bi bi-plus-lg"></i> Add
     </button>
@@ -97,12 +91,10 @@
   {% endif %}
 </div>
 
-<!-- ── YOUR SUBJECTS / START SESSION ── -->
+<!-- YOUR SUBJECTS / START SESSION -->
 <div class="sec-mono">// YOUR SUBJECTS — START A CLASS SESSION</div>
 
 {% if my_subjects %}
-
-<!-- FIX #3: Filter bar for subjects -->
 <div class="filter-bar">
   <div class="fg" style="flex:2;min-width:160px;">
     <span class="fl"><i class="bi bi-search"></i> Search subject</span>
@@ -191,29 +183,63 @@
       </a>
     </div>
     {% else %}
-    <form method="POST" action="{{ url_for('start_session') }}" class="start-form">
+    <!--
+      Start Session Form — 3 fields:
+        1. Time Slot    — slots before current time are disabled (greyed out)
+        2. Grace Period — minutes before latecomers are marked Late (default 15)
+        3. Start button
+    -->
+    <form method="POST" action="{{ url_for('start_session') }}" class="start-form"
+          onsubmit="return validateStartForm(this)">
       <input type="hidden" name="subject_id"  value="{{ ms.subject_id }}"/>
       <input type="hidden" name="section_key" value="{{ ms.section_key }}"/>
-      <div>
-        <label style="display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;"><i class="bi bi-clock"></i> Time Slot</label>
-        <select name="time_slot" required class="fs">
+
+      <!-- Time Slot — JS disables slots whose END time has already passed -->
+      <div class="sf-field">
+        <label style="display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">
+          <i class="bi bi-clock"></i> Time Slot
+        </label>
+        <select name="time_slot" required class="fs slot-select"
+                data-units="{{ ms.units|default(3)|string }}">
           <option value="" disabled selected>— Select time slot —</option>
           {% set units=ms.units|default(3)|string %}
           {% if units=='2' %}
-            <option>7:00 AM – 8:00 AM</option><option>8:00 AM – 9:00 AM</option>
-            <option>9:00 AM – 10:00 AM</option><option>10:00 AM – 11:00 AM</option>
-            <option>11:00 AM – 12:00 PM</option><option>12:00 PM – 1:00 PM</option>
-            <option>1:00 PM – 2:00 PM</option><option>2:00 PM – 3:00 PM</option>
-            <option>3:00 PM – 4:00 PM</option><option>4:00 PM – 5:00 PM</option>
+            <option value="7:00 AM – 8:00 AM">7:00 AM – 8:00 AM</option>
+            <option value="8:00 AM – 9:00 AM">8:00 AM – 9:00 AM</option>
+            <option value="9:00 AM – 10:00 AM">9:00 AM – 10:00 AM</option>
+            <option value="10:00 AM – 11:00 AM">10:00 AM – 11:00 AM</option>
+            <option value="11:00 AM – 12:00 PM">11:00 AM – 12:00 PM</option>
+            <option value="12:00 PM – 1:00 PM">12:00 PM – 1:00 PM</option>
+            <option value="1:00 PM – 2:00 PM">1:00 PM – 2:00 PM</option>
+            <option value="2:00 PM – 3:00 PM">2:00 PM – 3:00 PM</option>
+            <option value="3:00 PM – 4:00 PM">3:00 PM – 4:00 PM</option>
+            <option value="4:00 PM – 5:00 PM">4:00 PM – 5:00 PM</option>
           {% else %}
-            <option>7:00 AM – 9:00 AM</option><option>8:00 AM – 10:00 AM</option>
-            <option>9:00 AM – 11:00 AM</option><option>10:00 AM – 12:00 PM</option>
-            <option>11:00 AM – 1:00 PM</option><option>12:00 PM – 2:00 PM</option>
-            <option>1:00 PM – 3:00 PM</option><option>2:00 PM – 4:00 PM</option>
-            <option>3:00 PM – 5:00 PM</option><option>4:00 PM – 6:00 PM</option>
+            <option value="7:00 AM – 9:00 AM">7:00 AM – 9:00 AM</option>
+            <option value="8:00 AM – 10:00 AM">8:00 AM – 10:00 AM</option>
+            <option value="9:00 AM – 11:00 AM">9:00 AM – 11:00 AM</option>
+            <option value="10:00 AM – 12:00 PM">10:00 AM – 12:00 PM</option>
+            <option value="11:00 AM – 1:00 PM">11:00 AM – 1:00 PM</option>
+            <option value="12:00 PM – 2:00 PM">12:00 PM – 2:00 PM</option>
+            <option value="1:00 PM – 3:00 PM">1:00 PM – 3:00 PM</option>
+            <option value="2:00 PM – 4:00 PM">2:00 PM – 4:00 PM</option>
+            <option value="3:00 PM – 5:00 PM">3:00 PM – 5:00 PM</option>
+            <option value="4:00 PM – 6:00 PM">4:00 PM – 6:00 PM</option>
           {% endif %}
         </select>
       </div>
+
+      <!-- Grace Period — minutes until latecomers are marked Late -->
+      <div class="sf-field-sm">
+        <label style="display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;">
+          <i class="bi bi-hourglass-split"></i> Grace (min)
+        </label>
+        <input type="number" name="grace_period" class="fs" value="15"
+               min="1" max="120" step="1"
+               title="Minutes after session start before latecomers are marked Late"/>
+        <div class="grace-hint">Late cutoff</div>
+      </div>
+
       <button type="submit" class="btn-primary">
         <i class="bi bi-play-fill"></i> Start Session
       </button>
@@ -236,24 +262,18 @@
 {% endif %}
 
 <script>
-// FIX #2: Build section_key from separate program + year + section dropdowns
+// Build section_key from separate dropdowns
 function updateAddSectionKey() {
   const prog = document.getElementById('add_program').value;
   const year = document.getElementById('add_year').value;
   const sec  = document.getElementById('add_section').value;
   const btn  = document.getElementById('addBtn');
   const key  = document.getElementById('add_section_key');
-
-  if (prog && year && sec) {
-    key.value = `${prog}|${year}|${sec}`;
-    btn.disabled = false;
-  } else {
-    key.value = '';
-    btn.disabled = true;
-  }
+  if (prog && year && sec) { key.value = `${prog}|${year}|${sec}`; btn.disabled = false; }
+  else { key.value = ''; btn.disabled = true; }
 }
 
-// FIX #3: Filter subject cards by program, year, section, status
+// Filter subject cards
 function filterCards() {
   const q    = document.getElementById('sf_q').value.toLowerCase();
   const prog = document.getElementById('sf_program').value;
@@ -275,10 +295,79 @@ function filterCards() {
 }
 function resetFilter() {
   ['sf_q','sf_program','sf_year','sf_section','sf_status'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
+    const el = document.getElementById(id); if (el) el.value = '';
   });
   filterCards();
 }
+
+// ── Time slot filtering ────────────────────────────────────────────────────
+// Parse "10:00 AM" → minutes since midnight
+function parseTimeToMinutes(timeStr) {
+  const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ampm = m[3].toUpperCase();
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+// For each time slot option, disable it if the slot END time is already past.
+// Slots that are "current" (started but not ended) remain available.
+function filterPastTimeSlots() {
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  document.querySelectorAll('.slot-select').forEach(sel => {
+    let firstAvailable = null;
+    Array.from(sel.options).forEach(opt => {
+      if (!opt.value) return; // skip placeholder
+      const sep = opt.value.includes('–') ? '–' : '-';
+      const parts = opt.value.split(sep);
+      if (parts.length < 2) return;
+
+      const endMins = parseTimeToMinutes(parts[1].trim());
+      if (endMins === null) return;
+
+      const isPast = endMins <= nowMinutes;
+      opt.disabled = isPast;
+      if (isPast) {
+        opt.textContent = opt.value + ' (past)';
+        opt.classList.add('slot-past');
+      } else {
+        if (!firstAvailable) firstAvailable = opt;
+      }
+    });
+    // Auto-select the first available slot
+    if (firstAvailable && !sel.value) {
+      sel.value = firstAvailable.value;
+    }
+  });
+}
+
+// Validate before submitting — ensure a non-disabled slot is selected
+function validateStartForm(form) {
+  const sel = form.querySelector('.slot-select');
+  if (!sel.value) {
+    alert('Please select a time slot.');
+    return false;
+  }
+  const selected = Array.from(sel.options).find(o => o.value === sel.value);
+  if (selected && selected.disabled) {
+    alert('That time slot has already ended. Please select a current or future slot.');
+    return false;
+  }
+  const grace = parseInt(form.querySelector('[name="grace_period"]').value, 10);
+  if (isNaN(grace) || grace < 1 || grace > 120) {
+    alert('Grace period must be between 1 and 120 minutes.');
+    return false;
+  }
+  return true;
+}
+
+// Run slot filtering on page load and refresh every minute
+filterPastTimeSlots();
+setInterval(filterPastTimeSlots, 60000);
 </script>
 {% endblock %}

@@ -696,6 +696,25 @@ async function saveTeacherProfile(){
 /* ══ BLOCKCHAIN STATUS ══ */
 function updateChainBadge(){fetch('/api/blockchain_status',{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){var badge=document.getElementById('chainBadge'),lbl=document.getElementById('chainStatus');if(!badge||!lbl)return;if(d.online){badge.classList.remove('offline');lbl.textContent='Blockchain Online';}else{badge.classList.add('offline');lbl.textContent='Offline — '+d.student_cache_count+' cached';}}).catch(function(){var badge=document.getElementById('chainBadge'),lbl=document.getElementById('chainStatus');if(badge)badge.classList.add('offline');if(lbl)lbl.textContent='Network error';});}
 updateChainBadge();setInterval(updateChainBadge,10000);
+
+// ── Shared export button animation ────────────────────────────────────────
+// Call this on ANY export button: animateExportBtn(btn, '/export/url?params')
+// The button shows "Exporting…" for 2s then resets. Works for all export types.
+function animateExportBtn(btn, url) {
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Exporting…';
+  const a = document.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }, 2000);
+}
 </script>
 </body>
 </html>

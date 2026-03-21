@@ -3340,5 +3340,37 @@ def receive_pico_uid():
     nfc_set_uid(uid)
     return jsonify({'status':'ok','uid':uid})
 
+import subprocess as _sp
+import os as _os
+import sys as _sys
+
+def _launch_nfc_listener():
+    listener = _os.path.join(_os.path.dirname(__file__), 'nfc_listener.py')
+    if not _os.path.exists(listener):
+        print("[NFC] nfc_listener.py not found — skipping auto-launch.")
+        return
+    # Kill any existing nfc_listener process first
+    if _sys.platform == 'win32':
+        _sp.run(['taskkill', '/F', '/IM', 'python.exe', '/FI',
+                 f'WINDOWTITLE eq nfc_listener'],
+                capture_output=True)
+        proc = _sp.Popen(
+            [_sys.executable, listener],
+            creationflags=0x00000008 | 0x08000000,  # DETACHED_PROCESS + CREATE_NO_WINDOW
+            stdout=_sp.DEVNULL,
+            stderr=_sp.DEVNULL,
+            close_fds=True,
+        )
+    else:
+        proc = _sp.Popen(
+            [_sys.executable, listener],
+            start_new_session=True,
+            stdout=_sp.DEVNULL,
+            stderr=_sp.DEVNULL,
+        )
+    print(f"[NFC] Listener started in background (PID {proc.pid})")
+    print("[NFC] Check nfc_listener.log for tap activity.")
+
 if __name__ == '__main__':
+    _launch_nfc_listener()
     app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)

@@ -67,7 +67,7 @@
   .end-overlay.show{opacity:1;pointer-events:all;}
   .end-box{background:var(--surface);border:1px solid rgba(192,57,43,.3);border-radius:18px;max-width:420px;width:100%;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);overflow:hidden;}
   .end-overlay.show .end-box{transform:scale(1);}
-  .scan-indicator{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:20px;}
+  .scan-indicator{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:16px;}
   .scan-icon{font-size:26px;animation:scanPulse 2s infinite;}
   @keyframes scanPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.1);}}
   .btn-end{background:var(--danger);border:none;color:#fff;font-weight:700;border-radius:9px;padding:12px 28px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s;}
@@ -83,8 +83,40 @@
   @keyframes slideIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
   .list-search{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;margin-bottom:12px;}
   .list-search:focus{outline:none;border-color:var(--accent);}
+
+  /* NFC Tap Strip */
+  .nfc-tap-strip{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;margin-bottom:16px;transition:border-color .3s,box-shadow .3s;}
+  .nfc-tap-strip.active{border-color:var(--success);box-shadow:0 0 0 3px rgba(16,185,129,.12);}
+  .nfc-tap-strip.warning{border-color:var(--warning);box-shadow:0 0 0 3px rgba(245,158,11,.12);}
+  .nfc-tap-strip.error{border-color:var(--danger);box-shadow:0 0 0 3px rgba(239,68,68,.12);}
+  .nfc-strip-icon{font-size:22px;flex-shrink:0;}
+  .nfc-strip-label{font-size:11px;font-family:'Space Mono',monospace;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px;}
+  .nfc-strip-uid{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:var(--text);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;padding:6px 14px;flex:1;min-width:0;letter-spacing:2px;cursor:default;user-select:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:border-color .3s,color .3s;}
+  .nfc-strip-uid.flash-green{border-color:var(--success);color:var(--success);}
+  .nfc-strip-uid.flash-yellow{border-color:var(--warning);color:var(--warning);}
+  .nfc-strip-uid.flash-red{border-color:var(--danger);color:var(--danger);}
+  .nfc-strip-status{font-size:12px;font-weight:600;flex-shrink:0;min-width:90px;text-align:right;}
+
+  /* Toast */
+  #toastContainer{position:fixed;bottom:28px;right:24px;z-index:9998;display:flex;flex-direction:column;gap:10px;pointer-events:none;}
+  .toast{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;min-width:260px;max-width:340px;box-shadow:0 8px 24px rgba(0,0,0,.18);display:flex;align-items:center;gap:12px;animation:toastIn .3s cubic-bezier(.34,1.56,.64,1) both;pointer-events:all;}
+  .toast.removing{animation:toastOut .25s ease forwards;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(60px);}to{opacity:1;transform:translateX(0);}}
+  @keyframes toastOut{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(60px);}}
+  .toast-icon{font-size:20px;flex-shrink:0;}
+  .toast-body{flex:1;min-width:0;}
+  .toast-title{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .toast-sub{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .toast.t-green{border-left:3px solid var(--success);}
+  .toast.t-yellow{border-left:3px solid var(--warning);}
+  .toast.t-red{border-left:3px solid var(--danger);}
+  .toast.t-blue{border-left:3px solid #60a5fa;}
+
   @media(max-width:600px){.session-header{padding:16px;}.tap-modal{padding:28px 24px;}.excuse-box{padding:20px;}}
 </style>
+
+<!-- TOAST CONTAINER -->
+<div id="toastContainer"></div>
 
 <!-- TAP MODAL -->
 <div class="tap-modal-overlay" id="tapModalOverlay">
@@ -204,6 +236,7 @@
 </div>
 
 {% if is_active %}
+<!-- NFC Active indicator -->
 <div class="scan-indicator">
   <span class="scan-icon">📡</span>
   <div>
@@ -214,6 +247,40 @@
       Students are marked <strong style="color:var(--warning);">Late</strong> after 30 minutes.
     </div>
   </div>
+</div>
+
+<!--
+  HIDDEN NFC HID INPUT
+  ─────────────────────────────────────────────────────────────────────────────
+  USB NFC readers (ACR122U etc.) act as HID keyboards — they type the card UID
+  as keystrokes then send Enter, exactly like a barcode scanner.
+
+  This 1×1px invisible input stays focused at all times so it captures every
+  keystroke from the reader regardless of which browser tab/window is active.
+
+  On Enter (or 300ms timeout): sends UID to /mark_pico, shows ONE popup + toast,
+  then blocks any further popups until the NEXT physical card tap.
+
+  The poll() loop only updates the attendance list — it NEVER shows popups.
+  Popups are shown ONLY here, once per physical tap, via popupAllowed gate.
+  ─────────────────────────────────────────────────────────────────────────────
+-->
+<input id="nfcHidInput" type="text"
+  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+  tabindex="0"
+  style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;
+         pointer-events:none;border:none;outline:none;background:transparent;
+         color:transparent;z-index:-1;font-size:1px;"
+  aria-hidden="true"/>
+
+<!-- NFC Tap Display Strip -->
+<div class="nfc-tap-strip" id="nfcTapStrip">
+  <span class="nfc-strip-icon" id="nfcStripIcon">💳</span>
+  <div style="flex:1;min-width:0;">
+    <div class="nfc-strip-label">Last NFC Card Tapped</div>
+    <div class="nfc-strip-uid" id="nfcStripUid">Waiting for card tap…</div>
+  </div>
+  <div class="nfc-strip-status" id="nfcStripStatus" style="color:var(--muted);">—</div>
 </div>
 {% endif %}
 
@@ -228,11 +295,9 @@
 <div class="two-panel">
   <!-- LEFT: Enrolled students -->
   <div class="card">
-    <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div class="card-title-text">Enrolled Students</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px;">{{ section_students|length }} student{{ 's' if section_students|length!=1 else '' }} in this section</div>
-      </div>
+    <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);">
+      <div class="card-title-text">Enrolled Students</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">{{ section_students|length }} student{{ 's' if section_students|length!=1 else '' }} in this section</div>
     </div>
     <div style="padding:12px 20px 0;">
       <input type="text" class="list-search" id="enrolledSearch" placeholder="Search student…" oninput="filterEnrolled()"/>
@@ -324,16 +389,63 @@
 <script>
   const sessId        = "{{ sess_id }}";
   const totalStudents = {{ section_students|length }};
-  // lastTimestamp=0 → first poll syncs state; then uses server_time (not
-  // Date.now()) so browser clock drift never causes taps to be missed.
   let lastTimestamp   = 0;
   let pollInitialized = false;
-  let modalTimer      = null;
-  // Track nfc_ids already shown to prevent duplicate popups from 2s buffer
   const shownTaps     = new Set();
 
-  function openEndModal(){ document.getElementById('endSessionModal').classList.add('show'); }
-  function closeEndModal(){ document.getElementById('endSessionModal').classList.remove('show'); }
+  // ── Popup gate ────────────────────────────────────────────────────────────
+  // popupAllowed is set true ONLY when a physical card tap is detected by
+  // the HID input handler. It is consumed (set false) after ONE popup fires.
+  // The poll() loop NEVER shows popups — it only updates the status list.
+  // This guarantees exactly one popup per physical card tap, no repeats.
+  let popupAllowed = false;
+  function openPopupGate()    { popupAllowed = true;  }
+  function consumePopupGate() { const v = popupAllowed; popupAllowed = false; return v; }
+
+  // ── NFC strip ─────────────────────────────────────────────────────────────
+  let stripTimer = null;
+  function updateNFCStrip(uid, colorClass, statusText, iconEmoji) {
+    const strip  = document.getElementById('nfcTapStrip');
+    const uidEl  = document.getElementById('nfcStripUid');
+    const statEl = document.getElementById('nfcStripStatus');
+    const iconEl = document.getElementById('nfcStripIcon');
+    strip.classList.remove('active','warning','error');
+    uidEl.classList.remove('flash-green','flash-yellow','flash-red');
+    strip.classList.add(colorClass);
+    uidEl.classList.add(colorClass==='active'?'flash-green':colorClass==='warning'?'flash-yellow':'flash-red');
+    uidEl.textContent  = uid        || 'Waiting for card tap…';
+    statEl.textContent = statusText || '—';
+    iconEl.textContent = iconEmoji  || '💳';
+    statEl.style.color = colorClass==='active'?'var(--success)':colorClass==='warning'?'var(--warning)':'var(--danger)';
+    clearTimeout(stripTimer);
+    stripTimer = setTimeout(()=>{
+      strip.classList.remove('active','warning','error');
+      uidEl.classList.remove('flash-green','flash-yellow','flash-red');
+      uidEl.textContent='Waiting for card tap…';
+      statEl.textContent='—';
+      statEl.style.color='var(--muted)';
+      iconEl.textContent='💳';
+    }, 4000);
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(title, sub, colorClass, iconEmoji, duration=4000) {
+    const c = document.getElementById('toastContainer');
+    const t = document.createElement('div');
+    t.className = `toast ${colorClass}`;
+    t.innerHTML = `<span class="toast-icon">${iconEmoji}</span>
+      <div class="toast-body">
+        <div class="toast-title">${title}</div>
+        ${sub?`<div class="toast-sub">${sub}</div>`:''}
+      </div>`;
+    c.appendChild(t);
+    setTimeout(()=>{ t.classList.add('removing'); setTimeout(()=>t.remove(),260); }, duration);
+  }
+
+  // ── Modal ─────────────────────────────────────────────────────────────────
+  let modalTimer = null;
+  function openEndModal()  { document.getElementById('endSessionModal').classList.add('show'); }
+  function closeEndModal() { document.getElementById('endSessionModal').classList.remove('show'); }
 
   function showModal(type, name, studentId, message, time) {
     const overlay = document.getElementById('tapModalOverlay');
@@ -344,176 +456,252 @@
     const mId     = document.getElementById('modalStudentId');
     const mMsg    = document.getElementById('modalMessage');
     const mTime   = document.getElementById('modalTime');
-
-    ['green','yellow','orange','red'].forEach(c => {
+    ['green','yellow','orange','red'].forEach(c=>{
       modal.classList.remove(c); icon.classList.remove(c);
       status.classList.remove(c); mMsg.classList.remove(c);
     });
-
     const cfg = {
       'present': {cls:'green',  icon:'✔', label:'PRESENT',      msg:'Attendance recorded successfully.'},
       'late':    {cls:'orange', icon:'⏱', label:'LATE',         msg:'Arrived after the 30-minute grace period — marked Late.'},
       'warning': {cls:'yellow', icon:'⚠', label:'DUPLICATE TAP',msg:'Already marked — this tap was not counted again.'},
-      'invalid': {cls:'red',    icon:'✕', label:'INVALID CARD', msg: message || 'This NFC card is not registered in the system.'},
+      'invalid': {cls:'red',    icon:'✕', label:'INVALID CARD', msg: message||'This NFC card is not registered in the system.'},
     };
     const c = cfg[type] || cfg['invalid'];
-
-    modal.classList.add(c.cls); icon.className = 'modal-icon-ring ' + c.cls;
-    icon.textContent = c.icon;
-    status.className = 'modal-status ' + c.cls; status.textContent = c.label;
-    mMsg.className   = 'modal-message '  + c.cls; mMsg.textContent   = c.msg;
-    mName.textContent = name || '—';
-    mId.textContent   = studentId ? 'ID: ' + studentId : '';
-    mTime.textContent = time || '';
-
+    modal.classList.add(c.cls); icon.className='modal-icon-ring '+c.cls; icon.textContent=c.icon;
+    status.className='modal-status '+c.cls; status.textContent=c.label;
+    mMsg.className='modal-message '+c.cls; mMsg.textContent=c.msg;
+    mName.textContent = name||'—';
+    mId.textContent   = studentId?'ID: '+studentId:'';
+    mTime.textContent = time||'';
     overlay.classList.add('show');
     clearTimeout(modalTimer);
-    modalTimer = setTimeout(() => overlay.classList.remove('show'), 3500);
+    modalTimer = setTimeout(()=>overlay.classList.remove('show'), 3500);
   }
 
-  document.getElementById('tapModalOverlay').addEventListener('click', function(e) {
-    if (e.target === this) this.classList.remove('show');
+  document.getElementById('tapModalOverlay').addEventListener('click', function(e){
+    if(e.target===this) this.classList.remove('show');
   });
 
+  // ── Status update (used by both HID handler and poll) ─────────────────────
   function updateStudentStatus(nfc_id, status) {
-    const row    = document.getElementById('srow_' + nfc_id);
-    const badge  = document.getElementById('sbadge_' + nfc_id);
-    const avt    = document.getElementById('savt_'   + nfc_id);
-    const excBtn = document.getElementById('sexc_'   + nfc_id);
-    if (!row) return;
+    const row    = document.getElementById('srow_'  +nfc_id);
+    const badge  = document.getElementById('sbadge_'+nfc_id);
+    const avt    = document.getElementById('savt_'  +nfc_id);
+    const excBtn = document.getElementById('sexc_'  +nfc_id);
+    if(!row) return;
     row.dataset.status = status;
-
-    const statusMap = {
+    const map = {
       'present': {avCls:'av-green',  badgeCls:'sb-present',  label:'✔ Present'},
       'late':    {avCls:'av-yellow', badgeCls:'sb-late',     label:'⏱ Late'},
       'excused': {avCls:'av-blue',   badgeCls:'sb-excused',  label:'🔵 Excused'},
       'absent':  {avCls:'av-red',    badgeCls:'sb-absent',   label:'✕ Absent'},
     };
-    const s = statusMap[status] || {avCls:'av-gray', badgeCls:'sb-unknown', label:'— Unknown'};
-
-    if (avt) {
-      ['av-green','av-yellow','av-blue','av-red','av-gray'].forEach(c => avt.classList.remove(c));
-      avt.classList.add(s.avCls);
-    }
-    if (badge) { badge.className = 'status-badge ' + s.badgeCls; badge.textContent = s.label; }
-    if (excBtn) { excBtn.classList.toggle('show-excuse', status === 'absent'); }
+    const s = map[status]||{avCls:'av-gray',badgeCls:'sb-unknown',label:'— Unknown'};
+    if(avt){ ['av-green','av-yellow','av-blue','av-red','av-gray'].forEach(c=>avt.classList.remove(c)); avt.classList.add(s.avCls); }
+    if(badge){ badge.className='status-badge '+s.badgeCls; badge.textContent=s.label; }
+    if(excBtn){ excBtn.classList.toggle('show-excuse', status==='absent'); }
   }
 
   function updateCounts() {
     const rows = document.querySelectorAll('#statusList .student-row[data-status]');
-    let present = 0, late = 0, absent = 0, excused = 0;
-    rows.forEach(r => {
-      const st = r.dataset.status;
-      if (st === 'present') present++;
-      else if (st === 'late') late++;
-      else if (st === 'absent') absent++;
-      else if (st === 'excused') excused++;
+    let present=0, late=0, absent=0, excused=0;
+    rows.forEach(r=>{
+      const st=r.dataset.status;
+      if(st==='present') present++;
+      else if(st==='late') late++;
+      else if(st==='absent') absent++;
+      else if(st==='excused') excused++;
     });
     document.getElementById('sc_present').textContent = present;
     document.getElementById('sc_late').textContent    = late;
     document.getElementById('sc_absent').textContent  = absent;
     document.getElementById('sc_excused').textContent = excused;
-
-    const pCount = present + late;
-    const rate   = totalStudents > 0 ? ((pCount / totalStudents) * 100).toFixed(1) : 0;
-    document.getElementById('presentLabel').textContent  = pCount + ' students present';
-    document.getElementById('progressFill').style.width  = rate + '%';
-    document.getElementById('rateLabel').textContent     = rate + '%';
+    const pCount = present+late;
+    const rate   = totalStudents>0?((pCount/totalStudents)*100).toFixed(1):0;
+    document.getElementById('presentLabel').textContent = pCount+' students present';
+    document.getElementById('progressFill').style.width = rate+'%';
+    document.getElementById('rateLabel').textContent    = rate+'%';
   }
 
+  // ── HID Keyboard NFC reader ───────────────────────────────────────────────
+  // The USB reader types the UID as keystrokes + Enter (like a barcode scanner).
+  // We keep a hidden input focused at all times to capture those keystrokes.
+  // On Enter (or 300ms idle): sends to /mark_pico, shows ONE popup, blocks
+  // further popups until the next physical tap via the popupAllowed gate.
+  const nfcInput  = document.getElementById('nfcHidInput');
+  let   nfcBuffer = '';
+  let   nfcTimer  = null;
+  const NFC_TIMEOUT = 300;
+
+  function refocusNFC() {
+    const tag     = document.activeElement ? document.activeElement.tagName : '';
+    const isModal = document.getElementById('excuseOverlay').classList.contains('show') ||
+                    document.getElementById('endSessionModal').classList.contains('show');
+    // Don't steal focus from search boxes or open modals
+    if(!isModal && tag!=='INPUT' && tag!=='TEXTAREA' && tag!=='SELECT') {
+      nfcInput.focus();
+    }
+  }
+
+  async function processNFCUid(uid) {
+    uid = uid.trim().toUpperCase();
+    if(!uid || uid.length < 4) return;
+
+    // Open the popup gate — exactly one popup will fire for this tap
+    openPopupGate();
+
+    updateNFCStrip(uid, 'active', 'Reading…', '📡');
+
+    try {
+      const resp = await fetch('/mark_pico', {
+        method:  'POST',
+        headers: {'Content-Type':'application/json'},
+        body:    JSON.stringify({nfc_id: uid})
+      });
+      const data = await resp.json();
+      const status = data.status || '';
+
+      // consumePopupGate() returns true once then false — ensures single popup
+      if(status === 'ok') {
+        const isLate  = data.is_late;
+        const label   = isLate ? 'LATE' : 'PRESENT';
+        const color   = isLate ? 'warning' : 'active';
+        const icon    = isLate ? '⏱' : '✔';
+        updateNFCStrip(uid, color, `${label} — ${data.name||uid}`, icon);
+        updateStudentStatus(uid, isLate ? 'late' : 'present');
+        updateCounts();
+        if(consumePopupGate()) {
+          showModal(isLate ? 'late' : 'present', data.name, data.student_id, '', data.time);
+          showToast(
+            data.name||uid,
+            isLate ? `⏱ Marked LATE · ${data.time||''}` : `✔ Marked PRESENT · ${data.time||''}`,
+            isLate ? 't-yellow' : 't-green',
+            isLate ? '⏱' : '✔'
+          );
+        }
+      } else if(status === 'already_marked') {
+        updateNFCStrip(uid, 'warning', `DUPLICATE — ${data.name||uid}`, '⚠');
+        if(consumePopupGate()) {
+          showModal('warning', data.name, data.student_id, '', '');
+          showToast(data.name||uid, 'Already marked — not counted again.', 't-yellow', '⚠');
+        }
+      } else if(status === 'registration') {
+        updateNFCStrip(uid, 'active', 'Sent to registration form', '📋');
+        if(consumePopupGate()) {
+          showToast('Registration Scan', `UID ${uid} sent to register form.`, 't-blue', '📋');
+        }
+      } else if(status === 'no_session') {
+        updateNFCStrip(uid, 'error', 'No active session', '✕');
+        if(consumePopupGate()) {
+          showModal('invalid', 'No Session', '', 'No active session for this section.', uid);
+          showToast('No Session', `UID: ${uid} — no active session.`, 't-red', '✕');
+        }
+      } else {
+        updateNFCStrip(uid, 'error', 'Not registered', '✕');
+        if(consumePopupGate()) {
+          showModal('invalid', 'Unknown Card', '', data.message||'Card not registered.', uid);
+          showToast('Unknown Card', `UID: ${uid}`, 't-red', '✕');
+        }
+      }
+    } catch(e) {
+      updateNFCStrip(uid, 'error', 'Server error', '⚠');
+      consumePopupGate(); // consume gate even on error
+      console.warn('NFC error:', e);
+    }
+  }
+
+  nfcInput.addEventListener('keydown', function(e) {
+    clearTimeout(nfcTimer);
+    if(e.key === 'Enter') {
+      const uid = nfcBuffer.trim();
+      nfcBuffer = ''; nfcInput.value = '';
+      if(uid) processNFCUid(uid);
+      return;
+    }
+    if(e.key.length === 1) { nfcBuffer += e.key; nfcInput.value = nfcBuffer; }
+    nfcTimer = setTimeout(()=>{
+      const uid = nfcBuffer.trim();
+      nfcBuffer = ''; nfcInput.value = '';
+      if(uid) processNFCUid(uid);
+    }, NFC_TIMEOUT);
+  });
+
+  document.addEventListener('click', refocusNFC);
+  document.addEventListener('keyup',  refocusNFC);
+  nfcInput.addEventListener('blur', ()=>setTimeout(refocusNFC, 150));
+  window.addEventListener('load', ()=>nfcInput.focus());
+  nfcInput.focus();
+
+  // ── Poll loop — ONLY updates status list, NEVER shows popups ─────────────
   async function poll() {
     try {
-      const url = `/api/session/${sessId}/poll?since=${lastTimestamp}`;
-      const r   = await fetch(url);
+      const r    = await fetch(`/api/session/${sessId}/poll?since=${lastTimestamp}`);
       const data = await r.json();
 
-      if (!data.active) {
-        // Session ended — reload page to show ended state
-        if (pollInitialized) {
-          window.location.reload();
-        }
+      if(!data.active) {
+        if(pollInitialized) window.location.reload();
         return;
       }
 
-      // On first successful poll, sync all current statuses from server
-      if (!pollInitialized) {
+      // First poll — sync existing statuses from server state
+      if(!pollInitialized) {
         pollInitialized = true;
-        // Sync present/late/excused from server state
-        const presentSet  = new Set(data.present_ids  || []);
-        const lateSet     = new Set(data.late_ids     || []);
-        const excusedSet  = new Set(data.excused_ids  || []);
-        document.querySelectorAll('#statusList .student-row[data-nfc]').forEach(row => {
+        const presentSet = new Set(data.present_ids  || []);
+        const lateSet    = new Set(data.late_ids     || []);
+        const excusedSet = new Set(data.excused_ids  || []);
+        document.querySelectorAll('#statusList .student-row[data-nfc]').forEach(row=>{
           const nid = row.dataset.nfc;
-          if      (excusedSet.has(nid)) updateStudentStatus(nid, 'excused');
-          else if (lateSet.has(nid))    updateStudentStatus(nid, 'late');
-          else if (presentSet.has(nid)) updateStudentStatus(nid, 'present');
+          if     (excusedSet.has(nid)) updateStudentStatus(nid, 'excused');
+          else if(lateSet.has(nid))    updateStudentStatus(nid, 'late');
+          else if(presentSet.has(nid)) updateStudentStatus(nid, 'present');
         });
         updateCounts();
-        // Use server_time so future polls stay in sync with server clock,
-        // not browser clock which may be ahead and cause taps to be missed
-        lastTimestamp = data.server_time || (Date.now() / 1000);
+        lastTimestamp = data.server_time || (Date.now()/1000);
         setTimeout(poll, 1500);
         return;
       }
 
-      // Process new taps — skip any already shown (dedup from 2s buffer)
-      if (data.new_taps && data.new_taps.length > 0) {
+      // Subsequent polls — silently update status rows, NO popups at all
+      if(data.new_taps && data.new_taps.length > 0) {
         let gotNew = false;
-        data.new_taps.forEach(tap => {
-          // Dedup: if we already showed a popup for this nfc_id+timestamp, skip
-          const tapKey = tap.nfc_id + '_' + tap.timestamp;
-          if (shownTaps.has(tapKey)) return;
+        data.new_taps.forEach(tap=>{
+          const tapKey = tap.nfc_id+'_'+tap.timestamp;
+          if(shownTaps.has(tapKey)) return;
           shownTaps.add(tapKey);
           gotNew = true;
-          const isLate = (data.late_ids || []).includes(tap.nfc_id);
-          updateStudentStatus(tap.nfc_id, isLate ? 'late' : 'present');
-          showModal(isLate ? 'late' : 'present', tap.name, tap.student_id, '', tap.time);
-          // Advance lastTimestamp past this tap
-          if (tap.timestamp && tap.timestamp > lastTimestamp) {
+          const isLate = (data.late_ids||[]).includes(tap.nfc_id);
+          updateStudentStatus(tap.nfc_id, isLate?'late':'present');
+          // No showModal / showToast here — HID handler already did it
+          if(tap.timestamp && tap.timestamp > lastTimestamp)
             lastTimestamp = tap.timestamp + 0.001;
-          }
         });
-        if (gotNew) updateCounts();
+        if(gotNew) updateCounts();
       }
 
-      if (data.new_warnings && data.new_warnings.length > 0) {
-        data.new_warnings.forEach(w => {
-          showModal('warning', w.name, w.student_id, '', '');
-          if (w.timestamp && w.timestamp > lastTimestamp) lastTimestamp = w.timestamp + 0.001;
-        });
+      // Advance server timestamp even with no new events
+      if((!data.new_taps    || !data.new_taps.length) &&
+         (!data.new_warnings || !data.new_warnings.length) &&
+         (!data.new_invalids || !data.new_invalids.length)) {
+        if(data.server_time) lastTimestamp = data.server_time;
       }
 
-      if (data.new_invalids && data.new_invalids.length > 0) {
-        data.new_invalids.forEach(inv => {
-          showModal('invalid', 'Unknown Card', '', inv.reason || 'Not registered', inv.nfc_id);
-          if (inv.timestamp && inv.timestamp > lastTimestamp) lastTimestamp = inv.timestamp + 0.001;
-        });
-      }
-
-      // When no new events, advance lastTimestamp using SERVER time
-      // (not Date.now()) to prevent clock drift from causing missed taps
-      if ((!data.new_taps || !data.new_taps.length) &&
-          (!data.new_warnings || !data.new_warnings.length) &&
-          (!data.new_invalids || !data.new_invalids.length)) {
-        if (data.server_time) lastTimestamp = data.server_time;
-      }
-
-    } catch(e) {
-      console.warn('Poll error:', e);
-    }
+    } catch(e) { console.warn('Poll error:', e); }
     setTimeout(poll, 1500);
   }
 
-  // Start polling immediately
   poll();
 
+  // ── Excuse modal ──────────────────────────────────────────────────────────
   function openExcuse(nfc_id, name) {
-    document.getElementById('excuseNfc').value  = nfc_id;
+    document.getElementById('excuseNfc').value        = nfc_id;
     document.getElementById('excuseName').textContent = name;
-    document.getElementById('excuseNote').value = '';
+    document.getElementById('excuseNote').value       = '';
     document.getElementById('excuseOverlay').classList.add('show');
   }
-  function closeExcuse() { document.getElementById('excuseOverlay').classList.remove('show'); }
+  function closeExcuse() {
+    document.getElementById('excuseOverlay').classList.remove('show');
+    setTimeout(refocusNFC, 150);
+  }
 
   async function submitExcuse() {
     const nfc_id = document.getElementById('excuseNfc').value;
@@ -521,29 +709,31 @@
     try {
       const r = await fetch(`/teacher/session/${sessId}/excuse`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        headers: {'Content-Type':'application/x-www-form-urlencoded'},
         body: `nfc_id=${encodeURIComponent(nfc_id)}&note=${encodeURIComponent(note)}`
       });
       const d = await r.json();
-      if (d.status === 'ok') {
+      if(d.status==='ok') {
         updateStudentStatus(nfc_id, 'excused');
         updateCounts();
+        showToast(d.name||nfc_id, `Marked Excused — ${note}`, 't-blue', '🔵');
       }
     } catch(e) { console.warn(e); }
     closeExcuse();
   }
 
+  // ── Search/filter ─────────────────────────────────────────────────────────
   function filterEnrolled() {
     const q = document.getElementById('enrolledSearch').value.toLowerCase();
-    document.querySelectorAll('#enrolledList .student-row').forEach(r => {
-      r.style.display = (!q || r.dataset.enrollName.includes(q)) ? '' : 'none';
+    document.querySelectorAll('#enrolledList .student-row').forEach(r=>{
+      r.style.display = (!q||r.dataset.enrollName.includes(q)) ? '' : 'none';
     });
   }
   function filterByStatus() {
     const st = document.getElementById('statusFilter').value;
     const q  = document.getElementById('statusSearch').value.toLowerCase();
-    document.querySelectorAll('#statusList .student-row').forEach(r => {
-      r.style.display = ((!st || r.dataset.status === st) && (!q || r.dataset.statusName.includes(q))) ? '' : 'none';
+    document.querySelectorAll('#statusList .student-row').forEach(r=>{
+      r.style.display = ((!st||r.dataset.status===st)&&(!q||r.dataset.statusName.includes(q))) ? '' : 'none';
     });
   }
   function filterStatus() { filterByStatus(); }

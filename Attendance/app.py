@@ -13,6 +13,399 @@ except ImportError:
 app = Flask(__name__)
 app.secret_key = 'davs-super-secret-2024'
 
+# ── Email config helpers ──────────────────────────────────────────────────
+def get_email_config():
+    """Load SMTP config from DB. Returns dict with all keys."""
+    defaults = {
+        'smtp_host':     'smtp.gmail.com',
+        'smtp_port':     '587',
+        'smtp_user':     '',
+        'smtp_password': '',
+        'smtp_from':     '',
+        'enabled':       '0',
+    }
+    try:
+        with get_db() as conn:
+            rows = conn.execute('SELECT key, value FROM email_config').fetchall()
+            cfg  = dict(defaults)
+            for row in rows:
+                cfg[row['key']] = row['value']
+            return cfg
+    except Exception:
+        return defaults
+ 
+def save_email_config(cfg: dict):
+    """Upsert email config into DB."""
+    with get_db() as conn:
+        for key, value in cfg.items():
+            conn.execute(
+                'INSERT INTO email_config (key, value) VALUES (?, ?) '
+                'ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+                (key, str(value))
+            )
+ 
+def _send_email(to_addrs: list, subject: str, html_body: str):
+    """
+    Send an HTML email via Gmail SMTP in a background thread.
+    Silently logs errors — never crashes the main request.
+    """
+    import threading as _th
+    def _worker():
+        try:
+            import smtplib, ssl
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.text      import MIMEText
+            cfg = get_email_config()
+            if cfg.get('enabled') != '1':
+                return
+            if not cfg.get('smtp_user') or not cfg.get('smtp_password'):
+                print('[EMAIL] SMTP credentials not configured — skipping.')
+                return
+            recipients = [a for a in to_addrs if a and '@' in a]
+            if not recipients:
+                return
+            msg                    = MIMEMultipart('alternative')
+            msg['Subject']         = subject
+            msg['From']            = cfg.get('smtp_from') or cfg['smtp_user']
+            msg['To']              = ', '.join(recipients)
+            msg.attach(MIMEText(html_body, 'html'))
+            ctx  = ssl.create_default_context()
+            port = int(cfg.get('smtp_port', 587))
+            with smtplib.SMTP(cfg['smtp_host'], port, timeout=10) as srv:
+                srv.ehlo()
+                srv.starttls(context=ctx)
+                srv.login(cfg['smtp_user'], cfg['smtp_password'])
+                srv.sendmail(msg['From'], recipients, msg.as_string())
+            print(f'[EMAIL] Sent "{subject}" → {recipients}')
+        except Exception as _e:
+            print(f'[EMAIL] Failed to send "{subject}": {_e}')
+    _th.Thread(target=_worker, daemon=True).start()
+ 
+def send_student_attendance_receipt(
+        student_name, student_email, student_id,
+        subject_name, section_key, teacher_name,
+        tap_time, status, tx_hash, block_num):
+    """Send attendance receipt email to student."""
+    if not student_email or '@' not in student_email:
+        return
+    status_colors = {
+        'present': ('#2D6A27', '#E8F5E9', '✓ Present'),
+        'late':    ('#D4A017', '#FFF8E1', '⏱ Late'),
+        'absent':  ('#C0392B', '#FFEBEE', '✕ Absent'),
+        'excused': ('#2980B9', '#E3F2FD', '◎ Excused'),
+    }
+    clr, bg, label = status_colors.get(status, ('#333333', '#F5F5F5', status.capitalize()))
+    section_display = section_key.replace('|', ' · ') if section_key else '—'
+    tx_row = ''
+    if tx_hash:
+        tx_row = f'''
+        <tr>
+          <td style="padding:8px 12px;font-size:12px;color:#666;border-bottom:1px solid #eee;">
+            Blockchain TX
+          </td>
+          <td style="padding:8px 12px;font-size:11px;font-family:monospace;
+                     color:#2D6A27;border-bottom:1px solid #eee;word-break:break-all;">
+            {tx_hash}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 12px;font-size:12px;color:#666;">Block #</td>
+          <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#333;">
+            {block_num}
+          </td>
+        </tr>'''
+    html = f'''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Calibri,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr><td align="center" style="padding:32px 16px;">
+    <table width="560" cellpadding="0" cellspacing="0"
+           style="background:#fff;border-radius:12px;overflow:hidden;
+                  box-shadow:0 2px 12px rgba(0,0,0,.1);">
+      <!-- Header -->
+      <tr>
+        <td style="background:#1E4A1A;padding:24px 32px;">
+          <div style="font-size:20px;font-weight:700;color:#F5C518;
+                      letter-spacing:1px;">DAVS</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
+            Decentralized Attendance Verification System
+          </div>
+          <div style="font-size:11px;color:#94a3b8;">
+            Cavite State University — Silang Campus
+          </div>
+        </td>
+      </tr>
+      <!-- Status banner -->
+      <tr>
+        <td style="background:{bg};padding:20px 32px;
+                   border-left:4px solid {clr};">
+          <div style="font-size:28px;font-weight:700;color:{clr};">
+            {label}
+          </div>
+          <div style="font-size:13px;color:#555;margin-top:4px;">
+            Your attendance has been recorded for today's class.
+          </div>
+        </td>
+      </tr>
+      <!-- Details table -->
+      <tr>
+        <td style="padding:24px 32px 8px;">
+          <div style="font-size:13px;font-weight:700;color:#1E4A1A;
+                      text-transform:uppercase;letter-spacing:1px;
+                      margin-bottom:12px;">Attendance Details</div>
+          <table width="100%" cellpadding="0" cellspacing="0"
+                 style="border:1px solid #eee;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;width:140px;">Student</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:600;
+                         color:#333;border-bottom:1px solid #eee;">
+                {student_name}
+                {f'<span style="color:#999;font-size:11px;"> · ID: {student_id}</span>'
+                 if student_id else ''}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Subject</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:600;
+                         color:#333;border-bottom:1px solid #eee;">
+                {subject_name}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Section</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{section_display}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Instructor</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{teacher_name}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Date & Time</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{tap_time}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Status</td>
+              <td style="padding:8px 12px;">
+                <span style="background:{bg};color:{clr};font-weight:700;
+                             font-size:12px;padding:3px 10px;border-radius:20px;
+                             border:1px solid {clr};">{label}</span>
+              </td>
+            </tr>
+            {tx_row}
+          </table>
+        </td>
+      </tr>
+      <!-- Footer -->
+      <tr>
+        <td style="padding:20px 32px 28px;">
+          <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
+            This is an automated attendance receipt from the DAVS system.<br>
+            {"The TX hash above is your tamper-proof blockchain proof of attendance.<br>" if tx_hash else ""}
+            Please do not reply to this email.
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>'''
+    _send_email(
+        [student_email],
+        f'[DAVS] Attendance Receipt — {subject_name} ({label})',
+        html
+    )
+ 
+def send_teacher_session_summary(
+        teacher_email, teacher_name,
+        subject_name, section_key, time_slot,
+        started_at, ended_at,
+        present_count, late_count, absent_count, excused_count,
+        student_rows):
+    """
+    Send session summary email to teacher when session ends.
+    student_rows: list of dicts with keys:
+        name, student_id, status, tap_time, tx_hash, block_num
+    """
+    if not teacher_email or '@' not in teacher_email:
+        return
+    total        = present_count + late_count + absent_count + excused_count
+    rate         = round((present_count + late_count) / total * 100, 1) if total else 0
+    section_disp = section_key.replace('|', ' · ') if section_key else '—'
+    status_colors = {
+        'present': ('#2D6A27', '#E8F5E9', '✓ Present'),
+        'late':    ('#D4A017', '#FFF8E1', '⏱ Late'),
+        'absent':  ('#C0392B', '#FFEBEE', '✕ Absent'),
+        'excused': ('#2980B9', '#E3F2FD', '◎ Excused'),
+    }
+    rows_html = ''
+    for i, st in enumerate(student_rows):
+        clr, bg, lbl = status_colors.get(st.get('status','absent'),
+                                          ('#333','#f5f5f5', st.get('status','—').capitalize()))
+        tx = st.get('tx_hash','')
+        tx_cell = (f'<span style="font-family:monospace;font-size:10px;color:#2D6A27;">'
+                   f'{tx[:20]}…</span>') if tx else '—'
+        bg_row = '#F9FBF9' if i % 2 == 0 else '#FFFFFF'
+        rows_html += f'''<tr style="background:{bg_row};">
+          <td style="padding:7px 10px;font-size:12px;border-bottom:1px solid #eee;">
+            {st.get("name","—")}
+            <div style="font-size:10px;color:#999;">{st.get("student_id","")}</div>
+          </td>
+          <td style="padding:7px 10px;font-size:11px;color:#666;
+                     border-bottom:1px solid #eee;white-space:nowrap;">
+            {st.get("tap_time","—")}
+          </td>
+          <td style="padding:7px 10px;border-bottom:1px solid #eee;">
+            <span style="background:{bg};color:{clr};font-weight:700;
+                         font-size:11px;padding:2px 8px;border-radius:20px;
+                         border:1px solid {clr};">{lbl}</span>
+          </td>
+          <td style="padding:7px 10px;font-size:11px;border-bottom:1px solid #eee;">
+            {tx_cell}
+          </td>
+        </tr>'''
+    html = f'''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Calibri,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr><td align="center" style="padding:32px 16px;">
+    <table width="640" cellpadding="0" cellspacing="0"
+           style="background:#fff;border-radius:12px;overflow:hidden;
+                  box-shadow:0 2px 12px rgba(0,0,0,.1);">
+      <!-- Header -->
+      <tr>
+        <td style="background:#1E4A1A;padding:24px 32px;">
+          <div style="font-size:20px;font-weight:700;color:#F5C518;">DAVS</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
+            Session Summary Report — {subject_name}
+          </div>
+        </td>
+      </tr>
+      <!-- Summary stats -->
+      <tr>
+        <td style="padding:20px 32px 8px;">
+          <div style="font-size:13px;font-weight:700;color:#1E4A1A;
+                      text-transform:uppercase;letter-spacing:1px;
+                      margin-bottom:12px;">Session Overview</div>
+          <table width="100%" cellpadding="0" cellspacing="0"
+                 style="border:1px solid #eee;border-radius:8px;
+                        overflow:hidden;margin-bottom:16px;">
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;width:140px;">Subject</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:600;
+                         color:#333;border-bottom:1px solid #eee;">{subject_name}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Section</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{section_disp}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Time Slot</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{time_slot or "—"}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Started</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{started_at}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;">Ended</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;">{ended_at}</td>
+            </tr>
+          </table>
+          <!-- Stat boxes -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+            <tr>
+              <td width="25%" style="padding:4px;">
+                <div style="background:#E8F5E9;border:1px solid #2D6A27;border-radius:8px;
+                            padding:12px;text-align:center;">
+                  <div style="font-size:28px;font-weight:700;color:#2D6A27;">{present_count}</div>
+                  <div style="font-size:11px;color:#2D6A27;font-weight:600;">Present</div>
+                </div>
+              </td>
+              <td width="25%" style="padding:4px;">
+                <div style="background:#FFF8E1;border:1px solid #D4A017;border-radius:8px;
+                            padding:12px;text-align:center;">
+                  <div style="font-size:28px;font-weight:700;color:#D4A017;">{late_count}</div>
+                  <div style="font-size:11px;color:#D4A017;font-weight:600;">Late</div>
+                </div>
+              </td>
+              <td width="25%" style="padding:4px;">
+                <div style="background:#FFEBEE;border:1px solid #C0392B;border-radius:8px;
+                            padding:12px;text-align:center;">
+                  <div style="font-size:28px;font-weight:700;color:#C0392B;">{absent_count}</div>
+                  <div style="font-size:11px;color:#C0392B;font-weight:600;">Absent</div>
+                </div>
+              </td>
+              <td width="25%" style="padding:4px;">
+                <div style="background:#E3F2FD;border:1px solid #2980B9;border-radius:8px;
+                            padding:12px;text-align:center;">
+                  <div style="font-size:28px;font-weight:700;color:#2980B9;">{excused_count}</div>
+                  <div style="font-size:11px;color:#2980B9;font-weight:600;">Excused</div>
+                </div>
+              </td>
+            </tr>
+          </table>
+          <div style="font-size:12px;color:#555;margin-bottom:20px;">
+            Attendance rate: <strong style="color:#1E4A1A;">{rate}%</strong>
+            &nbsp;·&nbsp; {total} students enrolled
+          </div>
+          <!-- Student list -->
+          <div style="font-size:13px;font-weight:700;color:#1E4A1A;
+                      text-transform:uppercase;letter-spacing:1px;
+                      margin-bottom:10px;">Student Attendance List</div>
+          <table width="100%" cellpadding="0" cellspacing="0"
+                 style="border:1px solid #eee;border-radius:8px;overflow:hidden;">
+            <thead>
+              <tr style="background:#1E4A1A;">
+                <th style="padding:9px 10px;font-size:11px;color:#fff;
+                           text-align:left;font-weight:600;">Student</th>
+                <th style="padding:9px 10px;font-size:11px;color:#fff;
+                           text-align:left;font-weight:600;">Tap Time</th>
+                <th style="padding:9px 10px;font-size:11px;color:#fff;
+                           text-align:left;font-weight:600;">Status</th>
+                <th style="padding:9px 10px;font-size:11px;color:#fff;
+                           text-align:left;font-weight:600;">TX Hash</th>
+              </tr>
+            </thead>
+            <tbody>{rows_html}</tbody>
+          </table>
+        </td>
+      </tr>
+      <!-- Footer -->
+      <tr>
+        <td style="padding:16px 32px 28px;">
+          <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
+            This is an automated session summary from the DAVS system.<br>
+            All TX hashes are immutable blockchain records verifiable on the Hardhat network.<br>
+            Please do not reply to this email.
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>'''
+    _send_email(
+        [teacher_email],
+        f'[DAVS] Session Summary — {subject_name} · {section_disp}',
+        html
+    )
+
 @app.context_processor
 def inject_globals():
     return dict(
@@ -207,6 +600,10 @@ def init_db():
         school_year TEXT DEFAULT '', date_registered TEXT DEFAULT '',
         course TEXT DEFAULT '', year_level TEXT DEFAULT '',
         section TEXT DEFAULT ''
+    );
+    CREATE TABLE IF NOT EXISTS email_config (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL DEFAULT ''
     );
     """
     with get_db() as conn:
@@ -1024,7 +1421,6 @@ def index():
                            subjects_db=db_get_all_subjects(),
                            users_db=db_get_all_users())
 
-
 def _register_save_pending_subjects(req, sess):
     import json as _json
     from datetime import datetime as _dt
@@ -1058,6 +1454,72 @@ def _register_save_pending_subjects(req, sess):
             existing_codes[code_upper] = new_id
         saved_count += 1
     return saved_count
+
+@app.route('/admin/settings', methods=['GET'])
+@admin_required
+def admin_settings():
+    cfg = get_email_config()
+    return render_template('admin_settings.html', cfg=cfg)
+ 
+@app.route('/admin/settings/save', methods=['POST'])
+@admin_required
+def admin_settings_save():
+    cfg = {
+        'smtp_host':     request.form.get('smtp_host',     'smtp.gmail.com').strip(),
+        'smtp_port':     request.form.get('smtp_port',     '587').strip(),
+        'smtp_user':     request.form.get('smtp_user',     '').strip(),
+        'smtp_password': request.form.get('smtp_password', '').strip(),
+        'smtp_from':     request.form.get('smtp_from',     '').strip(),
+        'enabled':       '1' if request.form.get('enabled') else '0',
+    }
+    save_email_config(cfg)
+    flash('Email settings saved successfully.')
+    return redirect(url_for('admin_settings'))
+ 
+@app.route('/admin/settings/test', methods=['POST'])
+@admin_required
+def admin_settings_test():
+    """Send a test email to verify SMTP config."""
+    cfg = get_email_config()
+    test_to = request.form.get('test_email', '').strip()
+    if not test_to or '@' not in test_to:
+        return jsonify({'ok': False, 'message': 'Invalid email address.'})
+    if cfg.get('enabled') != '1':
+        return jsonify({'ok': False, 'message': 'Email notifications are disabled. Enable them first.'})
+    if not cfg.get('smtp_user') or not cfg.get('smtp_password'):
+        return jsonify({'ok': False, 'message': 'SMTP credentials not configured.'})
+    try:
+        import smtplib, ssl
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text      import MIMEText
+        msg            = MIMEMultipart('alternative')
+        msg['Subject'] = '[DAVS] Test Email — SMTP Configuration Verified'
+        msg['From']    = cfg.get('smtp_from') or cfg['smtp_user']
+        msg['To']      = test_to
+        msg.attach(MIMEText(f'''
+        <div style="font-family:Arial,sans-serif;padding:24px;max-width:480px;">
+          <div style="font-size:20px;font-weight:700;color:#1E4A1A;margin-bottom:8px;">
+            ✓ DAVS Email Test Successful
+          </div>
+          <p style="color:#555;font-size:13px;">
+            Your SMTP configuration is working correctly.<br>
+            Email notifications will be sent from:
+            <strong>{cfg.get("smtp_from") or cfg["smtp_user"]}</strong>
+          </p>
+          <p style="color:#94a3b8;font-size:11px;margin-top:16px;">
+            Cavite State University — DAVS System
+          </p>
+        </div>''', 'html'))
+        ctx  = ssl.create_default_context()
+        port = int(cfg.get('smtp_port', 587))
+        with smtplib.SMTP(cfg['smtp_host'], port, timeout=10) as srv:
+            srv.ehlo(); srv.starttls(context=ctx)
+            srv.login(cfg['smtp_user'], cfg['smtp_password'])
+            srv.sendmail(msg['From'], [test_to], msg.as_string())
+        return jsonify({'ok': True, 'message': f'Test email sent to {test_to}'})
+    except Exception as e:
+        return jsonify({'ok': False, 'message': str(e)})
+ 
 
 @app.route('/register', methods=['GET','POST'])
 @admin_required
@@ -2197,6 +2659,49 @@ def end_session(sess_id):
     present_count = len([n for n in present_set if n not in sess.get('late',[])])
     late_count    = len(sess.get('late', []))
     flash(f'Session ended. {present_count} present, {late_count} late, {len(absent_list)} absent.')
+    # ── Email: send session summary to teacher ────────────────────────────
+    try:
+        teacher_username = sess.get('teacher', '')
+        all_users        = db_get_all_users()
+        teacher_user     = all_users.get(teacher_username, {})
+        teacher_email    = teacher_user.get('email', '')
+        if teacher_email:
+            att_logs = {lg['nfc_id']: lg for lg in db_get_session_attendance(sess_id)}
+            late_set  = set(sess.get('late', []))
+            exc_set   = set(sess.get('excused', []))
+            student_rows = []
+            for st in section_students:
+                nid    = st['nfcId']
+                if   nid in exc_set:     st_status = 'excused'
+                elif nid in late_set:    st_status = 'late'
+                elif nid in present_set: st_status = 'present'
+                else:                    st_status = 'absent'
+                lg = att_logs.get(nid, {})
+                student_rows.append({
+                    'name':       st.get('name', '—'),
+                    'student_id': st.get('student_id', ''),
+                    'status':     st_status,
+                    'tap_time':   lg.get('tap_time', '—') if lg else '—',
+                    'tx_hash':    lg.get('tx_hash', '') if lg else '',
+                    'block_num':  lg.get('block_number', '') if lg else '',
+                })
+            excused_count = len(exc_set)
+            send_teacher_session_summary(
+                teacher_email  = teacher_email,
+                teacher_name   = sess.get('teacher_name', ''),
+                subject_name   = sess.get('subject_name', ''),
+                section_key    = sess.get('section_key', ''),
+                time_slot      = sess.get('time_slot', ''),
+                started_at     = sess.get('started_at', ''),
+                ended_at       = ended_time,
+                present_count  = present_count,
+                late_count     = late_count,
+                absent_count   = len(absent_list),
+                excused_count  = excused_count,
+                student_rows   = student_rows,
+            )
+    except Exception as _email_err:
+        print(f'[EMAIL] Teacher summary error: {_email_err}')
     return redirect(url_for('teacher_dashboard'))
 
 @app.route('/teacher/session/<sess_id>/excuse', methods=['POST'])
@@ -2644,6 +3149,21 @@ def mark_pico():
         'subject':   sess.get('subject_name',''),
         'is_late':   is_late,
     })
+    
+    # ── Email: send attendance receipt to student ─────────────────────────
+    student_email = student_info.get('email', '')
+    send_student_attendance_receipt(
+        student_name   = name,
+        student_email  = student_email,
+        student_id     = student_id,
+        subject_name   = sess.get('subject_name', ''),
+        section_key    = sess.get('section_key', ''),
+        teacher_name   = sess.get('teacher_name', ''),
+        tap_time       = datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+        status         = status_label,
+        tx_hash        = tx_hash or '',
+        block_num      = block_num or '',
+    )
 
     return jsonify({
         'status':'ok','name':name,'student_id':student_id,

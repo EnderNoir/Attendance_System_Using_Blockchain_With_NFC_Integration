@@ -482,7 +482,7 @@
     </a>
     <a href="{{ url_for('manage_subjects') }}" class="nav-link {% if request.endpoint == 'manage_subjects' %}active{% endif %}" onclick="closeSidebar()"><i class="bi bi-book"></i> Subject Catalogue</a>
     <a href="{{ url_for('admin_sessions') }}" class="nav-link {% if request.endpoint == 'admin_sessions' %}active{% endif %}" onclick="closeSidebar()"><i class="bi bi-broadcast"></i> Classroom Sessions</a>
-    {% else %}
+    <a href="{{ url_for('admin_settings') }}" class="nav-link {% if request.endpoint in ('admin_settings','admin_settings_save','admin_settings_test') %}active{% endif %}" onclick="closeSidebar()"><i class="bi bi-gear-fill"></i> System Settings</a>    {% else %}
     <div class="nav-section-label">My Classroom</div>
     <a href="{{ url_for('teacher_dashboard') }}" class="nav-link {% if request.endpoint == 'teacher_dashboard' %}active{% endif %}" onclick="closeSidebar()"><i class="bi bi-house"></i> My Dashboard</a>
     <a href="{{ url_for('teacher_create_session') }}" class="nav-link {% if request.endpoint == 'teacher_create_session' %}active{% endif %}" onclick="closeSidebar()"><i class="bi bi-play-circle"></i> Create Session</a>

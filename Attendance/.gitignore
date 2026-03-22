@@ -35,10 +35,52 @@
 __pycache__/
 *.pyc
 *.pyd
+*.egg-info/
 
 # Python virtual environment
 venv/
+env/
 
-#sqlite database files
+# SQLite database files and WAL
 *.db
+*.db-shm
+*.db-wal
 
+# Application logs
+nfc_listener.log
+*.log
+
+# User uploads (student photos)
+/static/uploads/
+
+# Migration backup files
+*.migrated
+
+# IDE and utilities
+.idea/
+.project
+.pydevproject
+*.swp
+*.swo
+*~
+
+# Pytest cache
+.pytest_cache/
+.coverage
+
+# Python build
+build/
+!/build/.gitkeep
+
+# Backup files
+*.bak
+*.tmp
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# Windows
+Thumbs.db
+
+# Environment local overrides
+.env.local

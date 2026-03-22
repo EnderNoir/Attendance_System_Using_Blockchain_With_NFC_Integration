@@ -35,3 +35,10 @@
 __pycache__/
 *.pyc
 *.pyd
+
+# Python virtual environment
+venv/
+
+#sqlite database files
+*.db
+

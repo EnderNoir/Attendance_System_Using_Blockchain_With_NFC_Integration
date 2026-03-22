@@ -1,151 +1,367 @@
-{% extends "base.html" %}
-{% block title %}Attendance Record — DAVS{% endblock %}
-{% block page_title %}STUDENT ATTENDANCE RECORD{% endblock %}
-{% block content %}
-<style>
-  .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--muted);text-decoration:none;font-size:12px;margin-bottom:18px;transition:color .2s;}
-  .back-link:hover{color:var(--accent);}
-  .summary-pill{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;flex:1;min-width:120px;}
-  .summary-pill .val{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;}
-  .summary-pill .lbl{font-size:10px;color:var(--muted);margin-top:2px;}
-
-  /* Session record card */
-  .sess-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;transition:border-color .2s;}
-  .sess-card:hover{border-color:var(--border);}
-  .sess-card.present{border-left:3px solid var(--success);}
-  .sess-card.late{border-left:3px solid var(--warning);}
-  .sess-card.excused{border-left:3px solid #60a5fa;}
-  .sess-card.absent{border-left:3px solid var(--danger);}
-</style>
-
-<a href="{{ url_for('dashboard') }}" class="back-link"><i class="bi bi-arrow-left"></i> Back to Directory</a>
-
-{% set present_count = records | selectattr('1') | list | length %}
-{% set total = records | length %}
-{% set rate = ((present_count / total * 100) | round(1)) if total > 0 else 0 %}
-
-<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
-  <div>
-    <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">// INDIVIDUAL ATTENDANCE RECORD</div>
-    <h2 style="font-size:20px;font-weight:600;margin-bottom:4px;">
-      {% if student and student.name %}{{ student.name }}{% else %}Attendance History{% endif %}
-    </h2>
-    <p style="font-size:12px;color:var(--muted);">
-      NFC: <code>{{ nfc_id }}</code>
-      {% if student and student.course %}&nbsp;·&nbsp; {{ student.course }} · {{ student.year_level }} · Section {{ student.section }}{% endif %}
-      &nbsp;·&nbsp; All records verified on-chain.
-    </p>
+{% extends "base.html" %} {% block content %}
+<!-- Page Header with NFC ID -->
+<div style="margin-top: 2rem; margin-bottom: 3rem">
+  <div
+    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem"
+  >
+    <div
+      style="
+        background: rgba(102, 126, 234, 0.1);
+        width: 50px;
+        height: 50px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <i
+        class="bi bi-calendar-check"
+        style="font-size: 1.8rem; color: #667eea"
+      ></i>
+    </div>
+    <div>
+      <h2 style="margin: 0; font-weight: 700">Attendance History</h2>
+      <p style="margin: 0.5rem 0 0 0; color: #6c757d">
+        <i class="bi bi-nfc" style="color: #667eea; margin-right: 0.3rem"></i>
+        <code
+          style="
+            background: #f8f9fa;
+            padding: 0.3rem 0.6rem;
+            border-radius: 0.3rem;
+          "
+          >{{ nfc_id }}</code
+        >
+      </p>
+    </div>
   </div>
-  <a href="{{ url_for('export_page') }}?nfc_id={{ nfc_id }}" class="btn-outline" style="font-size:12px;">
-    <i class="bi bi-download"></i> Export CSV
+</div>
+
+<!-- Summary Stats -->
+{% if records %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-md-3">
+    <div
+      style="
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        color: white;
+        box-shadow: 0 4px 12px rgba(17, 153, 142, 0.2);
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <small style="opacity: 0.9">Total Records</small>
+          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">
+            {{ records|length }}
+          </h3>
+        </div>
+        <i class="bi bi-list-check" style="font-size: 2rem; opacity: 0.3"></i>
+      </div>
+    </div>
+  </div>
+
+  {% set present_count = records|selectattr('1', 'equalto', true)|list|length %}
+  <div class="col-sm-6 col-md-3">
+    <div
+      style="
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <small style="opacity: 0.9">Present</small>
+          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">
+            {{ present_count }}
+          </h3>
+        </div>
+        <i
+          class="bi bi-check-circle-fill"
+          style="font-size: 2rem; opacity: 0.3"
+        ></i>
+      </div>
+    </div>
+  </div>
+
+  {% set absent_count = records|selectattr('1', 'equalto', false)|list|length %}
+  <div class="col-sm-6 col-md-3">
+    <div
+      style="
+        background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        color: white;
+        box-shadow: 0 4px 12px rgba(245, 87, 108, 0.2);
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <small style="opacity: 0.9">Absent</small>
+          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">
+            {{ absent_count }}
+          </h3>
+        </div>
+        <i
+          class="bi bi-x-circle-fill"
+          style="font-size: 2rem; opacity: 0.3"
+        ></i>
+      </div>
+    </div>
+  </div>
+
+  {% if records|length > 0 %} {% set attendance_rate = (present_count /
+  (records|length) * 100)|round(1) %}
+  <div class="col-sm-6 col-md-3">
+    <div
+      style="
+        background: linear-gradient(135deg, #f39c12 0%, #f8b500 100%);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        color: white;
+        box-shadow: 0 4px 12px rgba(243, 156, 18, 0.2);
+      "
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div>
+          <small style="opacity: 0.9">Attendance Rate</small>
+          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">
+            {{ attendance_rate }}%
+          </h3>
+        </div>
+        <i class="bi bi-percent" style="font-size: 2rem; opacity: 0.3"></i>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Attendance Records Table -->
+{% if records %}
+<div
+  style="
+    background: white;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+  "
+>
+  <div class="table-responsive">
+    <table class="table table-hover" style="margin-bottom: 0">
+      <thead
+        style="
+          background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%);
+          color: white;
+        "
+      >
+        <tr>
+          <th style="padding: 1rem; border: none">
+            <i class="bi bi-calendar-event"></i> Date & Time
+          </th>
+          <th style="padding: 1rem; border: none; text-align: center">
+            <i class="bi bi-check2-circle"></i> Status
+          </th>
+          <th style="padding: 1rem; border: none; text-align: right">
+            <i class="bi bi-clock-history"></i> Duration
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for timestamp, present in records %}
+        <tr style="border-bottom: 1px solid #dee2e6">
+          <td
+            style="
+              padding: 1.25rem 1rem;
+              vertical-align: middle;
+              font-weight: 500;
+            "
+          >
+            <i
+              class="bi bi-calendar3"
+              style="color: #667eea; margin-right: 0.5rem"
+            ></i>
+            {{ timestamp }}
+          </td>
+          <td
+            style="
+              padding: 1.25rem 1rem;
+              vertical-align: middle;
+              text-align: center;
+            "
+          >
+            {% if present %}
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                background: rgba(17, 153, 142, 0.1);
+                color: #0d5f57;
+                padding: 0.4rem 0.8rem;
+                border-radius: 0.4rem;
+                font-weight: 600;
+                font-size: 0.9rem;
+              "
+            >
+              <i class="bi bi-check-circle-fill"></i> Present
+            </span>
+            {% else %}
+            <span
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+                background: rgba(245, 87, 108, 0.1);
+                color: #c13845;
+                padding: 0.4rem 0.8rem;
+                border-radius: 0.4rem;
+                font-weight: 600;
+                font-size: 0.9rem;
+              "
+            >
+              <i class="bi bi-x-circle-fill"></i> Absent
+            </span>
+            {% endif %}
+          </td>
+          <td
+            style="
+              padding: 1.25rem 1rem;
+              vertical-align: middle;
+              text-align: right;
+              color: #6c757d;
+              font-size: 0.9rem;
+            "
+          >
+            <i class="bi bi-hourglass-split"></i> Today
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div
+  style="
+    background: white;
+    border-radius: 1rem;
+    padding: 3rem 2rem;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+  "
+>
+  <i
+    class="bi bi-inbox"
+    style="font-size: 3rem; color: #dee2e6; display: block; margin-bottom: 1rem"
+  ></i>
+  <h4 style="font-weight: 700; color: #2c3e50; margin-bottom: 0.5rem">
+    No attendance records found
+  </h4>
+  <p style="color: #6c757d; margin-bottom: 1.5rem">
+    This NFC ID has not been scanned yet or no attendance data is available.
+  </p>
+  <div
+    style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap"
+  >
+    <a
+      href="{{ url_for('dashboard') }}"
+      class="btn btn-primary"
+      style="white-space: nowrap"
+    >
+      <i class="bi bi-graph-up"></i> View All Students
+    </a>
+    <a
+      href="{{ url_for('register') }}"
+      class="btn btn-secondary"
+      style="white-space: nowrap"
+    >
+      <i class="bi bi-person-plus"></i> Register Student
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<!-- Action Buttons -->
+<div style="display: flex; gap: 1rem; flex-wrap: wrap">
+  <a
+    href="{{ url_for('dashboard') }}"
+    class="btn btn-primary"
+    style="
+      flex: 1;
+      min-width: 150px;
+      padding: 0.85rem 1rem;
+      font-weight: 600;
+      white-space: nowrap;
+    "
+  >
+    <i class="bi bi-graph-up"></i> Back to Dashboard
+  </a>
+  <a
+    href="{{ url_for('index') }}"
+    class="btn btn-secondary"
+    style="
+      flex: 1;
+      min-width: 150px;
+      padding: 0.85rem 1rem;
+      font-weight: 600;
+      white-space: nowrap;
+    "
+  >
+    <i class="bi bi-house-fill"></i> Home
   </a>
 </div>
 
-<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
-  <div class="summary-pill"><div class="card-icon cyan"><i class="bi bi-calendar-check"></i></div><div><div class="val">{{ total }}</div><div class="lbl">Classes Held</div></div></div>
-  <div class="summary-pill"><div class="card-icon green"><i class="bi bi-check-circle"></i></div><div><div class="val" style="color:var(--success);">{{ present_count }}</div><div class="lbl">Attended</div></div></div>
-  <div class="summary-pill"><div class="card-icon" style="background:rgba(239,68,68,.1);color:var(--danger)"><i class="bi bi-x-circle"></i></div><div><div class="val" style="color:var(--danger);">{{ total - present_count }}</div><div class="lbl">Missed</div></div></div>
-  <div class="summary-pill"><div class="card-icon amber"><i class="bi bi-percent"></i></div>
-    <div><div class="val" style="color:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ rate }}%</div><div class="lbl">Rate</div></div></div>
+<!-- Info Card -->
+<div
+  style="
+    background: rgba(102, 126, 234, 0.05);
+    border-left: 4px solid #667eea;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-top: 2rem;
+  "
+>
+  <p style="margin: 0; color: #6c757d; font-size: 0.95rem">
+    <i
+      class="bi bi-info-circle"
+      style="color: #667eea; margin-right: 0.5rem"
+    ></i>
+    Attendance records are immutably stored on the Ethereum blockchain. Each
+    entry is timestamped and verified by the smart contract.
+  </p>
 </div>
 
-{% if total > 0 %}
-<div class="card" style="padding:16px 20px;margin-bottom:20px;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-    <div>
-      <div style="font-size:12px;font-weight:600;">Overall Attendance Standing</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:1px;">
-        {% if rate >= 75 %}✅ Good standing — meets 75% requirement
-        {% elif rate >= 50 %}⚠️ At risk — below the 75% requirement
-        {% else %}❌ Critical — significantly below required threshold{% endif %}
-      </div>
-    </div>
-    <span style="font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ rate }}%</span>
-  </div>
-  <div style="height:7px;background:var(--border);border-radius:999px;overflow:hidden;">
-    <div style="height:100%;width:{{ rate }}%;background:{% if rate >= 75 %}var(--success){% elif rate >= 50 %}var(--warning){% else %}var(--danger){% endif %};border-radius:999px;transition:width .8s;"></div>
-  </div>
-</div>
-{% endif %}
-
-<!-- Session-by-session detail (from sessions_db) -->
-<div class="card" style="margin-bottom:20px;">
-  <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-    <div>
-      <div class="card-title-text">Classroom Session Log</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px;">Subject · Instructor · Date · Time · Status for each recorded session</div>
-    </div>
-    <span style="font-size:11px;color:var(--muted);" id="sessCount">Loading…</span>
-  </div>
-  <!-- Scrollable session list -->
-  <div style="max-height:480px;overflow-y:auto;padding:14px 18px;" class="scroll-container" id="sessionDetailList">
-    <div style="text-align:center;color:var(--muted);padding:32px;font-size:12px;">
-      <div class="spin" style="margin:0 auto 10px;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;"></div>
-      Loading session records…
-    </div>
-  </div>
-</div>
-
-<!-- Legacy blockchain tap log (timestamp only) -->
-{% if records %}
-<div class="card">
-  <div style="padding:16px 20px;border-bottom:1px solid var(--border);">
-    <div class="card-title-text">Raw Blockchain Tap Log</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px;">Raw on-chain attendance timestamps — immutable records from the Ethereum blockchain</div>
-  </div>
-  <div style="max-height:320px;overflow-y:auto;padding:10px 20px 16px;" class="scroll-container">
-    {% for timestamp, present in records %}
-    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);" class="timeline-item">
-      <div style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);width:20px;text-align:right;flex-shrink:0;">{{ loop.index }}</div>
-      <div style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:{% if present %}var(--success){% else %}var(--danger){% endif %};"></div>
-      <div style="flex:1;font-size:12px;">
-        {{ timestamp.split(' ')[1] if ' ' in timestamp else timestamp }}
-        <div style="font-size:10px;color:var(--muted);margin-top:1px;"><i class="bi bi-calendar3"></i> {{ timestamp.split(' ')[0] if ' ' in timestamp else '' }}</div>
-      </div>
-      {% if present %}
-        <span class="badge-present"><i class="bi bi-check"></i> Attended</span>
-      {% else %}
-        <span class="badge-absent"><i class="bi bi-x"></i> Absent</span>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
-<script>
-// Load detailed session records
-fetch('/api/student_sessions/{{ nfc_id }}', {credentials:'same-origin'})
-.then(r=>r.json()).then(sessions=>{
-  const list=document.getElementById('sessionDetailList');
-  document.getElementById('sessCount').textContent=`${sessions.length} session${sessions.length!==1?'s':''}`;
-  if(!sessions.length){
-    list.innerHTML='<div style="text-align:center;color:var(--muted);padding:32px;font-size:12px;"><i class="bi bi-calendar-x" style="font-size:28px;display:block;opacity:.2;margin-bottom:8px;"></i>No detailed session records found.</div>';
-    return;
-  }
-  list.innerHTML=sessions.map((s,i)=>`
-    <div class="sess-card ${s.status}" style="${i>0?'margin-top:8px':''}">
-      <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:13px;">${s.subject_name}${s.course_code?' <span style=\\"font-family:monospace;font-size:10px;color:var(--accent);\\">['+s.course_code+']</span>':''}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:12px;">
-          <span><i class="bi bi-person-badge"></i> ${s.teacher_name}</span>
-          <span><i class="bi bi-grid"></i> ${s.section_key.replace(/\|/g,' · ')}</span>
-          <span><i class="bi bi-clock"></i> ${s.time_slot}</span>
-          <span><i class="bi bi-calendar3"></i> ${s.date}</span>
-          ${s.units?`<span><i class="bi bi-layers"></i> ${s.units} units</span>`:''}
-        </div>
-      </div>
-      <span style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0;
-        ${s.status==='present'?'background:rgba(16,185,129,.12);color:var(--success);border:1px solid rgba(16,185,129,.25);':
-          s.status==='late'?'background:rgba(245,158,11,.1);color:var(--warning);border:1px solid rgba(245,158,11,.25);':
-          s.status==='excused'?'background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.25);':
-          'background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2);'}">
-        ${s.status.charAt(0).toUpperCase()+s.status.slice(1)}
-      </span>
-    </div>
-  `).join('');
-}).catch(()=>{
-  document.getElementById('sessionDetailList').innerHTML='<div style="color:var(--danger);text-align:center;padding:24px;font-size:12px;">Failed to load session records.</div>';
-});
-</script>
 {% endblock %}

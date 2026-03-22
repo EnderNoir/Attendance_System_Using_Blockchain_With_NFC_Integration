@@ -1,341 +1,370 @@
-{% extends "base.html" %}
-{% block title %}Register Student — DAVS{% endblock %}
-{% block page_title %}REGISTER STUDENT{% endblock %}
-{% block content %}
-<style>
-  .full-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px 16px;}
-  .span-2{grid-column:span 2;}.span-3{grid-column:1/-1;}
-  @media(max-width:860px){.full-form{grid-template-columns:1fr 1fr;}.span-2{grid-column:span 1;}}
-  @media(max-width:540px){.full-form{grid-template-columns:1fr;}.span-2,.span-3{grid-column:1;}}
-  .field-wrap{display:flex;flex-direction:column;}.field-wrap .form-label{margin-bottom:5px;}
-  .fsec{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;padding-bottom:8px;border-bottom:1px solid var(--border);grid-column:1/-1;}
-  .upload-banner{background:rgba(45,106,39,.04);border:2px dashed rgba(45,106,39,.25);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .2s;margin-bottom:18px;flex-wrap:wrap;}
-  .upload-banner:hover{border-color:var(--accent);}.upload-banner.loading{border-color:var(--warning);border-style:solid;cursor:default;}
-  .upload-banner.success{border-color:var(--success);border-style:solid;background:rgba(45,106,39,.05);}
-  .upload-banner.error{border-color:var(--danger);border-style:solid;}
-  .ub-icon{font-size:30px;flex-shrink:0;}.ub-text{flex:1;min-width:120px;}
-  .ub-title{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;}.ub-sub{font-size:12px;color:var(--muted);margin-top:2px;}
-  .btn-upload{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:9px 16px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;}
-  [data-theme="dark"] .btn-upload{color:#000;}.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
-  @keyframes spin{to{transform:rotate(360deg);}}
-  .steps-box{background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.15);border-radius:10px;padding:12px 16px;margin-bottom:18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-  .step-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
-  .step-num{width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-  [data-theme="dark"] .step-num{color:#000;}.sep{color:var(--border);font-size:14px;}
-  .subj-preview{display:none;grid-column:1/-1;}.subj-preview.show{display:block;}
-  .subj-preview-inner{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:12px 14px;max-height:220px;overflow-y:auto;}
-  .subj-notice{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--warning);margin-bottom:8px;display:flex;align-items:flex-start;gap:7px;}
-  .subj-table{width:100%;border-collapse:collapse;font-size:12px;}
-  .subj-table th{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;}
-  .subj-table td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;}
-  .subj-table tr:last-child td{border-bottom:none;}
-  .photo-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-  .photo-preview-wrap{width:72px;height:72px;border-radius:50%;background:rgba(45,106,39,.08);border:2px dashed rgba(45,106,39,.25);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;transition:border-color .2s;}
-  .form-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;margin-top:16px;}
-  @media(max-width:540px){.form-card{padding:14px;}}
-  .submit-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
-  .submit-row .btn-primary{flex:1;min-width:180px;justify-content:center;padding:12px;font-size:14px;}
-  .submit-row .btn-outline{flex-shrink:0;padding:12px 20px;}
-  @media(max-width:480px){.submit-row{flex-direction:column;}.submit-row .btn-primary,.submit-row .btn-outline{width:100%;justify-content:center;}}
-
-  /* NFC card strip — replaces old scan-strip + button */
-  .nfc-card-strip{
-    background:rgba(45,106,39,.04);
-    border:2px dashed rgba(45,106,39,.2);
-    border-radius:12px;
-    padding:16px 20px;
-    display:flex;align-items:center;gap:14px;
-    transition:all .3s;
-  }
-  .nfc-card-strip.captured{
-    border-style:solid;
-    border-color:var(--success);
-    background:rgba(45,106,39,.05);
-  }
-  .nfc-card-strip.waiting{
-    border-style:solid;
-    border-color:var(--accent);
-    animation:borderPulse 1.5s infinite;
-  }
-  .nfc-card-strip.error{
-    border-style:solid;
-    border-color:var(--danger);
-  }
-  @keyframes borderPulse{0%,100%{border-color:var(--accent);}50%{border-color:rgba(45,106,39,.2);}}
-  .nfc-strip-icon{font-size:28px;flex-shrink:0;}
-  .nfc-strip-info{flex:1;min-width:0;}
-  .nfc-strip-title{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;}
-  .nfc-strip-sub{font-size:12px;color:var(--muted);margin-top:3px;}
-  .nfc-uid-display{
-    font-family:'Space Mono',monospace;font-size:14px;font-weight:700;
-    color:var(--text);background:rgba(255,255,255,.04);
-    border:1px solid var(--border);border-radius:6px;
-    padding:6px 14px;letter-spacing:2px;
-    cursor:default;user-select:none;
-    transition:border-color .3s,color .3s;
-    margin-top:8px;display:inline-block;
-  }
-  .nfc-uid-display.has-uid{border-color:var(--success);color:var(--success);}
-  .nfc-uid-display.no-uid{color:var(--muted);}
-</style>
-
-<!--
-  HIDDEN NFC HID INPUT — register page
-  Same approach as session_live.html: USB reader types UID + Enter,
-  hidden input captures it, fills the nfc_id field automatically.
-  No Scan button needed.
--->
-<input id="nfcHidInput" type="text"
-  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-  tabindex="0"
-  style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;
-         pointer-events:none;border:none;outline:none;background:transparent;
-         color:transparent;z-index:-1;font-size:1px;"
-  aria-hidden="true"/>
-
-<div style="margin-bottom:16px;">
-  <h2 style="font-size:20px;font-weight:700;margin-bottom:4px;">Register New Student</h2>
-  <p style="font-size:13px;color:var(--muted);">Upload a CvSU registration form PDF to auto-fill, or fill in manually.</p>
-</div>
-
-<div class="steps-box">
-  <div class="step-chip"><div class="step-num">1</div><span>Upload PDF or fill manually</span></div>
-  <div class="sep">·</div>
-  <div class="step-chip"><div class="step-num">2</div><span>Complete all fields</span></div>
-  <div class="sep">·</div>
-  <div class="step-chip"><div class="step-num">3</div><span>Tap NFC card on reader</span></div>
-  <div class="sep">·</div>
-  <div class="step-chip"><div class="step-num">4</div><span>Click Register to save</span></div>
-  <span style="margin-left:auto;font-size:12px;color:var(--muted);"><span style="color:var(--danger);font-weight:700;">*</span> = Required</span>
-</div>
-
-<div class="upload-banner" id="uploadBanner"
-     ondragover="event.preventDefault();this.classList.add('dragover')"
-     ondragleave="this.classList.remove('dragover')"
-     ondrop="handleDrop(event)">
-  <div class="ub-icon" id="ubIcon">📄</div>
-  <div class="ub-text">
-    <div class="ub-title" id="ubTitle">Auto-fill from CvSU Registration PDF</div>
-    <div class="ub-sub" id="ubSub">Drop a PDF here or click Upload — subjects will be saved only when you click Register</div>
+{% extends "base.html" %} {% block content %}
+<!-- Page Header -->
+<div style="margin-top: 2rem; margin-bottom: 3rem">
+  <div
+    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem"
+  >
+    <div
+      style="
+        background: rgba(102, 126, 234, 0.1);
+        width: 50px;
+        height: 50px;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      "
+    >
+      <i
+        class="bi bi-person-plus"
+        style="font-size: 1.8rem; color: #667eea"
+      ></i>
+    </div>
+    <div>
+      <h2 style="margin: 0; font-weight: 700">Register New Student</h2>
+      <p style="margin: 0.5rem 0 0 0; color: #6c757d">
+        Assign NFC card and register on blockchain
+      </p>
+    </div>
   </div>
-  <button type="button" class="btn-upload" onclick="document.getElementById('pdfFileInput').click()" id="btnUpload">
-    <i class="bi bi-cloud-upload"></i> Upload PDF
-  </button>
-  <input type="file" id="pdfFileInput" accept=".pdf" style="display:none;" onchange="handlePdfUpload(this)">
 </div>
 
-<!-- Subject preview -->
-<div class="subj-preview" id="subjPreview">
-  <div class="subj-notice">
-    <i class="bi bi-info-circle" style="flex-shrink:0;margin-top:1px;"></i>
-    <span>These subjects will be added to the catalogue only when you click <strong>Register Student on Blockchain</strong>.</span>
+<!-- Progress Steps -->
+<div style="margin-bottom: 3rem">
+  <div
+    style="
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      justify-content: space-between;
+      position: relative;
+    "
+  >
+    <!-- Step 1 -->
+    <div
+      style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        position: relative;
+        z-index: 1;
+      "
+    >
+      <div
+        style="
+          background: #667eea;
+          color: white;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        "
+      >
+        1
+      </div>
+      <span style="font-size: 0.9rem; font-weight: 600; color: #2c3e50"
+        >Enter Name</span
+      >
+    </div>
+
+    <!-- Line -->
+    <div
+      style="
+        flex: 1;
+        height: 2px;
+        background: #dee2e6;
+        position: absolute;
+        top: 25px;
+        left: 0;
+        right: 0;
+      "
+    ></div>
+
+    <!-- Step 2 -->
+    <div
+      style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        position: relative;
+        z-index: 1;
+      "
+    >
+      <div
+        style="
+          background: #e9ecef;
+          color: #6c757d;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        "
+      >
+        2
+      </div>
+      <span style="font-size: 0.9rem; font-weight: 600; color: #6c757d"
+        >Scan NFC</span
+      >
+    </div>
+
+    <!-- Line -->
+    <div
+      style="
+        flex: 1;
+        height: 2px;
+        background: #dee2e6;
+        position: absolute;
+        top: 25px;
+        right: 0;
+        left: 0;
+      "
+    ></div>
+
+    <!-- Step 3 -->
+    <div
+      style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+        position: relative;
+        z-index: 1;
+      "
+    >
+      <div
+        style="
+          background: #e9ecef;
+          color: #6c757d;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+        "
+      >
+        3
+      </div>
+      <span style="font-size: 0.9rem; font-weight: 600; color: #6c757d"
+        >Confirm</span
+      >
+    </div>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-    <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;">// SUBJECTS FOUND IN PDF</span>
-    <span style="font-size:11px;color:var(--muted);" id="subjPreviewNote"></span>
-  </div>
-  <div class="subj-preview-inner" id="subjPreviewList"></div>
 </div>
 
-<div class="form-card">
-  <form method="POST" action="{{ url_for('register') }}" id="registerForm" enctype="multipart/form-data" onsubmit="return validateRegisterForm()">
-    <input type="hidden" name="pending_subjects_json" id="pendingSubjectsJson" value="[]"/>
+<!-- NFC Scan Status Alert -->
+<div id="scanStatus" style="display: none; margin-bottom: 2rem"></div>
 
-    <div class="full-form">
-      <div class="fsec">// Enrollment Details</div>
-      <div class="field-wrap">
-        <label class="form-label">Semester <span style="color:var(--danger)">*</span></label>
-        <select class="form-control" name="semester" id="f_semester" required>
-          <option value="" disabled selected>Select semester…</option>
-          <option value="First">First Semester</option>
-          <option value="Second">Second Semester</option>
-          <option value="Summer">Summer</option>
-        </select>
-      </div>
-      <div class="field-wrap">
-        <label class="form-label">School Year <span style="color:var(--danger)">*</span></label>
-        <input type="text" class="form-control" name="school_year" id="f_school_year" placeholder="e.g. 2024-2025" required/>
-      </div>
-      <div class="field-wrap">
-        <label class="form-label">Date of Admission</label>
-        <input type="month" class="form-control" name="date_registered" id="f_date_registered"/>
-      </div>
+<!-- Registration Form -->
+<div
+  style="
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+  "
+>
+  <form method="POST" action="{{ url_for('register') }}">
+    <!-- Student Name Input -->
+    <div style="margin-bottom: 2rem">
+      <label
+        for="name"
+        style="
+          display: block;
+          font-weight: 600;
+          color: #2c3e50;
+          margin-bottom: 0.75rem;
+        "
+      >
+        <i
+          class="bi bi-person-fill"
+          style="color: #667eea; margin-right: 0.5rem"
+        ></i>
+        Student Full Name
+      </label>
+      <input
+        type="text"
+        class="form-control"
+        id="name"
+        name="name"
+        placeholder="e.g., John Doe"
+        required
+        style="
+          font-size: 1rem;
+          padding: 0.85rem 1rem;
+          border: 2px solid #dee2e6;
+          border-radius: 0.5rem;
+        "
+      />
+      <small style="color: #6c757d; display: block; margin-top: 0.5rem"
+        >Enter the student's full name</small
+      >
+    </div>
 
-      <div class="fsec" style="margin-top:6px;">// Personal Information</div>
-      <div class="field-wrap span-3">
-        <label class="form-label">Student Photo <span style="font-size:10px;font-weight:400;color:var(--muted);text-transform:none;">(optional)</span></label>
-        <div class="photo-row">
-          <div class="photo-preview-wrap" id="photoPreviewWrap" onclick="document.getElementById('studentPhotoInput').click()">
-            <div id="photoPreviewInit" style="text-align:center;"><i class="bi bi-camera" style="font-size:20px;color:var(--muted);display:block;"></i><span style="font-size:10px;color:var(--muted);">Upload</span></div>
-            <img id="photoPreviewImg" src="" style="display:none;width:100%;height:100%;object-fit:cover;"/>
-          </div>
-          <div>
-            <input type="file" id="studentPhotoInput" name="student_photo" accept="image/*" style="display:none;" onchange="previewStudentPhoto(this)">
-            <button type="button" class="btn-outline" style="font-size:12px;padding:7px 14px;" onclick="document.getElementById('studentPhotoInput').click()"><i class="bi bi-cloud-upload"></i> Choose Photo</button>
-            <div style="font-size:11px;color:var(--muted);margin-top:5px;">JPG, PNG, WEBP · Max 5 MB</div>
-          </div>
-        </div>
+    <!-- NFC UID Input with Scan Button -->
+    <div style="margin-bottom: 2rem">
+      <label
+        for="nfc_id"
+        style="
+          display: block;
+          font-weight: 600;
+          color: #2c3e50;
+          margin-bottom: 0.75rem;
+        "
+      >
+        <i class="bi bi-nfc" style="color: #667eea; margin-right: 0.5rem"></i>
+        NFC Tag UID
+      </label>
+      <div style="display: flex; gap: 0.75rem">
+        <input
+          type="text"
+          class="form-control"
+          id="nfc_id"
+          name="nfc_id"
+          placeholder="Tap card or click Scan"
+          required
+          style="
+            flex: 1;
+            font-size: 1rem;
+            padding: 0.85rem 1rem;
+            border: 2px solid #dee2e6;
+            border-radius: 0.5rem;
+            font-family: 'Courier New', monospace;
+          "
+        />
+        <button
+          type="button"
+          class="btn btn-primary"
+          onclick="scanNFC()"
+          style="white-space: nowrap; padding: 0.85rem 1.5rem; font-weight: 600"
+        >
+          <i class="bi bi-phone"></i> Scan
+        </button>
       </div>
-      <div class="field-wrap span-2">
-        <label class="form-label">Student Full Name <span style="color:var(--danger)">*</span></label>
-        <input type="text" class="form-control" name="name" id="f_name" placeholder="e.g. Juan Dela Cruz" required/>
-      </div>
-      <div class="field-wrap">
-        <label class="form-label">Student ID Number <span style="color:var(--danger)">*</span></label>
-        <input type="text" class="form-control" name="student_id" id="f_student_id" placeholder="e.g. 2021-00123" required/>
-      </div>
-      <div class="field-wrap span-2">
-        <label class="form-label">Email Address</label>
-        <input type="email" class="form-control" name="email" id="f_email" placeholder="e.g. juan@school.edu"/>
-      </div>
-      <div class="field-wrap">
-        <label class="form-label">Contact Number</label>
-        <input type="text" class="form-control" name="contact" id="f_contact" placeholder="e.g. 09XX-XXX-XXXX"/>
-      </div>
+      <small style="color: #6c757d; display: block; margin-top: 0.5rem"
+        >Click "Scan" and tap the NFC card on the reader</small
+      >
+    </div>
 
-      <div class="fsec" style="margin-top:6px;">// Academic Information</div>
-      <div class="field-wrap">
-        <label class="form-label">Program <span style="color:var(--danger)">*</span></label>
-        <select class="form-control" name="course" id="f_course" required>
-          <option value="" disabled selected>Select program…</option>
-          <option value="BS Computer Science">BS Computer Science</option>
-          <option value="BS Information Technology">BS Information Technology</option>
-        </select>
-      </div>
-      <div class="field-wrap">
-        <label class="form-label">Major / Specialization</label>
-        <input type="text" class="form-control" name="major" id="f_major" placeholder="e.g. Software Engineering" value="N/A"/>
-      </div>
-      <div class="field-wrap">
-        <label class="form-label">Year Level <span style="color:var(--danger)">*</span></label>
-        <select class="form-control" name="year_level" id="f_year_level" required>
-          <option value="" disabled selected>Select year…</option>
-          <option value="1st Year">1st Year</option>
-          <option value="2nd Year">2nd Year</option>
-          <option value="3rd Year">3rd Year</option>
-          <option value="4th Year">4th Year</option>
-        </select>
-      </div>
-      <div class="field-wrap">
-        <label class="form-label">Section <span style="color:var(--danger)">*</span></label>
-        <select class="form-control" name="section" id="f_section" required>
-          <option value="" disabled selected>Select section…</option>
-          <option value="A">A</option>
-          <option value="B">B</option>
-          <option value="C">C</option>
-          <option value="D">D</option>
-        </select>
-      </div>
-      <div class="field-wrap span-2">
-        <label class="form-label">Adviser Name <span style="color:var(--danger)">*</span></label>
-        <input type="text" class="form-control" name="adviser" id="f_adviser"
-               placeholder="Type or pick a teacher name…" list="adviserList" required autocomplete="off"/>
-        <datalist id="adviserList">
-          {% for u, d in users_db.items() %}{% if d.role in ('teacher','admin') %}
-          <option value="{{ d.full_name }}">{{ d.full_name }}</option>
-          {% endif %}{% endfor %}
-        </datalist>
-      </div>
-
-      <!-- NFC Card — tap to fill, no button needed -->
-      <div class="fsec" style="margin-top:6px;">// NFC Card</div>
-      <div class="span-3">
-        <!-- Hidden real form field — filled automatically by HID input handler -->
-        <input type="hidden" name="nfc_id" id="nfc_id" required/>
-
-        <div class="nfc-card-strip" id="nfcCardStrip">
-          <span class="nfc-strip-icon" id="nfcStripIcon">💳</span>
-          <div class="nfc-strip-info">
-            <div class="nfc-strip-title" id="nfcStripTitle">Tap NFC card on the reader</div>
-            <div class="nfc-strip-sub" id="nfcStripSub">Hold the student's NFC card near the USB reader — the UID will fill automatically</div>
-            <div class="nfc-uid-display no-uid" id="nfcUidDisplay">No card tapped yet</div>
-          </div>
-        </div>
-        <div id="scanStatus" style="display:none;margin-top:8px;"></div>
-      </div>
-
-      <div class="span-3 submit-row">
-        <button type="submit" class="btn-primary"><i class="bi bi-check-circle"></i> Register Student on Blockchain</button>
-        <a href="{{ url_for('index') }}" class="btn-outline">Cancel</a>
-      </div>
+    <!-- Action Buttons -->
+    <div style="display: flex; gap: 1rem; margin-top: 2.5rem">
+      <button
+        type="submit"
+        class="btn btn-success"
+        style="flex: 1; padding: 0.85rem 1rem; font-weight: 600"
+      >
+        <i class="bi bi-check-circle"></i> Register Student
+      </button>
+      <a
+        href="{{ url_for('index') }}"
+        class="btn btn-secondary"
+        style="
+          flex: 1;
+          padding: 0.85rem 1rem;
+          font-weight: 600;
+          text-decoration: none;
+        "
+      >
+        <i class="bi bi-arrow-left"></i> Cancel
+      </a>
     </div>
   </form>
 </div>
 
+<!-- Tips Card -->
+<div
+  style="
+    background: rgba(102, 126, 234, 0.05);
+    border-left: 4px solid #667eea;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+  "
+>
+  <h6 style="font-weight: 700; color: #2c3e50; margin-bottom: 1rem">
+    <i
+      class="bi bi-info-circle"
+      style="color: #667eea; margin-right: 0.5rem"
+    ></i>
+    Tips
+  </h6>
+  <ul style="list-style: none; padding: 0; color: #6c757d; font-size: 0.95rem">
+    <li style="margin-bottom: 0.75rem">
+      <i class="bi bi-check2" style="color: #11998e; margin-right: 0.5rem"></i>
+      Make sure the NFC listener is running
+    </li>
+    <li style="margin-bottom: 0.75rem">
+      <i class="bi bi-check2" style="color: #11998e; margin-right: 0.5rem"></i>
+      Tap the card firmly on the NFC reader
+    </li>
+    <li>
+      <i class="bi bi-check2" style="color: #11998e; margin-right: 0.5rem"></i>
+      Wait for confirmation before submitting
+    </li>
+  </ul>
+</div>
+
+<script src="{{ url_for('static', filename='js/register.js') }}"></script>
 <script>
-let _pendingSubjects = [];
+  // Functions loaded from external JS
+  function scanNFC() {
+    const scanBtn = document.querySelector('button[onclick="scanNFC()"]');
+    const nfcInput = document.getElementById("nfc_id");
+    const statusDiv = document.getElementById("scanStatus");
 
-// ── PDF upload ────────────────────────────────────────────────────────────
-function handleDrop(e){e.preventDefault();document.getElementById('uploadBanner').classList.remove('dragover');const file=e.dataTransfer.files[0];if(file&&file.type==='application/pdf')processPdf(file);else showBannerError('Please drop a PDF file.');}
-function handlePdfUpload(input){if(input.files&&input.files[0])processPdf(input.files[0]);}
+    // Disable button and show loading state
+    scanBtn.disabled = true;
+    const originalHTML = scanBtn.innerHTML;
+    scanBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Scanning...';
 
-function processPdf(file){
-  document.getElementById('uploadBanner').className='upload-banner loading';
-  document.getElementById('ubIcon').textContent='⏳';
-  document.getElementById('ubTitle').textContent='Reading PDF…';
-  document.getElementById('ubSub').textContent='Extracting from '+file.name;
-  const btn=document.getElementById('btnUpload');btn.disabled=true;btn.innerHTML='<span class="spin"></span> Parsing…';
-  const fd=new FormData();fd.append('file',file);
-  fetch('/parse_registration_pdf',{method:'POST',credentials:'same-origin',body:fd})
-    .then(r=>{if(!r.ok&&r.status===302)throw new Error('Session expired.');const ct=r.headers.get('content-type')||'';if(!ct.includes('application/json'))throw new Error('Server error ('+r.status+').');return r.json();})
-    .then(data=>{
-      if(data.error){showBannerError(data.error);return;}
-      autofill(data);showBannerSuccess(file.name);
-      if(data.subjects&&data.subjects.length){
-        _pendingSubjects=data.subjects;
-        document.getElementById('pendingSubjectsJson').value=JSON.stringify(_pendingSubjects);
-        showSubjectPreview(data.subjects);
-      }
-    })
-    .catch(err=>showBannerError('Error: '+err.message));
-}
+    // Show status message
+    statusDiv.style.display = "block";
+    statusDiv.className = "alert alert-info d-flex align-items-center";
+    statusDiv.innerHTML = `
+      <div class="spinner-border spinner-border-sm me-2" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <div>
+        <strong>Ready to scan</strong>
+        <br/>
+        <small>Tap your NFC card on the reader...</small>
+      </div>
+    `;
 
-function autofill(d){
-  const map={f_student_id:d.student_id,f_name:d.name,f_email:d.email,f_contact:d.contact,f_section:d.section,f_adviser:d.adviser,f_major:d.major,f_school_year:d.school_year,f_date_registered:d.date_registered};
-  for(const [id,val] of Object.entries(map)){const el=document.getElementById(id);if(el&&val){el.value=val;highlight(el);}}
-  if(d.semester){const sel=document.getElementById('f_semester');for(const opt of sel.options){if(opt.value.toLowerCase().includes(d.semester.toLowerCase())){sel.value=opt.value;highlight(sel);break;}}}
-  if(d.course){const sel=document.getElementById('f_course');const allowed=['BS Computer Science','BS Information Technology'];const match=allowed.find(c=>c.toLowerCase()===d.course.toLowerCase()||d.course.toLowerCase().includes(c.replace('BS ','').toLowerCase()));if(match){sel.value=match;highlight(sel);}}
-  if(d.year_level){const sel=document.getElementById('f_year_level');for(const opt of sel.options){if(opt.value.toLowerCase()===d.year_level.toLowerCase()){sel.value=opt.value;highlight(sel);break;}}}
-}
-
-function highlight(el){el.style.transition='box-shadow .3s,border-color .3s';el.style.borderColor='var(--success)';el.style.boxShadow='0 0 0 3px rgba(45,106,39,.15)';setTimeout(()=>{el.style.borderColor='';el.style.boxShadow='';},2000);}
-
-function showBannerSuccess(filename){
-  document.getElementById('uploadBanner').className='upload-banner success';
-  document.getElementById('ubIcon').textContent='✅';
-  document.getElementById('ubTitle').textContent='Filled from: '+filename;
-  document.getElementById('ubSub').textContent='Fields auto-populated. Subjects will be saved when you click Register.';
-  const btn=document.getElementById('btnUpload');btn.disabled=false;btn.innerHTML='<i class="bi bi-arrow-repeat"></i> Re-upload';
-}
-
-function showBannerError(msg){
-  document.getElementById('uploadBanner').className='upload-banner error';
-  document.getElementById('ubIcon').textContent='❌';
-  document.getElementById('ubTitle').textContent='Could not read PDF';
-  document.getElementById('ubSub').textContent=msg;
-  const btn=document.getElementById('btnUpload');btn.disabled=false;btn.innerHTML='<i class="bi bi-cloud-upload"></i> Try Again';
-}
-
-function showSubjectPreview(subjects){
-  document.getElementById('subjPreviewNote').textContent=subjects.length+' subject(s) will be added on Register';
-  document.getElementById('subjPreviewList').innerHTML='<table class="subj-table"><thead><tr><th>Code</th><th>Subject Name</th><th>Units</th><th>Status</th></tr></thead><tbody>'+subjects.map(s=>{
-    return '<tr><td><code>'+s.course_code+'</code></td><td>'+s.name+'</td><td style="color:var(--muted);">'+s.units+'</td><td style="color:var(--warning);"><i class="bi bi-clock"></i> Pending register</td></tr>';
-  }).join('')+'</tbody></table>';
-  document.getElementById('subjPreview').classList.add('show');
-}
-
-// ── HID NFC input handler ─────────────────────────────────────────────────
-// Collects keystrokes from USB reader, fills nfc_id hidden field on Enter.
-const nfcHid   = document.getElementById('nfcHidInput');
-let   nfcBuf   = '';
-let   nfcTimer = null;
-const NFC_TIMEOUT = 300;
-
-function refocusNFC() {
-  const tag = document.activeElement ? document.activeElement.tagName : '';
-  // Don't steal focus from form inputs the user is typing in
-  if(tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
-    nfcHid.focus();
+    fetch("/request_registration_scan", { method: "POST" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.status === "ready") {
+          pollForUID();
+        } else {
+          throw new Error("Server not ready");
+        }
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+        statusDiv.className = "alert alert-danger d-flex align-items-center";
+        statusDiv.innerHTML = `
+          <i class="bi bi-exclamation-circle me-2" style="font-size: 1.2rem;"></i>
+          <div>
+            <strong>Could not connect to NFC listener</strong>
+            <br/>
+            <small>Make sure the NFC listener service is running</small>
+          </div>
+        `;
+        resetButton();
+      });
   }
 }
 
@@ -360,20 +389,58 @@ function applyUID(uid) {
   display.textContent   = uid;
   display.className = 'nfc-uid-display has-uid';
 
-  // Clear validation error if present
-  const hiddenInput = document.getElementById('nfc_id');
-  hiddenInput.classList.remove('is-invalid');
-  const err = hiddenInput.parentNode.querySelector('.reg-err');
-  if(err) err.remove();
-}
+  function pollForUID() {
+    let attempts = 0;
+    const maxAttempts = 30;
+    const statusDiv = document.getElementById("scanStatus");
 
-nfcHid.addEventListener('keydown', function(e) {
-  clearTimeout(nfcTimer);
-  if(e.key === 'Enter') {
-    const uid = nfcBuf.trim();
-    nfcBuf = ''; nfcHid.value = '';
-    if(uid) applyUID(uid);
-    return;
+    const poll = setInterval(() => {
+      fetch("/get_scanned_uid")
+        .then((response) => response.json())
+        .then((data) => {
+          if (data.uid) {
+            clearInterval(poll);
+
+            // Set the NFC ID and show success
+            document.getElementById("nfc_id").value = data.uid;
+
+            statusDiv.className =
+              "alert alert-success d-flex align-items-center";
+            statusDiv.innerHTML = `
+              <i class="bi bi-check-circle me-2" style="font-size: 1.2rem;"></i>
+              <div>
+                <strong>NFC card scanned successfully!</strong>
+                <br/>
+                <small>UID: <code>${data.uid}</code></small>
+              </div>
+            `;
+
+            resetButton();
+
+            // Auto-hide success message after 3 seconds
+            setTimeout(() => {
+              statusDiv.style.display = "none";
+            }, 3000);
+          } else {
+            attempts++;
+            if (attempts >= maxAttempts) {
+              clearInterval(poll);
+              statusDiv.className =
+                "alert alert-warning d-flex align-items-center";
+              statusDiv.innerHTML = `
+                <i class="bi bi-clock-history me-2" style="font-size: 1.2rem;"></i>
+                <div>
+                  <strong>Scan timeout</strong>
+                  <br/>
+                  <small>Please try again</small>
+                </div>
+              `;
+              resetButton();
+            }
+          }
+        })
+        .catch((err) => console.error("Polling error:", err));
+    }, 500);
   }
   if(e.key.length === 1) { nfcBuf += e.key; nfcHid.value = nfcBuf; }
   nfcTimer = setTimeout(()=>{
@@ -389,56 +456,10 @@ nfcHid.addEventListener('blur', ()=>setTimeout(refocusNFC, 150));
 window.addEventListener('load', ()=>nfcHid.focus());
 nfcHid.focus();
 
-// ── Photo preview ─────────────────────────────────────────────────────────
-function previewStudentPhoto(input){
-  if(!input.files||!input.files[0])return;
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const img=document.getElementById('photoPreviewImg'),init=document.getElementById('photoPreviewInit');
-    img.src=e.target.result;img.style.display='block';init.style.display='none';
-    const wrap=document.getElementById('photoPreviewWrap');wrap.style.borderStyle='solid';wrap.style.borderColor='var(--accent)';
-  };
-  reader.readAsDataURL(input.files[0]);
-}
-
-// ── Form validation ───────────────────────────────────────────────────────
-function validateRegisterForm(){
-  let ok=true;
-  const req=[
-    {id:'f_name',      msg:'Full name required.'},
-    {id:'f_student_id',msg:'Student ID required.'},
-    {id:'f_course',    msg:'Select a program.'},
-    {id:'f_year_level',msg:'Select year level.'},
-    {id:'f_section',   msg:'Select section.'},
-    {id:'f_adviser',   msg:'Adviser name required.'},
-    {id:'f_school_year',msg:'School year required.'},
-    {id:'nfc_id',      msg:'Tap an NFC card first.'},
-  ];
-  document.querySelectorAll('.form-control.is-invalid').forEach(el=>el.classList.remove('is-invalid'));
-  document.querySelectorAll('.reg-err').forEach(el=>el.remove());
-  req.forEach(({id,msg})=>{
-    const el=document.getElementById(id);
-    if(!el)return;
-    if(!el.value||!el.value.trim()){
-      // For hidden nfc_id, highlight the strip instead
-      if(id==='nfc_id'){
-        document.getElementById('nfcCardStrip').className='nfc-card-strip error';
-        document.getElementById('nfcStripTitle').textContent='NFC card required';
-        document.getElementById('nfcStripSub').textContent='Tap the student\'s NFC card on the reader before registering.';
-      } else {
-        el.classList.add('is-invalid');
-        const err=document.createElement('div');
-        err.className='reg-err';
-        err.style.cssText='font-size:11px;color:var(--danger);margin-top:3px;';
-        err.textContent=msg;
-        el.parentNode.insertBefore(err,el.nextSibling);
-      }
-      ok=false;
-    }
-  });
-  if(!ok){
-    const first=document.querySelector('.form-control.is-invalid,.nfc-card-strip.error');
-    if(first)first.scrollIntoView({behavior:'smooth',block:'center'});
+  function resetButton() {
+    const scanBtn = document.querySelector('button[onclick="scanNFC()"]');
+    scanBtn.disabled = false;
+    scanBtn.innerHTML = '<i class="bi bi-phone"></i> Scan';
   }
   return ok;
 }

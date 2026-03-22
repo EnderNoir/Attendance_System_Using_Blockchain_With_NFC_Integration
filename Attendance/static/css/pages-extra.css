@@ -1,0 +1,34 @@
+/* ============================================
+   Index Page (Home) Styles
+   ============================================ */
+
+.search-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.search-form .form-control {
+  flex: 1;
+  border-radius: 0.5rem;
+}
+
+.search-form .btn {
+  white-space: nowrap;
+}
+
+/* ============================================
+   Attendance History Styles
+   ============================================ */
+
+.attendance-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .attendance-stats {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}

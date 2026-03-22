@@ -82,10 +82,25 @@
             data-bs-dismiss="alert"
           ></button>
         </div>
-        {% endfor %} {% endif %} {% endwith %}
+        <div style="padding-top:14px;border-top:1.5px solid var(--border);"><span style="font-size:12px;font-weight:600;display:none;" id="pmMsg"></span><button class="btn-primary" onclick="saveProfileModal()" style="width:100%;justify-content:center;margin-top:10px;font-size:14px;padding:11px;"><i class="bi bi-check-circle"></i> Save Changes</button></div>
       </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
-      {% block content %}{% endblock %}
+<!-- ════ TEACHER PROFILE MODAL ════ -->
+{% if session.get('role') == 'teacher' %}
+<div class="pm-overlay" id="teacherProfileModal" onclick="if(event.target===this)closeTPM()">
+  <div class="pm-modal">
+    <div class="pm-modal-header">
+      <button onclick="closeTPM()" style="background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;flex-shrink:0;"><i class="bi bi-arrow-left"></i> Back</button>
+      <span style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#fff;flex:1;min-width:0;">My Profile</span>
+      <span style="background:rgba(255,255,255,.22);color:#fff;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;flex-shrink:0;">TEACHER</span>
+    </div>
+    <div class="pm-tab-bar">
+      <button class="pm-tab active-tab" onclick="switchTPMTab('info',this)"><i class="bi bi-person-lines-fill"></i> Info</button>
+      <button class="pm-tab" onclick="switchTPMTab('edit',this)"><i class="bi bi-pencil-square"></i> Edit</button>
     </div>
 
     <!-- Footer -->

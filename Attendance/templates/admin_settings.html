@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+{% block title %}System Settings — DAVS{% endblock %}
+{% block page_title %}SYSTEM SETTINGS{% endblock %}
+{% block content %}
+<style>
+  .settings-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:24px;}
+  .settings-head{padding:18px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+  .settings-head-icon{width:40px;height:40px;border-radius:10px;background:rgba(45,106,39,.1);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .settings-head-title{font-size:15px;font-weight:700;}
+  .settings-head-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .settings-body{padding:22px 24px;}
+  .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px;}
+  @media(max-width:600px){.field-grid{grid-template-columns:1fr;}}
+  .field-wrap{display:flex;flex-direction:column;gap:5px;}
+  .field-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .field-input{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 13px;font-size:13px;font-family:'DM Sans',sans-serif;transition:border-color .2s;width:100%;}
+  .field-input:focus{outline:none;border-color:var(--accent);}
+  .field-hint{font-size:11px;color:var(--muted);}
+  .toggle-wrap{display:flex;align-items:center;gap:12px;padding:14px 0;}
+  .toggle{position:relative;width:44px;height:24px;flex-shrink:0;}
+  .toggle input{opacity:0;width:0;height:0;}
+  .toggle-slider{position:absolute;inset:0;background:rgba(100,116,139,.3);border-radius:999px;cursor:pointer;transition:.3s;}
+  .toggle-slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;}
+  .toggle input:checked + .toggle-slider{background:var(--success);}
+  .toggle input:checked + .toggle-slider:before{transform:translateX(20px);}
+  .toggle-label{font-size:13px;font-weight:600;}
+  .btn-save{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:9px;padding:11px 28px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .2s;}
+  [data-theme="dark"] .btn-save{color:#000;}
+  .btn-save:hover{opacity:.88;}
+  .btn-test{background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:#60a5fa;font-weight:700;border-radius:9px;padding:11px 20px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .2s;}
+  .btn-test:hover{background:rgba(96,165,250,.2);}
+  .test-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:20px;padding-top:20px;border-top:1px solid var(--border);}
+  .test-result{font-size:12px;margin-top:8px;padding:8px 12px;border-radius:7px;display:none;}
+  .test-result.ok{background:rgba(45,106,39,.1);color:var(--success);border:1px solid rgba(45,106,39,.2);}
+  .test-result.err{background:rgba(192,57,43,.08);color:var(--danger);border:1px solid rgba(192,57,43,.15);}
+  .sec-mono{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+  .info-box{background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.15);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:20px;}
+  .info-box strong{color:var(--text);}
+  .info-box code{background:rgba(45,106,39,.08);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:11px;}
+</style>
+
+<div style="margin-bottom:20px;">
+  <div class="sec-mono">// SYSTEM CONFIGURATION</div>
+  <h2 style="font-size:20px;font-weight:700;margin:0;">System Settings</h2>
+  <p style="font-size:12px;color:var(--muted);margin-top:4px;">
+    Configure email notifications and other system settings.
+  </p>
+</div>
+
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+<div style="background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);border-radius:9px;
+            padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--success);
+            display:flex;align-items:center;gap:8px;">
+  <i class="bi bi-check-circle-fill"></i> {{ messages[0] }}
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- Email Notifications -->
+<div class="settings-card">
+  <div class="settings-head">
+    <div class="settings-head-icon"><i class="bi bi-envelope-fill"></i></div>
+    <div>
+      <div class="settings-head-title">Email Notifications</div>
+      <div class="settings-head-sub">
+        Send attendance receipts to students and session summaries to teachers via Gmail SMTP.
+      </div>
+    </div>
+  </div>
+  <div class="settings-body">
+
+    <div class="info-box" style="padding:0;overflow:hidden;">
+      <div style="background:rgba(45,106,39,.08);padding:12px 16px;border-bottom:1px solid rgba(45,106,39,.15);
+                  display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-patch-question-fill" style="color:var(--accent);font-size:16px;"></i>
+        <strong style="color:var(--text);font-size:13px;">How to Set Up Gmail — Step by Step</strong>
+      </div>
+      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px;">
+
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:12px;
+                      font-weight:700;flex-shrink:0;margin-top:1px;">1</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
+              Go to your Google Account
+            </div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+              Open a browser and go to
+              <a href="https://myaccount.google.com" target="_blank"
+                 style="color:var(--accent);font-weight:600;">myaccount.google.com</a>
+              using the Gmail account you want to use for sending emails.
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:12px;
+                      font-weight:700;flex-shrink:0;margin-top:1px;">2</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
+              Turn on 2-Step Verification
+            </div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+              Click <strong style="color:var(--text);">Security</strong> on the left side →
+              find <strong style="color:var(--text);">2-Step Verification</strong> →
+              click it and follow the steps to turn it
+              <strong style="color:var(--accent);">ON</strong>.
+              <br>
+              <span style="background:rgba(192,57,43,.08);color:var(--danger);border:1px solid rgba(192,57,43,.2);
+                           border-radius:5px;padding:2px 8px;font-size:11px;display:inline-block;margin-top:4px;">
+                ⚠ This step is required — App Passwords will not appear without it
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:12px;
+                      font-weight:700;flex-shrink:0;margin-top:1px;">3</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
+              Create an App Password
+            </div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+              While still on the Security page, use the
+              <strong style="color:var(--text);">search bar at the top</strong>
+              and search for <strong style="color:var(--text);">"App Passwords"</strong>
+              → click it → sign in again if asked.<br>
+              Under <em>Select app</em> choose <strong style="color:var(--text);">Mail</strong>,
+              under <em>Select device</em> choose
+              <strong style="color:var(--text);">Windows Computer</strong>
+              → click <strong style="color:var(--accent);">Generate</strong>.
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:12px;
+                      font-weight:700;flex-shrink:0;margin-top:1px;">4</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
+              Copy the 16-character password
+            </div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+              Google will show a password like
+              <code>abcd efgh ijkl mnop</code>.
+              <strong style="color:var(--text);">Copy it immediately</strong>
+              — you will not be able to see it again.
+              Paste it into the <strong style="color:var(--text);">App Password</strong>
+              field below.
+              <br>
+              <span style="background:rgba(192,57,43,.08);color:var(--danger);border:1px solid rgba(192,57,43,.2);
+                           border-radius:5px;padding:2px 8px;font-size:11px;display:inline-block;margin-top:4px;">
+                ⚠ Do NOT use your regular Gmail password — it will not work
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:12px;
+                      font-weight:700;flex-shrink:0;margin-top:1px;">5</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
+              Fill in the fields below and save
+            </div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+              Set these values in the form below:
+            </div>
+            <table style="margin-top:8px;border-collapse:collapse;width:100%;font-size:12px;">
+              <tr style="background:rgba(45,106,39,.06);">
+                <td style="padding:6px 10px;font-weight:700;color:var(--text);
+                           border:1px solid var(--border);width:120px;">SMTP Host</td>
+                <td style="padding:6px 10px;border:1px solid var(--border);">
+                  <code>smtp.gmail.com</code>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 10px;font-weight:700;color:var(--text);
+                           border:1px solid var(--border);">SMTP Port</td>
+                <td style="padding:6px 10px;border:1px solid var(--border);">
+                  <code>587</code>
+                </td>
+              </tr>
+              <tr style="background:rgba(45,106,39,.06);">
+                <td style="padding:6px 10px;font-weight:700;color:var(--text);
+                           border:1px solid var(--border);">Gmail Address</td>
+                <td style="padding:6px 10px;border:1px solid var(--border);color:var(--muted);">
+                  Your Gmail address e.g. <code>davs.cvsu@gmail.com</code>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:6px 10px;font-weight:700;color:var(--text);
+                           border:1px solid var(--border);">App Password</td>
+                <td style="padding:6px 10px;border:1px solid var(--border);color:var(--muted);">
+                  The 16-character password from Step 4
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:26px;height:26px;border-radius:50%;background:#60a5fa;color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:12px;
+                      font-weight:700;flex-shrink:0;margin-top:1px;">6</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
+              Test before going live
+            </div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+              After saving, scroll down to <strong style="color:var(--text);">Send Test Email</strong>,
+              enter your own email address and click
+              <strong style="color:#60a5fa;">Send Test</strong>.
+              If you see a ✓ green message, everything is working correctly.
+              Check your inbox for the test email.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('admin_settings_save') }}" id="settingsForm">
+
+      <!-- Enable toggle -->
+      <div class="toggle-wrap">
+        <label class="toggle">
+          <input type="checkbox" name="enabled" id="emailEnabled"
+                 {% if cfg.enabled == '1' %}checked{% endif %}>
+          <span class="toggle-slider"></span>
+        </label>
+        <div>
+          <div class="toggle-label">Enable Email Notifications</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:1px;">
+            When enabled, students receive tap receipts and teachers receive session summaries.
+          </div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:4px 0 20px;"></div>
+
+      <div class="field-grid">
+        <div class="field-wrap">
+          <label class="field-label" for="smtp_host">SMTP Host</label>
+          <input class="field-input" type="text" name="smtp_host" id="smtp_host"
+                 value="{{ cfg.smtp_host }}" placeholder="smtp.gmail.com"/>
+        </div>
+        <div class="field-wrap">
+          <label class="field-label" for="smtp_port">SMTP Port</label>
+          <input class="field-input" type="number" name="smtp_port" id="smtp_port"
+                 value="{{ cfg.smtp_port }}" placeholder="587"/>
+          <span class="field-hint">Use 587 for TLS (recommended)</span>
+        </div>
+        <div class="field-wrap">
+          <label class="field-label" for="smtp_user">Gmail Address <span style="color:var(--danger)">*</span></label>
+          <input class="field-input" type="email" name="smtp_user" id="smtp_user"
+                 value="{{ cfg.smtp_user }}" placeholder="yourschool@gmail.com"/>
+          <span class="field-hint">The Gmail account used to send emails</span>
+        </div>
+        <div class="field-wrap">
+          <label class="field-label" for="smtp_password">App Password <span style="color:var(--danger)">*</span></label>
+          <div style="position:relative;">
+            <input class="field-input" type="password" name="smtp_password" id="smtp_password"
+                   value="{{ cfg.smtp_password }}" placeholder="16-character app password"
+                   style="padding-right:40px;"/>
+            <button type="button" onclick="togglePw()"
+                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                           background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;">
+              <i class="bi bi-eye" id="pwEye"></i>
+            </button>
+          </div>
+          <span class="field-hint">Google App Password — not your regular password</span>
+        </div>
+        <div class="field-wrap" style="grid-column:1/-1;">
+          <label class="field-label" for="smtp_from">Display Name / From Address</label>
+          <input class="field-input" type="text" name="smtp_from" id="smtp_from"
+                 value="{{ cfg.smtp_from }}" placeholder="DAVS CvSU Silang &lt;yourschool@gmail.com&gt;"/>
+          <span class="field-hint">Optional — defaults to Gmail address if blank</span>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;align-items:center;">
+        <button type="submit" class="btn-save">
+          <i class="bi bi-floppy-fill"></i> Save Settings
+        </button>
+      </div>
+
+      <!-- Test email section -->
+      <div class="test-row">
+        <div class="field-wrap" style="flex:1;min-width:220px;">
+          <label class="field-label">Send Test Email</label>
+          <input class="field-input" type="email" id="testEmailAddr"
+                 placeholder="recipient@email.com"/>
+        </div>
+        <button type="button" class="btn-test" onclick="sendTestEmail()" id="btnTest">
+          <i class="bi bi-send"></i> Send Test
+        </button>
+      </div>
+      <div class="test-result" id="testResult"></div>
+
+    </form>
+  </div>
+</div>
+
+<!-- What gets sent info -->
+<div class="settings-card">
+  <div class="settings-head">
+    <div class="settings-head-icon"><i class="bi bi-info-circle-fill"></i></div>
+    <div>
+      <div class="settings-head-title">What Gets Sent</div>
+      <div class="settings-head-sub">Overview of email notifications sent by DAVS.</div>
+    </div>
+  </div>
+  <div class="settings-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div style="background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.15);
+                  border-radius:10px;padding:16px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;display:flex;
+                    align-items:center;gap:7px;">
+          <i class="bi bi-person-fill" style="color:var(--accent);"></i> Student Receipt
+        </div>
+        <ul style="margin:0;padding-left:16px;font-size:12px;color:var(--muted);
+                   line-height:1.8;list-style:disc;">
+          <li>Sent on <strong style="color:var(--text);">every card tap</strong></li>
+          <li>Includes: name, subject, section, instructor</li>
+          <li>Attendance status (Present / Late / Absent / Excused)</li>
+          <li>Date and time of tap</li>
+          <li>Blockchain TX hash + Block # as tamper-proof proof</li>
+        </ul>
+      </div>
+      <div style="background:rgba(96,165,250,.04);border:1px solid rgba(96,165,250,.2);
+                  border-radius:10px;padding:16px;">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;display:flex;
+                    align-items:center;gap:7px;">
+          <i class="bi bi-person-badge-fill" style="color:#60a5fa;"></i> Teacher Summary
+        </div>
+        <ul style="margin:0;padding-left:16px;font-size:12px;color:var(--muted);
+                   line-height:1.8;list-style:disc;">
+          <li>Sent when <strong style="color:var(--text);">session ends</strong></li>
+          <li>Session details: subject, section, time slot</li>
+          <li>Present / Late / Absent / Excused counts</li>
+          <li>Full student list with individual status</li>
+          <li>Blockchain TX hashes for all records</li>
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top:14px;font-size:11px;color:var(--muted);
+                background:rgba(245,197,24,.06);border:1px solid rgba(245,197,24,.2);
+                border-radius:8px;padding:10px 14px;">
+      <i class="bi bi-exclamation-triangle" style="color:var(--warning);"></i>
+      &nbsp;Student receipt emails are only sent if the student has an email address
+      registered in their profile. Teacher summary emails require the teacher's account
+      to have an email address set.
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePw() {
+  const inp = document.getElementById('smtp_password');
+  const eye = document.getElementById('pwEye');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    eye.className = 'bi bi-eye-slash';
+  } else {
+    inp.type = 'password';
+    eye.className = 'bi bi-eye';
+  }
+}
+
+async function sendTestEmail() {
+  const addr = document.getElementById('testEmailAddr').value.trim();
+  const btn  = document.getElementById('btnTest');
+  const res  = document.getElementById('testResult');
+  if (!addr || !addr.includes('@')) {
+    res.className = 'test-result err';
+    res.style.display = 'block';
+    res.textContent = '✕ Please enter a valid email address.';
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Sending…';
+  res.style.display = 'none';
+  try {
+    const fd = new FormData();
+    fd.append('test_email', addr);
+    const r = await fetch('{{ url_for("admin_settings_test") }}', {
+      method: 'POST', credentials: 'same-origin', body: fd
+    });
+    const d = await r.json();
+    res.className = d.ok ? 'test-result ok' : 'test-result err';
+    res.textContent = (d.ok ? '✓ ' : '✕ ') + d.message;
+    res.style.display = 'block';
+  } catch(e) {
+    res.className = 'test-result err';
+    res.textContent = '✕ Network error: ' + e.message;
+    res.style.display = 'block';
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-send"></i> Send Test';
+}
+</script>
+{% endblock %}

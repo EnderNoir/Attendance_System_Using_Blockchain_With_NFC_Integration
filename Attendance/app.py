@@ -4,11 +4,8 @@ from datetime import datetime
 from functools import wraps
 import json, os, secrets, time, csv, io, hashlib, uuid, re, sqlite3, calendar as _cal
 from collections import deque
-try:
-    from pdfminer.high_level import extract_text as pdf_extract_text
-    PDF_READY = True
-except ImportError:
-    PDF_READY = False
+# pdfminer is imported inside parse_registration_pdf() so a startup
+# import glitch can never permanently disable PDF parsing for the session.
 
 app = Flask(__name__)
 app.secret_key = 'davs-super-secret-2024'
@@ -1640,117 +1637,223 @@ def register():
 @admin_required
 def parse_registration_pdf():
     import traceback
-    if not PDF_READY:
-        return jsonify({'error': 'Run: pip install pdfminer.six'}), 500
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
     f = request.files['file']
     if not (f.filename or '').lower().endswith('.pdf'):
         return jsonify({'error': 'Only PDF files are supported'}), 400
-    course_map = {
-        'BSCS':'BS Computer Science','BSIT':'BS Information Technology',
+
+    # CvSU section-code prefix → full course name  (CS4A → BS Computer Science)
+    prefix_course_map = {
+        'CS':'BS Computer Science',  'IT':'BS Information Technology',
+        'IS':'BS Information Systems','COE':'BS Computer Engineering',
+        'ECE':'BS Electronics Engineering','EE':'BS Electrical Engineering',
+        'CE':'BS Civil Engineering',  'ME':'BS Mechanical Engineering',
+        'ED':'BS Education',          'N':'BS Nursing',
+        'A':'BS Accountancy',         'BA':'BS Business Administration',
+    }
+    abbr_course_map = {
+        'BSCS':'BS Computer Science',  'BSIT':'BS Information Technology',
         'BSIS':'BS Information Systems','BSCOE':'BS Computer Engineering',
         'BSECE':'BS Electronics Engineering','BSEE':'BS Electrical Engineering',
-        'BSCE':'BS Civil Engineering','BSME':'BS Mechanical Engineering',
-        'BSED':'BS Education','BSN':'BS Nursing','BSA':'BS Accountancy',
-        'BSBA':'BS Business Administration',
+        'BSCE':'BS Civil Engineering', 'BSME':'BS Mechanical Engineering',
+        'BSED':'BS Education',         'BSN':'BS Nursing',
+        'BSA':'BS Accountancy',        'BSBA':'BS Business Administration',
     }
-    year_map = {'1st':'1st Year','2nd':'2nd Year','3rd':'3rd Year',
-                '4th':'4th Year','5th':'5th Year'}
+    year_num_map = {
+        '1':'1st Year','2':'2nd Year','3':'3rd Year','4':'4th Year','5':'5th Year',
+        '1st':'1st Year','2nd':'2nd Year','3rd':'3rd Year',
+        '4th':'4th Year','5th':'5th Year',
+    }
     result = {
         'student_id':'','name':'','course':'','year_level':'',
         'section':'','adviser':'','email':'','contact':'',
         'semester':'','school_year':'','date_registered':'','major':'',
         'subjects':[]
     }
+
     try:
         raw_bytes = f.read()
         if not raw_bytes:
             return jsonify({'error': 'Uploaded file is empty'}), 400
-        text = pdf_extract_text(io.BytesIO(raw_bytes))
-        if not text or not text.strip():
-            return jsonify({'error': 'Could not extract text — PDF may be a scanned image'}), 400
-        text  = re.sub(r'\t', ' ', text)
-        text  = re.sub(r' +', ' ', text)
-        lines = [l.strip() for l in text.split('\n') if l.strip()]
-        full  = '\n'.join(lines)
-        def grab(pattern):
-            m = re.search(pattern, full, re.IGNORECASE)
-            return m.group(1).strip() if m else ''
-        result['student_id']  = grab(r'Student Number:\s*(\S+)')
-        result['semester']    = grab(r'Semester:\s*([A-Za-z]+)').title()
-        result['school_year'] = grab(r'School Year:\s*(\d{4}-\d{4})')
-        raw_section = grab(r'Section:\s*(\S+)')
-        result['section'] = raw_section.strip().upper() if raw_section else ''
-        m = re.search(r'Student Name:\s*(.+)', full)
-        if m:
-            raw_name = m.group(1).strip().upper()
+
+        # ── Extract text ──────────────────────────────────────────────
+        # pypdf is primary for CvSU PDFs; pdfminer as fallback.
+        full = ''
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(raw_bytes))
+            full = '\n'.join(page.extract_text() or '' for page in reader.pages)
+        except Exception as _e:
+            print(f'[PDF] pypdf failed: {_e}')
+
+        if not full.strip():
+            try:
+                from pdfminer.high_level import extract_text as _pdfminer_extract
+                full = _pdfminer_extract(io.BytesIO(raw_bytes))
+            except Exception as _e:
+                print(f'[PDF] pdfminer failed: {_e}')
+
+        if not full.strip():
+            return jsonify({'error': 'Could not extract text. Install pypdf: pip install pypdf'}), 400
+
+        print(f'[PDF] {len(full)} chars from "{f.filename}"')
+        print(f'[PDF] PREVIEW:\n{full[:800]}\n[PDF] END')
+
+        # ── CvSU pypdf format: LABEL\t\nVALUE\n ────────────────────────
+        # The value is ALWAYS on the line immediately after the label.
+        # IMPORTANT: group(1) may be None if pattern has alternation branches
+        # without a capturing group — always guard against None.
+        def next_line(label_pattern):
+            m = re.search(label_pattern + r'[^\n]*\n([^\n]+)', full, re.IGNORECASE)
+            if not m:
+                return ''
+            val = m.group(1)
+            if val is None:
+                return ''
+            return val.replace('\t', ' ').strip()
+
+        # ── Student ID ────────────────────────────────────────────────
+        result['student_id'] = next_line(r'Student\s*Number')
+        if not result['student_id']:
+            m2 = re.search(r'\b(\d{7,10})\b', full)
+            if m2: result['student_id'] = m2.group(1)
+
+        # ── Semester ──────────────────────────────────────────────────
+        raw_sem = next_line(r'Semester').upper()
+        sem_map = {'FIRST':'First','SECOND':'Second','SUMMER':'Summer',
+                   '1ST':'First','2ND':'Second'}
+        first_word = raw_sem.split()[0] if raw_sem else ''
+        result['semester'] = sem_map.get(first_word, raw_sem.title())
+
+        # ── School Year ───────────────────────────────────────────────
+        result['school_year'] = next_line(r'School\s*Year')
+
+        # ── Student Name ──────────────────────────────────────────────
+        # Real CvSU format:  FIRSTNAME  MIDDLE  INITIAL.  LASTNAME
+        # e.g.  MARCLAIN  JAMES  M.  SAMSON  (tabs between words)
+        raw_name = next_line(r'Student\s*Name')
+        if raw_name:
+            raw_name = re.sub(r'\s+', ' ', raw_name.replace('\t', ' ')).strip()
             result['name'] = raw_name.title()
-            clean = re.sub(r'\b[A-Z]\.\s*', '', raw_name)
-            name_parts = clean.split()
-            if len(name_parts) >= 2:
-                last  = name_parts[-1].lower()
-                first = ''.join(p.lower() for p in name_parts[:-1])
-                result['email'] = f"sc.{first}.{last}@cvsu.edu.ph"
-        m = re.search(r'Date:\s*(.+)', full)
-        if m:
-            _raw = m.group(1).strip().split('|')[0].strip()
-            _date_val = ''
-            _m2 = re.search(r'([A-Za-z]+)\s+(\d{4})', _raw)
-            if _m2:
+
+            # Email: sc.firstname.lastname@cvsu.edu.ph
+            # Strip middle initials (single letter + dot)  and suffixes
+            clean = re.sub(r'\b[A-Za-z]\.\s*', '', raw_name).strip()
+            clean = re.sub(r'\b(JR|SR|II|III|IV)\.?\b', '', clean,
+                           flags=re.IGNORECASE).strip()
+            clean = re.sub(r'\s+', ' ', clean)
+            words = clean.split()
+            if len(words) >= 2:
+                first_slug = re.sub(r'[^a-z]', '', words[0].lower())
+                last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
+                if first_slug and last_slug:
+                    result['email'] = f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
+
+        # ── Date registered ───────────────────────────────────────────
+        # Avoid matching VALIDATION DATE or VALIDATED BY DATE lines
+        raw_date = ''
+        for _m in re.finditer(r'Date[^\n]*\n([^\n]+)', full, re.IGNORECASE):
+            _line_before = full[max(0, _m.start()-20):_m.start()].upper()
+            if 'VALIDAT' not in _line_before:
+                raw_date = _m.group(1).replace('\t', ' ').strip()
+                break
+        if raw_date:
+            _dm = re.search(r'(\d{1,2})[-\s]+([A-Za-z]+)[-\s]+(\d{4})', raw_date)
+            if _dm:
                 try:
-                    _d = datetime.strptime(f"{_m2.group(1)} {_m2.group(2)}", "%B %Y")
-                    _date_val = _d.strftime('%Y-%m')
-                except:
+                    _d = datetime.strptime(f"{_dm.group(2)} {_dm.group(3)}", "%b %Y")
+                    result['date_registered'] = _d.strftime('%Y-%m')
+                except Exception:
                     pass
-            if not _date_val:
-                _m3 = re.search(r'([A-Za-z]+)\s+(\d{1,2})[,\s]+(\d{4})', _raw)
-                if _m3:
+            if not result['date_registered']:
+                _dm2 = re.search(r'([A-Za-z]+)\s+(\d{4})', raw_date)
+                if _dm2:
                     try:
-                        _d = datetime.strptime(f"{_m3.group(1)} {_m3.group(2)} {_m3.group(3)}", "%B %d %Y")
-                        _date_val = _d.strftime('%Y-%m')
-                    except:
+                        _d = datetime.strptime(f"{_dm2.group(1)} {_dm2.group(2)}", "%b %Y")
+                        result['date_registered'] = _d.strftime('%Y-%m')
+                    except Exception:
                         pass
-            if not _date_val:
-                _m4 = re.search(r'(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})', _raw)
-                if _m4:
-                    try:
-                        _d = datetime(int(_m4.group(3)), int(_m4.group(1)), int(_m4.group(2)))
-                        _date_val = _d.strftime('%Y-%m')
-                    except:
-                        pass
-            result['date_registered'] = _date_val or _raw
-        m = re.search(r'Course:\s*(\S+)', full)
-        if m: result['course'] = course_map.get(m.group(1).strip(), m.group(1).strip())
-        m = re.search(r'(?<!School )Year:\s*(1st|2nd|3rd|4th|5th)', full)
-        if m: result['year_level'] = year_map.get(m.group(1).strip(), m.group(1).strip())
-        m = re.search(r'Major:\s*(.+)', full)
-        if m:
-            maj = m.group(1).strip()
-            result['major'] = '' if maj.upper() in ('N/A','NA','') else maj
-        hdr_m  = re.search(r'Units Lec Lab Hour', full)
-        fees_m = re.search(r'Laboratory Fees', full)
-        new_subjects = []
-        if hdr_m and fees_m:
-            subj_block = full[hdr_m.end():fees_m.start()]
-            subj_lines = [l.strip() for l in subj_block.split('\n') if l.strip()]
-            course_codes, descriptions, units_list = [], [], []
-            for ln in subj_lines:
-                if re.match(r'^\d{9}$', ln): pass
-                elif re.match(r'^[A-Z]{2,5}\d[A-Z0-9]*$', ln): pass
-                elif re.match(r'^[A-Z]+\s*[\d]+\w*$', ln): course_codes.append(ln)
-                elif re.match(r'^\d+\.\d{2}$', ln): units_list.append(ln)
-                elif re.match(r'^[A-Z][A-Z0-9\s]+$', ln) and len(ln) > 3: descriptions.append(ln)
-            n = min(len(course_codes), len(descriptions), len(units_list))
-            for i in range(n):
-                try: u_val = str(round(float(units_list[i])))
-                except: u_val = '3'
-                new_subjects.append({'course_code':course_codes[i],'name':descriptions[i].title(),'units':u_val})
-        result['subjects'] = new_subjects
+
+        # ── Course ────────────────────────────────────────────────────
+        raw_course = next_line(r'Course').strip().upper()
+        result['course'] = abbr_course_map.get(raw_course, '')
+        if not result['course']:
+            for abbr, cname in abbr_course_map.items():
+                if re.search(r'\b' + abbr + r'\b', full, re.IGNORECASE):
+                    result['course'] = cname; break
+
+        # ── Section code → year + section letter + course ─────────────
+        # e.g. CS4A → prefix=CS, year=4, section=A
+        raw_section = next_line(r'Section').strip()
+        sec_m = re.match(r'^([A-Za-z]+)(\d)([A-Za-z])$', raw_section)
+        if sec_m:
+            prefix = sec_m.group(1).upper()
+            yr_num = sec_m.group(2)
+            result['section']    = sec_m.group(3).upper()
+            result['year_level'] = year_num_map.get(yr_num, yr_num + 'th Year')
+            if not result['course']:
+                result['course'] = prefix_course_map.get(prefix, '')
+        else:
+            # Plain letter section — get year from Year field directly
+            result['section'] = raw_section[:1].upper()
+            raw_year_val = next_line(r'Year').strip()
+            yr_word = raw_year_val.split()[0] if raw_year_val else ''
+            result['year_level'] = (
+                year_num_map.get(yr_word.lower()) or
+                year_num_map.get(yr_word.lower().rstrip('thsrnd')) or ''
+            )
+
+        # ── Major ─────────────────────────────────────────────────────
+        raw_major = next_line(r'Major')
+        result['major'] = '' if raw_major.upper() in ('N/A','NA','NONE','') \
+                          else raw_major.title()
+
+        # ── Subjects ─────────────────────────────────────────────────
+        # One subject = 8 consecutive lines in pypdf output:
+        #   0: ScheduleCode (9-digit)  1: SectionCode  2: CourseCode
+        #   3: Description             4: Units(3.00)  5: Lec  6: Lab  7: Hours
+        subjects = []
+        hdr_m  = re.search(
+            r'Schedule\s*Code.*?Course\s*Description.*?Hour\n',
+            full, re.DOTALL | re.IGNORECASE)
+        fees_m = re.search(r'Laboratory\s*Fees', full, re.IGNORECASE)
+        if hdr_m and fees_m and fees_m.start() > hdr_m.end():
+            block = full[hdr_m.end():fees_m.start()]
+            lines = [l.replace('\t', ' ').strip()
+                     for l in block.split('\n') if l.strip()]
+            i = 0
+            while i < len(lines):
+                if re.match(r'^\d{7,12}$', lines[i]) and i + 7 < len(lines):
+                    code_raw  = lines[i + 2]
+                    desc_raw  = lines[i + 3]
+                    units_raw = lines[i + 4]
+                    code_clean = re.sub(r'\s+', ' ', code_raw).strip()
+                    desc_clean = desc_raw.title()
+                    try:    units_int = str(round(float(units_raw)))
+                    except: units_int = '3'
+                    if units_int == '0': units_int = '3'
+                    if code_clean and desc_clean:
+                        subjects.append({
+                            'course_code': code_clean,
+                            'name':        desc_clean,
+                            'units':       units_int,
+                        })
+                    i += 8
+                else:
+                    i += 1
+        result['subjects'] = subjects
+
+        print(f'[PDF] name="{result["name"]}" id="{result["student_id"]}" '
+              f'course="{result["course"]}" year="{result["year_level"]}" '
+              f'sec="{result["section"]}" subjects={len(subjects)} '
+              f'email="{result["email"]}')
         return jsonify({**result, 'added_to_catalogue': []})
+
     except Exception as e:
         tb = traceback.format_exc()
-        print(f"[parse_registration_pdf ERROR]\n{tb}")
+        print(f'[parse_registration_pdf ERROR]\n{tb}')
         return jsonify({'error': f'{type(e).__name__}: {str(e)}'}), 500
 
 @app.route('/mark', methods=['POST'])
@@ -4186,7 +4289,7 @@ def export_stats_xlsx():
             bar_s.legend.position = 'b'
             bar_s.add_data(
                 Reference(wc, min_col=34, min_row=SUBJ_DATA_ROW-1,
-                          max_row=subj_last, max_col=37),
+                            max_row=subj_last, max_col=37),
                 titles_from_data=True)
             bar_s.set_categories(
                 Reference(wc, min_col=33, min_row=SUBJ_DATA_ROW, max_row=subj_last))
@@ -4196,7 +4299,7 @@ def export_stats_xlsx():
                     bar_s.series[i].graphicalProperties.line.solidFill = clr
             # Anchor subject chart below the pie chart — row 4 + ~20 rows down
             wc.add_chart(bar_s, 'B36')
- 
+
         # ── 3. Attendance by Section bar chart ───────────────────────────
         # Data in cols H-L, rows 10+
         SEC_DATA_ROW = 10
@@ -4220,7 +4323,7 @@ def export_stats_xlsx():
             bar_sc.legend.position = 'b'
             bar_sc.add_data(
                 Reference(wc, min_col=39, min_row=SEC_DATA_ROW-1,
-                          max_row=sec_last, max_col=42),
+                            max_row=sec_last, max_col=42),
                 titles_from_data=True)
             bar_sc.set_categories(
                 Reference(wc, min_col=38, min_row=SEC_DATA_ROW, max_row=sec_last))

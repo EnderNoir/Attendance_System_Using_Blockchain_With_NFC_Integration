@@ -1231,6 +1231,7 @@ def parse_student(raw):
 
 def get_all_students():
     global BLOCKCHAIN_ONLINE
+    cached = db_get_all_students()
     if not BLOCKCHAIN_ONLINE and contract:
         try:
             BLOCKCHAIN_ONLINE = web3.is_connected()
@@ -1266,11 +1267,33 @@ def get_all_students():
                 s['section'] = s['section'].strip().upper()
                 students.append(s)
                 db_save_student(s)
-            return students
+            # If blockchain is reachable but has no StudentRegistered events
+            # (e.g., fresh contract deployment), keep using SQLite cache so
+            # admin/teacher lists do not appear empty.
+            if students:
+                return students
+            print("[INFO] Blockchain has no student events yet — using SQLite cache.")
+            if cached:
+                for s in cached:
+                    ov = db_get_override(s['nfcId'])
+                    if ov.get('full_name'):       s['name']            = ov['full_name']
+                    if ov.get('student_id'):      s['student_id']      = ov['student_id']
+                    if ov.get('email'):           s['email']           = ov['email']
+                    if ov.get('contact'):         s['contact']         = ov['contact']
+                    if ov.get('adviser'):         s['adviser']         = ov['adviser']
+                    if ov.get('major'):           s['major']           = ov['major']
+                    if ov.get('semester'):        s['semester']        = ov['semester']
+                    if ov.get('school_year'):     s['school_year']     = ov['school_year']
+                    if ov.get('date_registered'): s['date_registered'] = ov['date_registered']
+                    if ov.get('course'):          s['course']          = ov['course']
+                    if ov.get('year_level'):      s['year_level']      = ov['year_level']
+                    if ov.get('section'):         s['section']         = ov['section'].upper()
+                    s['section'] = (s.get('section') or '').strip().upper()
+                return cached
+            return []
         except Exception as _be:
             print(f"[WARNING] Blockchain unreachable: {_be} — falling back to SQLite cache.")
             BLOCKCHAIN_ONLINE = False
-    cached = db_get_all_students()
     if not cached:
         print("[WARNING] No students in SQLite cache and blockchain is offline.")
         return []
@@ -1293,10 +1316,39 @@ def get_all_students():
 
 def get_attendance_records(nfc_id):
     try:
-        ts,pf = contract.functions.getAttendance(nfc_id).call()
-        return [(datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M:%S'),p) for t,p in zip(ts,pf)]
+        ts, statuses = contract.functions.getAttendance(nfc_id).call()
+        out = []
+        for t, code in zip(ts, statuses):
+            # Legacy contract returns bool; upgraded contract returns uint8.
+            if isinstance(code, bool):
+                status = 'present' if code else 'absent'
+            else:
+                status = {0: 'present', 1: 'late', 2: 'absent', 3: 'excused'}.get(int(code), 'absent')
+            out.append((datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M:%S'), status in ('present', 'late')))
+        return out
     except:
         return []
+
+def chain_status_code(status: str) -> int:
+    return {
+        'present': 0,
+        'late': 1,
+        'absent': 2,
+        'excused': 3,
+    }.get((status or '').lower(), 0)
+
+def mark_attendance_on_chain(nfc_id: str, status: str):
+    tx = contract.functions.markAttendanceWithStatus(
+        nfc_id, chain_status_code(status)
+    ).transact({'from': admin_account})
+    receipt = web3.eth.wait_for_transaction_receipt(tx)
+    return receipt['transactionHash'].hex(), receipt['blockNumber']
+
+def get_student_by_nfc_cached(nfc_id: str):
+    st = db_get_student(nfc_id)
+    if st:
+        return st
+    return next((s for s in get_all_students() if s.get('nfcId') == nfc_id), None)
 
 def get_student_attendance_stats(nfc_id):
     with get_db() as conn:
@@ -1706,7 +1758,9 @@ def parse_registration_pdf():
 def mark():
     nfc_id = request.form['nfc_id'].strip().upper()
     try:
-        tx = contract.functions.markAttendance(nfc_id).transact({'from':admin_account})
+        tx = contract.functions.markAttendanceWithStatus(
+            nfc_id, chain_status_code('present')
+        ).transact({'from':admin_account})
         web3.eth.wait_for_transaction_receipt(tx)
         name = student_name_map.get(nfc_id,"Unknown")
         recent_attendance.append({'nfc_id':nfc_id,'name':name,'timestamp':time.time()})
@@ -2280,6 +2334,25 @@ def api_session_attendance(sess_id):
     program     = sk_parts[0] if len(sk_parts) > 0 else ''
     year_level  = sk_parts[1] if len(sk_parts) > 1 else ''
     section_val = sk_parts[2] if len(sk_parts) > 2 else ''
+
+    # Historical-first view:
+    # - always include students who have logs in this session (even if moved section later)
+    # - also include currently enrolled students with no logs as "absent"
+    students_map = {}
+
+    for lg in logs:
+        nid = lg['nfc_id']
+        st  = get_student_by_nfc_cached(nid) or {}
+        students_map[nid] = {
+            'nfc_id':     nid,
+            'name':       lg.get('student_name') or st.get('name') or nid,
+            'student_id': lg.get('student_id')   or st.get('student_id', ''),
+            'status':     (lg.get('status') or 'absent').lower(),
+            'tx_hash':    lg.get('tx_hash') or '',
+            'block':      str(lg.get('block_number') or ''),
+            'time':       lg.get('tap_time') or '',
+        }
+
     with get_db() as _conn:
         if program and year_level and section_val:
             _rows = _conn.execute(
@@ -2292,18 +2365,22 @@ def api_session_attendance(sess_id):
     if not enrolled:
         all_students = get_all_students()
         enrolled = [s for s in all_students if build_student_section_key(s) == section_key]
-    students_out = []
-    for s in sorted(enrolled, key=lambda x: x['name']):
+
+    for s in enrolled:
         nid = s['nfcId']
-        lg  = logs_by_nfc.get(nid)
-        status = lg['status'] if lg else 'absent'
-        students_out.append({
-            'nfc_id':     nid, 'name': s['name'],
-            'student_id': s.get('student_id', ''), 'status': status,
-            'tx_hash':    lg['tx_hash']      if lg else '',
-            'block':      str(lg['block_number']) if lg else '',
-            'time':       lg['tap_time']     if lg else '',
-        })
+        if nid in students_map:
+            continue
+        students_map[nid] = {
+            'nfc_id':     nid,
+            'name':       s.get('name', nid),
+            'student_id': s.get('student_id', ''),
+            'status':     'absent',
+            'tx_hash':    '',
+            'block':      '',
+            'time':       '',
+        }
+
+    students_out = sorted(students_map.values(), key=lambda x: x['name'].lower())
     return jsonify({
         'students':     students_out,
         'subject_name': sess.get('subject_name', ''),
@@ -2426,20 +2503,43 @@ def _auto_end_session_thread(sess_id, auto_end_at_str, app_context):
                     nid = s['nfcId']
                     if nid not in present_set and nid not in excused_set:
                         try:
-                            tx      = contract.functions.markAttendance(nid).transact({'from': admin_account})
-                            receipt = web3.eth.wait_for_transaction_receipt(tx)
+                            tx_hash, block_num = mark_attendance_on_chain(nid, 'absent')
                             db_save_attendance_log(
                                 sess_id=sess_id, nfc_id=nid,
                                 student_name=s.get('name',''), student_id=s.get('student_id',''),
                                 status='absent', tap_time=ended_time,
-                                tx_hash=receipt['transactionHash'].hex(),
-                                block_number=receipt['blockNumber']
+                                tx_hash=tx_hash,
+                                block_number=block_num
+                            )
+                            send_student_attendance_receipt(
+                                student_name=s.get('name', nid),
+                                student_email=s.get('email', ''),
+                                student_id=s.get('student_id', ''),
+                                subject_name=current.get('subject_name', ''),
+                                section_key=current.get('section_key', ''),
+                                teacher_name=current.get('teacher_name', ''),
+                                tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+                                status='absent',
+                                tx_hash=tx_hash,
+                                block_num=block_num,
                             )
                         except Exception as _ae:
                             db_save_attendance_log(
                                 sess_id=sess_id, nfc_id=nid,
                                 student_name=s.get('name',''), student_id=s.get('student_id',''),
                                 status='absent', tap_time=ended_time
+                            )
+                            send_student_attendance_receipt(
+                                student_name=s.get('name', nid),
+                                student_email=s.get('email', ''),
+                                student_id=s.get('student_id', ''),
+                                subject_name=current.get('subject_name', ''),
+                                section_key=current.get('section_key', ''),
+                                teacher_name=current.get('teacher_name', ''),
+                                tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+                                status='absent',
+                                tx_hash='',
+                                block_num='',
                             )
             else:
                 for s in section_students:
@@ -2449,6 +2549,18 @@ def _auto_end_session_thread(sess_id, auto_end_at_str, app_context):
                             sess_id=sess_id, nfc_id=nid,
                             student_name=s.get('name',''), student_id=s.get('student_id',''),
                             status='absent', tap_time=ended_time
+                        )
+                        send_student_attendance_receipt(
+                            student_name=s.get('name', nid),
+                            student_email=s.get('email', ''),
+                            student_id=s.get('student_id', ''),
+                            subject_name=current.get('subject_name', ''),
+                            section_key=current.get('section_key', ''),
+                            teacher_name=current.get('teacher_name', ''),
+                            tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+                            status='absent',
+                            tx_hash='',
+                            block_num='',
                         )
  
             with get_db() as conn:
@@ -2621,15 +2733,24 @@ def end_session(sess_id):
                 nid = s['nfcId']
                 if nid not in present_set and nid not in excused_set:
                     try:
-                        tx      = contract.functions.markAttendance(nid).transact({'from': admin_account})
-                        receipt = web3.eth.wait_for_transaction_receipt(tx)
-                        abs_tx    = receipt['transactionHash'].hex()
-                        abs_block = receipt['blockNumber']
+                        abs_tx, abs_block = mark_attendance_on_chain(nid, 'absent')
                         db_save_attendance_log(
                             sess_id=sess_id, nfc_id=nid,
                             student_name=s.get('name',''), student_id=s.get('student_id',''),
                             status='absent', tap_time=ended_time,
                             tx_hash=abs_tx, block_number=abs_block
+                        )
+                        send_student_attendance_receipt(
+                            student_name=s.get('name', nid),
+                            student_email=s.get('email', ''),
+                            student_id=s.get('student_id', ''),
+                            subject_name=sess.get('subject_name', ''),
+                            section_key=sess.get('section_key', ''),
+                            teacher_name=sess.get('teacher_name', ''),
+                            tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+                            status='absent',
+                            tx_hash=abs_tx,
+                            block_num=abs_block,
                         )
                     except Exception as _e:
                         print(f"[WARN] absent blockchain tx failed for {nid}: {_e}")
@@ -2637,6 +2758,18 @@ def end_session(sess_id):
                             sess_id=sess_id, nfc_id=nid,
                             student_name=s.get('name',''), student_id=s.get('student_id',''),
                             status='absent', tap_time=ended_time
+                        )
+                        send_student_attendance_receipt(
+                            student_name=s.get('name', nid),
+                            student_email=s.get('email', ''),
+                            student_id=s.get('student_id', ''),
+                            subject_name=sess.get('subject_name', ''),
+                            section_key=sess.get('section_key', ''),
+                            teacher_name=sess.get('teacher_name', ''),
+                            tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+                            status='absent',
+                            tx_hash='',
+                            block_num='',
                         )
         except Exception as _be:
             print(f"[WARN] blockchain absent recording failed: {_be}")
@@ -2648,6 +2781,18 @@ def end_session(sess_id):
                     sess_id=sess_id, nfc_id=nid,
                     student_name=s.get('name',''), student_id=s.get('student_id',''),
                     status='absent', tap_time=ended_time
+                )
+                send_student_attendance_receipt(
+                    student_name=s.get('name', nid),
+                    student_email=s.get('email', ''),
+                    student_id=s.get('student_id', ''),
+                    subject_name=sess.get('subject_name', ''),
+                    section_key=sess.get('section_key', ''),
+                    teacher_name=sess.get('teacher_name', ''),
+                    tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+                    status='absent',
+                    tx_hash='',
+                    block_num='',
                 )
     with get_db() as conn:
         conn.execute("UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
@@ -2722,10 +2867,7 @@ def excuse_student(sess_id):
     exc_tx = ''; exc_block = 0
     if BLOCKCHAIN_ONLINE and contract and admin_account:
         try:
-            tx      = contract.functions.markAttendance(nfc_id).transact({'from': admin_account})
-            receipt = web3.eth.wait_for_transaction_receipt(tx)
-            exc_tx    = receipt['transactionHash'].hex()
-            exc_block = receipt['blockNumber']
+            exc_tx, exc_block = mark_attendance_on_chain(nfc_id, 'excused')
         except Exception as _e:
             print(f"[WARN] excused blockchain tx failed: {_e}")
     db_save_attendance_log(
@@ -2739,6 +2881,19 @@ def excuse_student(sess_id):
     save_session(sess_id, sess)
     sessions_db[sess_id] = sess
     name = student_name_map.get(nfc_id, nfc_id)
+    st = get_student_by_nfc_cached(nfc_id) or {}
+    send_student_attendance_receipt(
+        student_name=st.get('name', name),
+        student_email=st.get('email', ''),
+        student_id=st.get('student_id', ''),
+        subject_name=sess.get('subject_name', ''),
+        section_key=sess.get('section_key', ''),
+        teacher_name=sess.get('teacher_name', ''),
+        tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+        status='excused',
+        tx_hash=exc_tx,
+        block_num=exc_block,
+    )
     return jsonify({'status':'ok','name':name,'nfc_id':nfc_id,'note':note})
 
 @app.route('/teacher/sessions')
@@ -2887,10 +3042,10 @@ def poll_session(sess_id):
 def attendance_stats():
     period     = request.args.get('period',      'today')
     f_month    = request.args.get('month',       '').strip()
-    f_year_num = request.args.get('year_num',    request.args.get('year','')).strip()
+    f_year_num = request.args.get('year_num',    '').strip()
     f_subject  = request.args.get('subject',     '').strip()
-    f_section  = request.args.get('section_key', '').strip()
-    f_year_lvl = request.args.get('year',        '').strip()
+    f_section  = request.args.get('section_key', request.args.get('section', '')).strip()
+    f_year_lvl = request.args.get('year_level',  '').strip()
     f_program  = request.args.get('program',     '').strip()
     f_sec_ltr  = request.args.get('section_letter','').strip()
     f_instr    = request.args.get('instructor',  '').strip()
@@ -2898,6 +3053,9 @@ def attendance_stats():
     role       = session.get('role')
     username   = session.get('username')
     now        = datetime.now()
+    if not f_year_num:
+        # Backward compatibility for older clients still using `year`.
+        f_year_num = request.args.get('year', '').strip() if period in ('month', 'year') else ''
     if period == 'today':
         start_dt = now.replace(hour=0,minute=0,second=0,microsecond=0); end_dt = None
     elif period == 'month':
@@ -3097,10 +3255,7 @@ def mark_pico():
                         # Continue anyway — markAttendance will fail but we still save to SQLite
     
                 # Step 3: Mark attendance on blockchain → get TX hash + block number
-                tx        = contract.functions.markAttendance(nfc_id).transact({'from': admin_account})
-                receipt   = web3.eth.wait_for_transaction_receipt(tx)
-                tx_hash   = receipt['transactionHash'].hex()
-                block_num = receipt['blockNumber']
+                tx_hash, block_num = mark_attendance_on_chain(nfc_id, 'late' if is_late else 'present')
                 print(f"[BLOCKCHAIN] Attendance marked — TX: {tx_hash} Block: {block_num}")
     
             except Exception as e:
@@ -3673,8 +3828,8 @@ def export_stats_xlsx():
             qs         = parse_qs(body.get('params',''))
             def qp(k): return qs.get(k,[''])[0]
             period     = qp('period') or 'all'
-            f_section  = qp('section_key')
-            f_year     = qp('year')
+            f_section  = qp('section_key') or qp('section')
+            f_year_lvl = qp('year_level')
             f_subject  = qp('subject')
             f_instr    = qp('instructor')
             f_month    = qp('month')
@@ -3684,8 +3839,8 @@ def export_stats_xlsx():
             f_tod      = qp('time_of_day')
         else:
             period     = request.args.get('period',     'all')
-            f_section  = request.args.get('section_key','').strip()
-            f_year     = request.args.get('year',       '').strip()
+            f_section  = request.args.get('section_key', request.args.get('section','')).strip()
+            f_year_lvl = request.args.get('year_level', '').strip()
             f_subject  = request.args.get('subject',    '').strip()
             f_instr    = request.args.get('instructor', '').strip()
             f_month    = request.args.get('month',      '').strip()
@@ -3697,6 +3852,8 @@ def export_stats_xlsx():
         role     = session.get('role')
         username = session.get('username')
         now      = datetime.now()
+        if not f_year_num:
+            f_year_num = (qp('year') if request.method == 'POST' else request.args.get('year', '').strip()) if period in ('month', 'year') else ''
 
         if period == 'today':
             start_dt = now.replace(hour=0,minute=0,second=0,microsecond=0); end_dt = None
@@ -3739,7 +3896,7 @@ def export_stats_xlsx():
             sk = s.get('section_key',''); sk_parts = sk.split('|')
             if f_section_norm and normalize_section_key(sk) != f_section_norm: continue
             if f_program and (len(sk_parts)<1 or sk_parts[0] != f_program): continue
-            if f_year    and (len(sk_parts)<2 or sk_parts[1] != f_year):    continue
+            if f_year_lvl and (len(sk_parts)<2 or sk_parts[1] != f_year_lvl): continue
             if f_sec_ltr and (len(sk_parts)<3 or sk_parts[2] != f_sec_ltr): continue
             if f_subject and s.get('subject_name','') != f_subject: continue
             if f_instr   and s.get('teacher_name','') != f_instr:   continue
@@ -3756,7 +3913,7 @@ def export_stats_xlsx():
 
         af = []
         if f_program:  af.append('Program: '+f_program)
-        if f_year:     af.append('Year: '+f_year)
+        if f_year_lvl: af.append('Year: '+f_year_lvl)
         if f_sec_ltr:  af.append('Section: '+f_sec_ltr)
         if f_section:  af.append('Section: '+f_section.replace('|',' · '))
         if f_subject:  af.append('Subject: '+f_subject)
@@ -4076,7 +4233,7 @@ def export_stats_xlsx():
 
         parts = ['DAVS_Attendance_Report', period_label.replace(' ','_').replace(',','')]
         if f_program:  parts.append(f_program.replace('BS ','BS').replace(' ','_'))
-        if f_year:     parts.append(f_year.replace(' ','_'))
+        if f_year_lvl: parts.append(f_year_lvl.replace(' ','_'))
         if f_sec_ltr:  parts.append(f'Section_{f_sec_ltr}')
         if f_subject:  parts.append(re.sub(r'[^A-Za-z0-9]','_',f_subject)[:20])
         if f_instr:    parts.append(f_instr.split()[0])
@@ -4104,40 +4261,107 @@ def export_stats_xlsx():
 @app.route('/export/stats.csv')
 @login_required
 def export_stats_csv():
-    period   = request.args.get('period','all')
-    f_subj   = request.args.get('subject','').strip()
-    f_sec    = request.args.get('section_key','').strip()
-    role     = session.get('role'); username = session.get('username')
-    now      = datetime.now()
-    if period=='today': start_dt=now.replace(hour=0,minute=0,second=0,microsecond=0); end_dt=None
-    elif period=='month':
-        yr=int(request.args.get('year_num',now.year)); mo=int(request.args.get('month',now.month))
-        start_dt=datetime(yr,mo,1); end_dt=datetime(yr,mo,_cal.monthrange(yr,mo)[1],23,59,59)
-    elif period=='year':
-        yr=int(request.args.get('year_num',now.year)); start_dt=datetime(yr,1,1); end_dt=datetime(yr,12,31,23,59,59)
-    else: start_dt=datetime(2000,1,1); end_dt=None
-    all_sess=load_sessions(); all_stud=get_all_students()
-    f_sec_norm = normalize_section_key(f_sec) if f_sec else ''
-    out=io.StringIO(); w=csv.writer(out)
-    w.writerow(['Session ID','Subject','Section','Instructor','Date','Time Slot','Enrolled','Present','Late','Absent','Excused','Rate%'])
-    for sid,s in sorted(all_sess.items(),key=lambda x:x[1].get('started_at','')):
-        if not s.get('started_at'): continue
-        try: sess_dt=datetime.strptime(s['started_at'],'%Y-%m-%d %H:%M:%S')
-        except: continue
-        if sess_dt<start_dt: continue
-        if end_dt and sess_dt>end_dt: continue
-        if role=='teacher' and s.get('teacher')!=username: continue
-        if f_subj and s.get('subject_name','')!=f_subj: continue
-        if f_sec_norm and normalize_section_key(s.get('section_key',''))!=f_sec_norm: continue
-        sec=normalize_section_key(s.get('section_key',''))
-        enrolled=[st for st in all_stud if build_student_section_key(st) == sec]
-        p=set(s.get('present',[])); l=set(s.get('late',[])); e=set(s.get('excused',[]))
-        pres=len([n for n in p if n not in l]); late=len(l); exc=len(e); tot=len(enrolled); ab=max(0,tot-pres-late-exc)
-        rate=round((pres+late)/tot*100,1) if tot else 0
-        w.writerow([sid[:8],s.get('subject_name',''),sec.replace('|',' · '),s.get('teacher_name',''),s['started_at'][:10],s.get('time_slot',''),tot,pres,late,ab,exc,rate])
+    period     = request.args.get('period', 'all')
+    f_month    = request.args.get('month', '').strip()
+    f_year_num = request.args.get('year_num', '').strip()
+    f_subject  = request.args.get('subject', '').strip()
+    f_section  = request.args.get('section_key', request.args.get('section', '')).strip()
+    f_year_lvl = request.args.get('year_level', '').strip()
+    f_program  = request.args.get('program', '').strip()
+    f_sec_ltr  = request.args.get('section_letter', '').strip()
+    f_instr    = request.args.get('instructor', '').strip()
+    f_tod      = request.args.get('time_of_day', '').strip()
+    role       = session.get('role')
+    username   = session.get('username')
+    now        = datetime.now()
+
+    if not f_year_num:
+        f_year_num = request.args.get('year', '').strip() if period in ('month', 'year') else ''
+
+    if period == 'today':
+        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0); end_dt = None
+    elif period == 'month':
+        yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
+        mo = int(f_month) if f_month and f_month.isdigit() else now.month
+        start_dt = datetime(yr, mo, 1); end_dt = datetime(yr, mo, _cal.monthrange(yr, mo)[1], 23, 59, 59)
+    elif period == 'year':
+        yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
+        start_dt = datetime(yr, 1, 1); end_dt = datetime(yr, 12, 31, 23, 59, 59)
+    else:
+        start_dt = datetime(2000, 1, 1); end_dt = None
+
+    where = ["s.started_at >= ?"]
+    params = [start_dt.strftime('%Y-%m-%d %H:%M:%S')]
+    if end_dt:
+        where.append("s.started_at <= ?")
+        params.append(end_dt.strftime('%Y-%m-%d %H:%M:%S'))
+    if role == 'teacher':
+        where.append("s.teacher_username = ?")
+        params.append(username)
+    if f_section:
+        where.append("s.section_key = ?")
+        params.append(normalize_section_key(f_section))
+    if f_program:
+        where.append("s.section_key LIKE ?")
+        params.append(f_program + '%')
+    if f_year_lvl:
+        where.append("s.section_key LIKE ?")
+        params.append('%|' + f_year_lvl + '|%')
+    if f_sec_ltr:
+        where.append("s.section_key LIKE ?")
+        params.append('%|' + f_sec_ltr)
+    if f_subject:
+        where.append("s.subject_name = ?")
+        params.append(f_subject)
+    if f_instr:
+        where.append("s.teacher_name = ?")
+        params.append(f_instr)
+    if f_tod == 'morning':
+        where.append("CAST(strftime('%H',s.started_at) AS INTEGER) < 12")
+    elif f_tod == 'afternoon':
+        where.append("CAST(strftime('%H',s.started_at) AS INTEGER) >= 12")
+    elif f_tod and ':' in f_tod:
+        where.append("s.time_slot = ?")
+        params.append(f_tod)
+    wsql = " AND ".join(where)
+
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(['Session ID', 'Subject', 'Section', 'Instructor', 'Date', 'Time Slot', 'Total Records', 'Present', 'Late', 'Absent', 'Excused', 'Rate%'])
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT s.sess_id, s.subject_name, s.section_key, s.teacher_name, s.started_at, s.time_slot, "
+            "SUM(CASE WHEN al.status='present' THEN 1 ELSE 0 END) AS present_count, "
+            "SUM(CASE WHEN al.status='late' THEN 1 ELSE 0 END) AS late_count, "
+            "SUM(CASE WHEN al.status='absent' THEN 1 ELSE 0 END) AS absent_count, "
+            "SUM(CASE WHEN al.status='excused' THEN 1 ELSE 0 END) AS excused_count, "
+            "COUNT(*) AS total_count "
+            "FROM attendance_logs al "
+            "JOIN sessions s ON al.sess_id = s.sess_id "
+            "WHERE " + wsql + " "
+            "GROUP BY s.sess_id, s.subject_name, s.section_key, s.teacher_name, s.started_at, s.time_slot "
+            "ORDER BY s.started_at",
+            params
+        ).fetchall()
+    for r in rows:
+        total = int(r['total_count'] or 0)
+        present = int(r['present_count'] or 0)
+        late = int(r['late_count'] or 0)
+        absent = int(r['absent_count'] or 0)
+        excused = int(r['excused_count'] or 0)
+        rate = round((present + late) / total * 100, 1) if total else 0
+        w.writerow([
+            (r['sess_id'] or '')[:8],
+            r['subject_name'] or '',
+            normalize_section_key(r['section_key'] or '').replace('|', ' · '),
+            r['teacher_name'] or '',
+            (r['started_at'] or '')[:10],
+            r['time_slot'] or '',
+            total, present, late, absent, excused, rate
+        ])
     out.seek(0)
-    fname=f"attendance_{period}_{now.strftime('%Y%m%d')}.csv"
-    return Response(out.getvalue(),mimetype='text/csv',headers={'Content-Disposition':f'attachment;filename={fname}'})
+    fname = f"attendance_{period}_{now.strftime('%Y%m%d')}.csv"
+    return Response(out.getvalue(), mimetype='text/csv', headers={'Content-Disposition': f'attachment;filename={fname}'})
 
 @app.route('/request_registration_scan', methods=['POST'])
 @admin_required

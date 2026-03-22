@@ -409,8 +409,8 @@ function renderTrend(data){
 function applyTrendFilter(){
   const extra={
     subject:document.getElementById('tf_subject').value,
-    section:document.getElementById('tf_section').value,
-    year:document.getElementById('tf_year').value,
+    section_key:document.getElementById('tf_section').value,
+    year_level:document.getElementById('tf_year').value,
     instructor:document.getElementById('tf_instructor').value,
   };
   loadStats(curPeriod,extra);
@@ -481,10 +481,10 @@ function applyPeriodPick(){
   if(curPeriod==='month'){
     const m=document.getElementById('pickMonth').value;
     const y=document.getElementById('pickMonthYear').value;
-    loadStats('month',{month:m,year:y});
+    loadStats('month',{month:m,year_num:y});
   } else if(curPeriod==='year'){
     const y=document.getElementById('pickYear').value;
-    loadStats('year',{year:y});
+    loadStats('year',{year_num:y});
   }
 }
 

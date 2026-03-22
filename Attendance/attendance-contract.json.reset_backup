@@ -20,6 +20,16 @@
           "type": "uint256",
           "name": "timestamp",
           "indexed": false
+        },
+        {
+          "type": "uint8",
+          "name": "status",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "statusLabel",
+          "indexed": false
         }
       ]
     },
@@ -47,11 +57,62 @@
     },
     {
       "type": "function",
+      "name": "STATUS_ABSENT",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "STATUS_EXCUSED",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "STATUS_LATE",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "STATUS_PRESENT",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "function",
       "name": "admin",
       "constant": true,
       "stateMutability": "view",
       "payable": false,
-      "gas": 15777216,
       "inputs": [],
       "outputs": [
         {
@@ -65,7 +126,6 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
-      "gas": 15777216,
       "inputs": [
         {
           "type": "string"
@@ -80,8 +140,8 @@
           "name": "timestamp"
         },
         {
-          "type": "bool",
-          "name": "present"
+          "type": "uint8",
+          "name": "status"
         }
       ]
     },
@@ -91,7 +151,6 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
-      "gas": 15777216,
       "inputs": [
         {
           "type": "string",
@@ -103,7 +162,7 @@
           "type": "uint256[]"
         },
         {
-          "type": "bool[]"
+          "type": "uint8[]"
         }
       ]
     },
@@ -112,7 +171,6 @@
       "name": "markAttendance",
       "constant": false,
       "payable": false,
-      "gas": 15777216,
       "inputs": [
         {
           "type": "string",
@@ -123,10 +181,26 @@
     },
     {
       "type": "function",
+      "name": "markAttendanceWithStatus",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_nfcId"
+        },
+        {
+          "type": "uint8",
+          "name": "_status"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
       "name": "registerStudent",
       "constant": false,
       "payable": false,
-      "gas": 15777216,
       "inputs": [
         {
           "type": "address",
@@ -149,7 +223,6 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
-      "gas": 15777216,
       "inputs": [
         {
           "type": "address"
@@ -176,7 +249,6 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
-      "gas": 15777216,
       "inputs": [
         {
           "type": "string"

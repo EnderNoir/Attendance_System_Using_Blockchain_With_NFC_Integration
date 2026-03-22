@@ -1,0 +1,512 @@
+{% extends "base.html" %}
+{% block title %}Home — DAVS{% endblock %}
+{% block page_title %}DECENTRALIZED ATTENDANCE VERIFICATION SYSTEM{% endblock %}
+{% block content %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ── Hero (compact) ── */
+  .hero-info{font-size:11px;color:var(--muted);margin-bottom:22px;line-height:1.7;padding:10px 14px;background:rgba(0,229,255,.03);border:1px solid rgba(0,229,255,.1);border-radius:8px;}
+  .hero-info strong{color:var(--accent);}
+
+  /* ── Analytics panel ── */
+  .analytics-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:24px;}
+  .ap-topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;flex-wrap:wrap;gap:10px;}
+  .ap-title{font-size:16px;font-weight:700;}
+  .ap-subtitle{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  /* Period tabs */
+  .period-tabs{display:flex;gap:3px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:9px;padding:3px;flex-wrap:wrap;}
+  .ptab{padding:5px 12px;border:none;background:transparent;color:var(--muted);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;transition:all .2s;}
+  .ptab.active{background:rgba(0,229,255,.12);color:var(--accent);box-shadow:0 0 0 1px rgba(0,229,255,.2);}
+
+  /* Month/Year pickers (visible only when relevant tab active) */
+  .period-picker{display:none;align-items:center;gap:6px;flex-wrap:wrap;}
+  .period-picker.show{display:flex;}
+  .pp-select{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:5px 10px;font-size:12px;font-family:'DM Sans',sans-serif;}
+  .pp-select:focus{outline:none;border-color:var(--accent);}
+
+  /* Chart tabs */
+  .chart-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 20px;margin-top:12px;}
+  .ctab{padding:9px 16px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;display:flex;align-items:center;gap:6px;}
+  .ctab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .chart-pane{display:none;padding:16px 20px 18px;}.chart-pane.active{display:block;}
+
+  /* Stat chips row */
+  .chip-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+  @media(max-width:640px){.chip-row{grid-template-columns:repeat(2,1fr);}}
+  .chip{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:9px;}
+  .chip.c-green{border-color:rgba(16,185,129,.25);}
+  .chip.c-yellow{border-color:rgba(245,158,11,.25);}
+  .chip.c-red{border-color:rgba(239,68,68,.25);}
+  .chip.c-blue{border-color:rgba(59,130,246,.25);}
+  .chip-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .chip-val{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;line-height:1;}
+  .chip-lbl{font-size:10px;color:var(--muted);margin-top:2px;}
+
+  /* Chart area - compact with internal scroll for tall charts */
+  .chart-area{position:relative;height:200px;}
+  .chart-area.tall{height:260px;}
+  .chart-scroll{height:100%;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,229,255,.15) transparent;}
+  .chart-scroll::-webkit-scrollbar{width:4px;}
+  .chart-scroll::-webkit-scrollbar-thumb{background:rgba(0,229,255,.2);border-radius:99px;}
+  .chart-loading{position:absolute;inset:0;background:var(--surface);display:flex;align-items:center;justify-content:center;z-index:10;font-size:12px;color:var(--muted);gap:8px;border-radius:8px;}
+  .spin{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .no-data{display:none;position:absolute;inset:0;background:var(--surface);align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--muted);font-size:12px;border-radius:8px;z-index:5;}
+  .no-data.show{display:flex;}
+
+  /* Filter row */
+  .chart-filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px 12px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:9px;}
+  .cf-group{display:flex;flex-direction:column;gap:3px;flex:1;min-width:120px;}
+  .cf-label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .cf-select{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 9px;font-size:12px;font-family:'DM Sans',sans-serif;width:100%;}
+  .cf-select:focus{outline:none;border-color:var(--accent);}
+  .btn-cf-apply{background:var(--accent);border:none;color:#000;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;align-self:flex-end;white-space:nowrap;}
+  .btn-cf-reset{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:11px;cursor:pointer;align-self:flex-end;transition:all .2s;}
+  .btn-cf-reset:hover{border-color:var(--danger);color:var(--danger);}
+
+  /* Donut layout */
+  .donut-layout{display:grid;grid-template-columns:200px 1fr;gap:18px;align-items:center;}
+  @media(max-width:600px){.donut-layout{grid-template-columns:1fr;}}
+  .donut-legend{display:flex;flex-direction:column;gap:8px;}
+  .legend-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;background:rgba(255,255,255,.03);border-radius:7px;}
+  .legend-left{display:flex;align-items:center;gap:7px;font-size:12px;}
+  .legend-dot{width:9px;height:9px;border-radius:50%;}
+  .legend-val{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;}
+  .legend-pct{font-size:10px;color:var(--muted);}
+
+  .btn-export-sm{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:6px 12px;font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;text-decoration:none;transition:all .2s;}
+  .btn-export-sm:hover{border-color:var(--accent);color:var(--accent);}
+
+  /* Action cards */
+  .action-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;flex-direction:column;transition:border-color .2s,transform .15s;text-decoration:none;color:inherit;height:100%;}
+  .action-card:hover{border-color:var(--accent);transform:translateY(-2px);color:inherit;}
+  .ac-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:12px;}
+  .ac-title{font-family:'Space Mono',monospace;font-size:12px;font-weight:700;margin-bottom:4px;}
+  .ac-desc{font-size:12px;color:var(--muted);line-height:1.6;flex:1;}
+  .ac-hint{font-size:10px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+</style>
+
+<!-- ── Compact hero info ── -->
+<div class="hero-info">
+  <strong>Cavite State University — Silang Campus</strong> &nbsp;·&nbsp;
+  <strong>Decentralized Attendance Verification System Using Blockchain Technology</strong><br>
+  NFC · Blockchain · Real-Time Classroom Tracking &nbsp;·&nbsp;
+  Every student tap is recorded as an immutable transaction on the Ethereum blockchain — tamper-proof, permanent, and always auditable.
+</div>
+
+<!-- ── Quick stat row ── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-chip"><div class="card-icon cyan"><i class="bi bi-broadcast"></i></div>
+      <div><div class="value">{{ active_sessions|length }}</div><div class="label">Live Sessions</div></div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-chip"><div class="card-icon purple"><i class="bi bi-person-badge"></i></div>
+      <div><div class="value">{{ users_db.values()|selectattr('status','equalto','pending')|list|length }}</div><div class="label">Pending Faculty</div></div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-chip"><div class="card-icon green"><i class="bi bi-book"></i></div>
+      <div><div class="value">{{ subjects_db|length }}</div><div class="label">Subjects</div></div></div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-chip"><div class="card-icon amber"><i class="bi bi-boxes"></i></div>
+      <div><div class="value" id="blockNum">—</div><div class="label">Block Height</div></div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     ANALYTICS PANEL
+══════════════════════════════════════════════ -->
+<div class="analytics-panel">
+
+  <!-- Top bar -->
+  <div class="ap-topbar">
+    <div>
+      <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:2px;">// LIVE ANALYTICS</div>
+      <div class="ap-title">Attendance Overview</div>
+      <div class="ap-subtitle" id="sessionCountBadge">Loading…</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <!-- Period pill tabs -->
+      <div class="period-tabs">
+        <button class="ptab active" onclick="switchPeriod('today',this)">Today</button>
+        <button class="ptab"        onclick="switchPeriod('month',this)">Month</button>
+        <button class="ptab"        onclick="switchPeriod('year',this)">Year</button>
+        <button class="ptab"        onclick="switchPeriod('all',this)">All Time</button>
+      </div>
+      <!-- Month picker -->
+      <div class="period-picker" id="monthPicker">
+        <select class="pp-select" id="pickMonth" onchange="applyPeriodPick()">
+          <option value="1">January</option><option value="2">February</option>
+          <option value="3">March</option><option value="4">April</option>
+          <option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option>
+          <option value="9">September</option><option value="10">October</option>
+          <option value="11">November</option><option value="12">December</option>
+        </select>
+        <select class="pp-select" id="pickMonthYear" onchange="applyPeriodPick()">
+          <option>2025</option><option selected>2026</option><option>2027</option>
+        </select>
+      </div>
+      <!-- Year picker -->
+      <div class="period-picker" id="yearPicker">
+        <select class="pp-select" id="pickYear" onchange="applyPeriodPick()">
+          <option>2024</option><option>2025</option><option selected>2026</option><option>2027</option>
+        </select>
+      </div>
+      <a id="exportBtn" href="/export/stats.csv?period=today" class="btn-export-sm">
+        <i class="bi bi-download"></i> Export CSV
+      </a>
+    </div>
+  </div>
+
+  <!-- Stat chips -->
+  <div style="padding:14px 20px 0;">
+    <div class="chip-row">
+      <div class="chip c-green"><div class="chip-dot" style="background:#10b981;"></div><div><div class="chip-val" id="sc_present">—</div><div class="chip-lbl">Present</div></div></div>
+      <div class="chip c-yellow"><div class="chip-dot" style="background:#f59e0b;"></div><div><div class="chip-val" id="sc_late">—</div><div class="chip-lbl">Late</div></div></div>
+      <div class="chip c-red"><div class="chip-dot" style="background:#ef4444;"></div><div><div class="chip-val" id="sc_absent">—</div><div class="chip-lbl">Absent</div></div></div>
+      <div class="chip c-blue"><div class="chip-dot" style="background:#60a5fa;"></div><div><div class="chip-val" id="sc_excused">—</div><div class="chip-lbl">Excused</div></div></div>
+    </div>
+  </div>
+
+  <!-- Chart tabs -->
+  <div class="chart-tabs">
+    <button class="ctab active" onclick="switchChart('donut',this)"><i class="bi bi-pie-chart"></i> Status</button>
+    <button class="ctab"        onclick="switchChart('trend',this)"><i class="bi bi-graph-up"></i> Trend</button>
+    <button class="ctab"        onclick="switchChart('subject',this)"><i class="bi bi-bar-chart-steps"></i> By Subject</button>
+  </div>
+
+  <!-- ── PANE 1: Donut ── -->
+  <div class="chart-pane active" id="pane-donut">
+    <div class="chart-area">
+      <div class="chart-loading" id="donutLoading"><div class="spin"></div> Loading…</div>
+      <div class="no-data" id="donutNoData"><i class="bi bi-pie-chart" style="font-size:28px;opacity:.2;"></i>No session data.</div>
+      <div class="donut-layout">
+        <div><canvas id="donutChart" height="180"></canvas></div>
+        <div class="donut-legend" id="donutLegend">
+          <div class="legend-row"><span class="legend-left"><span class="legend-dot" style="background:#10b981;"></span>Present</span><span><span class="legend-val" id="leg_present">—</span> <span class="legend-pct" id="pct_present"></span></span></div>
+          <div class="legend-row"><span class="legend-left"><span class="legend-dot" style="background:#f59e0b;"></span>Late</span><span><span class="legend-val" id="leg_late">—</span> <span class="legend-pct" id="pct_late"></span></span></div>
+          <div class="legend-row"><span class="legend-left"><span class="legend-dot" style="background:#ef4444;"></span>Absent</span><span><span class="legend-val" id="leg_absent">—</span> <span class="legend-pct" id="pct_absent"></span></span></div>
+          <div class="legend-row"><span class="legend-left"><span class="legend-dot" style="background:#60a5fa;"></span>Excused</span><span><span class="legend-val" id="leg_excused">—</span> <span class="legend-pct" id="pct_excused"></span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PANE 2: Trend ── -->
+  <div class="chart-pane" id="pane-trend">
+    <div class="chart-filter-row">
+      <div class="cf-group"><span class="cf-label">Section</span>
+        <select class="cf-select" id="tf_section"><option value="">All Sections</option>
+          <option>CS1A</option><option>CS1B</option><option>CS2A</option><option>CS2B</option>
+          <option>IT1A</option><option>IT1B</option><option>IT2A</option><option>IT2B</option>
+        </select></div>
+      <div class="cf-group"><span class="cf-label">Year Level</span>
+        <select class="cf-select" id="tf_year"><option value="">All Years</option>
+          <option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option>
+        </select></div>
+      <div class="cf-group"><span class="cf-label">Subject</span>
+        <select class="cf-select" id="tf_subject"><option value="">All Subjects</option></select></div>
+      <div class="cf-group"><span class="cf-label">Instructor</span>
+        <select class="cf-select" id="tf_instructor"><option value="">All Instructors</option>
+          {% for u,d in users_db.items() %}{% if d.role in ('teacher','admin') %}<option value="{{ d.full_name }}">{{ d.full_name }}</option>{% endif %}{% endfor %}
+        </select></div>
+      <button class="btn-cf-apply" onclick="applyTrendFilter()"><i class="bi bi-search"></i> Apply</button>
+      <button class="btn-cf-reset" onclick="resetTrendFilter()"><i class="bi bi-x"></i> Reset</button>
+    </div>
+    <div class="chart-area">
+      <div class="chart-loading" id="trendLoading"><div class="spin"></div> Loading…</div>
+      <div class="no-data" id="trendNoData"><i class="bi bi-bar-chart" style="font-size:28px;opacity:.2;"></i>No sessions yet.</div>
+      <canvas id="trendChart" height="180"></canvas>
+    </div>
+  </div>
+
+  <!-- ── PANE 3: By Subject ── -->
+  <div class="chart-pane" id="pane-subject">
+    <div class="chart-filter-row">
+      <div class="cf-group"><span class="cf-label">Program</span>
+        <select class="cf-select" id="sf_course"><option value="">All Programs</option>
+          <option value="BS Computer Science">BS Computer Science</option>
+          <option value="BS Information Technology">BS Information Technology</option>
+        </select></div>
+      <div class="cf-group"><span class="cf-label">Status Focus</span>
+        <select class="cf-select" id="sf_status"><option value="all">All Statuses</option>
+          <option value="present">Present</option><option value="late">Late</option>
+          <option value="absent">Absent</option><option value="excused">Excused</option>
+        </select></div>
+      <div class="cf-group"><span class="cf-label">Sort By</span>
+        <select class="cf-select" id="sf_sort"><option value="name">Name</option>
+          <option value="present_desc">Most Present</option><option value="absent_desc">Most Absent</option>
+          <option value="sessions_desc">Most Sessions</option>
+        </select></div>
+      <button class="btn-cf-apply" onclick="applySubjectFilter()"><i class="bi bi-search"></i> Apply</button>
+      <button class="btn-cf-reset" onclick="resetSubjectFilter()"><i class="bi bi-x"></i> Reset</button>
+    </div>
+    <!-- Scrollable chart container for long subject lists -->
+    <div class="chart-area tall" id="subjChartArea">
+      <div class="chart-loading" id="subjLoading"><div class="spin"></div> Loading…</div>
+      <div class="no-data" id="subjNoData"><i class="bi bi-bar-chart-steps" style="font-size:28px;opacity:.2;"></i>No subject data.</div>
+      <div class="chart-scroll" id="subjChartScroll">
+        <canvas id="subjChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end analytics-panel -->
+
+<!-- ── Action cards ── -->
+<div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">// QUICK ACTIONS</div>
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <a href="{{ url_for('dashboard') }}" class="action-card">
+      <div class="ac-icon" style="background:rgba(0,229,255,.1);color:var(--accent);"><i class="bi bi-people"></i></div>
+      <div class="ac-title">Students & Faculty</div>
+      <div class="ac-desc">Directory of enrolled students and faculty. Click any card to view profile and attendance.</div>
+      <div class="ac-hint"><i class="bi bi-arrow-right"></i> Photo cards · Profile modal · Filters</div>
+    </a>
+  </div>
+  <div class="col-12 col-md-4">
+    <a href="{{ url_for('register') }}" class="action-card">
+      <div class="ac-icon" style="background:rgba(16,185,129,.1);color:var(--success);"><i class="bi bi-person-plus"></i></div>
+      <div class="ac-title">Enroll New Student</div>
+      <div class="ac-desc">Register a student and link their NFC card to the blockchain. Upload CvSU PDF for auto-fill.</div>
+      <div class="ac-hint"><i class="bi bi-arrow-right"></i> PDF auto-fill · NFC scan · On-chain record</div>
+    </a>
+  </div>
+  <div class="col-12 col-md-4">
+    <a href="{{ url_for('attendance_report') }}" class="action-card">
+      <div class="ac-icon" style="background:rgba(139,92,246,.1);color:#a78bfa;"><i class="bi bi-bar-chart"></i></div>
+      <div class="ac-title">Class Reports</div>
+      <div class="ac-desc">Attendance rate per student with Good / At Risk / Critical standing, filterable by program and year.</div>
+      <div class="ac-hint"><i class="bi bi-arrow-right"></i> Filter by program, year, standing</div>
+    </a>
+  </div>
+</div>
+
+{% if active_sessions %}
+<div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--success);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">// LIVE NOW</div>
+<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
+  {% for sid, s in active_sessions.items() %}
+  <div style="background:var(--surface);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;flex-shrink:0;"></div>
+      <div>
+        <div style="font-weight:600;font-size:13px;">{{ s.subject_name }}{% if s.course_code %} <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);">[{{ s.course_code }}]</span>{% endif %}</div>
+        <div style="font-size:11px;color:var(--muted);">{{ s.section_key.replace('|',' · ') }} · {{ s.teacher_name }}</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-family:'Space Mono',monospace;font-size:12px;color:var(--success);">{{ s.present|length }} present</span>
+      <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-export-sm" style="border-color:rgba(16,185,129,.3);color:var(--success);"><i class="bi bi-eye"></i> Monitor</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script>
+const COLORS={present:'#10b981',late:'#f59e0b',absent:'#ef4444',excused:'#60a5fa'};
+let curPeriod='today', curParamStr='', rawData=null;
+
+const donutChart=new Chart(document.getElementById('donutChart'),{
+  type:'doughnut',
+  data:{labels:['Present','Late','Absent','Excused'],datasets:[{data:[0,0,0,0],backgroundColor:[COLORS.present,COLORS.late,COLORS.absent,COLORS.excused],borderColor:'#1a1d24',borderWidth:3,hoverOffset:6}]},
+  options:{responsive:true,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const t=ctx.dataset.data.reduce((a,b)=>a+b,0);return ` ${ctx.label}: ${ctx.parsed} (${t?Math.round(ctx.parsed/t*100):0}%)`;}}}}}
+});
+
+const trendChart=new Chart(document.getElementById('trendChart'),{
+  type:'bar',
+  data:{labels:[],datasets:[
+    {label:'Present',data:[],backgroundColor:COLORS.present+'cc',borderRadius:3,borderSkipped:false},
+    {label:'Late',   data:[],backgroundColor:COLORS.late   +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Absent', data:[],backgroundColor:COLORS.absent +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Excused',data:[],backgroundColor:COLORS.excused+'cc',borderRadius:3,borderSkipped:false},
+  ]},
+  options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10,boxHeight:10}},tooltip:{mode:'index',intersect:false}},
+    scales:{x:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+            y:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:10}},grid:{color:'rgba(255,255,255,.06)'},beginAtZero:true}}}
+});
+
+const subjChart=new Chart(document.getElementById('subjChart'),{
+  type:'bar',
+  data:{labels:[],datasets:[
+    {label:'Present',data:[],backgroundColor:COLORS.present+'cc',borderRadius:3,borderSkipped:false},
+    {label:'Late',   data:[],backgroundColor:COLORS.late   +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Absent', data:[],backgroundColor:COLORS.absent +'cc',borderRadius:3,borderSkipped:false},
+    {label:'Excused',data:[],backgroundColor:COLORS.excused+'cc',borderRadius:3,borderSkipped:false},
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+    plugins:{legend:{labels:{color:'#94a3b8',font:{family:'DM Sans',size:11},boxWidth:10,boxHeight:10}},tooltip:{mode:'index',intersect:false}},
+    scales:{x:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:10}},grid:{color:'rgba(255,255,255,.04)'},beginAtZero:true},
+            y:{stacked:true,ticks:{color:'#64748b',font:{family:'Space Mono',size:10}},grid:{color:'rgba(255,255,255,.06)'}}}}
+});
+
+function setLoading(on){
+  ['donutLoading','trendLoading','subjLoading'].forEach(id=>{
+    document.getElementById(id).style.display=on?'flex':'none';
+  });
+}
+
+async function loadStats(period,extra){
+  setLoading(true);
+  const params=new URLSearchParams({period});
+  if(extra) for(const [k,v] of Object.entries(extra)) if(v) params.append(k,v);
+  curParamStr=params.toString();
+  try{
+    const r=await fetch(`/api/attendance/stats?${curParamStr}`);
+    rawData=await r.json();
+    renderAll(rawData);
+  }catch(e){console.warn(e);}
+  setLoading(false);
+}
+
+function renderAll(data){
+  const d=data.donut;
+  const total=d.present+d.late+d.absent+d.excused;
+  document.getElementById('sc_present').textContent=d.present;
+  document.getElementById('sc_late').textContent=d.late;
+  document.getElementById('sc_absent').textContent=d.absent;
+  document.getElementById('sc_excused').textContent=d.excused;
+  document.getElementById('sessionCountBadge').textContent=
+    `${data.session_count} session${data.session_count!==1?'s':''} · ${data.period}`;
+  document.getElementById('exportBtn').href=`/export/stats.csv?${curParamStr}`;
+
+  if(!total){document.getElementById('donutNoData').classList.add('show');}
+  else{
+    document.getElementById('donutNoData').classList.remove('show');
+    donutChart.data.datasets[0].data=[d.present,d.late,d.absent,d.excused];
+    donutChart.update('active');
+    ['present','late','absent','excused'].forEach(k=>{
+      document.getElementById('leg_'+k).textContent=d[k];
+      document.getElementById('pct_'+k).textContent=total?`(${Math.round(d[k]/total*100)}%)`:'';
+    });
+  }
+
+  // Rebuild subject dropdown for trend
+  const sel=document.getElementById('tf_subject');
+  const cur=sel.value;
+  while(sel.options.length>1) sel.remove(1);
+  (data.all_subjects||[]).forEach(s=>{sel.add(new Option(s.length>38?s.substring(0,36)+'…':s,s));});
+  if(cur) sel.value=cur;
+
+  renderTrend(data);
+  renderSubject(data);
+}
+
+function renderTrend(data){
+  const keys=Object.keys(data.trend||{});
+  document.getElementById('trendNoData').classList.toggle('show',keys.length===0);
+  if(!keys.length) return;
+  trendChart.data.labels=keys;
+  ['present','late','absent','excused'].forEach((k,i)=>{
+    trendChart.data.datasets[i].data=keys.map(key=>(data.trend[key]||{})[k]||0);
+  });
+  trendChart.update('active');
+}
+
+function applyTrendFilter(){
+  const extra={
+    subject:document.getElementById('tf_subject').value,
+    section_key:document.getElementById('tf_section').value,
+    year_level:document.getElementById('tf_year').value,
+    instructor:document.getElementById('tf_instructor').value,
+  };
+  loadStats(curPeriod,extra);
+}
+
+function resetTrendFilter(){
+  ['tf_subject','tf_section','tf_year','tf_instructor'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  loadStats(curPeriod);
+}
+
+function renderSubject(data){
+  let entries=Object.entries(data.subjects||{});
+  const course=document.getElementById('sf_course').value;
+  const status=document.getElementById('sf_status').value;
+  const sortBy=document.getElementById('sf_sort').value;
+  if(course==='BS Computer Science') entries=entries.filter(([k])=>k.toLowerCase().includes('cs')||k.toLowerCase().includes('computer'));
+  else if(course==='BS Information Technology') entries=entries.filter(([k])=>k.toLowerCase().includes('it')||k.toLowerCase().includes('info'));
+  if(sortBy==='present_desc') entries.sort((a,b)=>b[1].present-a[1].present);
+  else if(sortBy==='absent_desc') entries.sort((a,b)=>b[1].absent-a[1].absent);
+  else if(sortBy==='sessions_desc') entries.sort((a,b)=>b[1].sessions-a[1].sessions);
+  else entries.sort((a,b)=>a[0].localeCompare(b[0]));
+  const keys=entries.map(([k])=>k);
+  const vals=entries.map(([,v])=>v);
+  const shortKeys=keys.map(k=>k.length>26?k.substring(0,24)+'…':k);
+  document.getElementById('subjNoData').classList.toggle('show',keys.length===0);
+  if(!keys.length) return;
+
+  // Dynamically size the canvas based on number of subjects
+  const barH=36;
+  const canvasH=Math.max(160, keys.length*barH+60);
+  const scroll=document.getElementById('subjChartScroll');
+  const area=document.getElementById('subjChartArea');
+  subjChart.canvas.style.height=canvasH+'px';
+  subjChart.canvas.height=canvasH;
+
+  subjChart.data.labels=shortKeys;
+  const idx={present:0,late:1,absent:2,excused:3};
+  subjChart.data.datasets[0].data=vals.map(v=>v.present||0);
+  subjChart.data.datasets[1].data=vals.map(v=>v.late||0);
+  subjChart.data.datasets[2].data=vals.map(v=>v.absent||0);
+  subjChart.data.datasets[3].data=vals.map(v=>v.excused||0);
+  if(status!=='all'&&status){
+    subjChart.data.datasets.forEach((d,i)=>{d.hidden=(i!==idx[status]);});
+  } else {
+    subjChart.data.datasets.forEach(d=>d.hidden=false);
+  }
+  subjChart.update('active');
+}
+
+function applySubjectFilter(){if(rawData)renderSubject(rawData);}
+function resetSubjectFilter(){
+  ['sf_course','sf_status','sf_sort'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='sf_sort'?'name':id==='sf_status'?'all':'';});
+  if(rawData)renderSubject(rawData);
+}
+
+// ── Period switching ──
+function switchPeriod(p,btn){
+  curPeriod=p;
+  document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  // Show/hide pickers
+  document.getElementById('monthPicker').classList.toggle('show',p==='month');
+  document.getElementById('yearPicker').classList.toggle('show',p==='year');
+  if(p!=='month'&&p!=='year') loadStats(p);
+}
+
+function applyPeriodPick(){
+  if(curPeriod==='month'){
+    const m=document.getElementById('pickMonth').value;
+    const y=document.getElementById('pickMonthYear').value;
+    loadStats('month',{month:m,year_num:y});
+  } else if(curPeriod==='year'){
+    const y=document.getElementById('pickYear').value;
+    loadStats('year',{year_num:y});
+  }
+}
+
+// Set month picker default to current month
+(function(){
+  const now=new Date();
+  document.getElementById('pickMonth').value=now.getMonth()+1;
+})();
+
+function switchChart(id,btn){
+  document.querySelectorAll('.chart-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ctab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='trend'){trendChart.resize();}
+  if(id==='subject'){subjChart.update();}
+}
+
+loadStats('today');
+fetch('/api/block_number').then(r=>r.json()).then(d=>{
+  if(d.block!==undefined)document.getElementById('blockNum').textContent=d.block;
+}).catch(()=>{});
+setInterval(()=>loadStats(curPeriod),30000);
+</script>
+{% endblock %}

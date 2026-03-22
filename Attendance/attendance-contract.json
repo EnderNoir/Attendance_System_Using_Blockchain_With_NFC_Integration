@@ -1,5 +1,5 @@
 {
-  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
   "abi": [
     {
       "type": "constructor",
@@ -19,16 +19,6 @@
         {
           "type": "uint256",
           "name": "timestamp",
-          "indexed": false
-        },
-        {
-          "type": "uint8",
-          "name": "status",
-          "indexed": false
-        },
-        {
-          "type": "string",
-          "name": "statusLabel",
           "indexed": false
         }
       ]
@@ -52,58 +42,6 @@
           "type": "string",
           "name": "name",
           "indexed": false
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "name": "STATUS_ABSENT",
-      "constant": true,
-      "stateMutability": "view",
-      "payable": false,
-      "inputs": [],
-      "outputs": [
-        {
-          "type": "uint8"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "name": "STATUS_EXCUSED",
-      "constant": true,
-      "stateMutability": "view",
-      "payable": false,
-      "inputs": [],
-      "outputs": [
-        {
-          "type": "uint8"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "name": "STATUS_LATE",
-      "constant": true,
-      "stateMutability": "view",
-      "payable": false,
-      "inputs": [],
-      "outputs": [
-        {
-          "type": "uint8"
-        }
-      ]
-    },
-    {
-      "type": "function",
-      "name": "STATUS_PRESENT",
-      "constant": true,
-      "stateMutability": "view",
-      "payable": false,
-      "inputs": [],
-      "outputs": [
-        {
-          "type": "uint8"
         }
       ]
     },
@@ -140,8 +78,8 @@
           "name": "timestamp"
         },
         {
-          "type": "uint8",
-          "name": "status"
+          "type": "bool",
+          "name": "present"
         }
       ]
     },
@@ -162,7 +100,7 @@
           "type": "uint256[]"
         },
         {
-          "type": "uint8[]"
+          "type": "bool[]"
         }
       ]
     },
@@ -175,23 +113,6 @@
         {
           "type": "string",
           "name": "_nfcId"
-        }
-      ],
-      "outputs": []
-    },
-    {
-      "type": "function",
-      "name": "markAttendanceWithStatus",
-      "constant": false,
-      "payable": false,
-      "inputs": [
-        {
-          "type": "string",
-          "name": "_nfcId"
-        },
-        {
-          "type": "uint8",
-          "name": "_status"
         }
       ],
       "outputs": []

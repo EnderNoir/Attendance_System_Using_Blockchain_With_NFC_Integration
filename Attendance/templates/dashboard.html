@@ -1,370 +1,395 @@
-{% extends "base.html" %} {% block content %}
-<!-- Page Header -->
-<div style="margin-top: 2rem; margin-bottom: 3rem">
-  <div
-    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem"
-  >
-    <div
-      style="
-        background: rgba(102, 126, 234, 0.1);
-        width: 50px;
-        height: 50px;
-        border-radius: 0.75rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      "
-    >
-      <i class="bi bi-graph-up" style="font-size: 1.8rem; color: #667eea"></i>
+{% extends "base.html" %}
+{% block title %}Students & Faculty — DAVS{% endblock %}
+{% block page_title %}STUDENTS & FACULTY{% endblock %}
+{% block content %}
+<style>
+/* Tabs */
+.tab-row{display:flex;gap:4px;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;}
+.tab-btn{flex:1;padding:9px;border:none;background:transparent;color:var(--muted);border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;}
+.tab-btn.active{background:rgba(45,106,39,.1);color:var(--accent);}
+.tab-pane{display:none;}.tab-pane.active{display:block;}
+
+/* Filter bar */
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
+.fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;}
+.fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.fs{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 11px;font-size:12px;font-family:'DM Sans',sans-serif;appearance:none;transition:border-color .2s;}
+.fs:focus{outline:none;border-color:var(--accent);}
+.btn-rst{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 13px;font-size:12px;cursor:pointer;align-self:flex-end;transition:all .2s;}
+.btn-rst:hover{border-color:var(--danger);color:var(--danger);}
+
+/* Person row */
+.person-row{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:14px;margin-bottom:8px;transition:border-color .2s;}
+.person-row:hover{border-color:rgba(45,106,39,.3);}
+.prow-name{font-weight:700;font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.prow-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.btn-vr{background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);color:var(--accent);font-weight:600;border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .2s;flex-shrink:0;white-space:nowrap;}
+.btn-vr:hover{background:rgba(45,106,39,.18);}
+
+/* Pills */
+.pill-a{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(124,58,237,.15);color:#a78bfa;border:1px solid rgba(124,58,237,.2);}
+.pill-t{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(45,106,39,.12);color:var(--accent);border:1px solid rgba(45,106,39,.2);}
+.pill-ok{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(45,106,39,.1);color:var(--success);border:1px solid rgba(45,106,39,.2);}
+.pill-pend{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(245,197,24,.1);color:var(--warning);border:1px solid rgba(245,197,24,.2);}
+.pill-rej{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(192,57,43,.1);color:var(--danger);border:1px solid rgba(192,57,43,.2);}
+
+/* Modal overlay */
+.upd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s;}
+.upd-overlay.show{opacity:1;pointer-events:all;}
+.upd-box{background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:660px;width:96%;max-height:92vh;overflow-y:auto;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);scrollbar-width:thin;}
+.upd-overlay.show .upd-box{transform:scale(1);}
+.upd-box::-webkit-scrollbar{width:4px;}
+.upd-box::-webkit-scrollbar-thumb{background:rgba(45,106,39,.2);border-radius:99px;}
+
+/* Modal header */
+.upd-topbar{padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.upd-topbar h3{font-size:15px;font-weight:700;margin:0;}
+.upd-topbar p{font-size:11px;color:var(--muted);margin:2px 0 0;}
+
+/* Modal tabs */
+.modal-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 22px;}
+.mtab{padding:10px 16px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;}
+.mtab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.mpane{display:none;padding:18px 22px 20px;}.mpane.active{display:block;}
+
+/* Form fields */
+.upd-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;}
+.upd-grid.g1{grid-template-columns:1fr;}
+@media(max-width:520px){.upd-grid{grid-template-columns:1fr;}}
+.upd-field{display:flex;flex-direction:column;gap:4px;}
+.upd-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.upd-input{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:8px 12px;font-size:13px;font-family:'DM Sans',sans-serif;width:100%;transition:all .2s;}
+.upd-input:focus{outline:none;border-color:var(--accent);}
+.upd-input[readonly]{opacity:.5;cursor:not-allowed;}
+.sec-title{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+
+/* Session log */
+.sess-filter-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;}
+.sess-log-wrap{max-height:280px;overflow-y:auto;scrollbar-width:thin;}
+.sess-log-wrap::-webkit-scrollbar{width:4px;}
+.sess-log-wrap::-webkit-scrollbar-thumb{background:rgba(45,106,39,.2);border-radius:99px;}
+.sess-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.sess-item:last-child{border-bottom:none;}
+.status-badge{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0;}
+.sb-present{background:rgba(45,106,39,.12);color:var(--success);border:1px solid rgba(45,106,39,.25);}
+.sb-late{background:rgba(245,158,11,.1);color:var(--warning);border:1px solid rgba(245,158,11,.25);}
+.sb-absent{background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2);}
+.sb-excused{background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.2);}
+.tx-chip{font-family:'Space Mono',monospace;font-size:9px;color:rgba(45,106,39,.6);background:rgba(45,106,39,.05);border:1px solid rgba(45,106,39,.1);border-radius:5px;padding:2px 6px;margin-top:3px;display:inline-block;word-break:break-all;}
+
+/* Modal footer */
+.upd-footer{padding:14px 22px 18px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;justify-content:flex-end;}
+.upd-msg{font-size:12px;flex:1;}
+
+/* Photo upload block */
+.photo-upload-block{background:rgba(45,106,39,.04);border:1px dashed rgba(45,106,39,.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;}
+.photo-avatar-preview{width:64px;height:64px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);cursor:pointer;}
+
+/* Section checkbox grid (for teacher edit tab) */
+.section-course-block{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;}
+.section-course-header{padding:10px 14px;background:rgba(45,106,39,.06);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;}
+.section-course-title{font-size:13px;font-weight:700;}
+.btn-select-all{background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;}
+.btn-select-all:hover{border-color:var(--accent);color:var(--accent);}
+.year-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.year-row:last-child{border-bottom:none;}
+.year-label{font-size:12px;font-weight:500;min-width:70px;}
+.sec-checks{display:flex;gap:7px;flex-wrap:wrap;}
+.sec-cb-wrap{position:relative;}
+.sec-cb-wrap input{position:absolute;opacity:0;width:0;height:0;}
+.sec-cb-wrap label{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);transition:all .2s;font-family:'Space Mono',monospace;}
+.sec-cb-wrap label:hover{border-color:var(--accent);color:var(--text);}
+.sec-cb-wrap input:checked + label{border-color:var(--accent);background:rgba(45,106,39,.12);color:var(--accent);}
+</style>
+
+<!-- Update Modal -->
+<div class="upd-overlay" id="updModal" onclick="if(event.target===this)closeUpdModal()">
+  <div class="upd-box" id="updBox">
+    <input type="file" id="updPhotoInput" accept="image/*" style="display:none" onchange="handleUpdPhoto(this)">
+
+    <div class="upd-topbar">
+      <div>
+        <h3 id="updTitle">—</h3>
+        <p id="updSub">—</p>
+      </div>
+      <button onclick="closeUpdModal()" style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;"><i class="bi bi-x-lg"></i></button>
     </div>
-    <div>
-      <h2 style="margin: 0; font-weight: 700">Student Dashboard</h2>
-      <p style="margin: 0.5rem 0 0 0; color: #6c757d">
-        Manage all registered students and view attendance
-      </p>
+
+    <div class="modal-tabs" id="modalTabs">
+      <button class="mtab active" onclick="switchMTab('info',this)"><i class="bi bi-person-lines-fill"></i> Info</button>
+      <button class="mtab" onclick="switchMTab('edit',this)"><i class="bi bi-pencil-square"></i> Update</button>
+      <button class="mtab" onclick="switchMTab('sessions',this)"><i class="bi bi-journal-text"></i> Sessions</button>
+    </div>
+
+    <div class="mpane active" id="mpane-info">
+      <div id="infoContent"></div>
+    </div>
+
+    <div class="mpane" id="mpane-edit">
+      <div id="editContent"></div>
+      <div class="upd-footer">
+        <span class="upd-msg" id="updMsg" style="display:none;"></span>
+        <button class="btn-outline" onclick="closeUpdModal()"><i class="bi bi-x"></i> Cancel</button>
+        <button class="btn-primary" id="updSaveBtn" onclick="saveUpdate()"><i class="bi bi-check-circle-fill"></i> Update</button>
+      </div>
+    </div>
+
+    <div class="mpane" id="mpane-sessions">
+      <div class="sess-filter-bar">
+        <div class="fg" style="flex:2;min-width:140px;">
+          <span class="fl"><i class="bi bi-search"></i> Search</span>
+          <input type="text" class="upd-input" id="sessSearch" placeholder="Subject, instructor…" oninput="filterSessions()" style="appearance:none;"/>
+        </div>
+        <div class="fg">
+          <span class="fl">Status</span>
+          <select class="upd-input" id="sessStatus" onchange="filterSessions()" style="appearance:none;">
+            <option value="">All</option>
+            <option value="present">Present</option>
+            <option value="late">Late</option>
+            <option value="absent">Absent</option>
+            <option value="excused">Excused</option>
+          </select>
+        </div>
+        <div class="fg">
+          <span class="fl">Subject</span>
+          <select class="upd-input" id="sessSubject" onchange="filterSessions()" style="appearance:none;">
+            <option value="">All Subjects</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;align-self:flex-end;">
+          <button class="btn-rst" onclick="resetSessFilters()" title="Reset"><i class="bi bi-x-circle"></i></button>
+          <button class="btn-primary" id="sessExportBtn" onclick="exportStudentSessions()" style="padding:7px 12px;font-size:12px;" title="Export to Excel">
+            <i class="bi bi-file-earmark-excel"></i> Export
+          </button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;" id="sessCountLabel">Loading…</div>
+      <div class="sess-log-wrap" id="sessLogWrap">
+        <div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;">
+          <div style="width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;"></div>
+          Loading sessions…
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Stats Cards -->
-{% if students %}
+<!-- Stats row -->
 <div class="row g-3 mb-4">
-  <div class="col-sm-6 col-md-3">
-    <div
-      style="
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 0.75rem;
-        padding: 1.5rem;
-        color: white;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-      "
-    >
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <div>
-          <small style="opacity: 0.9">Total Students</small>
-          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">
-            {{ students|length }}
-          </h3>
-        </div>
-        <i class="bi bi-people-fill" style="font-size: 2rem; opacity: 0.3"></i>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-md-3">
-    <div
-      style="
-        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        border-radius: 0.75rem;
-        padding: 1.5rem;
-        color: white;
-        box-shadow: 0 4px 12px rgba(17, 153, 142, 0.2);
-      "
-    >
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <div>
-          <small style="opacity: 0.9">Active Now</small>
-          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">0</h3>
-        </div>
-        <i
-          class="bi bi-person-check-fill"
-          style="font-size: 2rem; opacity: 0.3"
-        ></i>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-md-3">
-    <div
-      style="
-        background: linear-gradient(135deg, #f39c12 0%, #f8b500 100%);
-        border-radius: 0.75rem;
-        padding: 1.5rem;
-        color: white;
-        box-shadow: 0 4px 12px rgba(243, 156, 18, 0.2);
-      "
-    >
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <div>
-          <small style="opacity: 0.9">Today</small>
-          <h3 style="margin: 0; font-size: 2rem; font-weight: 700">-</h3>
-        </div>
-        <i class="bi bi-calendar-day" style="font-size: 2rem; opacity: 0.3"></i>
-      </div>
-    </div>
-  </div>
-  <div class="col-sm-6 col-md-3">
-    <div
-      style="
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 0.75rem;
-        padding: 1.5rem;
-        color: white;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-      "
-    >
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <div>
-          <small style="opacity: 0.9">NFC Listener</small>
-          <h3 style="margin: 0; font-size: 1.3rem; font-weight: 700">
-            <span style="color: #38ef7d">●</span> Active
-          </h3>
-        </div>
-        <i class="bi bi-wifi" style="font-size: 2rem; opacity: 0.3"></i>
-      </div>
-    </div>
-  </div>
+  <div class="col-6 col-md-3"><div class="stat-chip"><div class="card-icon cyan"><i class="bi bi-people"></i></div><div><div class="value">{{ students|length }}</div><div class="label">Enrolled Students</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-chip"><div class="card-icon purple"><i class="bi bi-person-badge"></i></div><div><div class="value">{{ teachers|length }}</div><div class="label">Faculty Members</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-chip"><div class="card-icon amber"><i class="bi bi-boxes"></i></div><div><div class="value" id="blockNum">—</div><div class="label">Block Height</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-chip"><div class="card-icon green"><i class="bi bi-database-check"></i></div><div><div class="value">SQLite</div><div class="label">+ Blockchain</div></div></div></div>
 </div>
-{% endif %}
 
-<!-- Search Section -->
-<div
-  style="
-    background: white;
-    border-radius: 1rem;
-    padding: 1.5rem;
-    margin-bottom: 2rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  "
->
-  <div class="row g-2 align-items-end">
-    <div class="col-sm-6 col-lg-4">
-      <label
-        for="searchInput"
-        style="
-          display: block;
-          font-weight: 600;
-          margin-bottom: 0.5rem;
-          color: #2c3e50;
-        "
-      >
-        <i
-          class="bi bi-search"
-          style="color: #667eea; margin-right: 0.5rem"
-        ></i>
-        Search Students
-      </label>
-      <input
-        type="text"
-        id="searchInput"
-        class="form-control"
-        placeholder="Name or NFC ID..."
-        style="
-          border-radius: 0.5rem;
-          border: 2px solid #dee2e6;
-          padding: 0.75rem 1rem;
-        "
-      />
+<!-- Tabs -->
+<div class="tab-row">
+  <button class="tab-btn active" onclick="switchTab('students',this)"><i class="bi bi-people"></i> Students ({{ students|length }})</button>
+  <button class="tab-btn" onclick="switchTab('faculty',this)"><i class="bi bi-person-badge"></i> Faculty ({{ teachers|length }})</button>
+</div>
+
+<!-- ══ STUDENTS TAB ══ -->
+<div class="tab-pane active" id="tab-students">
+  <div class="filter-bar">
+    <div class="fg" style="flex:2;min-width:180px;">
+      <span class="fl"><i class="bi bi-search"></i> Search</span>
+      <input type="text" class="fs" id="st_search" placeholder="Name or Student ID…" oninput="filterStudents()" style="appearance:none;"/>
     </div>
-    <div class="col-sm-6 col-lg-2">
-      <button class="btn btn-primary w-100" onclick="filterTable()">
-        <i class="bi bi-search"></i> Search
+    <div class="fg">
+      <span class="fl">Program</span>
+      <select class="fs" id="st_course" onchange="filterStudents()">
+        <option value="">All Programs</option>
+        <option value="BS Computer Science">BS Computer Science</option>
+        <option value="BS Information Technology">BS Information Technology</option>
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Year Level</span>
+      <select class="fs" id="st_year" onchange="filterStudents()">
+        <option value="">All Years</option>
+        <option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option>
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Section</span>
+      <select class="fs" id="st_section" onchange="filterStudents()">
+        <option value="">All</option>
+        <option>A</option><option>B</option><option>C</option><option>D</option>
+      </select>
+    </div>
+    <button class="btn-rst" onclick="resetStudentFilters()"><i class="bi bi-x-circle"></i> Reset</button>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="st_count">{{ students|length }} students</span>
+  </div>
+
+  <div style="max-height:600px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="studentList">
+    {% for s in students %}
+    <div class="person-row" id="strow_{{ loop.index0 }}"
+         data-name="{{ s.name|lower }}"
+         data-id="{{ (s.student_id or '')|lower }}"
+         data-course="{{ s.course or '' }}"
+         data-year="{{ s.year_level or '' }}"
+         data-section="{{ s.section or '' }}">
+      <div style="flex:1;min-width:0;">
+        <div class="prow-name">{{ s.name }}</div>
+      </div>
+      <button class="btn-vr" onclick="openStudentRecord({{ loop.index0 }})">
+        <i class="bi bi-eye"></i> View Record
       </button>
     </div>
-    <div class="col-sm-6 col-lg-2">
-      <button class="btn btn-secondary w-100" onclick="clearSearch()">
-        <i class="bi bi-arrow-clockwise"></i> Reset
+    {% else %}
+    <div style="text-align:center;padding:48px 20px;color:var(--muted);">
+      <i class="bi bi-person-x" style="font-size:36px;opacity:.2;display:block;margin-bottom:10px;"></i>
+      No students enrolled yet.
+      <a href="{{ url_for('register') }}" style="color:var(--accent);display:block;margin-top:6px;">Enroll the first →</a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ══ FACULTY TAB ══ -->
+<div class="tab-pane" id="tab-faculty">
+  <div class="filter-bar">
+    <div class="fg" style="flex:2;min-width:180px;">
+      <span class="fl"><i class="bi bi-search"></i> Search</span>
+      <input type="text" class="fs" id="tc_search" placeholder="Name or username…" oninput="filterTeachers()" style="appearance:none;"/>
+    </div>
+    <div class="fg">
+      <span class="fl">Role</span>
+      <select class="fs" id="tc_role" onchange="filterTeachers()">
+        <option value="">All Roles</option>
+        <option value="admin">Admin</option>
+        <option value="teacher">Teacher</option>
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Status</span>
+      <select class="fs" id="tc_status" onchange="filterTeachers()">
+        <option value="">All</option>
+        <option value="approved">Active</option>
+        <option value="pending">Pending</option>
+        <option value="rejected">Rejected</option>
+      </select>
+    </div>
+    <button class="btn-rst" onclick="resetTeacherFilters()"><i class="bi bi-x-circle"></i> Reset</button>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="tc_count">{{ teachers|length }} faculty</span>
+  </div>
+
+  <div style="max-height:600px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="facultyList">
+    {% for username, u in teachers.items() %}
+    <div class="person-row" id="tcrow_{{ username }}"
+         data-name="{{ u.full_name|lower }}"
+         data-username="{{ username|lower }}"
+         data-role="{{ u.role }}"
+         data-status="{{ u.status|default('pending') }}">
+      <div style="flex:1;min-width:0;">
+        <div class="prow-name">{{ u.full_name }}</div>
+        <div class="prow-sub" style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
+          <code style="font-size:10px;">@{{ username }}</code>
+          <span class="{{ 'pill-a' if u.role=='admin' else 'pill-t' }}">{{ u.role|capitalize }}</span>
+          {% set st = u.status|default('pending') %}
+          <span class="{{ 'pill-ok' if st=='approved' else ('pill-pend' if st=='pending' else 'pill-rej') }}">{{ st|capitalize }}</span>
+        </div>
+      </div>
+      <button class="btn-vr" onclick="openTeacherRecord('{{ username }}')">
+        <i class="bi bi-eye"></i> View Record
       </button>
     </div>
+    {% else %}
+    <div style="text-align:center;padding:48px 20px;color:var(--muted);">
+      <i class="bi bi-person-badge" style="font-size:36px;opacity:.2;display:block;margin-bottom:10px;"></i>
+      No faculty accounts yet.
+    </div>
+    {% endfor %}
   </div>
 </div>
 
-<!-- Students Table -->
-<div
-  style="
-    background: white;
-    border-radius: 1rem;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  "
->
-  <div class="table-responsive">
-    <table class="table table-hover" id="studentTable" style="margin-bottom: 0">
-      <thead
-        style="
-          background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%);
-          color: white;
-        "
-      >
-        <tr>
-          <th style="padding: 1rem; border: none">
-            <i class="bi bi-person"></i> Name
-          </th>
-          <th style="padding: 1rem; border: none">
-            <i class="bi bi-nfc"></i> NFC ID
-          </th>
-          <th style="padding: 1rem; border: none">
-            <i class="bi bi-shield-lock"></i> Eth Address
-          </th>
-          <th style="padding: 1rem; border: none">
-            <i class="bi bi-link-45deg"></i> Tx Hash
-          </th>
-          <th style="padding: 1rem; border: none; text-align: center">
-            <i class="bi bi-eye"></i> Actions
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {% if students %} {% for student in students %}
-        <tr
-          style="
-            border-bottom: 1px solid #dee2e6;
-            transition: background-color 0.2s;
-          "
-        >
-          <td
-            style="
-              padding: 1.25rem 1rem;
-              vertical-align: middle;
-              font-weight: 600;
-            "
-          >
-            <i
-              class="bi bi-person-circle"
-              style="color: #667eea; margin-right: 0.5rem"
-            ></i>
-            {{ student.name }}
-          </td>
-          <td style="padding: 1.25rem 1rem; vertical-align: middle">
-            <code
-              style="
-                background: #f8f9fa;
-                padding: 0.3rem 0.6rem;
-                border-radius: 0.3rem;
-                font-size: 0.85rem;
-              "
-              >{{ student.nfcId }}</code
-            >
-          </td>
-          <td style="padding: 1.25rem 1rem; vertical-align: middle">
-            <small
-              style="color: #6c757d; font-family: 'Courier New', monospace"
-            >
-              {{ student.address[:10] }}...{{ student.address[-8:] }}
-            </small>
-          </td>
-          <td style="padding: 1.25rem 1rem; vertical-align: middle">
-            <a
-              href="https://etherscan.io/tx/{{ student.tx_hash }}"
-              target="_blank"
-              style="
-                color: #667eea;
-                text-decoration: none;
-                font-size: 0.85rem;
-                font-family: 'Courier New', monospace;
-              "
-            >
-              {{ student.tx_hash[:10] }}...
-              <i class="bi bi-box-arrow-up-right"></i>
-            </a>
-          </td>
-          <td
-            style="
-              padding: 1.25rem 1rem;
-              vertical-align: middle;
-              text-align: center;
-            "
-          >
-            <a
-              href="{{ url_for('view_attendance', nfc_id=student.nfcId) }}"
-              class="btn btn-sm btn-success"
-              style="white-space: nowrap"
-            >
-              <i class="bi bi-graph-up"></i> Attendance
-            </a>
-          </td>
-        </tr>
-        {% endfor %} {% else %}
-        <tr>
-          <td
-            colspan="5"
-            style="padding: 2rem; text-align: center; color: #6c757d"
-          >
-            <i
-              class="bi bi-inbox"
-              style="
-                font-size: 2rem;
-                margin-bottom: 0.5rem;
-                display: block;
-                opacity: 0.5;
-              "
-            ></i>
-            <strong>No students registered yet</strong>
-            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem">
-              <a
-                href="{{ url_for('register') }}"
-                style="color: #667eea; text-decoration: none"
-                >Register the first student</a
-              >
-            </p>
-          </td>
-        </tr>
-        {% endif %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Info Footer -->
-<div
-  style="
-    background: rgba(102, 126, 234, 0.05);
-    border-left: 4px solid #667eea;
-    border-radius: 0.5rem;
-    padding: 1.5rem;
-    margin-top: 2rem;
-  "
->
-  <p style="margin: 0; color: #6c757d; font-size: 0.95rem">
-    <i
-      class="bi bi-info-circle"
-      style="color: #667eea; margin-right: 0.5rem"
-    ></i>
-    Click "Attendance" to view detailed attendance history for any student. Data
-    is stored immutably on the blockchain.
-  </p>
-</div>
-
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 <script>
-  // Functions loaded from external JS
-  function filterTable() {
-    let input = document.getElementById("searchInput").value.toLowerCase();
-    let rows = document.querySelectorAll("#studentTable tbody tr");
-    let visibleCount = 0;
+const studentData = [
+  {% for s in students %}
+  {
+    idx:{{ loop.index0 }}, nfc:"{{ s.nfcId }}",
+    name:"{{ s.name|e }}", sid:"{{ s.student_id or '' }}",
+    course:"{{ s.course or '' }}", year:"{{ s.year_level or '' }}",
+    section:"{{ s.section or '' }}", major:"{{ s.major or 'N/A' }}",
+    adviser:"{{ s.adviser or '' }}", email:"{{ s.email or '' }}",
+    contact:"{{ s.contact or '' }}", semester:"{{ s.semester or '' }}",
+    sy:"{{ s.school_year or '' }}", datereg:"{{ s.date_registered or '' }}",
+    photo:"{{ photos_db.get(s.nfcId,'') if photos_db is defined else '' }}"
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
 
-    rows.forEach((row) => {
-      if (row.cells.length === 5) {
-        let name = row.cells[0].innerText.toLowerCase();
-        let nfcId = row.cells[1].innerText.toLowerCase();
-        if (name.includes(input) || nfcId.includes(input)) {
-          row.style.display = "";
-          visibleCount++;
-        } else {
-          row.style.display = "none";
-        }
+const teacherData = {
+  {% for username, u in teachers.items() %}
+  "{{ username }}":{
+    username:"{{ username }}", name:"{{ u.full_name|e }}",
+    email:"{{ u.email or '' }}", role:"{{ u.role }}",
+    status:"{{ u.status|default('pending') }}",
+    created:"{{ u.created_at or '' }}",
+    sections:{{ u.sections|tojson }},
+    photo:"{{ photos_db.get(username,'') if photos_db is defined else '' }}"
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+};
+
+let curMode=null, curId=null, allSessions=[];
+
+// ── Modal open / close (required by openStudentRecord and openTeacherRecord) ──
+function openUpdModal() {
+  document.getElementById('updModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+function closeUpdModal() {
+  document.getElementById('updModal').classList.remove('show');
+  document.body.style.overflow = '';
+  // Reset message state
+  const msg = document.getElementById('updMsg');
+  if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+  const btn = document.getElementById('updSaveBtn');
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Update'; }
+}
+
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// FIX 1: switchMTab always reloads sessions when tab clicked — no allSessions guard
+function switchMTab(id, btn) {
+  document.querySelectorAll('.mpane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.mtab').forEach(b => b.classList.remove('active'));
+  document.getElementById('mpane-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'sessions' && curMode === 'student') {
+    loadStudentSessions(curId);
+  }
+}
+
+// FIX 2: Single authoritative loadStudentSessions definition
+function loadStudentSessions(nfcId) {
+  if (!nfcId) return;
+  const wrap  = document.getElementById('sessLogWrap');
+  const label = document.getElementById('sessCountLabel');
+  wrap.innerHTML = `<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;">
+    <div style="width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 8px;"></div>
+    Loading sessions…
+  </div>`;
+  if (label) label.textContent = 'Loading…';
+
+  fetch(`/api/student_sessions/${nfcId}`, { credentials: 'same-origin' })
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(data => {
+      allSessions = data;
+      const subjects = [...new Set(data.map(s => s.subject_name).filter(Boolean))].sort();
+      const sel = document.getElementById('sessSubject');
+      if (sel) {
+        sel.innerHTML = '<option value="">All Subjects</option>' +
+          subjects.map(s => `<option value="${s}">${s}</option>`).join('');
       }
       renderSessions(data);
     })
@@ -643,9 +668,23 @@ function buildSectionGrid(assignedSections) {
        + courseBlock('BS Information Technology','it',DASH_IT_YEARS);
 }
 
-  // Trigger filter as you type
-  document.getElementById("searchInput").addEventListener("keyup", filterTable);
-</script>
+function dashToggleAllSections(prefix, btn) {
+  const course = prefix === 'cs' ? 'BS Computer Science' : 'BS Information Technology';
+  const cbs = document.querySelectorAll('.dash-sec-cb[value^="' + course + '"]');
+  const allChk = [...cbs].every(c => c.checked);
+  cbs.forEach(c => c.checked = !allChk);
+  btn.textContent = allChk ? 'Select All' : 'Deselect All';
+}
+
+function getSelectedSections() {
+  return [...document.querySelectorAll('.dash-sec-cb:checked')].map(c => c.value);
+}
+
+// FIX 3: Teacher record — info pane uses buildSectionAccordion() from base.html
+function openTeacherRecord(username){
+  const u=teacherData[username];
+  if(!u) return;
+  curMode='teacher'; curId=username;
 
   document.getElementById('updTitle').textContent = u.name;
   document.getElementById('updSub').textContent   = u.role.charAt(0).toUpperCase()+u.role.slice(1)+' · '+u.status;

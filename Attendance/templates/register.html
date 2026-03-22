@@ -366,28 +366,6 @@
         resetButton();
       });
   }
-}
-
-function applyUID(uid) {
-  uid = uid.trim().toUpperCase();
-  if(!uid || uid.length < 4) return;
-
-  // Fill the hidden form field
-  document.getElementById('nfc_id').value = uid;
-
-  // Update the visible strip
-  const strip   = document.getElementById('nfcCardStrip');
-  const icon    = document.getElementById('nfcStripIcon');
-  const title   = document.getElementById('nfcStripTitle');
-  const sub     = document.getElementById('nfcStripSub');
-  const display = document.getElementById('nfcUidDisplay');
-
-  strip.className   = 'nfc-card-strip captured';
-  icon.textContent  = '✅';
-  title.textContent = 'Card Captured!';
-  sub.textContent   = 'NFC card UID recorded. Click Register to save.';
-  display.textContent   = uid;
-  display.className = 'nfc-uid-display has-uid';
 
   function pollForUID() {
     let attempts = 0;
@@ -442,36 +420,11 @@ function applyUID(uid) {
         .catch((err) => console.error("Polling error:", err));
     }, 500);
   }
-  if(e.key.length === 1) { nfcBuf += e.key; nfcHid.value = nfcBuf; }
-  nfcTimer = setTimeout(()=>{
-    const uid = nfcBuf.trim();
-    nfcBuf = ''; nfcHid.value = '';
-    if(uid) applyUID(uid);
-  }, NFC_TIMEOUT);
-});
-
-// Re-focus hidden input whenever user is not typing in a form field
-document.addEventListener('click', refocusNFC);
-nfcHid.addEventListener('blur', ()=>setTimeout(refocusNFC, 150));
-window.addEventListener('load', ()=>nfcHid.focus());
-nfcHid.focus();
 
   function resetButton() {
     const scanBtn = document.querySelector('button[onclick="scanNFC()"]');
     scanBtn.disabled = false;
     scanBtn.innerHTML = '<i class="bi bi-phone"></i> Scan';
   }
-  return ok;
-}
-
-document.addEventListener('DOMContentLoaded',()=>{
-  document.querySelectorAll('#registerForm .form-control').forEach(el=>{
-    el.addEventListener('input',()=>{
-      el.classList.remove('is-invalid');
-      const next=el.nextSibling;
-      if(next&&next.classList&&next.classList.contains('reg-err'))next.remove();
-    });
-  });
-});
 </script>
 {% endblock %}

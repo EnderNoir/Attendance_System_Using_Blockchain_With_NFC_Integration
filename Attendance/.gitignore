@@ -18,3 +18,20 @@
 
 # Hardhat coverage reports
 /coverage
+
+# dotenv environment variables file
+.env
+
+# Log files
+*.log
+
+# VSCode settings
+.vscode/
+
+# OS generated files
+.DS_Store
+
+# Python bytecode files
+__pycache__/
+*.pyc
+*.pyd

@@ -1746,7 +1746,8 @@ def parse_registration_pdf():
             clean = re.sub(r'\s+', ' ', clean)
             words = clean.split()
             if len(words) >= 2:
-                first_slug = re.sub(r'[^a-z]', '', words[0].lower())
+                # Combine all words except the last as first name(s)
+                first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
                 last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
                 if first_slug and last_slug:
                     result['email'] = f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'

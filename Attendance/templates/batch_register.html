@@ -1,0 +1,990 @@
+{% extends "base.html" %}
+{% block title %}Batch Enrollment — DAVS{% endblock %}
+{% block page_title %}BATCH STUDENT ENROLLMENT{% endblock %}
+{% block content %}
+<style>
+/* ── Layout ─────────────────────────────────────────────────────────── */
+.be-steps{display:flex;gap:0;margin-bottom:20px;background:var(--surface);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.be-step{flex:1;padding:12px 10px;text-align:center;font-size:12px;font-weight:600;
+  color:var(--muted);border-right:1px solid var(--border);transition:all .3s;position:relative;}
+.be-step:last-child{border-right:none;}
+.be-step.active{background:rgba(45,106,39,.08);color:var(--accent);}
+.be-step.done{background:rgba(45,106,39,.05);color:var(--success);}
+.be-step-num{width:22px;height:22px;border-radius:50%;background:var(--border);color:var(--muted);
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
+  margin-bottom:4px;}
+.be-step.active .be-step-num{background:var(--accent);color:#fff;}
+[data-theme="dark"] .be-step.active .be-step-num{color:#000;}
+.be-step.done .be-step-num{background:var(--success);color:#fff;}
+
+/* ── Upload Banner ───────────────────────────────────────────────────── */
+.upload-banner{background:rgba(45,106,39,.04);border:2px dashed rgba(45,106,39,.25);
+  border-radius:12px;padding:20px 24px;display:flex;align-items:center;gap:16px;
+  cursor:pointer;transition:all .25s;margin-bottom:18px;flex-wrap:wrap;}
+.upload-banner:hover,.upload-banner.dragover{border-color:var(--accent);background:rgba(45,106,39,.07);}
+.upload-banner.loading{border-color:var(--warning);border-style:solid;cursor:default;}
+.upload-banner.success{border-color:var(--success);border-style:solid;background:rgba(45,106,39,.05);}
+.upload-banner.error{border-color:var(--danger);border-style:solid;}
+.ub-icon{font-size:34px;flex-shrink:0;}
+.ub-text{flex:1;min-width:120px;}
+.ub-title{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;}
+.ub-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+.btn-upload{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;
+  padding:10px 18px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;white-space:nowrap;flex-shrink:0;}
+[data-theme="dark"] .btn-upload{color:#000;}
+.btn-upload:disabled{opacity:.6;cursor:not-allowed;}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:_spin .7s linear infinite;display:inline-block;}
+@keyframes _spin{to{transform:rotate(360deg);}}
+
+/* ── Phase panels ────────────────────────────────────────────────────── */
+.phase{display:none;}
+.phase.active{display:block;}
+
+/* ── Student table (Phase 1) ────────────────────────────────────────── */
+.st-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  overflow:hidden;margin-top:4px;}
+.st-table{width:100%;border-collapse:collapse;font-size:13px;}
+.st-table thead th{background:rgba(45,106,39,.09);color:var(--accent);font-size:10px;
+  font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:10px 12px;
+  text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);}
+.st-table tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
+.st-table tbody tr:last-child{border-bottom:none;}
+.st-table tbody tr:hover{background:rgba(45,106,39,.03);}
+.st-table tbody tr.row-current{background:rgba(45,106,39,.07);border-left:3px solid var(--accent);}
+.st-table tbody tr.row-done{opacity:.7;}
+.st-table tbody tr.row-skipped{opacity:.5;text-decoration:line-through;}
+.st-table td{padding:9px 12px;vertical-align:middle;}
+.order-badge{width:22px;height:22px;border-radius:50%;background:rgba(45,106,39,.12);
+  color:var(--accent);font-size:11px;font-weight:700;display:inline-flex;
+  align-items:center;justify-content:center;font-family:'Space Mono',monospace;}
+.row-done .order-badge{background:rgba(45,106,39,.2);}
+.nfc-chip{font-family:'Space Mono',monospace;font-size:11px;background:rgba(45,106,39,.08);
+  color:var(--accent);border:1px solid rgba(45,106,39,.2);border-radius:5px;
+  padding:2px 8px;display:inline-block;}
+.status-tag{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;
+  display:inline-block;white-space:nowrap;}
+.st-waiting{background:rgba(100,116,139,.1);color:var(--muted);border:1px solid var(--border);}
+.st-current{background:rgba(45,106,39,.12);color:var(--accent);border:1px solid rgba(45,106,39,.3);
+  animation:_stpulse 1.5s infinite;}
+.st-assigned{background:rgba(45,106,39,.12);color:var(--success);border:1px solid rgba(45,106,39,.3);}
+.st-skipped{background:rgba(192,57,43,.08);color:var(--danger);border:1px solid rgba(192,57,43,.2);}
+@keyframes _stpulse{0%,100%{opacity:1;}50%{opacity:.65;}}
+
+/* missing field badge */
+.miss-badge{font-size:10px;background:rgba(245,197,24,.1);color:var(--warning);
+  border:1px solid rgba(245,197,24,.3);border-radius:4px;padding:1px 5px;margin-left:4px;}
+
+/* Inline edit row */
+.inline-edit-row{background:rgba(45,106,39,.03);}
+.inline-edit-row td{padding:10px 12px;}
+.ie-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px 12px;}
+.ie-field{display:flex;flex-direction:column;gap:3px;}
+.ie-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.ie-input{background:var(--input-bg);border:1.5px solid var(--border);color:var(--text);
+  border-radius:6px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;
+  transition:border-color .2s;width:100%;}
+.ie-input:focus{outline:none;border-color:var(--accent);}
+.ie-input.warn{border-color:var(--warning);}
+.ie-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.btn-ie-save{background:var(--accent);color:#fff;border:none;border-radius:7px;
+  padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;gap:5px;}
+[data-theme="dark"] .btn-ie-save{color:#000;}
+.btn-ie-cancel{background:transparent;border:1px solid var(--border);color:var(--muted);
+  border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;}
+
+/* ── NFC Assignment Panel (Phase 2) ─────────────────────────────────── */
+.nfc-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  overflow:hidden;margin-bottom:20px;}
+.nfc-panel-header{background:rgba(45,106,39,.06);padding:16px 20px;
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.nfc-panel-body{padding:24px;}
+
+/* Current student card */
+.curr-card{border:2px solid var(--accent);border-radius:12px;padding:20px 24px;
+  background:rgba(45,106,39,.04);margin-bottom:20px;display:flex;align-items:center;gap:20px;
+  flex-wrap:wrap;}
+.curr-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;
+  color:#000;flex-shrink:0;}
+.curr-info{flex:1;min-width:0;}
+.curr-name{font-size:18px;font-weight:700;margin-bottom:4px;}
+.curr-meta{font-size:13px;color:var(--muted);margin-bottom:10px;}
+.curr-order{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);
+  background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.15);border-radius:5px;
+  padding:2px 8px;display:inline-block;}
+
+/* Tap zone */
+.tap-zone{border:2px dashed rgba(45,106,39,.25);border-radius:12px;padding:28px 20px;
+  text-align:center;transition:all .3s;background:rgba(45,106,39,.02);}
+.tap-zone.waiting{border-color:var(--accent);border-style:solid;
+  animation:_tapborder 1.5s infinite;}
+.tap-zone.scanned{border-color:var(--success);border-style:solid;background:rgba(45,106,39,.05);}
+@keyframes _tapborder{0%,100%{border-color:var(--accent);}50%{border-color:rgba(45,106,39,.25);}}
+.tap-icon{font-size:52px;margin-bottom:10px;display:block;}
+.tap-uid-display{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;
+  color:var(--success);background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);
+  border-radius:8px;padding:10px 20px;display:inline-block;margin:12px 0;
+  letter-spacing:2px;}
+
+/* Action buttons */
+.nfc-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:16px;}
+.btn-confirm-nfc{background:var(--success);color:#fff;border:none;border-radius:9px;
+  padding:11px 24px;font-size:14px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;gap:8px;transition:all .2s;}
+[data-theme="dark"] .btn-confirm-nfc{color:#000;}
+.btn-confirm-nfc:hover{filter:brightness(1.1);}
+.btn-confirm-nfc:disabled{opacity:.5;cursor:not-allowed;}
+.btn-skip-nfc{background:transparent;border:2px solid var(--border);color:var(--muted);
+  border-radius:9px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;transition:all .2s;}
+.btn-skip-nfc:hover{border-color:var(--warning);color:var(--warning);}
+.btn-undo-nfc{background:transparent;border:2px solid var(--border);color:var(--muted);
+  border-radius:9px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;transition:all .2s;}
+.btn-undo-nfc:hover{border-color:var(--accent);color:var(--accent);}
+.btn-undo-nfc:disabled{opacity:.4;cursor:not-allowed;}
+
+/* Duplicate NFC warning */
+.dup-warn{background:rgba(192,57,43,.08);border:1.5px solid rgba(192,57,43,.3);
+  border-radius:8px;padding:10px 14px;font-size:12px;color:var(--danger);
+  margin-top:10px;display:none;}
+.dup-warn.show{display:flex;align-items:center;gap:8px;}
+
+/* Progress strip */
+.prog-strip{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.prog-bar-outer{flex:1;min-width:120px;height:6px;background:var(--border);
+  border-radius:99px;overflow:hidden;}
+.prog-bar-inner{height:100%;background:var(--accent);border-radius:99px;transition:width .4s;}
+.prog-label{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;
+  font-family:'Space Mono',monospace;}
+
+/* ── Phase 3 — Summary ───────────────────────────────────────────────── */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;
+  margin-bottom:20px;}
+.sum-chip{border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;}
+.sum-chip.total{background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);}
+.sum-chip.assigned{background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);}
+.sum-chip.skipped{background:rgba(192,57,43,.06);border:1px solid rgba(192,57,43,.2);}
+.sum-val{font-family:'Space Mono',monospace;font-size:28px;font-weight:700;}
+.sum-lab{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600;}
+
+/* Result table */
+.res-table{width:100%;border-collapse:collapse;font-size:12px;}
+.res-table th{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.5px;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+.res-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.res-table tr:last-child td{border-bottom:none;}
+.res-table tr:nth-child(even) td{background:rgba(45,106,39,.02);}
+
+/* ── Utility ─────────────────────────────────────────────────────────── */
+.msg-box{border-radius:9px;padding:11px 14px;font-size:13px;font-weight:600;
+  display:flex;align-items:center;gap:9px;margin-bottom:12px;animation:_slideIn .3s ease;}
+.msg-box.error{background:rgba(192,57,43,.08);border:1.5px solid rgba(192,57,43,.25);color:var(--danger);}
+.msg-box.success{background:rgba(45,106,39,.08);border:1.5px solid rgba(45,106,39,.25);color:var(--success);}
+.msg-box.info{background:rgba(90,62,0,.08);border:1.5px solid rgba(90,62,0,.25);color:var(--warning);}
+@keyframes _slideIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+.section-title{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);
+  letter-spacing:2px;text-transform:uppercase;padding-bottom:8px;
+  border-bottom:1px solid var(--border);margin-bottom:16px;}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+.btn-row .btn-primary{flex:1;min-width:160px;justify-content:center;padding:12px;font-size:14px;}
+</style>
+
+<!-- Hidden NFC HID input — captures USB reader keystrokes globally -->
+<input id="nfcHidInput" type="text"
+  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+  tabindex="0"
+  style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;
+         pointer-events:none;border:none;outline:none;background:transparent;
+         color:transparent;z-index:-1;font-size:1px;"
+  aria-hidden="true"/>
+
+<!-- Page header -->
+<div style="margin-bottom:16px;">
+  <h2 style="font-size:20px;font-weight:700;margin-bottom:4px;">Batch Student Enrollment</h2>
+  <p style="font-size:13px;color:var(--muted);">
+    Upload multiple CvSU registration PDFs, review extracted data,
+    then assign NFC cards sequentially in alphabetical order.
+  </p>
+</div>
+
+<!-- Step indicator -->
+<div class="be-steps" id="beSteps">
+  <div class="be-step active" id="beStep1">
+    <div class="be-step-num">1</div>
+    <div>Upload &amp; Review PDFs</div>
+  </div>
+  <div class="be-step" id="beStep2">
+    <div class="be-step-num">2</div>
+    <div>Assign NFC Cards</div>
+  </div>
+  <div class="be-step" id="beStep3">
+    <div class="be-step-num">3</div>
+    <div>Register on Blockchain</div>
+  </div>
+</div>
+
+<!-- Messages -->
+<div id="msgBox"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PHASE 1 — Upload PDFs & Review
+═══════════════════════════════════════════════════════════ -->
+<div class="phase active" id="phase1">
+
+  <div class="upload-banner" id="uploadBanner"
+       ondragover="event.preventDefault();this.classList.add('dragover')"
+       ondragleave="this.classList.remove('dragover')"
+       ondrop="handleDrop(event)">
+    <div class="ub-icon" id="ubIcon">📄</div>
+    <div class="ub-text">
+      <div class="ub-title" id="ubTitle">Upload Multiple CvSU Registration PDFs</div>
+      <div class="ub-sub" id="ubSub">
+        Drop PDF files here or click to browse — students will be sorted alphabetically by surname
+      </div>
+    </div>
+    <button type="button" class="btn-upload" id="btnUpload"
+            onclick="document.getElementById('pdfFilesInput').click()">
+      <i class="bi bi-cloud-upload"></i> Select PDFs
+    </button>
+    <input type="file" id="pdfFilesInput" accept=".pdf" multiple
+           style="display:none;" onchange="handleFileSelect(this)">
+  </div>
+
+  <!-- Student review table (hidden until PDFs parsed) -->
+  <div id="reviewPanel" style="display:none;">
+    <div class="section-title">// Parsed Students — Sorted by Surname</div>
+
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+      <i class="bi bi-pencil-square"></i>
+      Click <strong>Edit</strong> on any row to fill in missing fields before NFC assignment.
+      Fields highlighted in orange are missing or incomplete.
+      All fields can also be edited after registration.
+    </p>
+
+    <div class="st-table-wrap">
+      <table class="st-table" id="studentTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Student Name</th>
+            <th>Student ID</th>
+            <th>Course</th>
+            <th>Year / Sec</th>
+            <th>Email</th>
+            <th>PDF File</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="studentTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="btn-row">
+      <button type="button" class="btn-primary" id="proceedBtn" onclick="proceedToNFC()">
+        <i class="bi bi-arrow-right-circle"></i> Proceed to NFC Assignment
+      </button>
+      <button type="button" class="btn-outline" onclick="resetAll()">
+        <i class="bi bi-arrow-counterclockwise"></i> Start Over
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PHASE 2 — NFC Assignment
+═══════════════════════════════════════════════════════════ -->
+<div class="phase" id="phase2">
+
+  <div class="nfc-panel">
+    <div class="nfc-panel-header">
+      <i class="bi bi-credit-card-2-front" style="font-size:22px;color:var(--accent);"></i>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;">NFC Card Assignment</div>
+        <div style="font-size:12px;color:var(--muted);">
+          Tap cards in order. Each tap is confirmed before advancing. Undo returns to the previous student.
+        </div>
+      </div>
+    </div>
+
+    <div class="nfc-panel-body">
+      <!-- Progress -->
+      <div class="prog-strip">
+        <div class="prog-bar-outer"><div class="prog-bar-inner" id="progBarInner" style="width:0%;"></div></div>
+        <div class="prog-label" id="progLabel">0 / 0</div>
+      </div>
+
+      <!-- Current student card -->
+      <div class="curr-card" id="currCard">
+        <div class="curr-avatar" id="currAvatar">?</div>
+        <div class="curr-info">
+          <div class="curr-name" id="currName">—</div>
+          <div class="curr-meta" id="currMeta">—</div>
+          <div class="curr-order" id="currOrder">Student 0 of 0</div>
+        </div>
+      </div>
+
+      <!-- Tap zone -->
+      <div class="tap-zone" id="tapZone">
+        <span class="tap-icon" id="tapIcon">💳</span>
+        <div style="font-size:15px;font-weight:700;margin-bottom:6px;" id="tapTitle">
+          Tap the NFC card for this student
+        </div>
+        <div style="font-size:13px;color:var(--muted);" id="tapSub">
+          Hold the card near the USB reader — the UID will appear automatically
+        </div>
+        <div id="uidDisplay" style="display:none;">
+          <div class="tap-uid-display" id="uidText">—</div>
+        </div>
+      </div>
+
+      <!-- Duplicate warning -->
+      <div class="dup-warn" id="dupWarn">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span id="dupWarnText">This NFC UID is already assigned to another student in this batch.</span>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="nfc-actions">
+        <button class="btn-confirm-nfc" id="btnConfirm" onclick="confirmAssignment()" disabled>
+          <i class="bi bi-check-lg"></i> Confirm &amp; Assign
+        </button>
+        <button class="btn-undo-nfc" id="btnUndo" onclick="undoAssignment()" disabled>
+          <i class="bi bi-arrow-counterclockwise"></i> Undo Previous
+        </button>
+        <button class="btn-skip-nfc" id="btnSkip" onclick="skipStudent()">
+          <i class="bi bi-skip-forward"></i> Skip This Student
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mini list of upcoming students -->
+  <div class="section-title">// Assignment Queue</div>
+  <div class="st-table-wrap">
+    <table class="st-table" id="queueTable">
+      <thead>
+        <tr><th>#</th><th>Student Name</th><th>Course / Year</th><th>NFC Card</th><th>Status</th></tr>
+      </thead>
+      <tbody id="queueTbody"></tbody>
+    </table>
+  </div>
+
+  <div class="btn-row" style="margin-top:16px;">
+    <button type="button" class="btn-outline" onclick="goBack()">
+      <i class="bi bi-arrow-left"></i> Back to Review
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PHASE 3 — Summary & Register
+═══════════════════════════════════════════════════════════ -->
+<div class="phase" id="phase3">
+  <div class="section-title">// Assignment Summary</div>
+
+  <div class="summary-grid" id="summaryGrid"></div>
+
+  <!-- Subjects found across all PDFs -->
+  <div id="subjectSummaryBox" style="display:none;margin-bottom:18px;">
+    <div class="section-title">// Subjects Found in PDFs — Will Be Added to Catalogue</div>
+    <div style="background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.15);
+                border-radius:10px;padding:12px 14px;font-size:12px;">
+      <div id="subjectList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+    </div>
+  </div>
+
+  <div class="section-title">// Students to Register</div>
+  <div class="st-table-wrap" style="margin-bottom:20px;">
+    <table class="res-table" id="resultTable">
+      <thead>
+        <tr>
+          <th>#</th><th>Student Name</th><th>Student ID</th>
+          <th>Course</th><th>Year / Sec</th><th>NFC Card</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="resultTbody"></tbody>
+    </table>
+  </div>
+
+  <!-- Registration form (hidden, submitted programmatically) -->
+  <form method="POST" action="{{ url_for('batch_register') }}" id="finalForm">
+    <input type="hidden" name="students_data" id="studentsDataInput"/>
+  </form>
+
+  <div class="btn-row">
+    <button type="button" class="btn-primary" id="registerBtn" onclick="doRegister()">
+      <i class="bi bi-check-circle"></i> Register All on Blockchain
+    </button>
+    <button type="button" class="btn-outline" onclick="gotoPhase(2)">
+      <i class="bi bi-arrow-left"></i> Back to NFC Assignment
+    </button>
+    <button type="button" class="btn-outline" onclick="resetAll()">
+      <i class="bi bi-arrow-counterclockwise"></i> Start Over
+    </button>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+let students        = [];   // all parsed + sorted students
+let assignmentIndex = 0;    // which student we're currently assigning
+let pendingUID      = null; // UID scanned but not yet confirmed
+let history_stack   = [];   // [{index, nfc_id}] for undo
+
+// NFC HID reader state
+let nfcBuffer = '';
+let nfcTimer  = null;
+const NFC_TIMEOUT = 300;
+let phase2Active = false;   // only process taps during phase 2
+
+/* ═══════════════════════════════════════════════════════════════════
+   STEP NAVIGATION
+═══════════════════════════════════════════════════════════════════ */
+function gotoPhase(n) {
+  document.querySelectorAll('.phase').forEach((p, i) => {
+    p.classList.toggle('active', i + 1 === n);
+  });
+  ['beStep1','beStep2','beStep3'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    if (i + 1 === n)  el.classList.add('active');
+    if (i + 1 < n)    el.classList.add('done');
+  });
+  phase2Active = (n === 2);
+  if (n === 2) { refocusNFC(); renderQueue(); }
+  if (n === 3) { renderSummary(); }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PDF UPLOAD & PARSING
+═══════════════════════════════════════════════════════════════════ */
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadBanner').classList.remove('dragover');
+  processPDFFiles(e.dataTransfer.files);
+}
+function handleFileSelect(input) {
+  if (input.files && input.files.length > 0) processPDFFiles(input.files);
+}
+
+function processPDFFiles(files) {
+  const pdfs = Array.from(files).filter(f =>
+    f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  if (!pdfs.length) { showMsg('Please select PDF files only.', 'error'); return; }
+
+  setBanner('loading', '⏳',
+    `Processing ${pdfs.length} PDF(s)…`,
+    'Extracting student data and sorting alphabetically…');
+
+  const fd = new FormData();
+  pdfs.forEach(f => fd.append('files', f));
+
+  fetch('/parse_batch_pdfs', { method: 'POST', credentials: 'same-origin', body: fd })
+    .then(r => { if (!r.ok) throw new Error('Server error ' + r.status); return r.json(); })
+    .then(data => {
+      if (data.error) {
+        setBanner('error', '❌', 'Could not parse PDFs', data.error);
+        (data.details || []).forEach(e => showMsg(e, 'error'));
+        return;
+      }
+      students = (data.students || []).map(s => ({ ...s, nfc_id: null, _skipped: false }));
+      if (!students.length) {
+        setBanner('error', '❌', 'No student data found', 'Check that the PDFs are CvSU registration forms.');
+        return;
+      }
+      setBanner('success', '✅',
+        `Found ${students.length} student(s) — sorted alphabetically`,
+        'Review data below. Click Edit on any row to fill missing fields.');
+      renderReviewTable();
+      document.getElementById('reviewPanel').style.display = 'block';
+      (data.errors || []).forEach(e => showMsg('⚠ ' + e, 'info'));
+    })
+    .catch(err => {
+      setBanner('error', '❌', 'Upload failed', err.message);
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHASE 1 — REVIEW TABLE
+═══════════════════════════════════════════════════════════════════ */
+function renderReviewTable() {
+  const tbody = document.getElementById('studentTbody');
+  tbody.innerHTML = '';
+  students.forEach((s, i) => {
+    const missName  = !s.name;
+    const missSid   = !s.student_id;
+    const missCourse= !s.course;
+    const missYear  = !s.year_level;
+    const hasMiss   = missName || missSid || missCourse || missYear;
+
+    const nameHtml = (s.name || '<em style="color:var(--muted)">—</em>')
+      + (missName ? '<span class="miss-badge">!</span>' : '');
+    const sidHtml  = (s.student_id || '<em style="color:var(--muted)">—</em>')
+      + (missSid  ? '<span class="miss-badge">!</span>' : '');
+    const courseHtml = (s.course || '<em style="color:var(--muted)">—</em>')
+      + (missCourse ? '<span class="miss-badge">!</span>' : '');
+    const yearSec = [s.year_level, s.section].filter(Boolean).join(' / ')
+      || '<em style="color:var(--muted)">—</em>';
+    const emailHtml = s.email || '<em style="color:var(--muted)">—</em>';
+    const file = (s.filename || '').replace(/\.pdf$/i, '');
+
+    const mainRow = document.createElement('tr');
+    mainRow.id = `strow_${i}`;
+    mainRow.className = hasMiss ? 'row-warn' : '';
+    mainRow.innerHTML = `
+      <td><span class="order-badge">${i + 1}</span></td>
+      <td style="font-weight:600;">${nameHtml}</td>
+      <td>${sidHtml}</td>
+      <td>${courseHtml}</td>
+      <td>${yearSec}${missYear ? '<span class="miss-badge">!</span>' : ''}</td>
+      <td style="font-size:11px;">${emailHtml}</td>
+      <td style="font-size:11px;color:var(--muted);">${file}</td>
+      <td>
+        <button class="btn-vr" style="font-size:11px;padding:5px 10px;"
+                onclick="toggleInlineEdit(${i})">
+          <i class="bi bi-pencil"></i> Edit
+        </button>
+      </td>`;
+
+    // Inline edit row (hidden by default)
+    const editRow = document.createElement('tr');
+    editRow.id = `stedit_${i}`;
+    editRow.className = 'inline-edit-row';
+    editRow.style.display = 'none';
+    editRow.innerHTML = `<td colspan="8"><div class="ie-grid">${buildIEFields(s, i)}</div>
+      <div class="ie-actions">
+        <button class="btn-ie-save" onclick="saveInlineEdit(${i})">
+          <i class="bi bi-check-lg"></i> Save
+        </button>
+        <button class="btn-ie-cancel" onclick="toggleInlineEdit(${i})">
+          Cancel
+        </button>
+      </div></td>`;
+
+    tbody.appendChild(mainRow);
+    tbody.appendChild(editRow);
+  });
+}
+
+function buildIEFields(s, i) {
+  const courseOpts = [
+    'BS Computer Science','BS Information Technology','BS Information Systems',
+    'BS Computer Engineering','BS Electronics Engineering',
+    'BS Civil Engineering','BS Education','BS Nursing','BS Accountancy','BS Business Administration'
+  ].map(c => `<option value="${c}" ${s.course === c ? 'selected' : ''}>${c}</option>`).join('');
+
+  const yearOpts = ['1st Year','2nd Year','3rd Year','4th Year','5th Year']
+    .map(y => `<option value="${y}" ${s.year_level === y ? 'selected' : ''}>${y}</option>`).join('');
+
+  const semOpts = ['First','Second','Summer']
+    .map(v => `<option value="${v}" ${s.semester === v ? 'selected' : ''}>${v} Semester</option>`).join('');
+
+  const secOpts = ['A','B','C','D']
+    .map(v => `<option value="${v}" ${s.section === v ? 'selected' : ''}>${v}</option>`).join('');
+
+  return `
+    <div class="ie-field"><label class="ie-label">Full Name *</label>
+      <input class="ie-input ${!s.name?'warn':''}" id="ie_name_${i}" value="${esc(s.name)}" placeholder="Full Name"/></div>
+    <div class="ie-field"><label class="ie-label">Student ID</label>
+      <input class="ie-input ${!s.student_id?'warn':''}" id="ie_sid_${i}" value="${esc(s.student_id)}" placeholder="e.g. 2021-00123"/></div>
+    <div class="ie-field"><label class="ie-label">Course *</label>
+      <select class="ie-input ${!s.course?'warn':''}" id="ie_course_${i}">
+        <option value="">— Select —</option>${courseOpts}</select></div>
+    <div class="ie-field"><label class="ie-label">Year Level *</label>
+      <select class="ie-input ${!s.year_level?'warn':''}" id="ie_year_${i}">
+        <option value="">— Select —</option>${yearOpts}</select></div>
+    <div class="ie-field"><label class="ie-label">Section</label>
+      <select class="ie-input" id="ie_sec_${i}">
+        <option value="">—</option>${secOpts}</select></div>
+    <div class="ie-field"><label class="ie-label">Email</label>
+      <input class="ie-input" id="ie_email_${i}" value="${esc(s.email)}" placeholder="sc.first.last@cvsu.edu.ph"/></div>
+    <div class="ie-field"><label class="ie-label">Semester</label>
+      <select class="ie-input" id="ie_sem_${i}">
+        <option value="">—</option>${semOpts}</select></div>
+    <div class="ie-field"><label class="ie-label">School Year</label>
+      <input class="ie-input" id="ie_sy_${i}" value="${esc(s.school_year)}" placeholder="2024-2025"/></div>
+    <div class="ie-field"><label class="ie-label">Adviser</label>
+      <input class="ie-input" id="ie_adv_${i}" value="${esc(s.adviser)}" placeholder="Prof. Santos"/></div>
+    <div class="ie-field"><label class="ie-label">Contact</label>
+      <input class="ie-input" id="ie_contact_${i}" value="${esc(s.contact)}" placeholder="09XX-XXX-XXXX"/></div>
+    <div class="ie-field"><label class="ie-label">Major</label>
+      <input class="ie-input" id="ie_major_${i}" value="${esc(s.major)}" placeholder="N/A"/></div>`;
+}
+
+function toggleInlineEdit(i) {
+  const editRow = document.getElementById(`stedit_${i}`);
+  const isOpen  = editRow.style.display !== 'none';
+  // Close all others first
+  document.querySelectorAll('[id^="stedit_"]').forEach(r => r.style.display = 'none');
+  if (!isOpen) editRow.style.display = '';
+}
+
+function saveInlineEdit(i) {
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const s = students[i];
+  s.name          = g(`ie_name_${i}`)    || s.name;
+  s.student_id    = g(`ie_sid_${i}`)     || s.student_id;
+  s.course        = g(`ie_course_${i}`)  || s.course;
+  s.year_level    = g(`ie_year_${i}`)    || s.year_level;
+  s.section       = g(`ie_sec_${i}`)     || s.section;
+  s.email         = g(`ie_email_${i}`)   || s.email;
+  s.semester      = g(`ie_sem_${i}`)     || s.semester;
+  s.school_year   = g(`ie_sy_${i}`)      || s.school_year;
+  s.adviser       = g(`ie_adv_${i}`)     || s.adviser;
+  s.contact       = g(`ie_contact_${i}`) || s.contact;
+  s.major         = g(`ie_major_${i}`)   || s.major || 'N/A';
+
+  // Re-render just the main row
+  renderReviewTable();
+  document.getElementById(`stedit_${i}`).style.display = '';
+}
+
+function proceedToNFC() {
+  if (!students.length) return;
+  // Warn if any have no name (can't register without a name)
+  const noName = students.filter(s => !s.name);
+  if (noName.length) {
+    showMsg(`⚠ ${noName.length} student(s) have no name. Edit them before proceeding.`, 'error');
+    return;
+  }
+  assignmentIndex = 0;
+  history_stack   = [];
+  pendingUID      = null;
+  gotoPhase(2);
+  updateCurrentCard();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHASE 2 — NFC ASSIGNMENT
+═══════════════════════════════════════════════════════════════════ */
+function updateCurrentCard() {
+  // Skip already-assigned or skipped
+  while (assignmentIndex < students.length &&
+         (students[assignmentIndex].nfc_id || students[assignmentIndex]._skipped)) {
+    assignmentIndex++;
+  }
+
+  const total    = students.length;
+  const assigned = students.filter(s => s.nfc_id).length;
+  const pct      = total ? Math.round(assigned / total * 100) : 0;
+
+  document.getElementById('progBarInner').style.width = pct + '%';
+  document.getElementById('progLabel').textContent = `${assigned} / ${total} assigned`;
+
+  if (assignmentIndex >= students.length) {
+    // All done (or all skipped)
+    allAssigned();
+    return;
+  }
+
+  const s = students[assignmentIndex];
+  document.getElementById('currAvatar').textContent = (s.name || '?')[0].toUpperCase();
+  document.getElementById('currName').textContent   = s.name || '(No name)';
+  document.getElementById('currMeta').textContent   =
+    [s.course, s.year_level, s.section ? 'Section ' + s.section : ''].filter(Boolean).join(' · ');
+  document.getElementById('currOrder').textContent  =
+    `Student ${assignmentIndex + 1} of ${total}`;
+
+  // Reset tap zone
+  resetTapZone();
+  pendingUID = null;
+  document.getElementById('btnConfirm').disabled = true;
+  document.getElementById('btnUndo').disabled    = history_stack.length === 0;
+  document.getElementById('dupWarn').classList.remove('show');
+
+  renderQueue();
+  refocusNFC();
+}
+
+function resetTapZone() {
+  const zone  = document.getElementById('tapZone');
+  const icon  = document.getElementById('tapIcon');
+  const title = document.getElementById('tapTitle');
+  const sub   = document.getElementById('tapSub');
+  const uid   = document.getElementById('uidDisplay');
+  zone.className  = 'tap-zone waiting';
+  icon.textContent = '💳';
+  title.textContent = 'Tap the NFC card for this student';
+  sub.textContent   = 'Hold the card near the USB reader — the UID will appear automatically';
+  uid.style.display = 'none';
+}
+
+function renderQueue() {
+  const tbody = document.getElementById('queueTbody');
+  tbody.innerHTML = '';
+  students.forEach((s, i) => {
+    const isCurrent  = i === assignmentIndex && !s.nfc_id && !s._skipped;
+    const isAssigned = !!s.nfc_id;
+    const isSkipped  = s._skipped;
+
+    let statusHtml;
+    if (isAssigned)     statusHtml = `<span class="status-tag st-assigned">✓ ${s.nfc_id}</span>`;
+    else if (isSkipped) statusHtml = `<span class="status-tag st-skipped">Skipped</span>`;
+    else if (isCurrent) statusHtml = `<span class="status-tag st-current">← Current</span>`;
+    else                statusHtml = `<span class="status-tag st-waiting">Waiting</span>`;
+
+    const tr = document.createElement('tr');
+    if (isCurrent) tr.className = 'row-current';
+    if (isAssigned || isSkipped) tr.className = 'row-done';
+    tr.innerHTML = `
+      <td><span class="order-badge">${i + 1}</span></td>
+      <td style="font-weight:${isCurrent?700:500};">${s.name || '—'}</td>
+      <td style="font-size:12px;color:var(--muted);">
+        ${[s.course, s.year_level, s.section].filter(Boolean).join(' / ') || '—'}
+      </td>
+      <td>${isAssigned ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
+      <td>${statusHtml}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Called when NFC reader sends a UID
+function handleNFCTap(uid) {
+  if (!phase2Active) return;
+  uid = uid.trim().toUpperCase();
+  if (!uid || uid.length < 4) return;
+  if (assignmentIndex >= students.length) return;
+
+  // Check for duplicate within this batch
+  const dupIdx = students.findIndex((s, i) => s.nfc_id === uid && i !== assignmentIndex);
+  if (dupIdx !== -1) {
+    const dup = students[dupIdx];
+    document.getElementById('dupWarnText').textContent =
+      `This card (${uid}) is already assigned to ${dup.name} (#${dupIdx + 1}). Please use a different card.`;
+    document.getElementById('dupWarn').classList.add('show');
+    // Don't set pendingUID — force re-tap
+    return;
+  }
+  document.getElementById('dupWarn').classList.remove('show');
+
+  pendingUID = uid;
+  // Update tap zone to show scanned UID
+  document.getElementById('tapZone').className = 'tap-zone scanned';
+  document.getElementById('tapIcon').textContent = '✅';
+  document.getElementById('tapTitle').textContent = 'Card detected — confirm assignment';
+  document.getElementById('tapSub').textContent =
+    'Check the UID below then click Confirm to assign this card.';
+  document.getElementById('uidText').textContent = uid;
+  document.getElementById('uidDisplay').style.display = '';
+  document.getElementById('btnConfirm').disabled = false;
+}
+
+function confirmAssignment() {
+  if (!pendingUID || assignmentIndex >= students.length) return;
+  const s = students[assignmentIndex];
+  s.nfc_id = pendingUID;
+
+  // Push to history for undo
+  history_stack.push({ index: assignmentIndex, nfc_id: pendingUID });
+
+  assignmentIndex++;
+  pendingUID = null;
+  updateCurrentCard();
+}
+
+function undoAssignment() {
+  if (!history_stack.length) return;
+  const last = history_stack.pop();
+  students[last.index].nfc_id   = null;
+  students[last.index]._skipped = false;
+  assignmentIndex = last.index;
+  pendingUID      = null;
+  document.getElementById('dupWarn').classList.remove('show');
+  updateCurrentCard();
+}
+
+function skipStudent() {
+  if (assignmentIndex >= students.length) return;
+  students[assignmentIndex]._skipped = true;
+  // Push skip to history for undo
+  history_stack.push({ index: assignmentIndex, nfc_id: null, skipped: true });
+  assignmentIndex++;
+  pendingUID = null;
+  updateCurrentCard();
+}
+
+function allAssigned() {
+  // Check if there are any assigned students at all
+  const hasAssigned = students.some(s => s.nfc_id);
+  if (!hasAssigned) {
+    showMsg('No students were assigned NFC cards. Please go back and retry.', 'error');
+    return;
+  }
+  gotoPhase(3);
+}
+
+function goBack() {
+  phase2Active = false;
+  // Reset all assignments so phase 1 review is clean
+  students.forEach(s => { s.nfc_id = null; s._skipped = false; });
+  history_stack   = [];
+  assignmentIndex = 0;
+  pendingUID      = null;
+  gotoPhase(1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHASE 3 — SUMMARY & REGISTER
+═══════════════════════════════════════════════════════════════════ */
+function renderSummary() {
+  const total    = students.length;
+  const assigned = students.filter(s => s.nfc_id).length;
+  const skipped  = students.filter(s => s._skipped).length;
+  const nocard   = total - assigned - skipped;
+
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="sum-chip total">
+      <div style="font-size:28px;">👥</div>
+      <div><div class="sum-val">${total}</div><div class="sum-lab">Total Students</div></div>
+    </div>
+    <div class="sum-chip assigned">
+      <div style="font-size:28px;">✅</div>
+      <div><div class="sum-val" style="color:var(--success);">${assigned}</div>
+           <div class="sum-lab">Cards Assigned</div></div>
+    </div>
+    <div class="sum-chip skipped">
+      <div style="font-size:28px;">⏭</div>
+      <div><div class="sum-val" style="color:var(--danger);">${skipped + nocard}</div>
+           <div class="sum-lab">Skipped / No Card</div></div>
+    </div>`;
+
+  // Collect unique subjects across all students
+  const allSubjects = {};
+  students.filter(s => s.nfc_id).forEach(s => {
+    (s.subjects || []).forEach(subj => {
+      if (subj.course_code && !allSubjects[subj.course_code]) {
+        allSubjects[subj.course_code] = subj;
+      }
+    });
+  });
+  const subjKeys = Object.keys(allSubjects);
+  if (subjKeys.length) {
+    document.getElementById('subjectSummaryBox').style.display = '';
+    document.getElementById('subjectList').innerHTML = subjKeys.map(k => {
+      const s = allSubjects[k];
+      return `<span style="background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);
+        border-radius:6px;padding:4px 10px;font-size:11px;font-family:'Space Mono',monospace;
+        color:var(--accent);">[${s.course_code}] ${s.name}</span>`;
+    }).join('');
+  }
+
+  // Result table
+  const tbody = document.getElementById('resultTbody');
+  tbody.innerHTML = '';
+  students.forEach((s, i) => {
+    const isAssigned = !!s.nfc_id;
+    const statusHtml = isAssigned
+      ? `<span class="status-tag st-assigned">Will Register</span>`
+      : `<span class="status-tag st-skipped">${s._skipped ? 'Skipped' : 'No Card'}</span>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="order-badge">${i + 1}</span></td>
+      <td style="font-weight:600;">${s.name || '—'}</td>
+      <td style="font-size:11px;font-family:monospace;">${s.student_id || '—'}</td>
+      <td style="font-size:11px;">${s.course || '—'}</td>
+      <td style="font-size:11px;">${[s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
+      <td>${s.nfc_id ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
+      <td>${statusHtml}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function doRegister() {
+  const toRegister = students.filter(s => s.nfc_id);
+  if (!toRegister.length) {
+    showMsg('No students with NFC cards assigned. Nothing to register.', 'error');
+    return;
+  }
+  const btn = document.getElementById('registerBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Registering…';
+
+  document.getElementById('studentsDataInput').value = JSON.stringify(toRegister);
+  document.getElementById('finalForm').submit();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   NFC HID READER
+═══════════════════════════════════════════════════════════════════ */
+const nfcHid = document.getElementById('nfcHidInput');
+
+function refocusNFC() {
+  const tag = document.activeElement ? document.activeElement.tagName : '';
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+    nfcHid.focus();
+  }
+}
+
+nfcHid.addEventListener('keydown', function(e) {
+  clearTimeout(nfcTimer);
+  if (e.key === 'Enter') {
+    const uid = nfcBuffer.trim();
+    nfcBuffer = ''; nfcHid.value = '';
+    if (uid) handleNFCTap(uid);
+    return;
+  }
+  if (e.key.length === 1) { nfcBuffer += e.key; nfcHid.value = nfcBuffer; }
+  nfcTimer = setTimeout(() => {
+    const uid = nfcBuffer.trim();
+    nfcBuffer = ''; nfcHid.value = '';
+    if (uid) handleNFCTap(uid);
+  }, NFC_TIMEOUT);
+});
+
+document.addEventListener('click', refocusNFC);
+nfcHid.addEventListener('blur', () => setTimeout(refocusNFC, 150));
+window.addEventListener('load', () => nfcHid.focus());
+
+/* ═══════════════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════════════ */
+function setBanner(cls, icon, title, sub) {
+  document.getElementById('uploadBanner').className = 'upload-banner ' + cls;
+  document.getElementById('ubIcon').textContent    = icon;
+  document.getElementById('ubTitle').textContent   = title;
+  document.getElementById('ubSub').textContent     = sub;
+  const btn = document.getElementById('btnUpload');
+  btn.disabled = (cls === 'loading');
+  btn.innerHTML = cls === 'loading'
+    ? '<span class="spin"></span> Parsing…'
+    : (cls === 'success'
+      ? '<i class="bi bi-arrow-repeat"></i> Upload More'
+      : '<i class="bi bi-cloud-upload"></i> Select PDFs');
+}
+
+function showMsg(text, type = 'info') {
+  const box = document.getElementById('msgBox');
+  const div = document.createElement('div');
+  div.className = 'msg-box ' + type;
+  const icon = type === 'error' ? 'bi-x-circle' : type === 'success' ? 'bi-check-circle' : 'bi-info-circle';
+  div.innerHTML = `<i class="bi ${icon}"></i> ${text}`;
+  box.appendChild(div);
+  setTimeout(() => { if (div.parentNode) div.remove(); }, 7000);
+}
+
+function resetAll() {
+  students = []; assignmentIndex = 0; history_stack = []; pendingUID = null;
+  phase2Active = false;
+  document.getElementById('reviewPanel').style.display = 'none';
+  document.getElementById('studentTbody').innerHTML = '';
+  document.getElementById('msgBox').innerHTML = '';
+  setBanner('', '📄',
+    'Upload Multiple CvSU Registration PDFs',
+    'Drop PDF files here or click to browse — students will be sorted alphabetically by surname');
+  gotoPhase(1);
+}
+
+function esc(v) {
+  if (!v) return '';
+  return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

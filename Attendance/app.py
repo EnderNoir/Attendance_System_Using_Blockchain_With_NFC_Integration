@@ -4,11 +4,259 @@ from datetime import datetime
 from functools import wraps
 import json, os, secrets, time, csv, io, hashlib, uuid, re, sqlite3, calendar as _cal
 from collections import deque
+import re
+import io
+import uuid
+import json
+import secrets as _sec
+from datetime import datetime
 # pdfminer is imported inside parse_registration_pdf() so a startup
 # import glitch can never permanently disable PDF parsing for the session.
 
 app = Flask(__name__)
 app.secret_key = 'davs-super-secret-2024'
+
+def _parse_cvsu_pdf_text(raw_bytes: bytes) -> str:
+    """Extract plain text from a CvSU PDF. Tries pypdf, falls back to pdfminer."""
+    full = ''
+    try:
+        import pypdf
+        reader = pypdf.PdfReader(io.BytesIO(raw_bytes))
+        full = '\n'.join(page.extract_text() or '' for page in reader.pages)
+    except Exception as _e:
+        print(f'[PDF] pypdf failed: {_e}')
+    if not full.strip():
+        try:
+            from pdfminer.high_level import extract_text as _pm
+            full = _pm(io.BytesIO(raw_bytes))
+        except Exception as _e:
+            print(f'[PDF] pdfminer failed: {_e}')
+    return full
+ 
+ 
+def _generate_cvsu_email(name: str) -> str:
+    """sc.firstname.lastname@cvsu.edu.ph from a full name string."""
+    clean = re.sub(r'\b[A-Za-z]\.\s*', '', name).strip()
+    clean = re.sub(r'\b(JR|SR|II|III|IV)\.?\b', '', clean, flags=re.IGNORECASE).strip()
+    clean = re.sub(r'\s+', ' ', clean)
+    words = clean.split()
+    if len(words) >= 2:
+        first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
+        last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
+        if first_slug and last_slug:
+            return f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
+    return ''
+ 
+ 
+def _surname_sort_key(student: dict) -> tuple:
+    """
+    (surname_lower, firstnames_lower) for alphabetical-by-surname sorting.
+    Handles "First Mid Last" and "Last, First Mid" formats.
+    """
+    name = (student.get('name') or '').strip()
+    if not name:
+        return ('', '')
+    if ',' in name:
+        parts   = name.split(',', 1)
+        surname = parts[0].strip()
+        firsts  = parts[1].strip()
+    else:
+        parts   = name.split()
+        surname = parts[-1] if len(parts) > 1 else parts[0]
+        firsts  = ' '.join(parts[:-1])
+    clean = lambda s: re.sub(r'[^a-z ]', '', s.lower()).strip()
+    return (clean(surname), clean(firsts))
+ 
+ 
+def _extract_cvsu_fields(full: str) -> dict:
+    """
+    Parse all CvSU registration fields from extracted PDF text.
+ 
+    CvSU pypdf layout:  LABEL LINE\\nVALUE LINE
+    The value is always on the line immediately after its label.
+ 
+    Returns dict with keys:
+        student_id, name, email, contact, adviser,
+        semester, school_year, course, year_level, section,
+        major, date_registered, subjects
+    """
+    ABBR_COURSE = {
+        'BSCS': 'BS Computer Science', 'BSIT': 'BS Information Technology',
+        'BSIS': 'BS Information Systems', 'BSCOE': 'BS Computer Engineering',
+        'BSECE': 'BS Electronics Engineering', 'BSEE': 'BS Electrical Engineering',
+        'BSCE': 'BS Civil Engineering', 'BSME': 'BS Mechanical Engineering',
+        'BSED': 'BS Education', 'BSN': 'BS Nursing',
+        'BSA': 'BS Accountancy', 'BSBA': 'BS Business Administration',
+    }
+    PREFIX_COURSE = {
+        'CS': 'BS Computer Science', 'IT': 'BS Information Technology',
+        'IS': 'BS Information Systems', 'COE': 'BS Computer Engineering',
+        'ECE': 'BS Electronics Engineering', 'EE': 'BS Electrical Engineering',
+        'CE': 'BS Civil Engineering', 'ME': 'BS Mechanical Engineering',
+        'ED': 'BS Education', 'N': 'BS Nursing',
+        'A': 'BS Accountancy', 'BA': 'BS Business Administration',
+    }
+    YEAR_MAP = {
+        '1': '1st Year', '2': '2nd Year', '3': '3rd Year',
+        '4': '4th Year', '5': '5th Year',
+        '1st': '1st Year', '2nd': '2nd Year', '3rd': '3rd Year',
+        '4th': '4th Year', '5th': '5th Year',
+    }
+    SEM_MAP = {
+        'FIRST': 'First', 'SECOND': 'Second', 'SUMMER': 'Summer',
+        '1ST': 'First', '2ND': 'Second',
+    }
+ 
+    result = {
+        'student_id': '', 'name': '', 'email': '', 'contact': '',
+        'adviser': '', 'semester': '', 'school_year': '',
+        'course': '', 'year_level': '', 'section': '',
+        'major': '', 'date_registered': '', 'subjects': [],
+    }
+ 
+    def next_line(label_re):
+        """Value on the line immediately after a label pattern."""
+        m = re.search(label_re + r'[^\n]*\n([^\n]+)', full, re.IGNORECASE)
+        if not m:
+            return ''
+        v = (m.group(1) or '').replace('\t', ' ').strip()
+        return v
+ 
+    # Student ID
+    result['student_id'] = next_line(r'Student\s*(?:No\.?|Number|ID)')
+    if not result['student_id']:
+        m = re.search(r'\b(\d{4}-\d{4,6})\b', full)
+        if m:
+            result['student_id'] = m.group(1)
+    if not result['student_id']:
+        m = re.search(r'\b(\d{7,10})\b', full)
+        if m:
+            result['student_id'] = m.group(1)
+ 
+    # Semester
+    raw_sem  = next_line(r'Semester').upper()
+    first_w  = raw_sem.split()[0] if raw_sem else ''
+    result['semester'] = SEM_MAP.get(first_w, raw_sem.title()) if raw_sem else ''
+ 
+    # School Year
+    result['school_year'] = next_line(r'School\s*Year')
+ 
+    # Student Name → also derive email
+    _norm_full = full.replace('\t', ' ')
+    _name_m = re.search(
+        r'Student\s+Name\s*:\s*((?:[A-Z][A-Z\s.,\'\-]+?)'
+        r'(?=\s*(?:Date|Course|Year|Encoder|Major|Section|Address)\s*:|$))',
+        _norm_full, re.IGNORECASE | re.DOTALL
+    )
+    raw_name = ''
+    if _name_m:
+        raw_name = re.sub(r'\s+', ' ', _name_m.group(1)).strip()
+        # Guard: reject if it looks like a label value rather than a name
+        if re.match(r'(Date|Course|Year|Encoder)\s*:', raw_name, re.IGNORECASE):
+            raw_name = ''
+    if not raw_name:
+        # Last-resort: grab the next non-empty line after the label
+        _fb = re.search(r'Student\s*Name[^\n]*\n([^\n:]+)', _norm_full, re.IGNORECASE)
+        if _fb:
+            raw_name = _fb.group(1).replace('\t', ' ').strip()
+    if raw_name:
+        result['name']  = raw_name.title()
+        result['email'] = _generate_cvsu_email(raw_name)
+ 
+    # Adviser
+    result['adviser'] = next_line(r'Adviser|Advisor')
+ 
+    # Contact
+    result['contact'] = next_line(r'Contact\s*(?:No\.?|Number)')
+ 
+    # Date Registered (skip VALIDATION DATE lines)
+    raw_date = ''
+    for _m in re.finditer(r'Date[^\n]*\n([^\n]+)', full, re.IGNORECASE):
+        ctx = full[max(0, _m.start() - 30):_m.start()].upper()
+        if any(kw in ctx for kw in ('VALIDAT', 'PAYMENT', 'CONFIR')):
+            continue
+        raw_date = _m.group(1).replace('\t', ' ').strip()
+        break
+    if raw_date:
+        dm = re.search(r'(\d{1,2})[-\s/]+([A-Za-z]+)[-\s/]+(\d{4})', raw_date)
+        if dm:
+            try:
+                d = datetime.strptime(f"{dm.group(2)} {dm.group(3)}", "%b %Y")
+                result['date_registered'] = d.strftime('%Y-%m')
+            except Exception:
+                pass
+        if not result['date_registered']:
+            dm2 = re.search(r'([A-Za-z]+)\s+(\d{4})', raw_date)
+            if dm2:
+                try:
+                    d = datetime.strptime(f"{dm2.group(1)} {dm2.group(2)}", "%b %Y")
+                    result['date_registered'] = d.strftime('%Y-%m')
+                except Exception:
+                    pass
+ 
+    # Course
+    raw_course = next_line(r'Course').strip().upper()
+    result['course'] = ABBR_COURSE.get(raw_course, '')
+    if not result['course']:
+        for abbr, cname in ABBR_COURSE.items():
+            if re.search(r'\b' + abbr + r'\b', full, re.IGNORECASE):
+                result['course'] = cname
+                break
+ 
+    # Section code (e.g. IT4A → year=4th, sec=A, possibly course)
+    raw_section = next_line(r'Section').strip()
+    sec_m = re.match(r'^([A-Za-z]+)(\d)([A-Za-z])$', raw_section)
+    if sec_m:
+        prefix               = sec_m.group(1).upper()
+        yr_digit             = sec_m.group(2)
+        result['section']    = sec_m.group(3).upper()
+        result['year_level'] = YEAR_MAP.get(yr_digit, yr_digit + 'th Year')
+        if not result['course']:
+            result['course'] = PREFIX_COURSE.get(prefix, '')
+    else:
+        result['section'] = raw_section[:1].upper() if raw_section else ''
+        raw_year  = next_line(r'Year\s*(?:Level)?').strip()
+        yr_w      = raw_year.split()[0].lower() if raw_year else ''
+        result['year_level'] = (YEAR_MAP.get(yr_w) or
+                                YEAR_MAP.get(yr_w.rstrip('thsrnd')) or '')
+ 
+    # Major
+    raw_major = next_line(r'Major')
+    result['major'] = ('' if raw_major.upper().strip() in ('N/A', 'NA', 'NONE', '', '\u2014')
+                       else raw_major.title())
+ 
+    # Subjects — 8-line blocks after Schedule Code header, before Fees section
+    subjects = []
+    hdr_m  = re.search(
+        r'Schedule\s*Code.*?(?:Course\s*)?Description.*?Hour[s]?\s*\n',
+        full, re.DOTALL | re.IGNORECASE
+    )
+    fees_m = re.search(r'Laboratory\s*Fees|Total\s*Units', full, re.IGNORECASE)
+    if hdr_m and fees_m and fees_m.start() > hdr_m.end():
+        block = full[hdr_m.end():fees_m.start()]
+        lines = [l.replace('\t', ' ').strip() for l in block.split('\n') if l.strip()]
+        i = 0
+        while i < len(lines):
+            if re.match(r'^\d{7,12}$', lines[i]) and i + 7 < len(lines):
+                code_clean  = re.sub(r'\s+', ' ', lines[i + 2]).strip()
+                desc_clean  = lines[i + 3].title()
+                try:
+                    units_int = str(round(float(lines[i + 4])))
+                except Exception:
+                    units_int = '3'
+                if units_int == '0':
+                    units_int = '3'
+                if code_clean and desc_clean:
+                    subjects.append({
+                        'course_code': code_clean,
+                        'name':        desc_clean,
+                        'units':       units_int,
+                    })
+                i += 8
+            else:
+                i += 1
+    result['subjects'] = subjects
+    return result
 
 # ── Email config helpers ──────────────────────────────────────────────────
 def get_email_config():
@@ -431,6 +679,8 @@ except Exception as _ce:
     print(f"[WARNING] Could not load contract: {_ce}")
     contract      = None
     admin_account = None
+    BLOCKCHAIN_ONLINE = False
+    print("[INFO] Offline mode active: contract file missing or unreadable.")
 
 BASE_DIR      = os.path.dirname(__file__)
 DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
@@ -465,6 +715,28 @@ def build_student_section_key(student):
     if not course or not year_level or not section:
         return None
     return normalize_section_key(f"{course}|{year_level}|{section}")
+
+def generate_cvsu_email(name, provided_email=''):
+    """
+    Generate CVSU email pattern: sc.firstname.lastname@cvsu.edu.ph
+    If provided_email is given and not empty, return it.
+    Otherwise, generate from name.
+    """
+    provided_email = provided_email.strip()
+    if provided_email:
+        return provided_email
+
+    # Generate CVSU pattern email: sc.firstname.lastname@cvsu.edu.ph
+    clean = re.sub(r'\b[A-Za-z]\.\s*', '', name).strip()
+    clean = re.sub(r'\b(JR|SR|II|III|IV)\.?\b', '', clean, flags=re.IGNORECASE).strip()
+    clean = re.sub(r'\s+', ' ', clean)
+    words = clean.split()
+    if len(words) >= 2:
+        first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
+        last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
+        if first_slug and last_slug:
+            return f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
+    return ''
 
 def get_db():
     conn = sqlite3.connect(DB_FILE)
@@ -1229,6 +1501,14 @@ def parse_student(raw):
 def get_all_students():
     global BLOCKCHAIN_ONLINE
     cached = db_get_all_students()
+
+    if contract is None:
+        # Contract not loaded (or reset state); do not attempt event sync.
+        if cached:
+            return cached
+        print("[INFO] No blockchain contract; returning SQLite student cache (empty).")
+        return []
+
     if not BLOCKCHAIN_ONLINE and contract:
         try:
             BLOCKCHAIN_ONLINE = web3.is_connected()
@@ -1585,11 +1865,29 @@ def register():
             except:
                 pass
         section_val = request.form.get('section','').strip().upper()
+        
+        # Generate CVSU email if not provided or empty
+        email_val = request.form.get('email','').strip()
+        if not email_val:
+            # Generate CVSU pattern email: sc.firstname.lastname@cvsu.edu.ph
+            clean = re.sub(r'\b[A-Za-z]\.\s*', '', name).strip()
+            clean = re.sub(r'\b(JR|SR|II|III|IV)\.?\b', '', clean, flags=re.IGNORECASE).strip()
+            clean = re.sub(r'\s+', ' ', clean)
+            words = clean.split()
+            if len(words) >= 2:
+                first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
+                last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
+                if first_slug and last_slug:
+                    email_val = f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
+        
         for k,prefix in [('student_id','ID'),('course','Course'),('year_level','Year'),
-                          ('adviser','Adviser'),('email','Email'),('contact','Tel'),
+                          ('adviser','Adviser'),('contact','Tel'),
                           ('semester','Sem'),('school_year','SY')]:
             v = request.form.get(k,'').strip()
             if v: extras.append(f"{prefix}:{v}")
+        
+        # Add generated/provided email
+        if email_val: extras.append(f"Email:{email_val}")
         if section_val: extras.append(f"Sec:{section_val}")
         if raw_date: extras.append(f"RegDate:{raw_date}")
         major = request.form.get('major','').strip() or 'N/A'
@@ -1630,232 +1928,286 @@ def register():
         else:
             flash(f'Student {name} registered successfully (offline mode).')
         return redirect(url_for('index'))
-    return render_template('register.html', subjects_db=db_get_all_subjects(), users_db=db_get_all_users())
+    return render_template('enroll.html', subjects_db=db_get_all_subjects(), users_db=db_get_all_users())
 
 
 @app.route('/parse_registration_pdf', methods=['POST'])
 @admin_required
 def parse_registration_pdf():
     import traceback
-
+ 
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
     f = request.files['file']
     if not (f.filename or '').lower().endswith('.pdf'):
         return jsonify({'error': 'Only PDF files are supported'}), 400
-
-    # CvSU section-code prefix → full course name  (CS4A → BS Computer Science)
-    prefix_course_map = {
-        'CS':'BS Computer Science',  'IT':'BS Information Technology',
-        'IS':'BS Information Systems','COE':'BS Computer Engineering',
-        'ECE':'BS Electronics Engineering','EE':'BS Electrical Engineering',
-        'CE':'BS Civil Engineering',  'ME':'BS Mechanical Engineering',
-        'ED':'BS Education',          'N':'BS Nursing',
-        'A':'BS Accountancy',         'BA':'BS Business Administration',
-    }
-    abbr_course_map = {
-        'BSCS':'BS Computer Science',  'BSIT':'BS Information Technology',
-        'BSIS':'BS Information Systems','BSCOE':'BS Computer Engineering',
-        'BSECE':'BS Electronics Engineering','BSEE':'BS Electrical Engineering',
-        'BSCE':'BS Civil Engineering', 'BSME':'BS Mechanical Engineering',
-        'BSED':'BS Education',         'BSN':'BS Nursing',
-        'BSA':'BS Accountancy',        'BSBA':'BS Business Administration',
-    }
-    year_num_map = {
-        '1':'1st Year','2':'2nd Year','3':'3rd Year','4':'4th Year','5':'5th Year',
-        '1st':'1st Year','2nd':'2nd Year','3rd':'3rd Year',
-        '4th':'4th Year','5th':'5th Year',
-    }
-    result = {
-        'student_id':'','name':'','course':'','year_level':'',
-        'section':'','adviser':'','email':'','contact':'',
-        'semester':'','school_year':'','date_registered':'','major':'',
-        'subjects':[]
-    }
-
+ 
     try:
         raw_bytes = f.read()
         if not raw_bytes:
             return jsonify({'error': 'Uploaded file is empty'}), 400
-
-        # ── Extract text ──────────────────────────────────────────────
-        # pypdf is primary for CvSU PDFs; pdfminer as fallback.
-        full = ''
-        try:
-            import pypdf
-            reader = pypdf.PdfReader(io.BytesIO(raw_bytes))
-            full = '\n'.join(page.extract_text() or '' for page in reader.pages)
-        except Exception as _e:
-            print(f'[PDF] pypdf failed: {_e}')
-
+ 
+        full = _parse_cvsu_pdf_text(raw_bytes)
         if not full.strip():
-            try:
-                from pdfminer.high_level import extract_text as _pdfminer_extract
-                full = _pdfminer_extract(io.BytesIO(raw_bytes))
-            except Exception as _e:
-                print(f'[PDF] pdfminer failed: {_e}')
-
-        if not full.strip():
-            return jsonify({'error': 'Could not extract text. Install pypdf: pip install pypdf'}), 400
-
+            return jsonify({
+                'error': 'Could not extract text. Install pypdf: pip install pypdf'
+            }), 400
+ 
         print(f'[PDF] {len(full)} chars from "{f.filename}"')
-        print(f'[PDF] PREVIEW:\n{full[:800]}\n[PDF] END')
-
-        # ── CvSU pypdf format: LABEL\t\nVALUE\n ────────────────────────
-        # The value is ALWAYS on the line immediately after the label.
-        # IMPORTANT: group(1) may be None if pattern has alternation branches
-        # without a capturing group — always guard against None.
-        def next_line(label_pattern):
-            m = re.search(label_pattern + r'[^\n]*\n([^\n]+)', full, re.IGNORECASE)
-            if not m:
-                return ''
-            val = m.group(1)
-            if val is None:
-                return ''
-            return val.replace('\t', ' ').strip()
-
-        # ── Student ID ────────────────────────────────────────────────
-        result['student_id'] = next_line(r'Student\s*Number')
-        if not result['student_id']:
-            m2 = re.search(r'\b(\d{7,10})\b', full)
-            if m2: result['student_id'] = m2.group(1)
-
-        # ── Semester ──────────────────────────────────────────────────
-        raw_sem = next_line(r'Semester').upper()
-        sem_map = {'FIRST':'First','SECOND':'Second','SUMMER':'Summer',
-                   '1ST':'First','2ND':'Second'}
-        first_word = raw_sem.split()[0] if raw_sem else ''
-        result['semester'] = sem_map.get(first_word, raw_sem.title())
-
-        # ── School Year ───────────────────────────────────────────────
-        result['school_year'] = next_line(r'School\s*Year')
-
-        # ── Student Name ──────────────────────────────────────────────
-        # Real CvSU format:  FIRSTNAME  MIDDLE  INITIAL.  LASTNAME
-        # e.g.  MARCLAIN  JAMES  M.  SAMSON  (tabs between words)
-        raw_name = next_line(r'Student\s*Name')
-        if raw_name:
-            raw_name = re.sub(r'\s+', ' ', raw_name.replace('\t', ' ')).strip()
-            result['name'] = raw_name.title()
-
-            # Email: sc.firstname.lastname@cvsu.edu.ph
-            # Strip middle initials (single letter + dot)  and suffixes
-            clean = re.sub(r'\b[A-Za-z]\.\s*', '', raw_name).strip()
-            clean = re.sub(r'\b(JR|SR|II|III|IV)\.?\b', '', clean,
-                           flags=re.IGNORECASE).strip()
-            clean = re.sub(r'\s+', ' ', clean)
-            words = clean.split()
-            if len(words) >= 2:
-                # Combine all words except the last as first name(s)
-                first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
-                last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
-                if first_slug and last_slug:
-                    result['email'] = f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
-
-        # ── Date registered ───────────────────────────────────────────
-        # Avoid matching VALIDATION DATE or VALIDATED BY DATE lines
-        raw_date = ''
-        for _m in re.finditer(r'Date[^\n]*\n([^\n]+)', full, re.IGNORECASE):
-            _line_before = full[max(0, _m.start()-20):_m.start()].upper()
-            if 'VALIDAT' not in _line_before:
-                raw_date = _m.group(1).replace('\t', ' ').strip()
-                break
-        if raw_date:
-            _dm = re.search(r'(\d{1,2})[-\s]+([A-Za-z]+)[-\s]+(\d{4})', raw_date)
-            if _dm:
-                try:
-                    _d = datetime.strptime(f"{_dm.group(2)} {_dm.group(3)}", "%b %Y")
-                    result['date_registered'] = _d.strftime('%Y-%m')
-                except Exception:
-                    pass
-            if not result['date_registered']:
-                _dm2 = re.search(r'([A-Za-z]+)\s+(\d{4})', raw_date)
-                if _dm2:
-                    try:
-                        _d = datetime.strptime(f"{_dm2.group(1)} {_dm2.group(2)}", "%b %Y")
-                        result['date_registered'] = _d.strftime('%Y-%m')
-                    except Exception:
-                        pass
-
-        # ── Course ────────────────────────────────────────────────────
-        raw_course = next_line(r'Course').strip().upper()
-        result['course'] = abbr_course_map.get(raw_course, '')
-        if not result['course']:
-            for abbr, cname in abbr_course_map.items():
-                if re.search(r'\b' + abbr + r'\b', full, re.IGNORECASE):
-                    result['course'] = cname; break
-
-        # ── Section code → year + section letter + course ─────────────
-        # e.g. CS4A → prefix=CS, year=4, section=A
-        raw_section = next_line(r'Section').strip()
-        sec_m = re.match(r'^([A-Za-z]+)(\d)([A-Za-z])$', raw_section)
-        if sec_m:
-            prefix = sec_m.group(1).upper()
-            yr_num = sec_m.group(2)
-            result['section']    = sec_m.group(3).upper()
-            result['year_level'] = year_num_map.get(yr_num, yr_num + 'th Year')
-            if not result['course']:
-                result['course'] = prefix_course_map.get(prefix, '')
-        else:
-            # Plain letter section — get year from Year field directly
-            result['section'] = raw_section[:1].upper()
-            raw_year_val = next_line(r'Year').strip()
-            yr_word = raw_year_val.split()[0] if raw_year_val else ''
-            result['year_level'] = (
-                year_num_map.get(yr_word.lower()) or
-                year_num_map.get(yr_word.lower().rstrip('thsrnd')) or ''
-            )
-
-        # ── Major ─────────────────────────────────────────────────────
-        raw_major = next_line(r'Major')
-        result['major'] = '' if raw_major.upper() in ('N/A','NA','NONE','') \
-                          else raw_major.title()
-
-        # ── Subjects ─────────────────────────────────────────────────
-        # One subject = 8 consecutive lines in pypdf output:
-        #   0: ScheduleCode (9-digit)  1: SectionCode  2: CourseCode
-        #   3: Description             4: Units(3.00)  5: Lec  6: Lab  7: Hours
-        subjects = []
-        hdr_m  = re.search(
-            r'Schedule\s*Code.*?Course\s*Description.*?Hour\n',
-            full, re.DOTALL | re.IGNORECASE)
-        fees_m = re.search(r'Laboratory\s*Fees', full, re.IGNORECASE)
-        if hdr_m and fees_m and fees_m.start() > hdr_m.end():
-            block = full[hdr_m.end():fees_m.start()]
-            lines = [l.replace('\t', ' ').strip()
-                     for l in block.split('\n') if l.strip()]
-            i = 0
-            while i < len(lines):
-                if re.match(r'^\d{7,12}$', lines[i]) and i + 7 < len(lines):
-                    code_raw  = lines[i + 2]
-                    desc_raw  = lines[i + 3]
-                    units_raw = lines[i + 4]
-                    code_clean = re.sub(r'\s+', ' ', code_raw).strip()
-                    desc_clean = desc_raw.title()
-                    try:    units_int = str(round(float(units_raw)))
-                    except: units_int = '3'
-                    if units_int == '0': units_int = '3'
-                    if code_clean and desc_clean:
-                        subjects.append({
-                            'course_code': code_clean,
-                            'name':        desc_clean,
-                            'units':       units_int,
-                        })
-                    i += 8
-                else:
-                    i += 1
-        result['subjects'] = subjects
-
+        print(f'[PDF] PREVIEW:\n{full[:600]}\n[PDF] END')
+ 
+        result = _extract_cvsu_fields(full)
+ 
         print(f'[PDF] name="{result["name"]}" id="{result["student_id"]}" '
               f'course="{result["course"]}" year="{result["year_level"]}" '
-              f'sec="{result["section"]}" subjects={len(subjects)} '
-              f'email="{result["email"]}')
+              f'sec="{result["section"]}" subjects={len(result["subjects"])} '
+              f'email="{result["email"]}"')
+ 
         return jsonify({**result, 'added_to_catalogue': []})
-
+ 
     except Exception as e:
         tb = traceback.format_exc()
         print(f'[parse_registration_pdf ERROR]\n{tb}')
         return jsonify({'error': f'{type(e).__name__}: {str(e)}'}), 500
+
+@app.route('/batch_register', methods=['GET', 'POST'])
+@admin_required
+def batch_register():
+    if request.method == 'GET':
+        return render_template('batch_register.html',
+                               subjects_db=db_get_all_subjects(),
+                               users_db=db_get_all_users())
+ 
+    # POST: receive JSON list of students with nfc_id already assigned
+    students_json = request.form.get('students_data', '[]')
+    try:
+        students_in = json.loads(students_json)
+    except Exception:
+        flash('Invalid student data payload.')
+        return redirect(url_for('batch_register'))
+ 
+    # Filter to only students that have an nfc_id (skipped ones are excluded)
+    students_in = [s for s in students_in if s.get('nfc_id')]
+ 
+    success_count  = 0
+    blockchain_ok  = 0
+    errors         = []
+    subjects_saved = 0
+ 
+    # ── Save all subjects across all students to the catalogue ────────────
+    existing_subj  = db_get_all_subjects()
+    existing_codes = {
+        v.get('course_code', '').upper(): k
+        for k, v in existing_subj.items()
+        if v.get('course_code')
+    }
+    for student in students_in:
+        for subj in (student.get('subjects') or []):
+            code_upper = (subj.get('course_code') or '').upper().strip()
+            name_val   = (subj.get('name') or '').strip()
+            if not name_val:
+                continue
+            if code_upper and code_upper in existing_codes:
+                continue
+            new_id = str(uuid.uuid4())[:8]
+            db_save_subject(new_id, {
+                'name':        name_val,
+                'course_code': subj.get('course_code', ''),
+                'units':       str(subj.get('units', '3')),
+                'created_by':  session.get('username', 'admin'),
+                'created_at':  datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            })
+            if code_upper:
+                existing_codes[code_upper] = new_id
+            subjects_saved += 1
+ 
+    # ── Register each student ─────────────────────────────────────────────
+    for student in students_in:
+        try:
+            nfc_id = student.get('nfc_id', '').strip().upper()
+            name   = (student.get('name') or '').strip()
+ 
+            if not nfc_id:
+                errors.append(f"Missing NFC ID for {name or 'Unknown'}")
+                continue
+            if not name:
+                errors.append(f"Missing name for NFC {nfc_id}")
+                continue
+ 
+            # Build on-chain registration string
+            extras    = []
+            email_val = (student.get('email') or '').strip()
+            if not email_val:
+                email_val = _generate_cvsu_email(name)
+ 
+            for field, prefix in [
+                ('student_id',  'ID'),
+                ('course',      'Course'),
+                ('year_level',  'Year'),
+                ('adviser',     'Adviser'),
+                ('contact',     'Tel'),
+                ('semester',    'Sem'),
+                ('school_year', 'SY'),
+            ]:
+                v = (student.get(field) or '').strip()
+                if v:
+                    extras.append(f"{prefix}:{v}")
+ 
+            if email_val:
+                extras.append(f"Email:{email_val}")
+ 
+            section_val = (student.get('section') or '').strip().upper()
+            if section_val:
+                extras.append(f"Sec:{section_val}")
+ 
+            date_reg = (student.get('date_registered') or '').strip()
+            if date_reg:
+                extras.append(f"RegDate:{date_reg}")
+ 
+            major = (student.get('major') or 'N/A').strip()
+            extras.append(f"Major:{major}")
+ 
+            on_chain = name + (' | ' + ' | '.join(extras) if extras else '')
+ 
+            # Generate Ethereum address
+            pk   = "0x" + secrets.token_hex(32)
+            addr = web3.eth.account.from_key(pk).address
+ 
+            # Parse and save to SQLite cache
+            p = parse_student(on_chain)
+            student_name_map[nfc_id] = name
+            db_save_student({
+                **p,
+                'nfcId':      nfc_id,
+                'raw_name':   on_chain,
+                'address':    addr,
+                'tx_hash':    '',
+                'photo_file': student.get('photo_file', ''),
+            })
+            success_count += 1
+ 
+            # Register on blockchain (non-fatal if offline)
+            if BLOCKCHAIN_ONLINE and contract and admin_account:
+                try:
+                    tx = contract.functions.registerStudent(
+                        addr, nfc_id, on_chain
+                    ).transact({'from': admin_account})
+                    receipt  = web3.eth.wait_for_transaction_receipt(tx)
+                    tx_hash  = receipt['transactionHash'].hex()
+                    blk      = receipt['blockNumber']
+                    with get_db() as _conn:
+                        _conn.execute(
+                            "UPDATE students SET reg_tx_hash=?, eth_address=?, "
+                            "reg_block=?, updated_at=? WHERE nfc_id=?",
+                            (tx_hash, addr, blk,
+                             datetime.now().strftime('%Y-%m-%d %H:%M:%S'), nfc_id)
+                        )
+                    blockchain_ok += 1
+                except Exception as be:
+                    msg = str(be)
+                    if 'already' in msg.lower():
+                        blockchain_ok += 1  # already on chain — that's fine
+                    else:
+                        errors.append(f"Blockchain error for {name}: {be}")
+ 
+        except Exception as e:
+            errors.append(f"Error registering {student.get('name', 'Unknown')}: {e}")
+ 
+    # Flash results
+    if success_count:
+        chain_note = (f" {blockchain_ok} confirmed on blockchain."
+                      if BLOCKCHAIN_ONLINE else " (offline — saved to SQLite cache)")
+        subj_note  = f" {subjects_saved} subject(s) added to catalogue." if subjects_saved else ""
+        flash(f"Registered {success_count} student(s) successfully.{chain_note}{subj_note}")
+ 
+    if errors:
+        flash("Errors: " + " | ".join(errors[:5]) +
+              (f" (+{len(errors)-5} more)" if len(errors) > 5 else ""))
+ 
+    return redirect(url_for('dashboard'))
+
+@app.route('/parse_batch_pdfs', methods=['POST'])
+@admin_required
+def parse_batch_pdfs():
+    import traceback
+ 
+    if 'files' not in request.files:
+        return jsonify({'error': 'No files uploaded'}), 400
+ 
+    files     = request.files.getlist('files')
+    pdf_files = [f for f in files if f.filename and f.filename.lower().endswith('.pdf')]
+    if not pdf_files:
+        return jsonify({'error': 'No PDF files found in the upload'}), 400
+ 
+    students = []
+    errors   = []
+ 
+    for f in pdf_files:
+        filename = f.filename or 'unknown.pdf'
+        try:
+            raw_bytes = f.read()
+            if not raw_bytes:
+                errors.append(f'Empty file: {filename}')
+                continue
+ 
+            full = _parse_cvsu_pdf_text(raw_bytes)
+            if not full.strip():
+                errors.append(f'Could not extract text from: {filename}')
+                continue
+ 
+            result = _extract_cvsu_fields(full)
+ 
+            # Fallback: derive name from filename if PDF gave nothing
+            # Handles:  LASTNAME_FIRSTNAME MIDDLE.pdf
+            #           AMBATA_JHAY VIC_GUILLERMO.pdf
+            if not result['name']:
+                base = re.sub(r'\.pdf$', '', filename, flags=re.IGNORECASE)
+                if '_' in base:
+                    parts  = base.split('_', 1)
+                    last   = parts[0].replace('-', ' ').strip().title()
+                    first  = parts[1].replace('_', ' ').replace('-', ' ').strip().title()
+                    result['name'] = f"{first} {last}"
+                else:
+                    result['name'] = base.replace('-', ' ').replace('_', ' ').strip().title()
+ 
+                if result['name']:
+                    print(f'[BATCH PDF] Name from filename: "{result["name"]}"')
+                    if not result['email']:
+                        result['email'] = _generate_cvsu_email(result['name'])
+ 
+            if not result['name'] and not result['student_id']:
+                errors.append(f'No usable data extracted from: {filename}')
+                continue
+ 
+            result['filename'] = filename
+            students.append(result)
+ 
+            print(f'[BATCH PDF] OK  "{filename}" -> "{result["name"]}" '
+                  f'id="{result["student_id"]}" yr="{result["year_level"]}" '
+                  f'sec="{result["section"]}" subj={len(result["subjects"])}')
+ 
+        except Exception as e:
+            tb = traceback.format_exc()
+            print(f'[BATCH PDF ERROR] {filename}\n{tb}')
+            errors.append(f'{filename}: {type(e).__name__} — {str(e)}')
+ 
+    if not students:
+        return jsonify({
+            'error':   'No valid student data could be extracted.',
+            'details': errors,
+        }), 400
+ 
+    # Sort alphabetically by surname (e.g. Ambata before Berongoy)
+    students.sort(key=_surname_sort_key)
+    for i, s in enumerate(students):
+        s['sort_order'] = i + 1
+ 
+    return jsonify({
+        'students':     students,
+        'total_parsed': len(students),
+        'errors':       errors,
+        'sorted_by':    'surname_first',
+    })
 
 @app.route('/mark', methods=['POST'])
 @login_required

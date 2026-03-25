@@ -61,6 +61,7 @@ def reset_sqlite():
     conn = sqlite3.connect(DB_FILE)
     conn.execute("PRAGMA foreign_keys = OFF")
     conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     pw  = hash_password(ADMIN_PASSWORD)
 
@@ -147,6 +148,19 @@ def reset_sqlite():
         ok("VACUUM complete           (file size reduced)")
     except Exception as e:
         warn(f"VACUUM failed: {e}")
+
+    # ── Delete WAL files to ensure changes are committed ────────────────────
+    try:
+        wal_file = DB_FILE + '-wal'
+        shm_file = DB_FILE + '-shm'
+        if os.path.exists(wal_file):
+            os.remove(wal_file)
+            ok("Removed WAL file          (davs.db-wal)")
+        if os.path.exists(shm_file):
+            os.remove(shm_file)
+            ok("Removed SHM file          (davs.db-shm)")
+    except Exception as e:
+        warn(f"Could not remove WAL/SHM files: {e}")
 
     conn.execute("PRAGMA foreign_keys = ON")
     conn.close()

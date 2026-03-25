@@ -1,0 +1,1316 @@
+{% extends "base.html" %}
+{% block title %}Enroll Student — DAVS{% endblock %}
+{% block page_title %}STUDENT ENROLLMENT{% endblock %}
+{% block content %}
+<style>
+/* ── Tab switcher ────────────────────────────────────────────────────── */
+.enroll-tabs{display:flex;gap:0;background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;overflow:hidden;margin-bottom:22px;}
+.etab{flex:1;padding:13px 10px;text-align:center;font-size:13px;font-weight:700;
+  color:var(--muted);cursor:pointer;border-right:1px solid var(--border);
+  transition:all .2s;display:flex;align-items:center;justify-content:center;gap:7px;
+  font-family:'Space Mono',monospace;letter-spacing:.3px;}
+.etab:last-child{border-right:none;}
+.etab.active{background:rgba(45,106,39,.09);color:var(--accent);}
+.etab:hover:not(.active){background:rgba(45,106,39,.04);color:var(--text);}
+.etab-panel{display:none;}.etab-panel.active{display:block;}
+
+/* ── Shared upload banner ────────────────────────────────────────────── */
+.upload-banner{background:rgba(45,106,39,.04);border:2px dashed rgba(45,106,39,.25);
+  border-radius:12px;padding:18px 22px;display:flex;align-items:center;gap:14px;
+  cursor:pointer;transition:all .25s;margin-bottom:18px;flex-wrap:wrap;}
+.upload-banner:hover,.upload-banner.dragover{border-color:var(--accent);background:rgba(45,106,39,.07);}
+.upload-banner.loading{border-color:var(--warning);border-style:solid;cursor:default;}
+.upload-banner.success{border-color:var(--success);border-style:solid;background:rgba(45,106,39,.05);}
+.upload-banner.error{border-color:var(--danger);border-style:solid;}
+.ub-icon{font-size:32px;flex-shrink:0;}
+.ub-text{flex:1;min-width:120px;}
+.ub-title{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;}
+.ub-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+.btn-upload{background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;
+  padding:9px 16px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;}
+[data-theme="dark"] .btn-upload{color:#000;}
+.btn-upload:disabled{opacity:.6;cursor:not-allowed;}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  border-radius:50%;animation:_spin .7s linear infinite;display:inline-block;}
+@keyframes _spin{to{transform:rotate(360deg);}}
+
+/* ── Single enroll form ──────────────────────────────────────────────── */
+.full-form{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px 16px;}
+.span-2{grid-column:span 2;}.span-3{grid-column:1/-1;}
+@media(max-width:860px){.full-form{grid-template-columns:1fr 1fr;}.span-2{grid-column:span 1;}}
+@media(max-width:540px){.full-form{grid-template-columns:1fr;}.span-2,.span-3{grid-column:1;}}
+.field-wrap{display:flex;flex-direction:column;}.field-wrap .form-label{margin-bottom:5px;}
+.fsec{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;
+  text-transform:uppercase;margin-bottom:4px;padding-bottom:8px;
+  border-bottom:1px solid var(--border);grid-column:1/-1;}
+.steps-box{background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.15);border-radius:10px;
+  padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px;}
+.step-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.step-num{width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;
+  font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+[data-theme="dark"] .step-num{color:#000;}.sep{color:var(--border);font-size:14px;}
+.subj-preview{display:none;grid-column:1/-1;}.subj-preview.show{display:block;}
+.subj-preview-inner{background:rgba(255,255,255,.02);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;max-height:220px;overflow-y:auto;}
+.subj-notice{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.2);
+  border-radius:8px;padding:10px 13px;font-size:12px;color:var(--warning);
+  margin-bottom:8px;display:flex;align-items:flex-start;gap:7px;}
+.subj-table{width:100%;border-collapse:collapse;font-size:12px;}
+.subj-table th{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.5px;padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;}
+.subj-table td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle;}
+.subj-table tr:last-child td{border-bottom:none;}
+.photo-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.photo-preview-wrap{width:72px;height:72px;border-radius:50%;background:rgba(45,106,39,.08);
+  border:2px dashed rgba(45,106,39,.25);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;overflow:hidden;flex-shrink:0;transition:border-color .2s;}
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:22px 24px;margin-top:4px;}
+@media(max-width:540px){.form-card{padding:14px;}}
+.submit-row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;}
+.submit-row .btn-primary{flex:1;min-width:180px;justify-content:center;padding:12px;font-size:14px;}
+.submit-row .btn-outline{flex-shrink:0;padding:12px 20px;}
+.nfc-card-strip{background:rgba(45,106,39,.04);border:2px dashed rgba(45,106,39,.2);
+  border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:14px;transition:all .3s;}
+.nfc-card-strip.captured{border-style:solid;border-color:var(--success);background:rgba(45,106,39,.05);}
+.nfc-card-strip.waiting{border-style:solid;border-color:var(--accent);animation:borderPulse 1.5s infinite;}
+.nfc-card-strip.error{border-style:solid;border-color:var(--danger);}
+@keyframes borderPulse{0%,100%{border-color:var(--accent);}50%{border-color:rgba(45,106,39,.2);}}
+.nfc-strip-icon{font-size:28px;flex-shrink:0;}
+.nfc-strip-info{flex:1;min-width:0;}
+.nfc-strip-title{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;}
+.nfc-strip-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+.nfc-uid-display{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;
+  color:var(--text);background:rgba(255,255,255,.04);border:1px solid var(--border);
+  border-radius:6px;padding:6px 14px;letter-spacing:2px;cursor:default;user-select:none;
+  transition:border-color .3s,color .3s;margin-top:8px;display:inline-block;}
+.nfc-uid-display.has-uid{border-color:var(--success);color:var(--success);}
+.nfc-uid-display.no-uid{color:var(--muted);}
+
+/* ── Batch enroll ────────────────────────────────────────────────────── */
+.be-steps{display:flex;gap:0;margin-bottom:20px;background:var(--surface);
+  border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.be-step{flex:1;padding:12px 10px;text-align:center;font-size:12px;font-weight:600;
+  color:var(--muted);border-right:1px solid var(--border);transition:all .3s;}
+.be-step:last-child{border-right:none;}
+.be-step.active{background:rgba(45,106,39,.08);color:var(--accent);}
+.be-step.done{background:rgba(45,106,39,.05);color:var(--success);}
+.be-step-num{width:22px;height:22px;border-radius:50%;background:var(--border);color:var(--muted);
+  font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
+  margin-bottom:4px;}
+.be-step.active .be-step-num{background:var(--accent);color:#fff;}
+[data-theme="dark"] .be-step.active .be-step-num{color:#000;}
+.be-step.done .be-step-num{background:var(--success);color:#fff;}
+.phase{display:none;}.phase.active{display:block;}
+.st-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-top:4px;}
+.st-table{width:100%;border-collapse:collapse;font-size:13px;}
+.st-table thead th{background:rgba(45,106,39,.09);color:var(--accent);font-size:10px;
+  font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:10px 12px;
+  text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);}
+.st-table tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
+.st-table tbody tr:last-child{border-bottom:none;}
+.st-table tbody tr:hover{background:rgba(45,106,39,.03);}
+.st-table tbody tr.row-current{background:rgba(45,106,39,.07);border-left:3px solid var(--accent);}
+.st-table tbody tr.row-done{opacity:.7;}
+.st-table td{padding:9px 12px;vertical-align:middle;}
+.order-badge{width:22px;height:22px;border-radius:50%;background:rgba(45,106,39,.12);
+  color:var(--accent);font-size:11px;font-weight:700;display:inline-flex;
+  align-items:center;justify-content:center;font-family:'Space Mono',monospace;}
+.nfc-chip{font-family:'Space Mono',monospace;font-size:11px;background:rgba(45,106,39,.08);
+  color:var(--accent);border:1px solid rgba(45,106,39,.2);border-radius:5px;padding:2px 8px;}
+.status-tag{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;
+  display:inline-block;white-space:nowrap;}
+.st-waiting{background:rgba(100,116,139,.1);color:var(--muted);border:1px solid var(--border);}
+.st-current{background:rgba(45,106,39,.12);color:var(--accent);border:1px solid rgba(45,106,39,.3);
+  animation:_stpulse 1.5s infinite;}
+.st-assigned{background:rgba(45,106,39,.12);color:var(--success);border:1px solid rgba(45,106,39,.3);}
+.st-skipped{background:rgba(192,57,43,.08);color:var(--danger);border:1px solid rgba(192,57,43,.2);}
+@keyframes _stpulse{0%,100%{opacity:1;}50%{opacity:.65;}}
+.miss-badge{font-size:10px;background:rgba(245,197,24,.1);color:var(--warning);
+  border:1px solid rgba(245,197,24,.3);border-radius:4px;padding:1px 5px;margin-left:4px;}
+
+/* ── Inline edit row ─────────────────────────────────────────────────── */
+.inline-edit-row td{padding:12px 14px;background:rgba(45,106,39,.025);
+  border-bottom:2px solid var(--accent);}
+.ie-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px 12px;}
+.ie-field{display:flex;flex-direction:column;gap:3px;}
+.ie-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+.ie-input{background:var(--input-bg);border:1.5px solid var(--border);color:var(--text);
+  border-radius:6px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;
+  transition:border-color .2s;width:100%;}
+.ie-input:focus{outline:none;border-color:var(--accent);}
+.ie-input.warn{border-color:var(--warning);}
+.ie-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.btn-ie-save{background:var(--accent);color:#fff;border:none;border-radius:7px;
+  padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;gap:5px;transition:filter .2s;}
+.btn-ie-save:hover{filter:brightness(1.1);}
+[data-theme="dark"] .btn-ie-save{color:#000;}
+.btn-ie-cancel{background:transparent;border:1px solid var(--border);color:var(--muted);
+  border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;
+  transition:border-color .2s,color .2s;}
+.btn-ie-cancel:hover{border-color:var(--danger);color:var(--danger);}
+
+/* ── STYLED EDIT BUTTON ──────────────────────────────────────────────── */
+.btn-edit-row{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 12px;font-size:11px;font-weight:700;
+  border-radius:7px;cursor:pointer;transition:all .18s;
+  font-family:'DM Sans',sans-serif;letter-spacing:.2px;
+  background:rgba(45,106,39,.1);
+  color:var(--accent);
+  border:1.5px solid rgba(45,106,39,.3);
+}
+.btn-edit-row:hover{
+  background:var(--accent);color:#fff;
+  border-color:var(--accent);
+  box-shadow:0 2px 8px rgba(45,106,39,.25);
+}
+[data-theme="dark"] .btn-edit-row:hover{color:#000;}
+.btn-edit-row.open{
+  background:var(--accent);color:#fff;border-color:var(--accent);
+}
+[data-theme="dark"] .btn-edit-row.open{color:#000;}
+
+/* ── NFC assignment panel ────────────────────────────────────────────── */
+.nfc-panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  overflow:hidden;margin-bottom:20px;}
+.nfc-panel-header{background:rgba(45,106,39,.06);padding:16px 20px;
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.nfc-panel-body{padding:24px;}
+.curr-card{border:2px solid var(--accent);border-radius:12px;padding:20px 24px;
+  background:rgba(45,106,39,.04);margin-bottom:20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.curr-avatar{width:64px;height:64px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;
+  color:#000;flex-shrink:0;}
+.curr-info{flex:1;min-width:0;}
+.curr-name{font-size:18px;font-weight:700;margin-bottom:4px;}
+.curr-meta{font-size:13px;color:var(--muted);margin-bottom:10px;}
+.curr-order{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);
+  background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.15);border-radius:5px;
+  padding:2px 8px;display:inline-block;}
+.tap-zone{border:2px dashed rgba(45,106,39,.25);border-radius:12px;padding:28px 20px;
+  text-align:center;transition:all .3s;background:rgba(45,106,39,.02);}
+.tap-zone.waiting{border-color:var(--accent);border-style:solid;animation:_tapborder 1.5s infinite;}
+.tap-zone.scanned{border-color:var(--success);border-style:solid;background:rgba(45,106,39,.05);}
+@keyframes _tapborder{0%,100%{border-color:var(--accent);}50%{border-color:rgba(45,106,39,.25);}}
+.tap-icon{font-size:52px;margin-bottom:10px;display:block;}
+.tap-uid-display{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;
+  color:var(--success);background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);
+  border-radius:8px;padding:10px 20px;display:inline-block;margin:12px 0;letter-spacing:2px;}
+.nfc-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:16px;}
+.btn-confirm-nfc{background:var(--success);color:#fff;border:none;border-radius:9px;
+  padding:11px 24px;font-size:14px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;gap:8px;transition:all .2s;}
+[data-theme="dark"] .btn-confirm-nfc{color:#000;}
+.btn-confirm-nfc:hover{filter:brightness(1.1);}
+.btn-confirm-nfc:disabled{opacity:.5;cursor:not-allowed;}
+.btn-skip-nfc{background:transparent;border:2px solid var(--border);color:var(--muted);
+  border-radius:9px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;transition:all .2s;}
+.btn-skip-nfc:hover{border-color:var(--warning);color:var(--warning);}
+.btn-undo-nfc{background:transparent;border:2px solid var(--border);color:var(--muted);
+  border-radius:9px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;transition:all .2s;}
+.btn-undo-nfc:hover{border-color:var(--accent);color:var(--accent);}
+.btn-undo-nfc:disabled{opacity:.4;cursor:not-allowed;}
+.dup-warn{background:rgba(192,57,43,.08);border:1.5px solid rgba(192,57,43,.3);
+  border-radius:8px;padding:10px 14px;font-size:12px;color:var(--danger);
+  margin-top:10px;display:none;}
+.dup-warn.show{display:flex;align-items:center;gap:8px;}
+.prog-strip{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.prog-bar-outer{flex:1;min-width:120px;height:6px;background:var(--border);border-radius:99px;overflow:hidden;}
+.prog-bar-inner{height:100%;background:var(--accent);border-radius:99px;transition:width .4s;}
+.prog-label{font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;font-family:'Space Mono',monospace;}
+
+/* ── Phase 3 summary ─────────────────────────────────────────────────── */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:12px;margin-bottom:20px;}
+.sum-chip{border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px;}
+.sum-chip.total{background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);}
+.sum-chip.assigned{background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);}
+.sum-chip.skipped{background:rgba(192,57,43,.06);border:1px solid rgba(192,57,43,.2);}
+.sum-val{font-family:'Space Mono',monospace;font-size:28px;font-weight:700;}
+.sum-lab{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600;}
+.res-table{width:100%;border-collapse:collapse;font-size:12px;}
+.res-table th{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.5px;padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+.res-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.res-table tr:last-child td{border-bottom:none;}
+.res-table tr:nth-child(even) td{background:rgba(45,106,39,.02);}
+
+/* ── Misc ────────────────────────────────────────────────────────────── */
+.msg-box-wrap{margin-bottom:6px;}
+.msg-box{border-radius:9px;padding:11px 14px;font-size:13px;font-weight:600;
+  display:flex;align-items:center;gap:9px;margin-bottom:8px;animation:_slideIn .3s ease;}
+.msg-box.error{background:rgba(192,57,43,.08);border:1.5px solid rgba(192,57,43,.25);color:var(--danger);}
+.msg-box.success{background:rgba(45,106,39,.08);border:1.5px solid rgba(45,106,39,.25);color:var(--success);}
+.msg-box.info{background:rgba(245,197,24,.06);border:1.5px solid rgba(245,197,24,.2);color:var(--warning);}
+@keyframes _slideIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:translateY(0);}}
+.section-title{font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);
+  letter-spacing:2px;text-transform:uppercase;padding-bottom:8px;
+  border-bottom:1px solid var(--border);margin-bottom:16px;}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+.btn-row .btn-primary{flex:1;min-width:160px;justify-content:center;padding:12px;font-size:14px;}
+</style>
+
+<!-- Global NFC HID input — shared by both tabs -->
+<input id="nfcHidInput" type="text"
+  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+  tabindex="0"
+  style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;
+         pointer-events:none;border:none;outline:none;background:transparent;
+         color:transparent;z-index:-1;font-size:1px;"
+  aria-hidden="true"/>
+
+<!-- ── Page header ─────────────────────────────────────────────────── -->
+<div style="margin-bottom:18px;">
+  <h2 style="font-size:20px;font-weight:700;margin-bottom:4px;">Student Enrollment</h2>
+  <p style="font-size:13px;color:var(--muted);">Enroll a single student or upload multiple CvSU registration PDFs at once.</p>
+</div>
+
+<!-- ── Tab switcher ─────────────────────────────────────────────────── -->
+<div class="enroll-tabs" id="enrollTabs">
+  <div class="etab active" id="tabSingle" onclick="switchTab('single')">
+    <i class="bi bi-person-plus"></i> Enroll Single Student
+  </div>
+  <div class="etab" id="tabBatch" onclick="switchTab('batch')">
+    <i class="bi bi-people"></i> Batch Enrollment
+  </div>
+</div>
+
+<!-- Messages -->
+<div class="msg-box-wrap" id="msgBox"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB 1 — SINGLE ENROLL
+══════════════════════════════════════════════════════════════════ -->
+<div class="etab-panel active" id="panelSingle">
+
+  <div class="steps-box">
+    <div class="step-chip"><div class="step-num">1</div><span>Upload PDF or fill manually</span></div>
+    <div class="sep">·</div>
+    <div class="step-chip"><div class="step-num">2</div><span>Complete all fields</span></div>
+    <div class="sep">·</div>
+    <div class="step-chip"><div class="step-num">3</div><span>Tap NFC card on reader</span></div>
+    <div class="sep">·</div>
+    <div class="step-chip"><div class="step-num">4</div><span>Click Register to save</span></div>
+    <span style="margin-left:auto;font-size:12px;color:var(--muted);">
+      <span style="color:var(--danger);font-weight:700;">*</span> = Required
+    </span>
+  </div>
+
+  <div class="upload-banner" id="s_uploadBanner"
+       ondragover="event.preventDefault();this.classList.add('dragover')"
+       ondragleave="this.classList.remove('dragover')"
+       ondrop="s_handleDrop(event)">
+    <div class="ub-icon" id="s_ubIcon">📄</div>
+    <div class="ub-text">
+      <div class="ub-title" id="s_ubTitle">Auto-fill from CvSU Registration PDF</div>
+      <div class="ub-sub" id="s_ubSub">Drop a PDF here or click Upload — subjects will be saved only when you click Register</div>
+    </div>
+    <button type="button" class="btn-upload" onclick="document.getElementById('s_pdfFileInput').click()" id="s_btnUpload">
+      <i class="bi bi-cloud-upload"></i> Upload PDF
+    </button>
+    <input type="file" id="s_pdfFileInput" accept=".pdf" style="display:none;" onchange="s_handlePdfUpload(this)">
+  </div>
+
+  <!-- Subject preview -->
+  <div class="subj-preview" id="s_subjPreview">
+    <div class="subj-notice">
+      <i class="bi bi-info-circle" style="flex-shrink:0;margin-top:1px;"></i>
+      <span>These subjects will be added to the catalogue only when you click <strong>Register Student on Blockchain</strong>.</span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+      <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;">// SUBJECTS FOUND IN PDF</span>
+      <span style="font-size:11px;color:var(--muted);" id="s_subjPreviewNote"></span>
+    </div>
+    <div class="subj-preview-inner" id="s_subjPreviewList"></div>
+  </div>
+
+  <div class="form-card">
+    <form method="POST" action="{{ url_for('register') }}" id="registerForm" enctype="multipart/form-data" onsubmit="return validateRegisterForm()">
+      <input type="hidden" name="pending_subjects_json" id="pendingSubjectsJson" value="[]"/>
+
+      <div class="full-form">
+        <div class="fsec">// Enrollment Details</div>
+        <div class="field-wrap">
+          <label class="form-label">Semester <span style="color:var(--danger)">*</span></label>
+          <select class="form-control" name="semester" id="f_semester" required>
+            <option value="" disabled selected>Select semester…</option>
+            <option value="First">First Semester</option>
+            <option value="Second">Second Semester</option>
+            <option value="Summer">Summer</option>
+          </select>
+        </div>
+        <div class="field-wrap">
+          <label class="form-label">School Year <span style="color:var(--danger)">*</span></label>
+          <input type="text" class="form-control" name="school_year" id="f_school_year" placeholder="e.g. 2024-2025" required/>
+        </div>
+        <div class="field-wrap">
+          <label class="form-label">Date of Admission</label>
+          <input type="month" class="form-control" name="date_registered" id="f_date_registered"/>
+        </div>
+
+        <div class="fsec" style="margin-top:6px;">// Personal Information</div>
+        <div class="field-wrap span-3">
+          <label class="form-label">Student Photo <span style="font-size:10px;font-weight:400;color:var(--muted);text-transform:none;">(optional)</span></label>
+          <div class="photo-row">
+            <div class="photo-preview-wrap" id="photoPreviewWrap" onclick="document.getElementById('studentPhotoInput').click()">
+              <div id="photoPreviewInit" style="text-align:center;"><i class="bi bi-camera" style="font-size:20px;color:var(--muted);display:block;"></i><span style="font-size:10px;color:var(--muted);">Upload</span></div>
+              <img id="photoPreviewImg" src="" style="display:none;width:100%;height:100%;object-fit:cover;"/>
+            </div>
+            <div>
+              <input type="file" id="studentPhotoInput" name="student_photo" accept="image/*" style="display:none;" onchange="previewStudentPhoto(this)">
+              <button type="button" class="btn-outline" style="font-size:12px;padding:7px 14px;" onclick="document.getElementById('studentPhotoInput').click()"><i class="bi bi-cloud-upload"></i> Choose Photo</button>
+              <div style="font-size:11px;color:var(--muted);margin-top:5px;">JPG, PNG, WEBP · Max 5 MB</div>
+            </div>
+          </div>
+        </div>
+        <div class="field-wrap span-2">
+          <label class="form-label">Student Full Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" class="form-control" name="name" id="f_name" placeholder="e.g. Juan Dela Cruz" required/>
+        </div>
+        <div class="field-wrap">
+          <label class="form-label">Student ID Number <span style="color:var(--danger)">*</span></label>
+          <input type="text" class="form-control" name="student_id" id="f_student_id" placeholder="e.g. 2021-00123" required/>
+        </div>
+        <div class="field-wrap span-2">
+          <label class="form-label">Email Address</label>
+          <input type="email" class="form-control" name="email" id="f_email" placeholder="e.g. sc.juan.delacruz@cvsu.edu.ph"/>
+        </div>
+        <div class="field-wrap">
+          <label class="form-label">Contact Number</label>
+          <input type="text" class="form-control" name="contact" id="f_contact" placeholder="e.g. 09XX-XXX-XXXX"/>
+        </div>
+
+        <div class="fsec" style="margin-top:6px;">// Academic Information</div>
+        <div class="field-wrap">
+          <label class="form-label">Program <span style="color:var(--danger)">*</span></label>
+          <select class="form-control" name="course" id="f_course" required>
+            <option value="" disabled selected>Select program…</option>
+            <option value="BS Computer Science">BS Computer Science</option>
+            <option value="BS Information Technology">BS Information Technology</option>
+          </select>
+        </div>
+        <div class="field-wrap">
+          <label class="form-label">Major / Specialization</label>
+          <input type="text" class="form-control" name="major" id="f_major" placeholder="e.g. Software Engineering" value="N/A"/>
+        </div>
+        <div class="field-wrap">
+          <label class="form-label">Year Level <span style="color:var(--danger)">*</span></label>
+          <select class="form-control" name="year_level" id="f_year_level" required>
+            <option value="" disabled selected>Select year…</option>
+            <option value="1st Year">1st Year</option>
+            <option value="2nd Year">2nd Year</option>
+            <option value="3rd Year">3rd Year</option>
+            <option value="4th Year">4th Year</option>
+          </select>
+        </div>
+        <div class="field-wrap">
+          <label class="form-label">Section <span style="color:var(--danger)">*</span></label>
+          <select class="form-control" name="section" id="f_section" required>
+            <option value="" disabled selected>Select section…</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+        <div class="field-wrap span-2">
+          <label class="form-label">Adviser Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" class="form-control" name="adviser" id="f_adviser"
+                 placeholder="Type or pick a teacher name…" list="adviserList" required autocomplete="off"/>
+          <datalist id="adviserList">
+            {% for u, d in users_db.items() %}{% if d.role in ('teacher','admin') %}
+            <option value="{{ d.full_name }}">{{ d.full_name }}</option>
+            {% endif %}{% endfor %}
+          </datalist>
+        </div>
+
+        <div class="fsec" style="margin-top:6px;">// NFC Card</div>
+        <div class="span-3">
+          <input type="hidden" name="nfc_id" id="nfc_id" required/>
+          <div class="nfc-card-strip" id="nfcCardStrip">
+            <span class="nfc-strip-icon" id="nfcStripIcon">💳</span>
+            <div class="nfc-strip-info">
+              <div class="nfc-strip-title" id="nfcStripTitle">Tap NFC card on the reader</div>
+              <div class="nfc-strip-sub" id="nfcStripSub">Hold the student's NFC card near the USB reader — the UID will fill automatically</div>
+              <div class="nfc-uid-display no-uid" id="nfcUidDisplay">No card tapped yet</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="span-3 submit-row">
+          <button type="submit" class="btn-primary"><i class="bi bi-check-circle"></i> Register Student on Blockchain</button>
+          <a href="{{ url_for('index') }}" class="btn-outline">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div><!-- /panelSingle -->
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TAB 2 — BATCH ENROLL
+══════════════════════════════════════════════════════════════════ -->
+<div class="etab-panel" id="panelBatch">
+
+  <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">
+    Upload multiple CvSU registration PDFs, review extracted data,
+    then assign NFC cards sequentially in alphabetical order.
+  </p>
+
+  <!-- Step indicator -->
+  <div class="be-steps" id="beSteps">
+    <div class="be-step active" id="beStep1">
+      <div class="be-step-num">1</div><div>Upload &amp; Review PDFs</div>
+    </div>
+    <div class="be-step" id="beStep2">
+      <div class="be-step-num">2</div><div>Assign NFC Cards</div>
+    </div>
+    <div class="be-step" id="beStep3">
+      <div class="be-step-num">3</div><div>Register on Blockchain</div>
+    </div>
+  </div>
+
+  <!-- ── Phase 1: Upload & Review ───────────────────────────────────── -->
+  <div class="phase active" id="phase1">
+
+    <div class="upload-banner" id="b_uploadBanner"
+         ondragover="event.preventDefault();this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="b_handleDrop(event)">
+      <div class="ub-icon" id="b_ubIcon">📄</div>
+      <div class="ub-text">
+        <div class="ub-title" id="b_ubTitle">Upload Multiple CvSU Registration PDFs</div>
+        <div class="ub-sub" id="b_ubSub">Drop PDF files here or click to browse — sorted alphabetically by surname</div>
+      </div>
+      <button type="button" class="btn-upload" id="b_btnUpload"
+              onclick="document.getElementById('pdfFilesInput').click()">
+        <i class="bi bi-cloud-upload"></i> Select PDFs
+      </button>
+      <input type="file" id="pdfFilesInput" accept=".pdf" multiple
+             style="display:none;" onchange="b_handleFileSelect(this)">
+    </div>
+
+    <div id="reviewPanel" style="display:none;">
+      <div class="section-title">// Parsed Students — Sorted by Surname</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+        <i class="bi bi-pencil-square"></i>
+        Click <strong>Edit</strong> on any row to fill in missing fields.
+        Fields highlighted in orange are missing or incomplete.
+      </p>
+      <div class="st-table-wrap">
+        <table class="st-table" id="studentTable">
+          <thead>
+            <tr>
+              <th>#</th><th>Student Name</th><th>Student ID</th>
+              <th>Course</th><th>Year / Sec</th><th>Email</th><th>PDF File</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="studentTbody"></tbody>
+        </table>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn-primary" onclick="proceedToNFC()">
+          <i class="bi bi-arrow-right-circle"></i> Proceed to NFC Assignment
+        </button>
+        <button type="button" class="btn-outline" onclick="b_resetAll()">
+          <i class="bi bi-arrow-counterclockwise"></i> Start Over
+        </button>
+      </div>
+    </div>
+  </div><!-- /phase1 -->
+
+  <!-- ── Phase 2: NFC Assignment ────────────────────────────────────── -->
+  <div class="phase" id="phase2">
+    <div class="nfc-panel">
+      <div class="nfc-panel-header">
+        <i class="bi bi-credit-card-2-front" style="font-size:22px;color:var(--accent);"></i>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:700;">NFC Card Assignment</div>
+          <div style="font-size:12px;color:var(--muted);">Tap cards in order. Undo returns to the previous student.</div>
+        </div>
+      </div>
+      <div class="nfc-panel-body">
+        <div class="prog-strip">
+          <div class="prog-bar-outer"><div class="prog-bar-inner" id="progBarInner" style="width:0%;"></div></div>
+          <div class="prog-label" id="progLabel">0 / 0</div>
+        </div>
+        <div class="curr-card" id="currCard">
+          <div class="curr-avatar" id="currAvatar">?</div>
+          <div class="curr-info">
+            <div class="curr-name" id="currName">—</div>
+            <div class="curr-meta" id="currMeta">—</div>
+            <div class="curr-order" id="currOrder">Student 0 of 0</div>
+          </div>
+        </div>
+        <div class="tap-zone" id="tapZone">
+          <span class="tap-icon" id="tapIcon">💳</span>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;" id="tapTitle">Tap the NFC card for this student</div>
+          <div style="font-size:13px;color:var(--muted);" id="tapSub">Hold the card near the USB reader — the UID will appear automatically</div>
+          <div id="uidDisplay" style="display:none;">
+            <div class="tap-uid-display" id="uidText">—</div>
+          </div>
+        </div>
+        <div class="dup-warn" id="dupWarn">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span id="dupWarnText">This NFC UID is already assigned to another student in this batch.</span>
+        </div>
+        <div class="nfc-actions">
+          <button class="btn-confirm-nfc" id="btnConfirm" onclick="confirmAssignment()" disabled>
+            <i class="bi bi-check-lg"></i> Confirm &amp; Assign
+          </button>
+          <button class="btn-undo-nfc" id="btnUndo" onclick="undoAssignment()" disabled>
+            <i class="bi bi-arrow-counterclockwise"></i> Undo Previous
+          </button>
+          <button class="btn-skip-nfc" id="btnSkip" onclick="skipStudent()">
+            <i class="bi bi-skip-forward"></i> Skip This Student
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">// Assignment Queue</div>
+    <div class="st-table-wrap">
+      <table class="st-table" id="queueTable">
+        <thead><tr><th>#</th><th>Student Name</th><th>Course / Year</th><th>NFC Card</th><th>Status</th></tr></thead>
+        <tbody id="queueTbody"></tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      <button type="button" class="btn-outline" onclick="b_goBack()">
+        <i class="bi bi-arrow-left"></i> Back to Review
+      </button>
+    </div>
+  </div><!-- /phase2 -->
+
+  <!-- ── Phase 3: Summary & Register ───────────────────────────────── -->
+  <div class="phase" id="phase3">
+    <div class="section-title">// Assignment Summary</div>
+    <div class="summary-grid" id="summaryGrid"></div>
+    <div id="subjectSummaryBox" style="display:none;margin-bottom:18px;">
+      <div class="section-title">// Subjects Found in PDFs — Will Be Added to Catalogue</div>
+      <div style="background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.15);border-radius:10px;padding:12px 14px;font-size:12px;">
+        <div id="subjectList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+    </div>
+    <div class="section-title">// Students to Register</div>
+    <div class="st-table-wrap" style="margin-bottom:20px;">
+      <table class="res-table" id="resultTable">
+        <thead>
+          <tr><th>#</th><th>Student Name</th><th>Student ID</th><th>Course</th><th>Year / Sec</th><th>NFC Card</th><th>Status</th></tr>
+        </thead>
+        <tbody id="resultTbody"></tbody>
+      </table>
+    </div>
+    <form method="POST" action="{{ url_for('batch_register') }}" id="finalForm">
+      <input type="hidden" name="students_data" id="studentsDataInput"/>
+    </form>
+    <div class="btn-row">
+      <button type="button" class="btn-primary" id="registerBtn" onclick="doRegister()">
+        <i class="bi bi-check-circle"></i> Register All on Blockchain
+      </button>
+      <button type="button" class="btn-outline" onclick="gotoPhase(2)">
+        <i class="bi bi-arrow-left"></i> Back to NFC Assignment
+      </button>
+      <button type="button" class="btn-outline" onclick="b_resetAll()">
+        <i class="bi bi-arrow-counterclockwise"></i> Start Over
+      </button>
+    </div>
+  </div><!-- /phase3 -->
+
+</div><!-- /panelBatch -->
+
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════════════════════════════════ */
+function switchTab(tab) {
+  document.getElementById('panelSingle').classList.toggle('active', tab === 'single');
+  document.getElementById('panelBatch').classList.toggle('active', tab === 'batch');
+  document.getElementById('tabSingle').classList.toggle('active', tab === 'single');
+  document.getElementById('tabBatch').classList.toggle('active', tab === 'batch');
+  // When switching to batch, NFC taps go to batch handler; single tab owns them otherwise
+  phase2Active = false;
+  refocusNFC();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHARED: CVSU EMAIL GENERATOR  (mirrors Python _generate_cvsu_email)
+═══════════════════════════════════════════════════════════════════ */
+function cvsuEmail(name) {
+  if (!name) return '';
+  // Remove middle initials (single letter followed by a dot)
+  let clean = name.replace(/\b[A-Za-z]\.\s*/g, '').trim();
+  // Remove suffixes
+  clean = clean.replace(/\b(JR|SR|II|III|IV)\.?\b/gi, '').trim();
+  clean = clean.replace(/\s+/g, ' ').trim();
+  const words = clean.split(' ').filter(Boolean);
+  if (words.length < 2) return '';
+  const firstSlug = words.slice(0, -1).map(w => w.toLowerCase().replace(/[^a-z]/g, '')).join('');
+  const lastSlug  = words[words.length - 1].toLowerCase().replace(/[^a-z]/g, '');
+  if (!firstSlug || !lastSlug) return '';
+  return `sc.${firstSlug}.${lastSlug}@cvsu.edu.ph`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHARED: NFC HID READER
+═══════════════════════════════════════════════════════════════════ */
+const nfcHid = document.getElementById('nfcHidInput');
+let   nfcBuf  = '', nfcTimer = null;
+const NFC_TIMEOUT = 300;
+let   phase2Active = false;   // true only during batch NFC phase
+
+function refocusNFC() {
+  const tag = document.activeElement ? document.activeElement.tagName : '';
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') nfcHid.focus();
+}
+
+nfcHid.addEventListener('keydown', function(e) {
+  clearTimeout(nfcTimer);
+  if (e.key === 'Enter') {
+    const uid = nfcBuf.trim(); nfcBuf = ''; nfcHid.value = '';
+    if (uid) { if (phase2Active) handleNFCTap(uid); else s_applyUID(uid); }
+    return;
+  }
+  if (e.key.length === 1) { nfcBuf += e.key; nfcHid.value = nfcBuf; }
+  nfcTimer = setTimeout(() => {
+    const uid = nfcBuf.trim(); nfcBuf = ''; nfcHid.value = '';
+    if (uid) { if (phase2Active) handleNFCTap(uid); else s_applyUID(uid); }
+  }, NFC_TIMEOUT);
+});
+
+document.addEventListener('click', refocusNFC);
+nfcHid.addEventListener('blur', () => setTimeout(refocusNFC, 150));
+window.addEventListener('load', () => nfcHid.focus());
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAB 1 — SINGLE ENROLL
+═══════════════════════════════════════════════════════════════════ */
+let s_pendingSubjects = [];
+
+function s_handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('s_uploadBanner').classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type === 'application/pdf') s_processPdf(f);
+  else showMsg('Please drop a PDF file.', 'error');
+}
+function s_handlePdfUpload(input) { if (input.files && input.files[0]) s_processPdf(input.files[0]); }
+
+function s_processPdf(file) {
+  s_setBanner('loading', '⏳', 'Reading PDF…', 'Extracting from ' + file.name);
+  const btn = document.getElementById('s_btnUpload'); btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Parsing…';
+  const fd = new FormData(); fd.append('file', file);
+  fetch('/parse_registration_pdf', { method:'POST', credentials:'same-origin', body:fd })
+    .then(r => {
+      if (!r.ok && r.status === 302) throw new Error('Session expired.');
+      const ct = r.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) throw new Error('Server error (' + r.status + ').');
+      return r.json();
+    })
+    .then(data => {
+      if (data.error) { s_setBanner('error','❌','Could not read PDF', data.error); return; }
+      s_autofill(data);
+      s_setBanner('success', '✅', 'Filled from: ' + file.name,
+        'Fields auto-populated. Subjects will be saved when you click Register.');
+      if (data.subjects && data.subjects.length) {
+        s_pendingSubjects = data.subjects;
+        document.getElementById('pendingSubjectsJson').value = JSON.stringify(s_pendingSubjects);
+        s_showSubjectPreview(data.subjects);
+      }
+    })
+    .catch(err => s_setBanner('error', '❌', 'Could not read PDF', 'Error: ' + err.message));
+}
+
+function s_autofill(d) {
+  // Generate email from name if server didn't return one
+  const emailVal = d.email || cvsuEmail(d.name || '');
+  const map = {
+    f_student_id: d.student_id, f_name: d.name,
+    f_email: emailVal,
+    f_contact: d.contact, f_section: d.section,
+    f_adviser: d.adviser, f_major: d.major,
+    f_school_year: d.school_year, f_date_registered: d.date_registered
+  };
+  for (const [id, val] of Object.entries(map)) {
+    const el = document.getElementById(id);
+    if (el && val) { el.value = val; s_highlight(el); }
+  }
+  if (d.semester) {
+    const sel = document.getElementById('f_semester');
+    for (const opt of sel.options) {
+      if (opt.value.toLowerCase().includes(d.semester.toLowerCase())) { sel.value = opt.value; s_highlight(sel); break; }
+    }
+  }
+  if (d.course) {
+    const sel = document.getElementById('f_course');
+    const allowed = ['BS Computer Science','BS Information Technology'];
+    const match = allowed.find(c => c.toLowerCase() === d.course.toLowerCase() ||
+      d.course.toLowerCase().includes(c.replace('BS ','').toLowerCase()));
+    if (match) { sel.value = match; s_highlight(sel); }
+  }
+  if (d.year_level) {
+    const sel = document.getElementById('f_year_level');
+    for (const opt of sel.options) {
+      if (opt.value.toLowerCase() === d.year_level.toLowerCase()) { sel.value = opt.value; s_highlight(sel); break; }
+    }
+  }
+}
+
+function s_highlight(el) {
+  el.style.transition = 'box-shadow .3s,border-color .3s';
+  el.style.borderColor = 'var(--success)';
+  el.style.boxShadow   = '0 0 0 3px rgba(45,106,39,.15)';
+  setTimeout(() => { el.style.borderColor = ''; el.style.boxShadow = ''; }, 2000);
+}
+
+function s_setBanner(cls, icon, title, sub) {
+  document.getElementById('s_uploadBanner').className = 'upload-banner ' + cls;
+  document.getElementById('s_ubIcon').textContent  = icon;
+  document.getElementById('s_ubTitle').textContent = title;
+  document.getElementById('s_ubSub').textContent   = sub;
+  const btn = document.getElementById('s_btnUpload');
+  btn.disabled = (cls === 'loading');
+  btn.innerHTML = cls === 'loading'
+    ? '<span class="spin"></span> Parsing…'
+    : (cls === 'success'
+      ? '<i class="bi bi-arrow-repeat"></i> Re-upload'
+      : '<i class="bi bi-cloud-upload"></i> Upload PDF');
+}
+
+function s_showSubjectPreview(subjects) {
+  document.getElementById('s_subjPreviewNote').textContent = subjects.length + ' subject(s) will be added on Register';
+  document.getElementById('s_subjPreviewList').innerHTML =
+    '<table class="subj-table"><thead><tr><th>Code</th><th>Subject Name</th><th>Units</th><th>Status</th></tr></thead><tbody>' +
+    subjects.map(s => `<tr><td><code>${s.course_code}</code></td><td>${s.name}</td>
+      <td style="color:var(--muted);">${s.units}</td>
+      <td style="color:var(--warning);"><i class="bi bi-clock"></i> Pending register</td></tr>`).join('') +
+    '</tbody></table>';
+  document.getElementById('s_subjPreview').classList.add('show');
+}
+
+// NFC for single tab
+function s_applyUID(uid) {
+  uid = uid.trim().toUpperCase();
+  if (!uid || uid.length < 4) return;
+  document.getElementById('nfc_id').value = uid;
+  const strip = document.getElementById('nfcCardStrip');
+  strip.className = 'nfc-card-strip captured';
+  document.getElementById('nfcStripIcon').textContent  = '✅';
+  document.getElementById('nfcStripTitle').textContent = 'Card Captured!';
+  document.getElementById('nfcStripSub').textContent   = 'NFC card UID recorded. Click Register to save.';
+  const disp = document.getElementById('nfcUidDisplay');
+  disp.textContent = uid;
+  disp.className   = 'nfc-uid-display has-uid';
+  const hiddenInput = document.getElementById('nfc_id');
+  hiddenInput.classList.remove('is-invalid');
+  const err = hiddenInput.parentNode.querySelector('.reg-err');
+  if (err) err.remove();
+}
+
+function previewStudentPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img  = document.getElementById('photoPreviewImg');
+    const init = document.getElementById('photoPreviewInit');
+    img.src = e.target.result; img.style.display = 'block'; init.style.display = 'none';
+    const wrap = document.getElementById('photoPreviewWrap');
+    wrap.style.borderStyle = 'solid'; wrap.style.borderColor = 'var(--accent)';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function validateRegisterForm() {
+  let ok = true;
+  const req = [
+    {id:'f_name',       msg:'Full name required.'},
+    {id:'f_student_id', msg:'Student ID required.'},
+    {id:'f_course',     msg:'Select a program.'},
+    {id:'f_year_level', msg:'Select year level.'},
+    {id:'f_section',    msg:'Select section.'},
+    {id:'f_adviser',    msg:'Adviser name required.'},
+    {id:'f_school_year',msg:'School year required.'},
+    {id:'nfc_id',       msg:'Tap an NFC card first.'},
+  ];
+  document.querySelectorAll('.form-control.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+  document.querySelectorAll('.reg-err').forEach(el => el.remove());
+  req.forEach(({id, msg}) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!el.value || !el.value.trim()) {
+      if (id === 'nfc_id') {
+        document.getElementById('nfcCardStrip').className = 'nfc-card-strip error';
+        document.getElementById('nfcStripTitle').textContent = 'NFC card required';
+        document.getElementById('nfcStripSub').textContent = "Tap the student's NFC card on the reader before registering.";
+      } else {
+        el.classList.add('is-invalid');
+        const err = document.createElement('div');
+        err.className = 'reg-err';
+        err.style.cssText = 'font-size:11px;color:var(--danger);margin-top:3px;';
+        err.textContent = msg;
+        el.parentNode.insertBefore(err, el.nextSibling);
+      }
+      ok = false;
+    }
+  });
+  if (!ok) {
+    const first = document.querySelector('.form-control.is-invalid,.nfc-card-strip.error');
+    if (first) first.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+  return ok;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#registerForm .form-control').forEach(el => {
+    el.addEventListener('input', () => {
+      el.classList.remove('is-invalid');
+      const next = el.nextSibling;
+      if (next && next.classList && next.classList.contains('reg-err')) next.remove();
+    });
+  });
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAB 2 — BATCH ENROLL
+═══════════════════════════════════════════════════════════════════ */
+let b_students      = [];
+let assignmentIndex = 0;
+let pendingUID      = null;
+let history_stack   = [];
+
+function gotoPhase(n) {
+  document.querySelectorAll('.phase').forEach((p, i) => p.classList.toggle('active', i + 1 === n));
+  ['beStep1','beStep2','beStep3'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    if (i + 1 === n) el.classList.add('active');
+    if (i + 1 < n)  el.classList.add('done');
+  });
+  phase2Active = (n === 2);
+  if (n === 2) { refocusNFC(); renderQueue(); }
+  if (n === 3) { renderSummary(); }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function b_handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('b_uploadBanner').classList.remove('dragover');
+  b_processPDFFiles(e.dataTransfer.files);
+}
+function b_handleFileSelect(input) {
+  if (input.files && input.files.length > 0) b_processPDFFiles(input.files);
+}
+
+function b_processPDFFiles(files) {
+  const pdfs = Array.from(files).filter(f =>
+    f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+  if (!pdfs.length) { showMsg('Please select PDF files only.', 'error'); return; }
+  b_setBanner('loading', '⏳',
+    `Processing ${pdfs.length} PDF(s)…`, 'Extracting student data and sorting alphabetically…');
+  const fd = new FormData();
+  pdfs.forEach(f => fd.append('files', f));
+  fetch('/parse_batch_pdfs', { method:'POST', credentials:'same-origin', body:fd })
+    .then(r => { if (!r.ok) throw new Error('Server error ' + r.status); return r.json(); })
+    .then(data => {
+      if (data.error) {
+        b_setBanner('error','❌','Could not parse PDFs', data.error);
+        (data.details || []).forEach(e => showMsg(e, 'error'));
+        return;
+      }
+      // ── FIX: ensure email is generated for every student ──────────
+      b_students = (data.students || []).map(s => {
+        if (!s.email && s.name) s.email = cvsuEmail(s.name);
+        return { ...s, nfc_id: null, _skipped: false };
+      });
+      if (!b_students.length) {
+        b_setBanner('error','❌','No student data found','Check that the PDFs are CvSU registration forms.');
+        return;
+      }
+      b_setBanner('success','✅',
+        `Found ${b_students.length} student(s) — sorted alphabetically`,
+        'Review data below. Click Edit on any row to fill missing fields.');
+      renderReviewTable();
+      document.getElementById('reviewPanel').style.display = 'block';
+      (data.errors || []).forEach(e => showMsg('⚠ ' + e, 'info'));
+    })
+    .catch(err => b_setBanner('error','❌','Upload failed', err.message));
+}
+
+/* ── Review table ─────────────────────────────────────────────────── */
+function renderReviewTable() {
+  const tbody = document.getElementById('studentTbody');
+  tbody.innerHTML = '';
+  b_students.forEach((s, i) => {
+    const missName   = !s.name;
+    const missSid    = !s.student_id;
+    const missCourse = !s.course;
+    const missYear   = !s.year_level;
+    const hasMiss    = missName || missSid || missCourse || missYear;
+
+    // Ensure email shown is always populated
+    if (!s.email && s.name) s.email = cvsuEmail(s.name);
+
+    const nameHtml   = (s.name   || '<em style="color:var(--muted)">—</em>') + (missName   ? '<span class="miss-badge">!</span>' : '');
+    const sidHtml    = (s.student_id || '<em style="color:var(--muted)">—</em>') + (missSid ? '<span class="miss-badge">!</span>' : '');
+    const courseHtml = (s.course || '<em style="color:var(--muted)">—</em>') + (missCourse ? '<span class="miss-badge">!</span>' : '');
+    const yearSec    = [s.year_level, s.section].filter(Boolean).join(' / ') || '<em style="color:var(--muted)">—</em>';
+    const emailHtml  = s.email   || '<em style="color:var(--muted)">—</em>';
+    const file       = (s.filename || '').replace(/\.pdf$/i, '');
+
+    const mainRow = document.createElement('tr');
+    mainRow.id = `strow_${i}`;
+    mainRow.innerHTML = `
+      <td><span class="order-badge">${i + 1}</span></td>
+      <td style="font-weight:600;">${nameHtml}</td>
+      <td>${sidHtml}</td>
+      <td>${courseHtml}</td>
+      <td>${yearSec}${missYear ? '<span class="miss-badge">!</span>' : ''}</td>
+      <td style="font-size:11px;">${emailHtml}</td>
+      <td style="font-size:11px;color:var(--muted);">${esc(file)}</td>
+      <td>
+        <button class="btn-edit-row" id="editbtn_${i}" onclick="toggleInlineEdit(${i})">
+          <i class="bi bi-pencil-fill"></i> Edit
+        </button>
+      </td>`;
+
+    const editRow = document.createElement('tr');
+    editRow.id = `stedit_${i}`;
+    editRow.className = 'inline-edit-row';
+    editRow.style.display = 'none';
+    editRow.innerHTML = `<td colspan="8"><div class="ie-grid">${buildIEFields(s, i)}</div>
+      <div class="ie-actions">
+        <button class="btn-ie-save" onclick="saveInlineEdit(${i})">
+          <i class="bi bi-check-lg"></i> Save
+        </button>
+        <button class="btn-ie-cancel" onclick="toggleInlineEdit(${i})">Cancel</button>
+      </div></td>`;
+
+    tbody.appendChild(mainRow);
+    tbody.appendChild(editRow);
+  });
+}
+
+function buildIEFields(s, i) {
+  const courseOpts = [
+    'BS Computer Science','BS Information Technology','BS Information Systems',
+    'BS Computer Engineering','BS Electronics Engineering',
+    'BS Civil Engineering','BS Education','BS Nursing','BS Accountancy','BS Business Administration'
+  ].map(c => `<option value="${c}" ${s.course === c ? 'selected' : ''}>${c}</option>`).join('');
+  const yearOpts = ['1st Year','2nd Year','3rd Year','4th Year','5th Year']
+    .map(y => `<option value="${y}" ${s.year_level === y ? 'selected' : ''}>${y}</option>`).join('');
+  const semOpts  = ['First','Second','Summer']
+    .map(v => `<option value="${v}" ${s.semester === v ? 'selected' : ''}>${v} Semester</option>`).join('');
+  const secOpts  = ['A','B','C','D']
+    .map(v => `<option value="${v}" ${s.section === v ? 'selected' : ''}>${v}</option>`).join('');
+
+  // Pre-generate email for the edit field
+  const emailVal = s.email || cvsuEmail(s.name || '');
+
+  return `
+    <div class="ie-field"><label class="ie-label">Full Name *</label>
+      <input class="ie-input ${!s.name?'warn':''}" id="ie_name_${i}" value="${esc(s.name)}" placeholder="Full Name"
+             oninput="autoEmailFromName(${i})"/></div>
+    <div class="ie-field"><label class="ie-label">Student ID</label>
+      <input class="ie-input ${!s.student_id?'warn':''}" id="ie_sid_${i}" value="${esc(s.student_id)}" placeholder="e.g. 2021-00123"/></div>
+    <div class="ie-field"><label class="ie-label">Course *</label>
+      <select class="ie-input ${!s.course?'warn':''}" id="ie_course_${i}">
+        <option value="">— Select —</option>${courseOpts}</select></div>
+    <div class="ie-field"><label class="ie-label">Year Level *</label>
+      <select class="ie-input ${!s.year_level?'warn':''}" id="ie_year_${i}">
+        <option value="">— Select —</option>${yearOpts}</select></div>
+    <div class="ie-field"><label class="ie-label">Section</label>
+      <select class="ie-input" id="ie_sec_${i}">
+        <option value="">—</option>${secOpts}</select></div>
+    <div class="ie-field"><label class="ie-label">Email</label>
+      <input class="ie-input" id="ie_email_${i}" value="${esc(emailVal)}" placeholder="sc.first.last@cvsu.edu.ph"/></div>
+    <div class="ie-field"><label class="ie-label">Semester</label>
+      <select class="ie-input" id="ie_sem_${i}">
+        <option value="">—</option>${semOpts}</select></div>
+    <div class="ie-field"><label class="ie-label">School Year</label>
+      <input class="ie-input" id="ie_sy_${i}" value="${esc(s.school_year)}" placeholder="2024-2025"/></div>
+    <div class="ie-field"><label class="ie-label">Adviser</label>
+      <input class="ie-input" id="ie_adv_${i}" value="${esc(s.adviser)}" placeholder="Prof. Santos"/></div>
+    <div class="ie-field"><label class="ie-label">Contact</label>
+      <input class="ie-input" id="ie_contact_${i}" value="${esc(s.contact)}" placeholder="09XX-XXX-XXXX"/></div>
+    <div class="ie-field"><label class="ie-label">Major</label>
+      <input class="ie-input" id="ie_major_${i}" value="${esc(s.major)}" placeholder="N/A"/></div>`;
+}
+
+// Live email update when name is changed in edit row
+function autoEmailFromName(i) {
+  const nameEl  = document.getElementById(`ie_name_${i}`);
+  const emailEl = document.getElementById(`ie_email_${i}`);
+  if (!nameEl || !emailEl) return;
+  const generated = cvsuEmail(nameEl.value);
+  if (generated) emailEl.value = generated;
+}
+
+function toggleInlineEdit(i) {
+  const editRow = document.getElementById(`stedit_${i}`);
+  const editBtn = document.getElementById(`editbtn_${i}`);
+  const isOpen  = editRow.style.display !== 'none';
+  document.querySelectorAll('[id^="stedit_"]').forEach(r => r.style.display = 'none');
+  document.querySelectorAll('[id^="editbtn_"]').forEach(b => b.classList.remove('open'));
+  if (!isOpen) { editRow.style.display = ''; editBtn.classList.add('open'); editBtn.innerHTML = '<i class="bi bi-x-lg"></i> Close'; }
+  else { editBtn.innerHTML = '<i class="bi bi-pencil-fill"></i> Edit'; }
+}
+
+function saveInlineEdit(i) {
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const s = b_students[i];
+  s.name        = g(`ie_name_${i}`)    || s.name;
+  s.student_id  = g(`ie_sid_${i}`)     || s.student_id;
+  s.course      = g(`ie_course_${i}`)  || s.course;
+  s.year_level  = g(`ie_year_${i}`)    || s.year_level;
+  s.section     = g(`ie_sec_${i}`)     || s.section;
+  s.email       = g(`ie_email_${i}`)   || s.email || cvsuEmail(s.name);
+  s.semester    = g(`ie_sem_${i}`)     || s.semester;
+  s.school_year = g(`ie_sy_${i}`)      || s.school_year;
+  s.adviser     = g(`ie_adv_${i}`)     || s.adviser;
+  s.contact     = g(`ie_contact_${i}`) || s.contact;
+  s.major       = g(`ie_major_${i}`)   || s.major || 'N/A';
+  renderReviewTable();
+}
+
+function proceedToNFC() {
+  if (!b_students.length) return;
+  const noName = b_students.filter(s => !s.name);
+  if (noName.length) { showMsg(`⚠ ${noName.length} student(s) have no name. Edit them before proceeding.`, 'error'); return; }
+  assignmentIndex = 0; history_stack = []; pendingUID = null;
+  gotoPhase(2); updateCurrentCard();
+}
+
+/* ── NFC Assignment ───────────────────────────────────────────────── */
+function updateCurrentCard() {
+  while (assignmentIndex < b_students.length &&
+    (b_students[assignmentIndex].nfc_id || b_students[assignmentIndex]._skipped)) {
+    assignmentIndex++;
+  }
+  const total    = b_students.length;
+  const assigned = b_students.filter(s => s.nfc_id).length;
+  const pct      = total ? Math.round(assigned / total * 100) : 0;
+  document.getElementById('progBarInner').style.width = pct + '%';
+  document.getElementById('progLabel').textContent = `${assigned} / ${total} assigned`;
+  if (assignmentIndex >= b_students.length) { allAssigned(); return; }
+  const s = b_students[assignmentIndex];
+  document.getElementById('currAvatar').textContent = (s.name || '?')[0].toUpperCase();
+  document.getElementById('currName').textContent   = s.name || '(No name)';
+  document.getElementById('currMeta').textContent   =
+    [s.course, s.year_level, s.section ? 'Section ' + s.section : ''].filter(Boolean).join(' · ');
+  document.getElementById('currOrder').textContent  = `Student ${assignmentIndex + 1} of ${total}`;
+  resetTapZone(); pendingUID = null;
+  document.getElementById('btnConfirm').disabled = true;
+  document.getElementById('btnUndo').disabled    = history_stack.length === 0;
+  document.getElementById('dupWarn').classList.remove('show');
+  renderQueue(); refocusNFC();
+}
+
+function resetTapZone() {
+  document.getElementById('tapZone').className   = 'tap-zone waiting';
+  document.getElementById('tapIcon').textContent  = '💳';
+  document.getElementById('tapTitle').textContent = 'Tap the NFC card for this student';
+  document.getElementById('tapSub').textContent   = 'Hold the card near the USB reader — the UID will appear automatically';
+  document.getElementById('uidDisplay').style.display = 'none';
+}
+
+function renderQueue() {
+  const tbody = document.getElementById('queueTbody');
+  tbody.innerHTML = '';
+  b_students.forEach((s, i) => {
+    const isCurrent  = i === assignmentIndex && !s.nfc_id && !s._skipped;
+    const isAssigned = !!s.nfc_id;
+    const isSkipped  = s._skipped;
+    let statusHtml;
+    if (isAssigned)     statusHtml = `<span class="status-tag st-assigned">✓ ${s.nfc_id}</span>`;
+    else if (isSkipped) statusHtml = `<span class="status-tag st-skipped">Skipped</span>`;
+    else if (isCurrent) statusHtml = `<span class="status-tag st-current">← Current</span>`;
+    else                statusHtml = `<span class="status-tag st-waiting">Waiting</span>`;
+    const tr = document.createElement('tr');
+    if (isCurrent)  tr.className = 'row-current';
+    if (isAssigned || isSkipped) tr.className = 'row-done';
+    tr.innerHTML = `
+      <td><span class="order-badge">${i + 1}</span></td>
+      <td style="font-weight:${isCurrent?700:500};">${s.name || '—'}</td>
+      <td style="font-size:12px;color:var(--muted);">${[s.course, s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
+      <td>${isAssigned ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
+      <td>${statusHtml}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function handleNFCTap(uid) {
+  if (!phase2Active) return;
+  uid = uid.trim().toUpperCase();
+  if (!uid || uid.length < 4) return;
+  if (assignmentIndex >= b_students.length) return;
+  const dupIdx = b_students.findIndex((s, i) => s.nfc_id === uid && i !== assignmentIndex);
+  if (dupIdx !== -1) {
+    document.getElementById('dupWarnText').textContent =
+      `This card (${uid}) is already assigned to ${b_students[dupIdx].name} (#${dupIdx + 1}). Please use a different card.`;
+    document.getElementById('dupWarn').classList.add('show');
+    return;
+  }
+  document.getElementById('dupWarn').classList.remove('show');
+  pendingUID = uid;
+  document.getElementById('tapZone').className   = 'tap-zone scanned';
+  document.getElementById('tapIcon').textContent  = '✅';
+  document.getElementById('tapTitle').textContent = 'Card detected — confirm assignment';
+  document.getElementById('tapSub').textContent   = 'Check the UID below then click Confirm to assign this card.';
+  document.getElementById('uidText').textContent  = uid;
+  document.getElementById('uidDisplay').style.display = '';
+  document.getElementById('btnConfirm').disabled = false;
+}
+
+function confirmAssignment() {
+  if (!pendingUID || assignmentIndex >= b_students.length) return;
+  b_students[assignmentIndex].nfc_id = pendingUID;
+  history_stack.push({ index: assignmentIndex, nfc_id: pendingUID });
+  assignmentIndex++; pendingUID = null;
+  updateCurrentCard();
+}
+
+function undoAssignment() {
+  if (!history_stack.length) return;
+  const last = history_stack.pop();
+  b_students[last.index].nfc_id   = null;
+  b_students[last.index]._skipped = false;
+  assignmentIndex = last.index; pendingUID = null;
+  document.getElementById('dupWarn').classList.remove('show');
+  updateCurrentCard();
+}
+
+function skipStudent() {
+  if (assignmentIndex >= b_students.length) return;
+  b_students[assignmentIndex]._skipped = true;
+  history_stack.push({ index: assignmentIndex, nfc_id: null, skipped: true });
+  assignmentIndex++; pendingUID = null;
+  updateCurrentCard();
+}
+
+function allAssigned() {
+  if (!b_students.some(s => s.nfc_id)) {
+    showMsg('No students were assigned NFC cards. Please go back and retry.', 'error');
+    return;
+  }
+  gotoPhase(3);
+}
+
+function b_goBack() {
+  phase2Active = false;
+  b_students.forEach(s => { s.nfc_id = null; s._skipped = false; });
+  history_stack = []; assignmentIndex = 0; pendingUID = null;
+  gotoPhase(1);
+}
+
+/* ── Summary ──────────────────────────────────────────────────────── */
+function renderSummary() {
+  const total    = b_students.length;
+  const assigned = b_students.filter(s => s.nfc_id).length;
+  const skipped  = b_students.filter(s => s._skipped).length;
+  const nocard   = total - assigned - skipped;
+  document.getElementById('summaryGrid').innerHTML = `
+    <div class="sum-chip total"><div style="font-size:28px;">👥</div>
+      <div><div class="sum-val">${total}</div><div class="sum-lab">Total Students</div></div></div>
+    <div class="sum-chip assigned"><div style="font-size:28px;">✅</div>
+      <div><div class="sum-val" style="color:var(--success);">${assigned}</div><div class="sum-lab">Cards Assigned</div></div></div>
+    <div class="sum-chip skipped"><div style="font-size:28px;">⏭</div>
+      <div><div class="sum-val" style="color:var(--danger);">${skipped + nocard}</div><div class="sum-lab">Skipped / No Card</div></div></div>`;
+
+  const allSubjects = {};
+  b_students.filter(s => s.nfc_id).forEach(s => {
+    (s.subjects || []).forEach(subj => {
+      if (subj.course_code && !allSubjects[subj.course_code]) allSubjects[subj.course_code] = subj;
+    });
+  });
+  const subjKeys = Object.keys(allSubjects);
+  if (subjKeys.length) {
+    document.getElementById('subjectSummaryBox').style.display = '';
+    document.getElementById('subjectList').innerHTML = subjKeys.map(k => {
+      const s = allSubjects[k];
+      return `<span style="background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);
+        border-radius:6px;padding:4px 10px;font-size:11px;font-family:'Space Mono',monospace;
+        color:var(--accent);">[${s.course_code}] ${s.name}</span>`;
+    }).join('');
+  }
+
+  const tbody = document.getElementById('resultTbody');
+  tbody.innerHTML = '';
+  b_students.forEach((s, i) => {
+    const isAssigned = !!s.nfc_id;
+    const statusHtml = isAssigned
+      ? `<span class="status-tag st-assigned">Will Register</span>`
+      : `<span class="status-tag st-skipped">${s._skipped ? 'Skipped' : 'No Card'}</span>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="order-badge">${i + 1}</span></td>
+      <td style="font-weight:600;">${s.name || '—'}</td>
+      <td style="font-size:11px;font-family:monospace;">${s.student_id || '—'}</td>
+      <td style="font-size:11px;">${s.course || '—'}</td>
+      <td style="font-size:11px;">${[s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
+      <td>${s.nfc_id ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
+      <td>${statusHtml}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function doRegister() {
+  const toRegister = b_students.filter(s => s.nfc_id);
+  if (!toRegister.length) { showMsg('No students with NFC cards assigned. Nothing to register.', 'error'); return; }
+  const btn = document.getElementById('registerBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Registering…';
+  document.getElementById('studentsDataInput').value = JSON.stringify(toRegister);
+  document.getElementById('finalForm').submit();
+}
+
+function b_setBanner(cls, icon, title, sub) {
+  document.getElementById('b_uploadBanner').className = 'upload-banner ' + cls;
+  document.getElementById('b_ubIcon').textContent  = icon;
+  document.getElementById('b_ubTitle').textContent = title;
+  document.getElementById('b_ubSub').textContent   = sub;
+  const btn = document.getElementById('b_btnUpload');
+  btn.disabled = (cls === 'loading');
+  btn.innerHTML = cls === 'loading'
+    ? '<span class="spin"></span> Parsing…'
+    : (cls === 'success'
+      ? '<i class="bi bi-arrow-repeat"></i> Upload More'
+      : '<i class="bi bi-cloud-upload"></i> Select PDFs');
+}
+
+function b_resetAll() {
+  b_students = []; assignmentIndex = 0; history_stack = []; pendingUID = null; phase2Active = false;
+  document.getElementById('reviewPanel').style.display = 'none';
+  document.getElementById('studentTbody').innerHTML = '';
+  document.getElementById('msgBox').innerHTML = '';
+  b_setBanner('', '📄',
+    'Upload Multiple CvSU Registration PDFs',
+    'Drop PDF files here or click to browse — students will be sorted alphabetically by surname');
+  gotoPhase(1);
+}
+
+/* ── Shared helpers ───────────────────────────────────────────────── */
+function showMsg(text, type = 'info') {
+  const box = document.getElementById('msgBox');
+  const div = document.createElement('div');
+  div.className = 'msg-box ' + type;
+  const icon = type === 'error' ? 'bi-x-circle' : type === 'success' ? 'bi-check-circle' : 'bi-info-circle';
+  div.innerHTML = `<i class="bi ${icon}"></i> ${text}`;
+  box.appendChild(div);
+  setTimeout(() => { if (div.parentNode) div.remove(); }, 7000);
+}
+
+function esc(v) {
+  if (!v) return '';
+  return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

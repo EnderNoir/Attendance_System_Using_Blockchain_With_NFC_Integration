@@ -1,9 +1,8 @@
-{% extends "base.html" %}
-{% block title %}Live Class Session — DAVS{% endblock %}
-{% block page_title %}LIVE CLASSROOM SESSION{% endblock %}
-{% block content %}
+{% extends "base.html" %} {% block title %}Live Class Session — DAVS{% endblock
+%} {% block page_title %}LIVE CLASSROOM SESSION{% endblock %} {% block content
+%}
 <style>
-  .session-header{background:var(--surface);border:1px solid {% if is_active %}var(--success){% else %}var(--border){% endif %};border-radius:14px;padding:22px 26px;margin-bottom:24px;}
+  .session-header{background:var(--surface);border:1px solid {% if is_active %}var(--success){% else %}var(--border){% endfor %};border-radius:14px;padding:22px 26px;margin-bottom:24px;}
   .live-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:var(--success);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;font-family:'Space Mono',monospace;}
   .ended-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(100,116,139,.1);border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;font-family:'Space Mono',monospace;}
   .live-dot{width:7px;height:7px;background:var(--success);border-radius:50%;animation:blink 1.5s infinite;}
@@ -126,7 +125,9 @@
     <div class="modal-name" id="modalName">Student Name</div>
     <div class="modal-student-id" id="modalStudentId">ID: —</div>
     <div class="modal-divider"></div>
-    <div class="modal-message" id="modalMessage">Attendance recorded successfully.</div>
+    <div class="modal-message" id="modalMessage">
+      Attendance recorded successfully.
+    </div>
     <div class="modal-time" id="modalTime"></div>
   </div>
 </div>
@@ -134,49 +135,175 @@
 <!-- EXCUSE MODAL -->
 <div class="excuse-overlay" id="excuseOverlay">
   <div class="excuse-box">
-    <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Mark as Excused</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Student: <strong id="excuseName" style="color:var(--text);"></strong></div>
-    <input type="hidden" id="excuseNfc"/>
-    <label style="font-size:12px;color:var(--muted);display:block;margin-top:10px;">Reason / Note (optional)</label>
-    <input class="excuse-input" type="text" id="excuseNote" placeholder="e.g. Medical, Official Business…"/>
+    <div style="font-size: 16px; font-weight: 700; margin-bottom: 4px">
+      Mark as Excused
+    </div>
+    <div style="font-size: 13px; color: var(--muted); margin-bottom: 4px">
+      Student: <strong id="excuseName" style="color: var(--text)"></strong>
+    </div>
+    <input type="hidden" id="excuseNfc" />
+    <label
+      style="
+        font-size: 12px;
+        color: var(--muted);
+        display: block;
+        margin-top: 10px;
+      "
+      >Reason / Note (optional)</label
+    >
+    <input
+      class="excuse-input"
+      type="text"
+      id="excuseNote"
+      placeholder="e.g. Medical, Official Business…"
+    />
     <div>
-      <button class="btn-excuse-submit" onclick="submitExcuse()"><i class="bi bi-check"></i> Mark Excused</button>
+      <button class="btn-excuse-submit" onclick="submitExcuse()">
+        <i class="bi bi-check"></i> Mark Excused
+      </button>
       <button class="btn-excuse-cancel" onclick="closeExcuse()">Cancel</button>
     </div>
   </div>
 </div>
 
 <!-- END SESSION MODAL -->
-<div class="end-overlay" id="endSessionModal" onclick="if(event.target===this)closeEndModal()">
+<div
+  class="end-overlay"
+  id="endSessionModal"
+  onclick="if(event.target===this)closeEndModal()"
+>
   <div class="end-box">
-    <div style="background:rgba(192,57,43,.08);padding:20px 22px 16px;border-bottom:1px solid rgba(192,57,43,.15);">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="width:44px;height:44px;border-radius:50%;background:rgba(192,57,43,.12);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">
-          <i class="bi bi-stop-circle" style="color:var(--danger);"></i>
+    <div
+      style="
+        background: rgba(192, 57, 43, 0.08);
+        padding: 20px 22px 16px;
+        border-bottom: 1px solid rgba(192, 57, 43, 0.15);
+      "
+    >
+      <div style="display: flex; align-items: center; gap: 12px">
+        <div
+          style="
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(192, 57, 43, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+          "
+        >
+          <i class="bi bi-stop-circle" style="color: var(--danger)"></i>
         </div>
         <div>
-          <div style="font-size:16px;font-weight:700;color:var(--danger);">End Class Session?</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">This action cannot be undone.</div>
+          <div style="font-size: 16px; font-weight: 700; color: var(--danger)">
+            End Class Session?
+          </div>
+          <div style="font-size: 12px; color: var(--muted); margin-top: 2px">
+            This action cannot be undone.
+          </div>
         </div>
       </div>
     </div>
-    <div style="padding:20px 22px;">
-      <div style="font-size:13px;color:var(--text);line-height:1.7;margin-bottom:14px;">Ending the session will:</div>
-      <ul style="margin:0 0 14px 18px;font-size:12px;color:var(--muted);line-height:1.8;">
+    <div style="padding: 20px 22px">
+      <div
+        style="
+          font-size: 13px;
+          color: var(--text);
+          line-height: 1.7;
+          margin-bottom: 14px;
+        "
+      >
+        Ending the session will:
+      </div>
+      <ul
+        style="
+          margin: 0 0 14px 18px;
+          font-size: 12px;
+          color: var(--muted);
+          line-height: 1.8;
+        "
+      >
         <li>Stop accepting new NFC card taps immediately</li>
         <li>Lock the attendance record for this class</li>
-        <li>Mark all remaining students as <strong style="color:var(--danger);">Absent</strong></li>
+        <li>
+          Mark all remaining students as
+          <strong style="color: var(--danger)">Absent</strong>
+        </li>
       </ul>
-      <div style="background:rgba(45,106,39,.06);border:1px solid rgba(45,106,39,.15);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--muted);margin-bottom:18px;display:flex;align-items:flex-start;gap:8px;">
-        <i class="bi bi-shield-check" style="color:var(--accent);margin-top:1px;flex-shrink:0;"></i>
-        <span>All blockchain transaction records are already saved and will not be affected.</span>
+      <div
+        style="
+          background: rgba(45, 106, 39, 0.06);
+          border: 1px solid rgba(45, 106, 39, 0.15);
+          border-radius: 8px;
+          padding: 10px 12px;
+          font-size: 12px;
+          color: var(--muted);
+          margin-bottom: 18px;
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+        "
+      >
+        <i
+          class="bi bi-shield-check"
+          style="color: var(--accent); margin-top: 1px; flex-shrink: 0"
+        ></i>
+        <span
+          >All blockchain transaction records are already saved and will not be
+          affected.</span
+        >
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button onclick="closeEndModal()" style="flex:1;min-width:120px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;">
+      <div style="display: flex; gap: 10px; flex-wrap: wrap">
+        <button
+          onclick="closeEndModal()"
+          style="
+            flex: 1;
+            min-width: 120px;
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            border-radius: 8px;
+            padding: 11px;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+          "
+        >
           <i class="bi bi-arrow-left"></i> Keep Live
         </button>
-        <form method="POST" action="{{ url_for('end_session', sess_id=sess_id) }}" style="flex:1;min-width:140px;">
-          <button type="submit" style="width:100%;background:var(--danger);border:none;color:#fff;font-weight:700;border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .2s;">
+        <form
+          method="POST"
+          action="{{ url_for('end_session', sess_id=sess_id) }}"
+          style="flex: 1; min-width: 140px"
+        >
+          <button
+            type="submit"
+            style="
+              width: 100%;
+              background: var(--danger);
+              border: none;
+              color: #fff;
+              font-weight: 700;
+              border-radius: 8px;
+              padding: 11px;
+              font-size: 13px;
+              cursor: pointer;
+              font-family: 'DM Sans', sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 7px;
+              transition: all 0.2s;
+            "
+          >
             <i class="bi bi-stop-fill"></i> Yes, End Session
           </button>
         </form>
@@ -187,51 +314,124 @@
 
 <!-- Session Header -->
 <div class="session-header">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+  <div
+    style="
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    "
+  >
     <div>
       {% if is_active %}
-      <div class="live-badge" style="margin-bottom:10px;"><div class="live-dot"></div> LIVE CLASS</div>
-      {% else %}
-      <div class="ended-badge" style="margin-bottom:10px;"><i class="bi bi-check-circle"></i> CLASS ENDED</div>
-      {% endif %}
-      <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);margin-bottom:4px;">
-        {% if sess.course_code %}[{{ sess.course_code }}]{% endif %}
-        {{ sess.units|default(3) }} Units
-        {% if sess.time_slot %} · {{ sess.time_slot }}{% endif %}
+      <div class="live-badge" style="margin-bottom: 10px">
+        <div class="live-dot"></div>
+        LIVE CLASS
       </div>
-      <h2 style="font-size:22px;font-weight:700;margin-bottom:4px;">{{ sess.subject_name }}</h2>
-      <div style="font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;">
-        <span><i class="bi bi-people"></i> {{ sess.section_key.replace('|',' · ') }}</span>
+      {% else %}
+      <div class="ended-badge" style="margin-bottom: 10px">
+        <i class="bi bi-check-circle"></i> CLASS ENDED
+      </div>
+      {% endfor %}
+      <div
+        style="
+          font-family: 'Space Mono', monospace;
+          font-size: 12px;
+          color: var(--accent);
+          margin-bottom: 4px;
+        "
+      >
+        {% if sess.course_code %}[{{ sess.course_code }}]{% endfor %} {{
+        sess.units|default(3) }} Units {% if sess.time_slot %} · {{
+        sess.time_slot }}{% endfor %}
+      </div>
+      <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 4px">
+        {{ sess.subject_name }}
+      </h2>
+      <div
+        style="
+          font-size: 13px;
+          color: var(--muted);
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-top: 6px;
+        "
+      >
+        <span
+          ><i class="bi bi-people"></i> {{ sess.section_key.replace('|',' · ')
+          }}</span
+        >
         <span><i class="bi bi-person-badge"></i> {{ sess.teacher_name }}</span>
-        <span><i class="bi bi-clock"></i> Class started {{ fmt_time(sess.started_at) }}</span>
-        {% if sess.late_cutoff %}<span><i class="bi bi-exclamation-triangle"></i> Late after {{ fmt_time_short(sess.late_cutoff) }}</span>{% endif %}
-        {% if sess.ended_at %}<span><i class="bi bi-stop-circle"></i> Ended {{ fmt_time(sess.ended_at) }}</span>{% endif %}
+        <span
+          ><i class="bi bi-clock"></i> Class started {{
+          fmt_time(sess.started_at) }}</span
+        >
+        {% if sess.late_cutoff %}<span
+          ><i class="bi bi-exclamation-triangle"></i> Late after {{
+          fmt_time_short(sess.late_cutoff) }}</span
+        >{% endfor %} {% if sess.ended_at %}<span
+          ><i class="bi bi-stop-circle"></i> Ended {{ fmt_time(sess.ended_at)
+          }}</span
+        >{% endfor %}
       </div>
     </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <a href="{{ url_for('teacher_dashboard') }}" class="btn-outline-sm"><i class="bi bi-arrow-left"></i> Back</a>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap">
+      <a href="{{ url_for('teacher_dashboard') }}" class="btn-outline-sm"
+        ><i class="bi bi-arrow-left"></i> Back</a
+      >
       {% if is_active and session.get('role') != 'admin' %}
       <button type="button" class="btn-end" onclick="openEndModal()">
         <i class="bi bi-stop-fill"></i> End Class Session
       </button>
-      {% endif %}
+      {% endfor %}
     </div>
   </div>
 
-  {% set total   = section_students|length %}
-  {% set present = present_list|length %}
-  {% set rate    = ((present / total) * 100)|round(1) if total > 0 else 0 %}
-  <div style="margin-top:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-    <div style="flex:1;min-width:200px;">
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px;">
+  {% set total = section_students|length %} {% set present = present_list|length
+  %} {% set rate = ((present / total) * 100)|round(1) if total > 0 else 0 %}
+  <div
+    style="
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    "
+  >
+    <div style="flex: 1; min-width: 200px">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+          color: var(--muted);
+          margin-bottom: 4px;
+        "
+      >
         <span id="presentLabel">{{ present }} students present</span>
         <span>{{ total - present }} absent · {{ total }} enrolled</span>
       </div>
       <div class="progress-bar-bg">
-        <div class="progress-bar-fill" id="progressFill" style="width:{{ rate }}%;"></div>
+        <div
+          class="progress-bar-fill"
+          id="progressFill"
+          style="width:{{ rate }}%;"
+        ></div>
       </div>
     </div>
-    <div style="font-family:'Space Mono',monospace;font-size:24px;font-weight:700;color:var(--success);" id="rateLabel">{{ rate }}%</div>
+    <div
+      style="
+        font-family: 'Space Mono', monospace;
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--success);
+      "
+      id="rateLabel"
+    >
+      {{ rate }}%
+    </div>
   </div>
 </div>
 
@@ -240,11 +440,17 @@
 <div class="scan-indicator">
   <span class="scan-icon">📡</span>
   <div>
-    <div style="font-weight:600;font-size:14px;color:var(--success);">NFC Reader Active — Accepting Student Taps</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:2px;">
-      Students in <strong style="color:var(--text);">{{ sess.section_key.replace('|',' · ') }}</strong>
-      can tap their NFC card to mark their classroom attendance.
-      Students are marked <strong style="color:var(--warning);">Late</strong> after 30 minutes.
+    <div style="font-weight: 600; font-size: 14px; color: var(--success)">
+      NFC Reader Active — Accepting Student Taps
+    </div>
+    <div style="font-size: 12px; color: var(--muted); margin-top: 2px">
+      Students in
+      <strong style="color: var(--text)"
+        >{{ sess.section_key.replace('|',' · ') }}</strong
+      >
+      can tap their NFC card to mark their classroom attendance. Students are
+      marked <strong style="color: var(--warning)">Late</strong> after 30
+      minutes.
     </div>
   </div>
 </div>
@@ -265,55 +471,130 @@
   Popups are shown ONLY here, once per physical tap, via popupAllowed gate.
   ─────────────────────────────────────────────────────────────────────────────
 -->
-<input id="nfcHidInput" type="text"
-  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+<input
+  id="nfcHidInput"
+  type="text"
+  autocomplete="off"
+  autocorrect="off"
+  autocapitalize="off"
+  spellcheck="false"
   tabindex="0"
-  style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;
-         pointer-events:none;border:none;outline:none;background:transparent;
-         color:transparent;z-index:-1;font-size:1px;"
-  aria-hidden="true"/>
+  style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: transparent;
+    z-index: -1;
+    font-size: 1px;
+  "
+  aria-hidden="true"
+/>
 
 <!-- NFC Tap Display Strip -->
 <div class="nfc-tap-strip" id="nfcTapStrip">
   <span class="nfc-strip-icon" id="nfcStripIcon">💳</span>
-  <div style="flex:1;min-width:0;">
+  <div style="flex: 1; min-width: 0">
     <div class="nfc-strip-label">Last NFC Card Tapped</div>
     <div class="nfc-strip-uid" id="nfcStripUid">Waiting for card tap…</div>
   </div>
-  <div class="nfc-strip-status" id="nfcStripStatus" style="color:var(--muted);">—</div>
+  <div class="nfc-strip-status" id="nfcStripStatus" style="color: var(--muted)">
+    —
+  </div>
 </div>
-{% endif %}
+{% endfor %}
 
 <div class="stat-mini-row">
-  <div class="stat-mini"><div class="sv" style="color:var(--success);" id="sc_present">{{ student_statuses|selectattr('status','equalto','present')|list|length }}</div><div class="sl">Present</div></div>
-  <div class="stat-mini"><div class="sv" style="color:var(--warning);" id="sc_late">{{ student_statuses|selectattr('status','equalto','late')|list|length }}</div><div class="sl">Late</div></div>
-  <div class="stat-mini"><div class="sv" style="color:var(--danger);" id="sc_absent">{{ student_statuses|selectattr('status','equalto','absent')|list|length }}</div><div class="sl">Absent</div></div>
-  <div class="stat-mini"><div class="sv" style="color:#60a5fa;" id="sc_excused">{{ student_statuses|selectattr('status','equalto','excused')|list|length }}</div><div class="sl">Excused</div></div>
-  <div class="stat-mini"><div class="sv">{{ section_students|length }}</div><div class="sl">Enrolled</div></div>
+  <div class="stat-mini">
+    <div class="sv" style="color: var(--success)" id="sc_present">
+      {{ student_statuses|selectattr('status','equalto','present')|list|length
+      }}
+    </div>
+    <div class="sl">Present</div>
+  </div>
+  <div class="stat-mini">
+    <div class="sv" style="color: var(--warning)" id="sc_late">
+      {{ student_statuses|selectattr('status','equalto','late')|list|length }}
+    </div>
+    <div class="sl">Late</div>
+  </div>
+  <div class="stat-mini">
+    <div class="sv" style="color: var(--danger)" id="sc_absent">
+      {{ student_statuses|selectattr('status','equalto','absent')|list|length }}
+    </div>
+    <div class="sl">Absent</div>
+  </div>
+  <div class="stat-mini">
+    <div class="sv" style="color: #60a5fa" id="sc_excused">
+      {{ student_statuses|selectattr('status','equalto','excused')|list|length
+      }}
+    </div>
+    <div class="sl">Excused</div>
+  </div>
+  <div class="stat-mini">
+    <div class="sv">{{ section_students|length }}</div>
+    <div class="sl">Enrolled</div>
+  </div>
 </div>
 
 <div class="two-panel">
   <!-- LEFT: Enrolled students -->
   <div class="card">
-    <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);">
+    <div
+      style="padding: 16px 20px 12px; border-bottom: 1px solid var(--border)"
+    >
       <div class="card-title-text">Enrolled Students</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px;">{{ section_students|length }} student{{ 's' if section_students|length!=1 else '' }} in this section</div>
+      <div style="font-size: 11px; color: var(--muted); margin-top: 2px">
+        {{ section_students|length }} student{{ 's' if
+        section_students|length!=1 else '' }} in this section
+      </div>
     </div>
-    <div style="padding:12px 20px 0;">
-      <input type="text" class="list-search" id="enrolledSearch" placeholder="Search student…" oninput="filterEnrolled()"/>
+    <div style="padding: 12px 20px 0">
+      <input
+        type="text"
+        class="list-search"
+        id="enrolledSearch"
+        placeholder="Search student…"
+        oninput="filterEnrolled()"
+      />
     </div>
     <div class="scroll-list" id="enrolledList">
       {% for s in section_students %}
       <div class="student-row" data-enroll-name="{{ s.name|lower }}">
-        <div class="student-avatar av-gray">{{ s.name[0].upper() if s.name else '?' }}</div>
+        <div class="student-avatar av-gray">
+          {{ s.name[0].upper() if s.name else '?' }}
+        </div>
         <div class="student-info">
           <div class="student-name">{{ s.name }}</div>
-          <div class="student-sub"><code>{{ s.student_id or s.nfcId }}</code></div>
+          <div class="student-sub">
+            <code>{{ s.student_id or s.nfcId }}</code>
+          </div>
         </div>
       </div>
       {% else %}
-      <div style="text-align:center;padding:32px;color:var(--muted);font-size:13px;">
-        <i class="bi bi-people" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>
+      <div
+        style="
+          text-align: center;
+          padding: 32px;
+          color: var(--muted);
+          font-size: 13px;
+        "
+      >
+        <i
+          class="bi bi-people"
+          style="
+            font-size: 28px;
+            opacity: 0.2;
+            display: block;
+            margin-bottom: 8px;
+          "
+        ></i>
         No students enrolled in this section.
       </div>
       {% endfor %}
@@ -322,12 +603,38 @@
 
   <!-- RIGHT: Attendance status -->
   <div class="card">
-    <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+    <div
+      style="
+        padding: 16px 20px 12px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      "
+    >
       <div>
         <div class="card-title-text">Attendance Status</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px;">Updates in real time as students tap in</div>
+        <div style="font-size: 11px; color: var(--muted); margin-top: 2px">
+          Updates in real time as students tap in
+        </div>
       </div>
-      <select id="statusFilter" onchange="filterByStatus()" style="background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 10px;font-size:12px;font-family:'DM Sans',sans-serif;appearance:none;cursor:pointer;">
+      <select
+        id="statusFilter"
+        onchange="filterByStatus()"
+        style="
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid var(--border);
+          color: var(--text);
+          border-radius: 6px;
+          padding: 5px 10px;
+          font-size: 12px;
+          font-family: 'DM Sans', sans-serif;
+          appearance: none;
+          cursor: pointer;
+        "
+      >
         <option value="">All</option>
         <option value="present">Present</option>
         <option value="late">Late</option>
@@ -335,51 +642,67 @@
         <option value="excused">Excused</option>
       </select>
     </div>
-    <div style="padding:12px 20px 0;">
-      <input type="text" class="list-search" id="statusSearch" placeholder="Search student…" oninput="filterStatus()"/>
+    <div style="padding: 12px 20px 0">
+      <input
+        type="text"
+        class="list-search"
+        id="statusSearch"
+        placeholder="Search student…"
+        oninput="filterStatus()"
+      />
     </div>
     <div class="scroll-list" id="statusList">
       {% for s in student_statuses %}
-      <div class="student-row slide-in" id="srow_{{ s.nfcId }}"
-           data-nfc="{{ s.nfcId }}"
-           data-status="{{ s.status }}"
-           data-status-name="{{ s.name|lower }}"
-           style="animation-delay:{{ loop.index0 * 0.03 }}s">
-        <div class="student-avatar
-          {% if s.status == 'present' %}av-green
-          {% elif s.status == 'late' %}av-yellow
-          {% elif s.status == 'excused' %}av-blue
-          {% elif s.status == 'absent' %}av-red
-          {% else %}av-gray{% endif %}"
-          id="savt_{{ s.nfcId }}">{{ s.name[0].upper() if s.name else '?' }}</div>
+      <div
+        class="student-row slide-in"
+        id="srow_{{ s.nfcId }}"
+        data-nfc="{{ s.nfcId }}"
+        data-status="{{ s.status }}"
+        data-status-name="{{ s.name|lower }}"
+        style="animation-delay:{{ loop.index0 * 0.03 }}s"
+      >
+        <div
+          class="student-avatar {% if s.status == 'present' %}av-green {% elif s.status == 'late' %}av-yellow {% elif s.status == 'excused' %}av-blue {% elif s.status == 'absent' %}av-red {% else %}av-gray{% endfor %}"
+          id="savt_{{ s.nfcId }}"
+        >
+          {{ s.name[0].upper() if s.name else '?' }}
+        </div>
         <div class="student-info">
           <div class="student-name">{{ s.name }}</div>
-          <div class="student-sub"><code>{{ s.student_id or s.nfcId }}</code></div>
+          <div class="student-sub">
+            <code>{{ s.student_id or s.nfcId }}</code>
+          </div>
         </div>
-        <span class="status-badge
-          {% if s.status == 'present' %}sb-present
-          {% elif s.status == 'late' %}sb-late
-          {% elif s.status == 'excused' %}sb-excused
-          {% elif s.status == 'absent' %}sb-absent
-          {% else %}sb-unknown{% endif %}"
-          id="sbadge_{{ s.nfcId }}">
-          {% if s.status == 'present' %}✔ Present
-          {% elif s.status == 'late' %}⏱ Late
-          {% elif s.status == 'excused' %}🔵 Excused
-          {% elif s.status == 'absent' %}✕ Absent
-          {% else %}— Unknown{% endif %}
+        <span
+          class="status-badge {% if s.status == 'present' %}sb-present {% elif s.status == 'late' %}sb-late {% elif s.status == 'excused' %}sb-excused {% elif s.status == 'absent' %}sb-absent {% else %}sb-unknown{% endfor %}"
+          id="sbadge_{{ s.nfcId }}"
+        >
+          {% if s.status == 'present' %}✔ Present {% elif s.status == 'late' %}⏱
+          Late {% elif s.status == 'excused' %}🔵 Excused {% elif s.status ==
+          'absent' %}✕ Absent {% else %}— Unknown{% endfor %}
         </span>
         {% if is_active %}
-        <button class="btn-excuse {% if s.status == 'absent' %}show-excuse{% endif %}"
-                id="sexc_{{ s.nfcId }}"
-                onclick="openExcuse('{{ s.nfcId }}','{{ s.name|e }}')"
-                title="Mark as Excused">
+        <button
+          class="btn-excuse {% if s.status == 'absent' %}show-excuse{% endfor %}"
+          id="sexc_{{ s.nfcId }}"
+          onclick="openExcuse('{{ s.nfcId }}','{{ s.name|e }}')"
+          title="Mark as Excused"
+        >
           <i class="bi bi-journal-check"></i> Excuse
         </button>
-        {% endif %}
+        {% endfor %}
       </div>
       {% else %}
-      <div style="text-align:center;padding:32px;color:var(--muted);font-size:13px;">No students in this section.</div>
+      <div
+        style="
+          text-align: center;
+          padding: 32px;
+          color: var(--muted);
+          font-size: 13px;
+        "
+      >
+        No students in this section.
+      </div>
       {% endfor %}
     </div>
   </div>
@@ -737,6 +1060,99 @@
     });
   }
   function filterStatus() { filterByStatus(); }
+
+  // ── Mobile NFC (Web NFC API — Android Chrome only) ────────────────────────
+  // Reuses processNFCUid() so popups, toasts, strip updates and counts all
+  // work exactly the same as the USB HID reader. The button is hidden on any
+  // browser/device that does not support NDEFReader.
+  let mobileNfcReader  = null;
+  let mobileNfcActive  = false;
+  let mobileNfcLastUid = '';
+  let mobileNfcLastTs  = 0;
+  const MOBILE_NFC_DEBOUNCE = 2500; // ms — suppress same card held near phone
+
+  (function initMobileNFC() {
+    if (!('NDEFReader' in window)) return; // not supported — keep button hidden
+    const btn = document.getElementById('mobileNfcBtn');
+    if (btn) btn.style.display = 'inline-flex';
+  })();
+
+  async function toggleMobileNFC() {
+    if (mobileNfcActive) {
+      stopMobileNFC();
+    } else {
+      await startMobileNFC();
+    }
+  }
+
+  async function startMobileNFC() {
+    try {
+      mobileNfcReader = new NDEFReader();
+      await mobileNfcReader.scan();
+      mobileNfcActive = true;
+
+      // Update button to "active / stop" state
+      const btn   = document.getElementById('mobileNfcBtn');
+      const icon  = document.getElementById('mobileNfcIcon');
+      const label = document.getElementById('mobileNfcLabel');
+      if (btn)   btn.classList.add('active');
+      if (icon)  icon.className = 'bi bi-stop-circle';
+      if (label) label.textContent = 'Stop Mobile NFC';
+
+      // Update the tap strip to show mobile NFC is listening
+      updateNFCStrip('', 'active', 'Mobile NFC ready — hold card to phone', '📱');
+
+      mobileNfcReader.addEventListener('reading', ({ serialNumber }) => {
+        const uid = serialNumber.replace(/:/g, '').toUpperCase();
+        const now = Date.now();
+        // Debounce: same card held continuously fires repeatedly
+        if (uid === mobileNfcLastUid && now - mobileNfcLastTs < MOBILE_NFC_DEBOUNCE) return;
+        mobileNfcLastUid = uid;
+        mobileNfcLastTs  = now;
+        // Vibrate if supported (gives tactile feedback on mobile)
+        if (navigator.vibrate) navigator.vibrate(60);
+        processNFCUid(uid);
+      });
+
+      mobileNfcReader.addEventListener('readingerror', () => {
+        updateNFCStrip('', 'error', 'Mobile NFC read error — try again', '⚠');
+      });
+
+    } catch (err) {
+      mobileNfcActive = false;
+      const msg = err.message || String(err);
+      if (msg.includes('permission')) {
+        showToast('NFC Permission Denied', 'Allow NFC access and try again.', 't-red', '✕');
+      } else {
+        showToast('Mobile NFC Error', msg, 't-red', '✕');
+      }
+      resetMobileNFCBtn();
+    }
+  }
+
+  function stopMobileNFC() {
+    mobileNfcActive  = false;
+    mobileNfcReader  = null;
+    mobileNfcLastUid = '';
+    resetMobileNFCBtn();
+    updateNFCStrip('', 'active', 'Waiting for card tap…', '💳');
+    // Restore strip to idle after 1s
+    setTimeout(() => {
+      const uidEl = document.getElementById('nfcStripUid');
+      if (uidEl && uidEl.textContent === 'Waiting for card tap…') {
+        document.getElementById('nfcTapStrip').classList.remove('active','warning','error');
+        uidEl.classList.remove('flash-green','flash-yellow','flash-red');
+      }
+    }, 1000);
+  }
+
+  function resetMobileNFCBtn() {
+    const btn   = document.getElementById('mobileNfcBtn');
+    const icon  = document.getElementById('mobileNfcIcon');
+    const label = document.getElementById('mobileNfcLabel');
+    if (btn)   btn.classList.remove('active');
+    if (icon)  icon.className = 'bi bi-phone';
+    if (label) label.textContent = 'Mobile NFC';
+  }
 </script>
-{% endif %}
-{% endblock %}
+{% endfor %} {% endblock %}

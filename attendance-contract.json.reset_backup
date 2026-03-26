@@ -61,6 +61,7 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
+      "gas": 15777216,
       "inputs": [],
       "outputs": [
         {
@@ -74,6 +75,7 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
+      "gas": 15777216,
       "inputs": [],
       "outputs": [
         {
@@ -87,6 +89,7 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
+      "gas": 15777216,
       "inputs": [],
       "outputs": [
         {
@@ -100,6 +103,7 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
+      "gas": 15777216,
       "inputs": [],
       "outputs": [
         {
@@ -113,6 +117,7 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
+      "gas": 15777216,
       "inputs": [],
       "outputs": [
         {
@@ -126,6 +131,7 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
+      "gas": 15777216,
       "inputs": [
         {
           "type": "string"
@@ -151,6 +157,7 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
+      "gas": 15777216,
       "inputs": [
         {
           "type": "string",
@@ -171,6 +178,7 @@
       "name": "markAttendance",
       "constant": false,
       "payable": false,
+      "gas": 15777216,
       "inputs": [
         {
           "type": "string",
@@ -184,6 +192,7 @@
       "name": "markAttendanceWithStatus",
       "constant": false,
       "payable": false,
+      "gas": 15777216,
       "inputs": [
         {
           "type": "string",
@@ -201,6 +210,7 @@
       "name": "registerStudent",
       "constant": false,
       "payable": false,
+      "gas": 15777216,
       "inputs": [
         {
           "type": "address",
@@ -223,6 +233,7 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
+      "gas": 15777216,
       "inputs": [
         {
           "type": "address"
@@ -249,6 +260,7 @@
       "constant": true,
       "stateMutability": "view",
       "payable": false,
+      "gas": 15777216,
       "inputs": [
         {
           "type": "string"

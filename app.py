@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, session, send_from_directory
 from web3 import Web3
 from datetime import datetime
 from functools import wraps
 import json, os, secrets, time, csv, io, hashlib, uuid, re, sqlite3, calendar as _cal
 from collections import deque
+from werkzeug.utils import secure_filename
 import re
 import io
 import uuid
@@ -731,7 +732,24 @@ except Exception as _ce:
 BASE_DIR      = os.path.dirname(__file__)
 DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
+UPLOAD_FOLDER_EXCUSES = os.path.join(BASE_DIR, 'static', 'uploads', 'excuses')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER_EXCUSES, exist_ok=True)
+
+ALLOWED_EXTENSIONS_EXCUSES = {'png', 'jpg', 'jpeg', 'pdf'}
+
+EXCUSE_REASONS = [
+    ('sickness', 'Sickness / Illness'),
+    ('lbm', 'LBM'),
+    ('emergency', 'Family Emergency'),
+    ('bereavement', 'Bereavement'),
+    ('medical', 'Medical Appointment'),
+    ('accident', 'Accident / Injury'),
+    ('official', 'Official School Business'),
+    ('weather', 'Extreme Weather / Calamity'),
+    ('transport', 'Transportation Problem'),
+    ('others', 'Others')
+]
 
 def hash_password(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
@@ -756,7 +774,8 @@ def normalize_section_key(key):
     return key
 
 def build_student_section_key(student):
-    course     = (student.get('course') or '').strip()
+    # Try 'program' first (new field), then 'course' (legacy field)
+    course     = (student.get('program') or student.get('course') or '').strip()
     year_level = (student.get('year_level') or '').strip()
     section    = (student.get('section') or '').strip().upper()
     if not course or not year_level or not section:
@@ -1353,7 +1372,9 @@ def _student_row(row):
     d = dict(row)
     d['nfcId']    = d.get('nfc_id', '')
     d['name']     = d.get('full_name', '')
-    d['course']   = d.get('program', '')
+    # Keep both 'program' and 'course' for compatibility
+    if d.get('program') and not d.get('course'):
+        d['course'] = d.get('program', '')
     d['address']  = d.get('eth_address', '')
     d['tx_hash']  = d.get('reg_tx_hash', '')
     d['section']  = (d.get('section') or '').strip().upper()
@@ -1668,14 +1689,16 @@ def check_and_start_scheduled_sessions():
             
             # 1. Start session if time matches exactly or we missed it by up to 5 mins
             # and no active session for this teacher + subject + section exists
-            already_active = any(
-                asess['teacher'] == s['teacher_username'] and
-                asess['subject_id'] == s['subject_id'] and
-                asess['section_key'] == s['section_key']
-                for asess in active_sessions.values()
-            )
+            # Optimized Check: Only start if NO session exists for this subject/section/date yet.
+            # This prevents restarts if a teacher ends it early.
+            today_prefix = now_dt.strftime('%Y-%m-%d') + '%'
+            with get_db() as conn:
+                already_ran = conn.execute(
+                    "SELECT 1 FROM sessions WHERE subject_id=? AND section_key=? AND started_at LIKE ?",
+                    (s['subject_id'], s['section_key'], today_prefix)
+                ).fetchone()
             
-            if not already_active and start_time <= current_time_str < end_time:
+            if not already_ran and start_time <= current_time_str < end_time:
                 # Automate session start
                 sess_id = str(uuid.uuid4())[:13]
                 subj = db_get_subject(s['subject_id'])
@@ -1718,13 +1741,27 @@ def check_and_start_scheduled_sessions():
                 except:
                     pass
 
+def check_and_end_expired_sessions():
+    """System-wide check to end sessions after their end_time."""
+    current_time_str = datetime.now().strftime('%H:%M')
+    with get_db() as conn:
+        active = conn.execute("SELECT sess_id, section_key, subject_id FROM sessions WHERE ended_at IS NULL").fetchall()
+        for s in active:
+            sched = conn.execute("SELECT end_time FROM schedules WHERE subject_id=? AND section_key=?", (s['subject_id'], s['section_key'])).fetchone()
+            if sched and current_time_str >= sched['end_time']:
+                now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                conn.execute("UPDATE sessions SET ended_at=? WHERE sess_id=?", (now_str, s['sess_id']))
+                print(f"[AUTO] Ended session {s['sess_id']} (Time Expired)")
+
 def automation_loop():
+    """Single master loop for DAVS automation/synchronization."""
     while True:
         try:
             check_and_start_scheduled_sessions()
+            check_and_end_expired_sessions()
         except Exception as e:
             print(f"[AUTO ERROR] {e}")
-        time.sleep(60) # check every minute
+        time.sleep(15) # Optimized: minimize creation delay
 
 from threading import Thread
 from datetime import timedelta
@@ -3321,6 +3358,9 @@ def api_session_attendance(sess_id):
                     'attachment_file': exc['attachment_file'],
                 }
 
+        # Get session's excused list
+        excused_set = set(sess.get('excused', []))
+
         # Historical-first view:
         # - always include students who have logs in this session (even if moved section later)
         # - also include currently enrolled students with no logs as "absent"
@@ -3361,17 +3401,24 @@ def api_session_attendance(sess_id):
             nid = s['nfcId']
             if nid in students_map:
                 continue
+            # Check if student is in excused list
+            if nid in excused_set:
+                status_val = 'excused'
+                reason_info = excuse_details.get(nid, {})
+            else:
+                status_val = 'absent'
+                reason_info = {}
             students_map[nid] = {
                 'nfc_id':     nid,
                 'name':       s.get('name', nid),
                 'student_id': s.get('student_id', ''),
-                'status':     'absent',
+                'status':     status_val,
                 'tx_hash':    '',
                 'block':      '',
                 'time':       '',
-                'reason':     '',
-                'reason_detail': '',
-                'attachment_url': '',
+                'reason':     reason_info.get('reason', ''),
+                'reason_detail': reason_info.get('reason_detail', ''),
+                'attachment_url': url_for('admin_excuse_attachment', excuse_id=nid) if reason_info.get('attachment_file') else '',
             }
 
         students_out = sorted(students_map.values(), key=lambda x: (x.get('name') or 'Unknown').lower())
@@ -3565,6 +3612,19 @@ def _auto_end_session_thread(sess_id, auto_end_at_str, app_context):
                 conn.execute(
                     "UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
                     (len(section_students), ended_time, sess_id)
+                )
+                # Recalculate attendance statistics from logs
+                counts = conn.execute(
+                    "SELECT status, COUNT(*) as cnt FROM attendance_logs "
+                    "WHERE sess_id=? GROUP BY status", (sess_id,)
+                ).fetchall()
+                totals = {r['status']: r['cnt'] for r in counts}
+                conn.execute(
+                    "UPDATE sessions SET total_present=?,total_late=?,total_absent=?,total_excused=? "
+                    "WHERE sess_id=?",
+                    (totals.get('present', 0) + totals.get('late', 0),
+                     totals.get('late', 0), totals.get('absent', 0),
+                     totals.get('excused', 0), sess_id)
                 )
  
             current['ended_at'] = ended_time
@@ -4270,15 +4330,15 @@ def mark_pico():
     student_info= next((s for s in all_s if s['nfcId']==nfc_id),{})
     student_id  = student_info.get('student_id','')
 
-    # Check duplicate tap
-    if nfc_id in sess.get('present',[]):
+    # FIX #4: Check for duplicate/multiple tap - block if already present or late (one tap per session only)
+    if nfc_id in sess.get('present',[]) or nfc_id in sess.get('late',[]):
         warn_entry={'nfc_id':nfc_id,'name':name,'student_id':student_id,'timestamp':time.time()}
         if nfc_id not in sess.get('warned',[]): sess.setdefault('warned',[]).append(nfc_id)
         sess.setdefault('warn_log',[]).append(warn_entry)
         save_session(sess_id, sess)
         sessions_db[sess_id] = sess
         return jsonify({'status':'already_marked','name':name,'student_id':student_id,
-                        'message':f'{name} is already marked present.'})
+                        'message':f'{name} is already marked present or late.'})
 
     # Determine late status
     now_dt       = datetime.now()
@@ -5648,20 +5708,17 @@ def admin_schedules():
     # Only show teacher-role accounts in the instructor dropdown
     teachers   = {u: v for u, v in users.items() if v.get('role') == 'teacher' and v.get('status') == 'approved'}
     sections   = _get_all_section_keys()
-    # Access control: normal admin only sees schedules they are assigned to
     current_role = session.get('role', '')
-    current_username = session.get('username', '')
-    if current_role == 'super_admin':
-        schedules = all_schedules
-    else:
-        schedules = [s for s in all_schedules if s.get('teacher_username') == current_username]
+    # FIX #6: Both Admin and Super Admin can see all schedules and edit them (same permissions)
+    schedules = all_schedules
+    is_super = (current_role == 'super_admin')
     return render_template('admin_schedules.html',
                            schedules=schedules,
                            subjects=subjects,
                            teachers=teachers,
                            sections=sections,
                            dow_names=DOW_NAMES,
-                           is_super_admin=(current_role == 'super_admin'))
+                           is_super_admin=is_super)
 
 @app.route('/admin/schedules/create', methods=['POST'])
 @admin_required
@@ -5730,7 +5787,7 @@ def admin_schedule_edit(schedule_id):
             new_section = normalize_section_key(f"{program}|{year_level}|{sec_letter}")
         else:
             new_section = normalize_section_key(request.form.get('section_key', sched['section_key']))
-            
+
         db_save_schedule({
             'schedule_id': schedule_id,
             'section_key': new_section,
@@ -5745,9 +5802,22 @@ def admin_schedule_edit(schedule_id):
             'grace_minutes': int(request.form.get('grace_minutes', sched['grace_minutes'])),
             'created_by':  sched['created_by'],
         })
+
+        # FIX #2: Invalidate any active sessions created from this schedule
+        # so they reload with updated schedule data on next poll
+        for sess_id, sess in list(sessions_db.items()):
+            if sess.get('schedule_id') == schedule_id and not sess.get('ended_at'):
+                print(f"[SCHEDULE-EDIT] Invalidating session {sess_id} due to schedule change")
+                # Reload from DB to get fresh data
+                updated_sess = load_session(sess_id)
+                if updated_sess:
+                    sessions_db[sess_id] = updated_sess
+
         flash('Schedule updated.', 'success')
     except Exception as e:
         flash(f'Error updating schedule: {e}', 'danger')
+        import traceback
+        print(f"[ERROR schedule_edit] {e}\n{traceback.format_exc()}")
     return redirect(url_for('admin_schedules'))
 
 @app.route('/admin/schedules/<schedule_id>/delete', methods=['POST'])
@@ -5788,17 +5858,9 @@ def api_schedules_search():
             subj_results.append({'value': sid, 'code': code, 'label': label})
     return jsonify({'teachers': results[:20], 'subjects': subj_results[:20]})
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EXCUSE REQUEST ROUTES
-# ══════════════════════════════════════════════════════════════════════════════
 
-@app.route('/excuse/submit/<sess_id>/<nfc_id>', methods=['POST'])
-@login_required
+@app.route('/excuse/submit/<sess_id>/<nfc_id>', methods=['GET', 'POST'])
 def excuse_submit(sess_id, nfc_id):
-    """
-    Unified excuse submission. Handles marking a student as excused
-    immediately and saves the record for admin review.
-    """
     sess = load_session(sess_id)
     if not sess:
         return jsonify({'status':'error', 'message':'Session not found'}), 404
@@ -5806,6 +5868,15 @@ def excuse_submit(sess_id, nfc_id):
     student = db_get_student(nfc_id)
     if not student:
         return jsonify({'status':'error', 'message':'Student not found'}), 404
+
+    if request.method == 'GET':
+        # Render the submission form for students
+        return render_template('excuse_form.html', 
+                               sess_id=sess_id, 
+                               nfc_id=nfc_id, 
+                               student=student, 
+                               sess=sess,
+                               excuse_reasons=EXCUSE_REASONS)
 
     reason_type   = request.form.get('reason_type', 'others')
     reason_detail = request.form.get('reason_detail', '').strip()
@@ -6019,6 +6090,20 @@ def _get_all_section_keys():
         k = normalize_section_key(f"{r['program']}|{r['year_level']}|{r['section']}")
         if k: keys.add(k)
     return sorted(keys)
+
+def _save_excuse_attachment(uploaded):
+    """Saves an excuse attachment file and returns the secure filename."""
+    if not uploaded or not uploaded.filename:
+        return ''
+    
+    ext = uploaded.filename.rsplit('.', 1)[1].lower() if '.' in uploaded.filename else ''
+    if ext not in ALLOWED_EXTENSIONS_EXCUSES:
+        raise ValueError(f"File extension '.{ext}' not allowed.")
+    
+    fname = f"excuse_{uuid.uuid4().hex[:8]}_{secure_filename(uploaded.filename)}"
+    fpath = os.path.join(UPLOAD_FOLDER_EXCUSES, fname)
+    uploaded.save(fpath)
+    return fname
 
 @app.route('/teacher/schedule')
 @staff_required

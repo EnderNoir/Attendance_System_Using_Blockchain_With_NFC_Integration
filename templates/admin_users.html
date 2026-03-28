@@ -76,6 +76,14 @@
 .btn-action-delete:hover{background:rgba(192,57,43,.1);}
 .btn-action-approve:disabled,.btn-action-reject:disabled,.btn-action-restore:disabled,.btn-action-delete:disabled{opacity:.5;cursor:not-allowed;}
 
+/* Inline Actions Column */
+.actions-col{display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;}
+.role-select-inline{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:5px 8px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;min-width:90px;transition:border-color .2s;}
+.role-select-inline:focus{outline:none;border-color:var(--accent);}
+.btn-apply-role{background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.3);color:var(--accent);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .2s;white-space:nowrap;}
+.btn-apply-role:hover{background:rgba(45,106,39,.2);}
+.btn-apply-role:disabled{opacity:.5;cursor:not-allowed;}
+
 /* Photo upload block */
 .photo-upload-block{background:rgba(45,106,39,.04);border:1px dashed rgba(45,106,39,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;}
 .photo-av{width:60px;height:60px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);}
@@ -166,9 +174,22 @@
         <div class="prow-name">{{ u.full_name }}</div>
         <div class="prow-sub">
           <code style="font-size:10px;">@{{ username }}</code>
-          <span class="{{ 'pill-a' if u.role=='admin' else 'pill-t' }}">{{ u.role|capitalize }}</span>
+          <span class="{{ 'pill-a' if u.role in ('admin','super_admin') else 'pill-t' }}" id="rolepill_{{ username }}">{{ u.role|replace('_',' ')|title }}</span>
           <span class="pill-ok">Active</span>
         </div>
+      </div>
+      <!-- Actions Column: inline role selector -->
+      <div class="actions-col" title="Change Role">
+        <select class="role-select-inline" id="rolesel_{{ username }}" onchange="markRoleDirty('{{ username }}')">
+          <option value="teacher" {{ 'selected' if u.role == 'teacher' else '' }}>Teacher</option>
+          <option value="admin" {{ 'selected' if u.role == 'admin' else '' }}>Admin</option>
+          {% if session.get('role') == 'super_admin' %}
+          <option value="super_admin" {{ 'selected' if u.role == 'super_admin' else '' }}>Super Admin</option>
+          {% endif %}
+        </select>
+        <button class="btn-apply-role" id="applyrole_{{ username }}" onclick="applyRole('{{ username }}')" disabled title="Apply role change">
+          <i class="bi bi-check-lg"></i> Apply
+        </button>
       </div>
       <button class="btn-vr" onclick='openFaModal({{ {"username":username,"name":u.full_name,"email":u.email or "","role":u.role,"status":"approved","created":u.created_at or "","sections":u.sections,"photo":photos_db.get(username,"")}|tojson|e }})'>
         <i class="bi bi-eye"></i> View
@@ -207,6 +228,48 @@
 
 <script>
 let curFaUser = null;
+
+// ── Inline Role Actions Column ────────────────────────────────────────────
+function markRoleDirty(username) {
+  const btn = document.getElementById('applyrole_' + username);
+  if (btn) btn.disabled = false;
+}
+
+function applyRole(username) {
+  const sel = document.getElementById('rolesel_' + username);
+  const btn = document.getElementById('applyrole_' + username);
+  const pill = document.getElementById('rolepill_' + username);
+  if (!sel || !btn) return;
+  const newRole = sel.value;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass"></i> …';
+  fetch('/update_faculty', {
+    method: 'POST', credentials: 'same-origin',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({username: username, role: newRole})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      btn.innerHTML = '<i class="bi bi-check-lg"></i> Applied!';
+      if (pill) {
+        const labels = {teacher: 'Teacher', admin: 'Admin', super_admin: 'Super Admin'};
+        pill.textContent = labels[newRole] || newRole;
+        pill.className = (newRole === 'admin' || newRole === 'super_admin') ? 'pill-a' : 'pill-t';
+      }
+      setTimeout(() => { btn.innerHTML = '<i class="bi bi-check-lg"></i> Apply'; btn.disabled = true; }, 2000);
+    } else {
+      btn.innerHTML = '<i class="bi bi-check-lg"></i> Apply';
+      btn.disabled = false;
+      alert('Error: ' + (d.error || 'Could not update role. Try again.'));
+    }
+  })
+  .catch(() => {
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Apply';
+    btn.disabled = false;
+    alert('Network error. Please try again.');
+  });
+}
 
 const CS_YEARS = ['1st Year','2nd Year','3rd Year','4th Year'];
 const IT_YEARS = ['1st Year','2nd Year','3rd Year','4th Year'];

@@ -1,0 +1,1409 @@
+{% extends 'base.html' %}
+{% block title %}Schedules - DAVS{% endblock %}
+{% block page_title %}ADMIN / SCHEDULES{% endblock %}
+{% block content %}
+<style>
+  /* ── SCHEDULE PAGE ── */
+  .sched-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .sched-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .sched-search-wrap {
+    position: relative;
+    min-width: 240px;
+  }
+
+  .sched-search-input {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 36px 9px 13px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    transition: border-color .2s;
+    box-sizing: border-box;
+  }
+
+  .sched-search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .sched-search-icon {
+    position: absolute;
+    right: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  .sched-search-dropdown {
+    position: absolute;
+    top: calc(100%+4px);
+    left: 0;
+    right: 0;
+    z-index: 3000;
+    background: var(--surface);
+    border: 1.5px solid var(--accent);
+    border-radius: 10px;
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, .18);
+    display: none;
+  }
+
+  .sched-search-dropdown.open {
+    display: block;
+  }
+
+  .search-section-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 8px 12px 3px;
+    background: rgba(45, 106, 39, .06);
+  }
+
+  .search-result-row {
+    display: grid;
+    grid-template-columns: 1fr 80px;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background .12s;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .search-result-row:last-of-type {
+    border-bottom: none;
+  }
+
+  .search-result-row:hover,
+  .search-result-row.highlighted {
+    background: rgba(45, 106, 39, .09);
+    color: var(--accent);
+  }
+
+  .search-result-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .search-result-row:hover .search-result-name {
+    color: var(--accent);
+  }
+
+  .search-result-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .badge-teacher {
+    background: rgba(45, 106, 39, .12);
+    color: #1A5A17;
+    border: 1px solid rgba(45, 106, 39, .25);
+  }
+
+  .badge-admin {
+    background: rgba(109, 40, 217, .1);
+    color: #5B21B6;
+    border: 1px solid rgba(109, 40, 217, .2);
+  }
+
+  .badge-subject {
+    background: rgba(90, 62, 0, .1);
+    color: #5A3E00;
+    border: 1px solid rgba(90, 62, 0, .25);
+  }
+
+  [data-theme="dark"] .badge-teacher {
+    background: rgba(245, 197, 24, .1);
+    color: #F5C518;
+    border-color: rgba(245, 197, 24, .25);
+  }
+
+  [data-theme="dark"] .badge-subject {
+    background: rgba(255, 193, 7, .1);
+    color: #FFC107;
+    border-color: rgba(255, 193, 7, .25);
+  }
+
+  /* ── FILTER CHIPS ── */
+  .active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+    min-height: 28px;
+  }
+
+  .filter-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(45, 106, 39, .1);
+    border: 1.5px solid rgba(45, 106, 39, .25);
+    color: #1A5A17;
+    border-radius: 20px;
+    padding: 3px 10px 3px 12px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  [data-theme="dark"] .filter-chip {
+    color: #F5C518;
+    border-color: rgba(245, 197, 24, .25);
+    background: rgba(245, 197, 24, .08);
+  }
+
+  .filter-chip button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    font-size: 12px;
+    line-height: 1;
+    opacity: .7;
+  }
+
+  .filter-chip button:hover {
+    opacity: 1;
+  }
+
+  /* ── CALENDAR GRID ── */
+  .cal-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, .06);
+  }
+
+  .cal-table {
+    width: 100%;
+    min-width: 680px;
+    border-collapse: collapse;
+  }
+
+  .cal-table th {
+    background: rgba(45, 106, 39, .09);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .cal-table th.time-col {
+    width: 100px;
+    background: rgba(45, 106, 39, .06);
+    color: var(--muted);
+  }
+
+  .cal-table th.today-col {
+    background: rgba(45, 106, 39, .18) !important;
+    position: relative;
+  }
+
+  .cal-table th.today-col::after {
+    content: 'TODAY';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 7px;
+    background: var(--accent);
+    color: #fff;
+    padding: 1px 5px;
+    border-radius: 3px 3px 0 0;
+    letter-spacing: 1px;
+  }
+
+  [data-theme="dark"] .cal-table th.today-col::after {
+    color: #000;
+  }
+
+  .cal-table td {
+    border: 1px solid var(--border);
+    vertical-align: top;
+    padding: 6px;
+    width: calc((100% - 100px)/7);
+    min-height: 80px;
+  }
+
+  .cal-table td.time-cell {
+    background: rgba(45, 106, 39, .04);
+    text-align: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .cal-table tbody tr:hover td:not(.time-cell) {
+    background: rgba(45, 106, 39, .02);
+  }
+
+  /* ── SCHEDULE BLOCK (subject name only by default) ── */
+  .sched-block {
+    background: linear-gradient(135deg, rgba(45, 106, 39, .12), rgba(45, 106, 39, .06));
+    border: 1.5px solid rgba(45, 106, 39, .28);
+    border-left: 3px solid var(--accent);
+    border-radius: 7px;
+    padding: 8px 9px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: all .18s;
+    position: relative;
+  }
+
+  .sched-block:hover {
+    border-color: var(--accent);
+    background: rgba(45, 106, 39, .16);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .10);
+  }
+
+  .sched-block.filtered-out {
+    opacity: .2;
+    pointer-events: none;
+  }
+
+  .sched-block .sb-subject {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sched-block .sb-time {
+    font-size: 9px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .sched-block .sb-section {
+    font-size: 9px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+  [data-theme="dark"] .sched-block {
+    background: rgba(245, 197, 24, .06);
+    border-color: rgba(245, 197, 24, .18);
+    border-left-color: #F5C518;
+  }
+
+  /* Live states */
+  .sched-block.live-now {
+    border-left-color: #10b981 !important;
+    background: linear-gradient(135deg, rgba(16, 185, 129, .15), rgba(16, 185, 129, .05)) !important;
+    animation: livePulse 2s infinite;
+  }
+
+  @keyframes livePulse {
+
+    0%,
+    100% {
+      box-shadow: none;
+    }
+
+    50% {
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, .1);
+    }
+  }
+
+  .sched-block.upcoming-block {
+    border-left-color: #f59e0b !important;
+    background: linear-gradient(135deg, rgba(245, 158, 11, .12), rgba(245, 158, 11, .04)) !important;
+  }
+
+  .live-badge-block {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(16, 185, 129, .15);
+    color: #10b981;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 9px;
+    font-weight: 700;
+    margin-top: 3px;
+  }
+
+  .live-dot-s {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #10b981;
+    animation: blink2 1.5s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes blink2 {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: .2;
+    }
+  }
+
+  /* ── 3-TAB MODAL ── */
+  .modal-backdrop-custom {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .55);
+    z-index: 1999;
+    display: none;
+  }
+
+  .modal-backdrop-custom.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+  }
+
+  .modal-box {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 92vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 56px rgba(0, 0, 0, .22);
+  }
+
+  .modal-header-cs {
+    background: var(--accent);
+    padding: 14px 18px;
+    border-radius: 14px 14px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .modal-header-cs h3 {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  [data-theme="dark"] .modal-header-cs h3 {
+    color: #000;
+  }
+
+  .modal-close-btn {
+    background: rgba(255, 255, 255, .2);
+    border: none;
+    color: #fff;
+    border-radius: 7px;
+    padding: 5px 11px;
+    cursor: pointer;
+    font-size: 15px;
+    transition: background .2s;
+  }
+
+  .modal-close-btn:hover {
+    background: rgba(255, 255, 255, .3);
+  }
+
+  [data-theme="dark"] .modal-close-btn {
+    color: #000;
+  }
+
+  .modal-body-cs {
+    padding: 22px;
+  }
+
+  /* Tab bar inside modal */
+  .pm-tab-bar {
+    display: flex;
+    border-bottom: 2px solid var(--border);
+    background: var(--surface);
+  }
+
+  .pm-tab {
+    flex: 1;
+    padding: 11px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    font-family: 'DM Sans', sans-serif;
+    transition: all .2s;
+  }
+
+  .pm-tab:hover {
+    color: var(--accent);
+  }
+
+  .pm-tab.active-tab {
+    color: var(--accent) !important;
+    border-bottom-color: var(--accent) !important;
+  }
+
+  .sched-pane {
+    display: none;
+    padding: 16px 0 0;
+  }
+
+  .sched-pane.active {
+    display: block;
+  }
+
+  /* Info rows */
+  .pm-info-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1.5px solid var(--border);
+  }
+
+  .pm-info-row:last-child {
+    border-bottom: none;
+  }
+
+  .pm-info-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding-top: 2px;
+  }
+
+  .pm-info-val {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .pm-avatar-block {
+    text-align: center;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  .pm-display-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 10px;
+  }
+
+  .pm-display-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  /* Autocomplete */
+  .ac-wrap {
+    position: relative;
+    z-index: 2010;
+  }
+
+  .ac-input {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    transition: border-color .2s;
+    box-sizing: border-box;
+  }
+
+  .ac-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .ac-dropdown {
+    position: absolute;
+    top: calc(100%+4px);
+    left: 0;
+    right: 0;
+    z-index: 3000;
+    background: var(--surface);
+    border: 1.5px solid var(--accent);
+    border-radius: 10px;
+    max-height: 230px;
+    overflow-y: auto;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .20);
+    display: none;
+  }
+
+  .ac-dropdown.open {
+    display: block;
+  }
+
+  .ac-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .ac-th {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    padding: 7px 12px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ac-tr {
+    cursor: pointer;
+    transition: background .12s;
+  }
+
+  .ac-tr:hover,
+  .ac-tr.highlighted {
+    background: rgba(45, 106, 39, .1);
+  }
+
+  .ac-td {
+    padding: 7px 12px;
+    font-size: 12px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ac-td.muted {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .ac-tr:last-child .ac-td {
+    border-bottom: none;
+  }
+
+  .ac-empty {
+    padding: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  /* Times */
+  .time-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .time-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 8px;
+  }
+
+  .tp-btn {
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all .15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .tp-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .form-label-sm {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 5px;
+    display: block;
+  }
+
+  .time-input {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    transition: border-color .2s;
+    box-sizing: border-box;
+  }
+
+  .time-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .section-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  @media(max-width:480px) {
+    .section-fields {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  /* Pre-session toast */
+  .presession-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 10999;
+    background: var(--surface);
+    border: 2px solid #f59e0b;
+    border-radius: 14px;
+    padding: 16px 20px 14px;
+    max-width: 320px;
+    width: calc(100vw - 48px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .18);
+    animation: ptIn .4s cubic-bezier(.34, 1.56, .64, 1) both;
+  }
+
+  @keyframes ptIn {
+    from {
+      opacity: 0;
+      transform: translateX(40px) scale(.9);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
+
+  .presession-toast.removing {
+    animation: ptOut .3s ease forwards;
+  }
+
+  @keyframes ptOut {
+    to {
+      opacity: 0;
+      transform: translateX(40px);
+    }
+  }
+
+  .pt-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f59e0b;
+    margin-bottom: 5px;
+  }
+
+  .pt-body {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .pt-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  /* ── ADD MODAL ── */
+  .add-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .55);
+    z-index: 1999;
+    display: none;
+  }
+
+  .add-modal-backdrop.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+  }
+</style>
+
+{% set dow_list = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
+
+<!-- PRE-SESSION TOAST CONTAINER -->
+<div id="presessionContainer"></div>
+
+<!-- PAGE HEADER -->
+<div class="sched-page-header">
+  <div>
+    <h2 style="font-size:18px;font-weight:700;margin:0;">Weekly Schedules</h2>
+    <p style="color:var(--muted);font-size:12px;margin:4px 0 0;">
+      {% if is_super_admin %}All schedules — click a block to view, edit, or delete.{% else %}All scheduled classes.
+      Click a block to view or edit.{% endif %}
+    </p>
+  </div>
+  <div class="sched-search-bar">
+    <div class="sched-search-wrap">
+      <input type="text" id="schedSearchInput" class="sched-search-input" placeholder="Filter by teacher or subject…"
+        autocomplete="off" oninput="onSearchInput()" onfocus="onSearchInput()">
+      <i class="bi bi-search sched-search-icon"></i>
+      <div class="sched-search-dropdown" id="schedSearchDrop"></div>
+    </div>
+    {% if is_super_admin %}
+    <button class="btn-primary" onclick="openAddModal()"><i class="bi bi-plus-lg"></i> Add Schedule</button>
+    {% endif %}
+  </div>
+</div>
+
+<div class="active-filters" id="activeFilters"></div>
+
+<!-- CALENDAR GRID -->
+<div class="cal-wrap">
+  <table class="cal-table" id="calTable">
+    <thead>
+      <tr>
+        <th class="time-col"><i class="bi bi-clock"></i> Time</th>
+        {% for d in dow_list %}
+        <th id="th_dow_{{ loop.index0 }}">{{ d }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody id="calBody"></tbody>
+  </table>
+</div>
+
+{% if not schedules %}
+<div style="text-align:center;padding:48px 0;color:var(--muted);">
+  <i class="bi bi-calendar-x" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3;"></i>
+  <div style="font-size:14px;font-weight:600;">No schedules found.</div>
+  {% if is_super_admin %}<div style="font-size:12px;margin-top:6px;">Click <b>Add Schedule</b> to create one.</div>{%
+  endif %}
+</div>
+{% endif %}
+
+<!-- ── UNIFIED 3-TAB DETAIL MODAL ── -->
+<div class="modal-backdrop-custom" id="scheduleModal" onclick="if(event.target===this)closeSchedModal()">
+  <div class="modal-box">
+    <div class="modal-header-cs">
+      <h3 id="modalTitle"><i class="bi bi-calendar-event"></i> Schedule Details</h3>
+      <button class="modal-close-btn" onclick="closeSchedModal()">✕</button>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="pm-tab-bar">
+      <button class="pm-tab active-tab" id="tab-info-btn" onclick="switchSchedTab('info')">
+        <i class="bi bi-info-circle"></i> Info
+      </button>
+      {% if is_super_admin %}
+      <button class="pm-tab" id="tab-edit-btn" onclick="switchSchedTab('edit')">
+        <i class="bi bi-pencil-square"></i> Edit
+      </button>
+      <button class="pm-tab" id="tab-action-btn" onclick="switchSchedTab('action')">
+        <i class="bi bi-shield-lock"></i> Action
+      </button>
+      {% endif %}
+    </div>
+
+    <div class="modal-body-cs">
+
+      <!-- ── INFO PANE ── -->
+      <div id="pane-info" class="sched-pane active">
+        <div class="pm-avatar-block">
+          <div
+            style="width:50px;height:50px;margin:0 auto;border-radius:12px;background:rgba(45,106,39,.1);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--accent);">
+            <i class="bi bi-calendar-event"></i>
+          </div>
+          <div class="pm-display-name" id="infoSubjectName">—</div>
+          <div class="pm-display-sub" id="infoCourseCode">—</div>
+          <div id="infoLiveBadge" style="display:none;margin-top:8px;">
+            <span
+              style="background:rgba(16,185,129,.12);color:#10b981;border:1.5px solid rgba(16,185,129,.3);border-radius:20px;padding:3px 14px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:7px;">
+              <span
+                style="width:6px;height:6px;border-radius:50%;background:#10b981;animation:blink2 1.5s infinite;display:inline-block;"></span>
+              Live Now
+            </span>
+          </div>
+        </div>
+
+        <div class="pm-info-row"><span class="pm-info-lbl">Teacher</span><span class="pm-info-val"
+            id="infoTeacherName">—</span></div>
+        <div class="pm-info-row"><span class="pm-info-lbl">Section</span><span class="pm-info-val"
+            id="infoSectionName">—</span></div>
+        <div class="pm-info-row"><span class="pm-info-lbl">Day & Time</span><span class="pm-info-val"
+            id="infoDayTime">—</span></div>
+        <div class="pm-info-row"><span class="pm-info-lbl">Grace Period</span><span class="pm-info-val"
+            id="infoGrace">—</span></div>
+        <div class="pm-info-row"><span class="pm-info-lbl">Next Class</span><span class="pm-info-val"
+            id="infoNextClass">—</span></div>
+        <div class="pm-info-row" style="border-bottom:none;">
+          <span class="pm-info-lbl">Recurring</span>
+          <span class="pm-info-val"><span
+              style="background:rgba(45,106,39,.1);color:var(--success);border:1px solid rgba(45,106,39,.25);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;"><i
+                class="bi bi-arrow-repeat"></i> Auto-Recurring</span></span>
+        </div>
+
+        <div style="margin-top:20px;text-align:center;">
+          <button class="btn-outline" onclick="closeSchedModal()">Close</button>
+        </div>
+      </div>
+
+      <!-- ── EDIT PANE (admin & super admin) ── -->
+      {% if is_super_admin %}
+      <div id="pane-edit" class="sched-pane">
+        <form id="editForm" method="POST" onsubmit="return validateSchedForm('edit')">
+          <div class="mb-3">
+            <label class="form-label-sm">Subject *</label>
+            <div class="ac-wrap" id="editSubjWrap">
+              <input type="text" class="ac-input" id="editSubjInput" autocomplete="off" placeholder="Search subject…">
+              <input type="hidden" name="subject_id" id="editSubjHidden">
+              <div class="ac-dropdown" id="editSubjDrop">
+                <table class="ac-table">
+                  <tbody id="editSubjBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label-sm">Teacher *</label>
+            <div class="ac-wrap" id="editTeacherWrap">
+              <input type="text" class="ac-input" id="editTeacherInput" autocomplete="off"
+                placeholder="Search teacher…">
+              <input type="hidden" name="teacher_username" id="editTeacherHidden">
+              <div class="ac-dropdown" id="editTeacherDrop">
+                <table class="ac-table">
+                  <tbody id="editTeacherBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label-sm">Section *</label>
+            <div class="section-fields">
+              <div><label class="form-label-sm" style="margin-top:0;">Program</label><input class="ac-input"
+                  name="program" id="editProgram" required></div>
+              <div><label class="form-label-sm" style="margin-top:0;">Year</label>
+                <select class="ac-input" name="year_level" id="editYear" required>
+                  <option>1st Year</option>
+                  <option>2nd Year</option>
+                  <option>3rd Year</option>
+                  <option>4th Year</option>
+                </select>
+              </div>
+              <div><label class="form-label-sm" style="margin-top:0;">Section</label><input class="ac-input"
+                  name="section" id="editSection" required></div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label-sm">Day & Time *</label>
+            <select class="ac-input mb-2" name="day_of_week" id="editDay">
+              {% for d in dow_list %}<option value="{{ loop.index0 }}">{{ d }}</option>{% endfor %}
+            </select>
+            <div class="time-row">
+              <input type="time" name="start_time" id="editStartTime" class="time-input" required>
+              <input type="time" name="end_time" id="editEndTime" class="time-input" required>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label-sm">Grace Period (min)</label>
+            <input type="number" name="grace_minutes" id="editGrace" class="ac-input" value="15">
+          </div>
+          <button type="submit" class="btn-primary w-100 justify-content-center"><i class="bi bi-save"></i> Update
+            Schedule</button>
+        </form>
+      </div>
+
+      <!-- ── ACTION PANE ── -->
+      <div id="pane-action" class="sched-pane">
+        <div
+          style="background:rgba(139,26,10,0.05);border:1.5px dashed rgba(139,26,10,0.2);border-radius:12px;padding:20px;text-align:center;">
+          <i class="bi bi-exclamation-triangle-fill" style="font-size:32px;color:var(--danger);"></i>
+          <h4 style="margin-top:12px;font-size:15px;font-weight:700;">Danger Zone</h4>
+          <p style="font-size:12px;color:var(--muted);margin:8px 0 14px;">Deleting this schedule stops future
+            auto-sessions. Past sessions remain in the database.</p>
+          <button class="btn-primary" style="background:var(--danger);width:100%;justify-content:center;"
+            onclick="deleteCurrentSched()">
+            <i class="bi bi-trash"></i> Delete Permanently
+          </button>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD SCHEDULE MODAL ── -->
+{% if is_super_admin %}
+<div class="add-modal-backdrop" id="addModal" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal-box">
+    <div class="modal-header-cs">
+      <h3><i class="bi bi-plus-circle"></i> New Schedule</h3>
+      <button class="modal-close-btn" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-body-cs">
+      <form method="POST" action="{{ url_for('admin_schedule_create') }}" id="addForm"
+        onsubmit="return validateSchedForm('add')">
+        <div class="mb-3">
+          <label class="form-label-sm">Subject *</label>
+          <div class="ac-wrap" id="addSubjWrap">
+            <input type="text" id="addSubjInput" class="ac-input" placeholder="Search course code or subject name…"
+              autocomplete="off">
+            <input type="hidden" name="subject_id" id="addSubjHidden">
+            <div class="ac-dropdown" id="addSubjDrop">
+              <table class="ac-table">
+                <thead>
+                  <tr>
+                    <th class="ac-th">Code</th>
+                    <th class="ac-th">Subject Name</th>
+                  </tr>
+                </thead>
+                <tbody id="addSubjBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Teacher *</label>
+          <div class="ac-wrap" id="addTeacherWrap">
+            <input type="text" id="addTeacherInput" class="ac-input" placeholder="Search teacher name…"
+              autocomplete="off">
+            <input type="hidden" name="teacher_username" id="addTeacherHidden">
+            <div class="ac-dropdown" id="addTeacherDrop">
+              <table class="ac-table">
+                <thead>
+                  <tr>
+                    <th class="ac-th">Teacher</th>
+                    <th class="ac-th">Role</th>
+                  </tr>
+                </thead>
+                <tbody id="addTeacherBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Section *</label>
+          <div class="section-fields">
+            <div>
+              <label class="form-label-sm" style="margin-top:0;">Program</label>
+              <input class="ac-input" name="program" id="addProgram" placeholder="e.g. BSCS" required>
+            </div>
+            <div>
+              <label class="form-label-sm" style="margin-top:0;">Year Level</label>
+              <select class="ac-input" name="year_level" id="addYear" required>
+                <option value="">-- Year --</option>
+                <option>1st Year</option>
+                <option>2nd Year</option>
+                <option>3rd Year</option>
+                <option>4th Year</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label-sm" style="margin-top:0;">Section</label>
+              <input class="ac-input" name="section" id="addSection" placeholder="e.g. A" required>
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Day of Week *</label>
+          <select class="ac-input" name="day_of_week" id="addDay" required>
+            {% for d in dow_list %}<option value="{{ loop.index0 }}">{{ d }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Quick Presets</label>
+          <div class="time-presets">
+            <button type="button" class="tp-btn" onclick="applyPreset('add','07:30','09:00')">7:30–9:00</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('add','09:00','10:30')">9:00–10:30</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('add','10:30','12:00')">10:30–12:00</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('add','13:00','14:30')">1:00–2:30</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('add','14:30','16:00')">2:30–4:00</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('add','16:00','17:30')">4:00–5:30</button>
+          </div>
+          <div class="time-row">
+            <div>
+              <label class="form-label-sm">Start Time *</label>
+              <input type="time" name="start_time" id="addStartTime" class="time-input" required>
+            </div>
+            <div>
+              <label class="form-label-sm">End Time *</label>
+              <input type="time" name="end_time" id="addEndTime" class="time-input" required>
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Grace Period (minutes)</label>
+          <input type="number" name="grace_minutes" class="ac-input" value="15" min="1" max="120">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:4px;">
+          <button type="submit" class="btn-primary" style="flex:1;justify-content:center;">
+            <i class="bi bi-check-circle"></i> Create Schedule
+          </button>
+          <button type="button" class="btn-outline" onclick="closeAddModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<form id="deleteForm" method="POST" style="display:none"></form>
+
+<script>
+  /* ── DATA ── */
+  const ALL_SCHEDULES = {{ schedules | tojson }};
+  const ALL_SUBJECTS = {{ subjects  | tojson if subjects else '{}' }};
+  const ALL_TEACHERS = {{ teachers  | tojson if teachers else '{}' }};
+  const DOW_NAMES = {{ dow_list  | tojson }};
+  const IS_SUPER = {{ 'true' if is_super_admin else 'false' }};
+  const TEACHER_VIEW = {{ 'true' if teacher_view else 'false' }};
+
+  /* ── TIME UTILS ── */
+  function to24h(t) {
+    if (!t) return '00:00';
+    if (t.includes(':') && !t.toLowerCase().includes('m')) return t.substring(0, 5);
+    const m = t.match(/(\d{1,2}):(\d{2})\s*([ap]m?)/i);
+    if (!m) return t.substring(0, 5);
+    let h = parseInt(m[1]), mn = m[2], pm = m[3].toLowerCase().startsWith('p');
+    if (pm && h !== 12) h += 12; if (!pm && h === 12) h = 0;
+    return (h < 10 ? '0' : '') + h + ':' + mn;
+  }
+  function fmtTime(t) {
+    if (!t) return '';
+    const [h, m] = t.split(':').map(Number);
+    const ap = h >= 12 ? 'PM' : 'AM'; const hh = h % 12 || 12;
+    return hh + ':' + (m < 10 ? '0' + m : m) + ' ' + ap;
+  }
+  function timeToMins(t) { const p = to24h(t).split(':'); return parseInt(p[0]) * 60 + parseInt(p[1] || 0); }
+  function nowMins() { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+  function todayDow() { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; }
+  function isLive(s) { return s.day_of_week === todayDow() && nowMins() >= timeToMins(s.start_time) && nowMins() < timeToMins(s.end_time); }
+  function isUpcoming(s) { const diff = timeToMins(s.start_time) - nowMins(); return s.day_of_week === todayDow() && diff > 0 && diff <= 10; }
+  function minsUntil(s) { return timeToMins(s.start_time) - nowMins(); }
+
+  /* ── HIGHLIGHT TODAY ── */
+  (function () {
+    const th = document.getElementById('th_dow_' + todayDow());
+    if (th) th.classList.add('today-col');
+  })();
+
+  /* ── BUILD CALENDAR ── */
+  const TIME_SLOTS = ['07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+    '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'];
+
+  function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function buildCalendar(filtered) {
+    const body = document.getElementById('calBody'); if (!body) return;
+    body.innerHTML = '';
+    const grid = {}; for (let d = 0; d < 7; d++) grid[d] = [];
+    (filtered || ALL_SCHEDULES).forEach(s => grid[s.day_of_week].push(s));
+    TIME_SLOTS.forEach((slot, idx) => {
+      const tr = document.createElement('tr');
+      const tc = document.createElement('td');
+      tc.className = 'time-cell'; tc.textContent = fmtTime(slot);
+      tr.appendChild(tc);
+      for (let d = 0; d < 7; d++) {
+        const td = document.createElement('td');
+        grid[d].filter(s => {
+          const st = to24h(s.start_time);
+          return st >= slot && st < (TIME_SLOTS[idx + 1] || '23:59');
+        }).forEach(s => {
+          const div = document.createElement('div');
+          div.className = 'sched-block';
+          div.dataset.teacher = s.teacher_username || '';
+          div.dataset.subject = s.subject_id || '';
+          if (isLive(s)) div.classList.add('live-now');
+          else if (isUpcoming(s)) div.classList.add('upcoming-block');
+          div.onclick = () => openSchedModal(s);
+          const liveHtml = isLive(s)
+            ? '<div class="live-badge-block"><span class="live-dot-s"></span> LIVE</div>'
+            : (isUpcoming(s) ? '<div style="font-size:9px;color:#f59e0b;margin-top:2px;font-weight:700;">⏱ ' + minsUntil(s) + 'm</div>' : '');
+          // DEFAULT: show SUBJECT NAME ONLY (clean view)
+          div.innerHTML = '<div class="sb-subject">' + esc(s.subject_name) + '</div>' + liveHtml;
+          td.appendChild(div);
+        });
+        tr.appendChild(td);
+      }
+      body.appendChild(tr);
+    });
+    applyFilter();
+  }
+
+  /* ── FILTER ── */
+  let activeFilters = {};
+  function applyFilter() {
+    const tf = Object.values(activeFilters).filter(f => f.type === 'teacher').map(f => f.value);
+    const sf = Object.values(activeFilters).filter(f => f.type === 'subject').map(f => f.value);
+    document.querySelectorAll('.sched-block').forEach(b => {
+      const mT = !tf.length || tf.includes(b.dataset.teacher);
+      const mS = !sf.length || sf.includes(b.dataset.subject);
+      b.classList.toggle('filtered-out', !(mT && mS));
+    });
+  }
+  function addFilter(type, value, label) {
+    const key = type + '_' + value; if (activeFilters[key]) return;
+    activeFilters[key] = { type, value, label }; renderFilterChips(); applyFilter();
+  }
+  function removeFilter(key) { delete activeFilters[key]; renderFilterChips(); applyFilter(); }
+  function renderFilterChips() {
+    const c = document.getElementById('activeFilters'); if (!c) return;
+    c.innerHTML = '';
+    Object.keys(activeFilters).forEach(key => {
+      const f = activeFilters[key];
+      const chip = document.createElement('div'); chip.className = 'filter-chip';
+      chip.innerHTML = '<i class="bi bi-funnel-fill" style="font-size:9px;"></i> ' + esc(f.label) +
+        '<button onclick="removeFilter(\'' + key + '\')"><i class="bi bi-x"></i></button>';
+      c.appendChild(chip);
+    });
+  }
+
+  /* ── SEARCH ── */
+  let searchTm = null;
+  function onSearchInput() { clearTimeout(searchTm); searchTm = setTimeout(doSearch, 180); }
+  function doSearch() {
+    const q = (document.getElementById('schedSearchInput').value || '').trim().toLowerCase();
+    const drop = document.getElementById('schedSearchDrop'); if (!drop) return;
+    if (!q) { drop.classList.remove('open'); return; }
+    const teachers = Object.entries(ALL_TEACHERS).filter(e =>
+      !q || (e[1].full_name || '').toLowerCase().includes(q) || e[0].toLowerCase().includes(q)
+    ).slice(0, 8);
+    const subjects = Object.entries(ALL_SUBJECTS).filter(e =>
+      !q || (e[1].name || '').toLowerCase().includes(q) || (e[1].course_code || '').toLowerCase().includes(q)
+    ).slice(0, 8);
+    if (!teachers.length && !subjects.length) { drop.innerHTML = '<div class="ac-empty">No matches found.</div>'; drop.classList.add('open'); return; }
+    let html = '';
+    if (teachers.length) {
+      html += '<div class="search-section-label">Teachers</div>';
+      teachers.forEach(e => {
+        html += '<div class="search-result-row" onclick="addFilter(\'teacher\',\'' + e[0] + '\',\'' + esc(e[1].full_name) + '\');closeSearch()">' +
+          '<span class="search-result-name">' + esc(e[1].full_name) + '</span>' +
+          '<span class="search-result-badge badge-teacher">' + esc(e[1].role) + '</span></div>';
+      });
+    }
+    if (subjects.length) {
+      html += '<div class="search-section-label">Subjects</div>';
+      subjects.forEach(e => {
+        const lbl = '[' + e[1].course_code + '] ' + e[1].name;
+        html += '<div class="search-result-row" onclick="addFilter(\'subject\',\'' + e[0] + '\',\'' + esc(lbl) + '\');closeSearch()">' +
+          '<span class="search-result-name">' + esc(lbl) + '</span>' +
+          '<span class="search-result-badge badge-subject">Subject</span></div>';
+      });
+    }
+    drop.innerHTML = html; drop.classList.add('open');
+  }
+  function closeSearch() { document.getElementById('schedSearchInput').value = ''; document.getElementById('schedSearchDrop').classList.remove('open'); }
+  document.addEventListener('click', e => { if (!e.target.closest('.sched-search-wrap')) document.getElementById('schedSearchDrop')?.classList.remove('open'); });
+
+  /* ── MODAL SYSTEM ── */
+  let selectedSched = null;
+  function openSchedModal(s) {
+    selectedSched = s;
+    // Info tab
+    document.getElementById('infoSubjectName').textContent = s.subject_name;
+    document.getElementById('infoCourseCode').textContent = s.course_code || '';
+    document.getElementById('infoTeacherName').textContent = s.teacher_name || '—';
+    document.getElementById('infoSectionName').textContent = (s.section_key || '').split('|').join(' · ');
+    document.getElementById('infoDayTime').textContent = DOW_NAMES[s.day_of_week] + ' @ ' + fmtTime(to24h(s.start_time)) + ' – ' + fmtTime(to24h(s.end_time));
+    document.getElementById('infoGrace').textContent = (s.grace_minutes || 15) + ' minutes';
+    const liveBadge = document.getElementById('infoLiveBadge');
+    if (liveBadge) liveBadge.style.display = isLive(s) ? 'block' : 'none';
+
+    // Next class
+    let nextTxt = '—';
+    if (isLive(s)) { nextTxt = 'Currently in session'; }
+    else {
+      const d = new Date(); let diff = (s.day_of_week - todayDow() + 7) % 7;
+      if (diff === 0) diff = 7;
+      const nd = new Date(d); nd.setDate(nd.getDate() + diff);
+      nextTxt = DOW_NAMES[s.day_of_week] + ', ' + nd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' @ ' + fmtTime(to24h(s.start_time));
+    }
+    document.getElementById('infoNextClass').textContent = nextTxt;
+
+    if (IS_SUPER) {
+      document.getElementById('editForm').action = '/admin/schedules/' + s.schedule_id + '/edit';
+      document.getElementById('editSubjInput').value = s.subject_name;
+      document.getElementById('editSubjHidden').value = s.subject_id;
+      document.getElementById('editTeacherInput').value = s.teacher_name;
+      document.getElementById('editTeacherHidden').value = s.teacher_username;
+      const sk = (s.section_key || '').split('|');
+      document.getElementById('editProgram').value = sk[0] || '';
+      document.getElementById('editYear').value = sk[1] || '1st Year';
+      document.getElementById('editSection').value = sk[2] || '';
+      document.getElementById('editDay').value = s.day_of_week;
+      document.getElementById('editStartTime').value = to24h(s.start_time);
+      document.getElementById('editEndTime').value = to24h(s.end_time);
+      document.getElementById('editGrace').value = s.grace_minutes || 15;
+    }
+    switchSchedTab('info');
+    document.getElementById('scheduleModal').classList.add('show');
+  }
+  function closeSchedModal() { document.getElementById('scheduleModal').classList.remove('show'); selectedSched = null; }
+
+  function switchSchedTab(tabId) {
+    document.querySelectorAll('.sched-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.pm-tab').forEach(t => t.classList.remove('active-tab'));
+    const p = document.getElementById('pane-' + tabId);
+    const b = document.getElementById('tab-' + tabId + '-btn');
+    if (p) p.classList.add('active');
+    if (b) b.classList.add('active-tab');
+  }
+
+  function deleteCurrentSched() {
+    if (!selectedSched || !confirm('Permanently delete this schedule?')) return;
+    const f = document.getElementById('deleteForm');
+    f.action = '/admin/schedules/' + selectedSched.schedule_id + '/delete';
+    f.submit();
+  }
+
+  /* ── ADD MODAL ── */
+  function openAddModal() { document.getElementById('addModal').classList.add('show'); }
+  function closeAddModal() { document.getElementById('addModal').classList.remove('show'); }
+  function applyPreset(prefix, st, et) {
+    document.getElementById(prefix + 'StartTime').value = st;
+    document.getElementById(prefix + 'EndTime').value = et;
+  }
+
+  /* ── AUTOCOMPLETE ── */
+  function makeAC(inputId, hiddenId, bodyId, dropId, dataFn, colA, colB) {
+    const inp = document.getElementById(inputId), hid = document.getElementById(hiddenId);
+    const tbody = document.getElementById(bodyId), drop = document.getElementById(dropId);
+    if (!inp || !tbody) return;
+    inp.onfocus = inp.oninput = function () { renderAC(inp.value, tbody, drop, hid, inp, dataFn, colA, colB); };
+    document.addEventListener('click', e => { if (!e.target.closest('.ac-wrap')) drop.classList.remove('open'); });
+  }
+  function renderAC(q, tbody, drop, hid, inp, dataFn, colA, colB) {
+    const items = dataFn(q.toLowerCase()); tbody.innerHTML = '';
+    if (!items.length) { tbody.innerHTML = '<tr><td colspan="2" class="ac-td ac-empty">No matches.</td></tr>'; drop.classList.add('open'); return; }
+    items.forEach(it => {
+      const tr = document.createElement('tr'); tr.className = 'ac-tr';
+      tr.innerHTML = '<td class="ac-td">' + esc(it[colA]) + '</td><td class="ac-td muted">' + esc(it[colB]) + '</td>';
+      tr.onclick = () => { hid.value = it.id; inp.value = it.label; drop.classList.remove('open'); };
+      tbody.appendChild(tr);
+    });
+    drop.classList.add('open');
+  }
+  function subjDataFn(q) { return Object.entries(ALL_SUBJECTS).filter(e => !q || (e[1].name || '').toLowerCase().includes(q) || (e[1].course_code || '').toLowerCase().includes(q)).slice(0, 10).map(e => ({ id: e[0], label: e[1].name, code: e[1].course_code || '—' })); }
+  function teacherDataFn(q) { return Object.entries(ALL_TEACHERS).filter(e => !q || (e[1].full_name || '').toLowerCase().includes(q) || e[0].toLowerCase().includes(q)).slice(0, 10).map(e => ({ id: e[0], label: e[1].full_name, role: e[1].role })); }
+
+  function validateSchedForm(prefix) {
+    const hid = document.getElementById(prefix + 'SubjHidden');
+    const thid = document.getElementById(prefix + 'TeacherHidden');
+    if (!hid || !thid || !hid.value || !thid.value) { alert('Please select subject and teacher from dropdown.'); return false; }
+    return true;
+  }
+
+  /* ── PRE-SESSION NOTIFICATION (5 min before) ── */
+  const notifiedSessions = new Set();
+  function checkPresessions() {
+    ALL_SCHEDULES.forEach(s => {
+      const mins = minsUntil(s);
+      const key = s.schedule_id + '_' + new Date().toDateString();
+      if (mins > 0 && mins <= 5 && !notifiedSessions.has(key)) {
+        notifiedSessions.add(key);
+        showPresessionToast(s, mins);
+      }
+    });
+  }
+  function showPresessionToast(s, mins) {
+    const c = document.getElementById('presessionContainer');
+    const el = document.createElement('div');
+    el.className = 'presession-toast';
+    el.innerHTML =
+      '<button class="pt-close" onclick="this.parentNode.remove()"><i class="bi bi-x"></i></button>' +
+      '<div style="font-size:24px;margin-bottom:7px;">⏰</div>' +
+      '<div class="pt-title">Class Starting in ' + mins + ' Minute' + (mins !== 1 ? 's' : '') + '!</div>' +
+      '<div class="pt-body">' +
+      '<strong>' + esc(s.subject_name) + '</strong><br>' +
+      esc(s.teacher_name) + '<br>' +
+      (s.section_key || '').replace(/\|/g, ' · ') + '<br>' +
+      fmtTime(to24h(s.start_time)) + ' – ' + fmtTime(to24h(s.end_time)) +
+      '</div>';
+    c.appendChild(el);
+    setTimeout(() => {
+      if (el.parentNode) { el.classList.add('removing'); setTimeout(() => el.parentNode && el.remove(), 350); }
+    }, 30000);
+  }
+
+  /* ── RECURRING AUTO-SESSION CHECK ── */
+  // This runs every minute to detect if a scheduled class is now "live"
+  // and visually marks the block — actual session start/end is handled server-side
+  // via the /api/check_recurring_sessions endpoint if implemented.
+  function checkRecurringSessions() {
+    buildCalendar(ALL_SCHEDULES);
+    checkPresessions();
+  }
+
+  /* ── INIT ── */
+  document.addEventListener('DOMContentLoaded', () => {
+    buildCalendar(ALL_SCHEDULES);
+    if (IS_SUPER) {
+      makeAC('addSubjInput', 'addSubjHidden', 'addSubjBody', 'addSubjDrop', subjDataFn, 'code', 'label');
+      makeAC('addTeacherInput', 'addTeacherHidden', 'addTeacherBody', 'addTeacherDrop', teacherDataFn, 'label', 'role');
+      makeAC('editSubjInput', 'editSubjHidden', 'editSubjBody', 'editSubjDrop', subjDataFn, 'code', 'label');
+      makeAC('editTeacherInput', 'editTeacherHidden', 'editTeacherBody', 'editTeacherDrop', teacherDataFn, 'label', 'role');
+    }
+    checkPresessions();
+    setInterval(checkRecurringSessions, 60000);
+  });
+</script>
+{% endblock %}

@@ -55,7 +55,13 @@ COLUMNS_TO_ADD = [
     ("photos",   "uploaded_at",       "TEXT NOT NULL DEFAULT ''"),
 
     # attendance_logs table
-    ("attendance_logs", "excuse_note", "TEXT NOT NULL DEFAULT ''"),
+    ("attendance_logs", "excuse_note",       "TEXT NOT NULL DEFAULT ''"),
+    ("attendance_logs", "excuse_request_id",  "INTEGER DEFAULT NULL"),
+
+    # sessions table – extra columns added later
+    ("sessions", "grace_period",    "INTEGER NOT NULL DEFAULT 15"),
+    ("sessions", "auto_end_at",     "TEXT"),
+    ("sessions", "schedule_id",     "TEXT DEFAULT NULL"),
 ]
 
 # Tables that must exist (created if missing)
@@ -98,6 +104,44 @@ TABLES_TO_CREATE = [
             section         TEXT DEFAULT ''
         )"""
     ),
+    (
+        "schedules",
+        """CREATE TABLE IF NOT EXISTS schedules (
+            schedule_id      TEXT PRIMARY KEY,
+            section_key      TEXT NOT NULL DEFAULT '',
+            subject_id       TEXT NOT NULL DEFAULT '',
+            subject_name     TEXT NOT NULL DEFAULT '',
+            course_code      TEXT NOT NULL DEFAULT '',
+            teacher_username TEXT NOT NULL DEFAULT '',
+            teacher_name     TEXT NOT NULL DEFAULT '',
+            day_of_week      INTEGER NOT NULL DEFAULT 1,
+            start_time       TEXT NOT NULL DEFAULT '',
+            end_time         TEXT NOT NULL DEFAULT '',
+            grace_minutes    INTEGER NOT NULL DEFAULT 15,
+            is_active        INTEGER NOT NULL DEFAULT 1,
+            created_by       TEXT NOT NULL DEFAULT '',
+            created_at       TEXT NOT NULL DEFAULT '',
+            updated_at       TEXT NOT NULL DEFAULT ''
+        )"""
+    ),
+    (
+        "excuse_requests",
+        """CREATE TABLE IF NOT EXISTS excuse_requests (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            sess_id         TEXT NOT NULL DEFAULT '',
+            nfc_id          TEXT NOT NULL DEFAULT '',
+            student_name    TEXT NOT NULL DEFAULT '',
+            student_id      TEXT NOT NULL DEFAULT '',
+            student_email   TEXT NOT NULL DEFAULT '',
+            reason_type     TEXT NOT NULL DEFAULT '',
+            reason_detail   TEXT NOT NULL DEFAULT '',
+            attachment_file TEXT NOT NULL DEFAULT '',
+            status          TEXT NOT NULL DEFAULT 'pending',
+            reviewed_by     TEXT NOT NULL DEFAULT '',
+            reviewed_at     TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL DEFAULT ''
+        )"""
+    ),
 ]
 
 # Data backfills: copy old column → new column where new is empty
@@ -111,15 +155,20 @@ BACKFILLS = [
 
 # Indexes to create
 INDEXES = [
-    ("idx_stu_program",  "CREATE INDEX IF NOT EXISTS idx_stu_program ON students(program)"),
-    ("idx_stu_section",  "CREATE INDEX IF NOT EXISTS idx_stu_section ON students(year_level, section)"),
-    ("idx_sess_teacher", "CREATE INDEX IF NOT EXISTS idx_sess_teacher ON sessions(teacher_username)"),
-    ("idx_sess_ended",   "CREATE INDEX IF NOT EXISTS idx_sess_ended ON sessions(ended_at)"),
-    ("idx_sess_section", "CREATE INDEX IF NOT EXISTS idx_sess_section ON sessions(section_key)"),
-    ("idx_att_sess",     "CREATE INDEX IF NOT EXISTS idx_att_sess ON attendance_logs(sess_id)"),
-    ("idx_att_nfc",      "CREATE INDEX IF NOT EXISTS idx_att_nfc ON attendance_logs(nfc_id)"),
-    ("idx_att_status",   "CREATE INDEX IF NOT EXISTS idx_att_status ON attendance_logs(status)"),
-    ("idx_subj_code",    "CREATE INDEX IF NOT EXISTS idx_subj_code ON subjects(course_code)"),
+    ("idx_stu_program",   "CREATE INDEX IF NOT EXISTS idx_stu_program ON students(program)"),
+    ("idx_stu_section",   "CREATE INDEX IF NOT EXISTS idx_stu_section ON students(year_level, section)"),
+    ("idx_sess_teacher",  "CREATE INDEX IF NOT EXISTS idx_sess_teacher ON sessions(teacher_username)"),
+    ("idx_sess_ended",    "CREATE INDEX IF NOT EXISTS idx_sess_ended ON sessions(ended_at)"),
+    ("idx_sess_section",  "CREATE INDEX IF NOT EXISTS idx_sess_section ON sessions(section_key)"),
+    ("idx_att_sess",      "CREATE INDEX IF NOT EXISTS idx_att_sess ON attendance_logs(sess_id)"),
+    ("idx_att_nfc",       "CREATE INDEX IF NOT EXISTS idx_att_nfc ON attendance_logs(nfc_id)"),
+    ("idx_att_status",    "CREATE INDEX IF NOT EXISTS idx_att_status ON attendance_logs(status)"),
+    ("idx_subj_code",     "CREATE INDEX IF NOT EXISTS idx_subj_code ON subjects(course_code)"),
+    ("idx_sched_teacher", "CREATE INDEX IF NOT EXISTS idx_sched_teacher ON schedules(teacher_username)"),
+    ("idx_sched_day",     "CREATE INDEX IF NOT EXISTS idx_sched_day ON schedules(day_of_week)"),
+    ("idx_excuse_sess",   "CREATE INDEX IF NOT EXISTS idx_excuse_sess ON excuse_requests(sess_id)"),
+    ("idx_excuse_nfc",    "CREATE INDEX IF NOT EXISTS idx_excuse_nfc ON excuse_requests(nfc_id)"),
+    ("idx_excuse_status", "CREATE INDEX IF NOT EXISTS idx_excuse_status ON excuse_requests(status)"),
 ]
 
 

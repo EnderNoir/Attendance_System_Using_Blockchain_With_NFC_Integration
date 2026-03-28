@@ -31,9 +31,10 @@ DB_FILE        = os.path.join(BASE_DIR, 'davs.db')
 CONTRACT_FILE  = os.path.join(BASE_DIR, 'attendance-contract.json')
 UPLOAD_FOLDER  = os.path.join(BASE_DIR, 'static', 'uploads')
 
-ADMIN_USERNAME = 'admin'
+ADMIN_USERNAME = 'superadmin'
 ADMIN_PASSWORD = 'admin123'
-ADMIN_FULLNAME = 'System Administrator'
+ADMIN_FULLNAME = 'Super Administrator'
+ADMIN_ROLE    = 'super_admin'
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def hash_password(pw):
@@ -75,6 +76,8 @@ def reset_sqlite():
         'photos',
         'accounts',
         'users',
+        'schedules',
+        'excuse_requests',
     ]
     for table in data_tables:
         try:
@@ -120,12 +123,12 @@ def reset_sqlite():
             "(username, password_hash, role, full_name, email, status, "
             " sections_json, my_subjects_json, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (ADMIN_USERNAME, pw, 'admin', ADMIN_FULLNAME,
+            (ADMIN_USERNAME, pw, ADMIN_ROLE, ADMIN_FULLNAME,
              '', 'approved', '[]', '[]', now, now)
         )
-        ok(f"Created  accounts.admin  (admin / {ADMIN_PASSWORD})")
+        ok(f"Created  accounts.superadmin  ({ADMIN_USERNAME} / {ADMIN_PASSWORD})")
     except Exception as e:
-        err(f"Failed to create admin in accounts: {e}")
+        err(f"Failed to create super admin in accounts: {e}")
 
     # ── Mirror into legacy users table ───────────────────────────────────────
     try:
@@ -134,10 +137,10 @@ def reset_sqlite():
             "(username, password, role, full_name, email, status, "
             " sections_json, my_subjects_json, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (ADMIN_USERNAME, pw, 'admin', ADMIN_FULLNAME,
+            (ADMIN_USERNAME, pw, ADMIN_ROLE, ADMIN_FULLNAME,
              '', 'approved', '[]', '[]', now)
         )
-        ok(f"Mirrored users.admin     (legacy table)")
+        ok(f"Mirrored users.superadmin (legacy table)")
     except Exception as e:
         warn(f"Legacy users table skipped: {e}")
 
@@ -292,10 +295,10 @@ def main():
   ⚠  This will permanently delete:
        • All students (SQLite + blockchain contract reference)
        • All classroom sessions and attendance logs
-       • All teacher accounts
+       • All teacher/admin accounts
        • All subjects and uploaded photos
 
-  Only the super admin (admin / admin123) will remain.
+  Only the super admin (superadmin / admin123) will remain.
   Students will NOT reappear after Flask restart.
 """)
         answer = input("  Type  YES  to confirm: ").strip()
@@ -320,7 +323,7 @@ def main():
     print("   RESET COMPLETE")
     print("  ══════════════════════════════════════════════════════")
     print()
-    print(f"   Login:    admin  /  {ADMIN_PASSWORD}")
+    print(f"   Login:    {ADMIN_USERNAME}  /  {ADMIN_PASSWORD}  (role: super_admin)")
     print()
     print("   Next steps:")
     print("   1.  python app.py               ← restart Flask")

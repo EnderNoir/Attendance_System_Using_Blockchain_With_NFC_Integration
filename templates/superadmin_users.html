@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}User Management — DAVS{% endblock %}
+{% block page_title %}SUPER ADMIN / USERS{% endblock %}
+{% block content %}
+<style>
+.role-badge-sa{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(109,40,217,.1);color:#5B21B6;border:1.5px solid rgba(109,40,217,.25);}
+.role-badge-a{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(192,57,43,.1);color:#8B1A0A;border:1.5px solid rgba(192,57,43,.25);}
+.role-badge-t{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(45,106,39,.1);color:#1A5A17;border:1.5px solid rgba(45,106,39,.25);}
+.user-table-wrap{overflow-x:auto;}
+.promote-form{display:inline-flex;align-items:center;gap:6px;}
+</style>
+
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+  <div>
+    <h2 style="font-size:18px;font-weight:700;margin:0;">User Management</h2>
+    <p style="color:var(--muted);font-size:12px;margin:4px 0 0;">Only Super Admins can create or change Admin/Super Admin accounts.</p>
+  </div>
+  <a href="{{ url_for('superadmin_create_user') }}" class="btn-primary"><i class="bi bi-person-plus"></i> Create Account</a>
+</div>
+
+<div class="card user-table-wrap">
+  <table class="table mb-0">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Change Role</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for uname, u in users.items() | sort(attribute='0') %}
+      <tr>
+        <td><strong>{{ u.full_name or '—' }}</strong></td>
+        <td><code>{{ uname }}</code></td>
+        <td style="font-size:12px;">{{ u.email or '—' }}</td>
+        <td>
+          {% if u.role == 'super_admin' %}<span class="role-badge-sa"><i class="bi bi-shield-lock"></i> Super Admin</span>
+          {% elif u.role == 'admin' %}<span class="role-badge-a"><i class="bi bi-shield-check"></i> Admin</span>
+          {% else %}<span class="role-badge-t"><i class="bi bi-person"></i> Instructor</span>{% endif %}
+        </td>
+        <td>
+          {% if u.status == 'approved' %}<span class="pill-ok">Approved</span>
+          {% elif u.status == 'pending' %}<span class="pill-pend">Pending</span>
+          {% else %}<span class="pill-rej">{{ u.status }}</span>{% endif %}
+        </td>
+        <td>
+          {% if uname != session.get('username') %}
+          <form method="POST" action="{{ url_for('superadmin_promote', username=uname) }}" class="promote-form">
+            <select name="role" class="form-select form-select-sm" style="width:auto;padding:4px 8px;font-size:12px;">
+              <option value="teacher" {% if u.role=='teacher' %}selected{% endif %}>Instructor</option>
+              <option value="admin" {% if u.role=='admin' %}selected{% endif %}>Admin</option>
+              {# Only allow promoting to Super Admin if none exists yet, or this user IS already Super Admin #}
+              {% if u.role == 'super_admin' or super_admin_count == 0 %}
+              <option value="super_admin" {% if u.role=='super_admin' %}selected{% endif %}>Super Admin</option>
+              {% else %}
+              <option value="super_admin" disabled title="A Super Admin already exists">Super Admin (taken)</option>
+              {% endif %}
+            </select>
+            <button type="submit" class="btn-primary" style="padding:5px 12px;font-size:12px;">Apply</button>
+          </form>
+          {% else %}
+          <span style="font-size:11px;color:var(--muted);">— (you)</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

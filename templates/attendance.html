@@ -331,7 +331,7 @@ if total > 0 else 0 %}
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;font-size:13px;">${s.subject_name}${
             s.course_code
-              ? ' <span style=\\"font-family:monospace;font-size:10px;color:var(--accent);\\">[' +
+              ? ' <span style="font-family:monospace;font-size:10px;color:var(--accent);">[' +
                 s.course_code +
                 "]</span>"
               : ""
@@ -350,6 +350,7 @@ if total > 0 else 0 %}
               : ""
           }
         </div>
+        ${s.excuse_note ? `<div style="font-size:11px;color:var(--warning);margin-top:6px;"><i class="bi bi-info-circle"></i> Reason: <strong>${s.excuse_note}</strong></div>` : ''}
       </div>
       <span style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0;
         ${

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Create Account — DAVS{% endblock %}
+{% block page_title %}SUPER ADMIN / CREATE ACCOUNT{% endblock %}
+{% block content %}
+<div style="max-width:480px;margin:0 auto;">
+  <a href="{{ url_for('superadmin_users') }}" class="btn-outline" style="margin-bottom:14px;display:inline-flex;"><i class="bi bi-arrow-left"></i> Back</a>
+  <h2 style="font-size:18px;font-weight:700;margin-bottom:4px;">Create New Account</h2>
+  <p style="color:var(--muted);font-size:12px;margin-bottom:18px;">The account will be immediately approved (no pending review).</p>
+
+  <form method="POST" class="card" style="padding:22px;">
+    <div class="mb-3">
+      <label class="form-label">Full Name *</label>
+      <input type="text" name="full_name" class="form-control" placeholder="e.g. Maria Santos" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Username * <span style="font-size:11px;color:var(--muted);font-weight:500;">(lowercase, no spaces)</span></label>
+      <input type="text" name="username" class="form-control" placeholder="e.g. msantos"
+             oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'')" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Email</label>
+      <input type="email" name="email" class="form-control" placeholder="msantos@cvsu.edu.ph">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Role *</label>
+      <select name="role" class="form-select" required>
+        <option value="teacher">Instructor</option>
+        <option value="admin">Admin</option>
+        {% if show_super_admin %}
+        <option value="super_admin">Super Admin</option>
+        {% endif %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Password * <span style="font-size:11px;color:var(--muted);font-weight:500;">(min. 8 characters)</span></label>
+      <input type="password" name="password" class="form-control" minlength="8" placeholder="Set a strong password" required>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:10px;border-top:1.5px solid var(--border);">
+      <a href="{{ url_for('superadmin_users') }}" class="btn-outline">Cancel</a>
+      <button type="submit" class="btn-primary"><i class="bi bi-person-check"></i> Create Account</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -595,6 +595,7 @@ function renderSessions(sessions){
           &nbsp;·&nbsp;<i class="bi bi-calendar3"></i> ${s.date}
           &nbsp;·&nbsp;<i class="bi bi-clock"></i> ${s.time_slot||'—'}
         </div>
+        ${s.excuse_note ? `<div style="font-size:11px;color:var(--warning);margin-top:3px;"><i class="bi bi-info-circle"></i> Reason: <strong>${s.excuse_note}</strong></div>` : ''}
         ${s.tx_hash?`<div class="tx-chip"><i class="bi bi-link-45deg"></i> TX: ${s.tx_hash.substring(0,20)}… Block #${s.block}</div>`:''}
       </div>
       <span class="status-badge ${sbClass}">${statusLabel}</span>

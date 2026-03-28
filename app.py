@@ -3293,96 +3293,101 @@ def teacher_records():
 @app.route('/api/session_attendance/<sess_id>')
 @login_required
 def api_session_attendance(sess_id):
-    sess = load_session(sess_id)
-    if sess is None:
-        return jsonify({'error': 'Session not found'}), 404
-    if not _is_my_session(sess):
-        return jsonify({'error': 'Access denied'}), 403
-    logs = db_get_session_attendance(sess_id)
-    logs_by_nfc = {lg['nfc_id']: lg for lg in logs}
-    section_key = normalize_section_key(sess.get('section_key', ''))
-    sk_parts    = section_key.split('|')
-    program     = sk_parts[0] if len(sk_parts) > 0 else ''
-    year_level  = sk_parts[1] if len(sk_parts) > 1 else ''
-    section_val = sk_parts[2] if len(sk_parts) > 2 else ''
+    try:
+        sess = load_session(sess_id)
+        if sess is None:
+            return jsonify({'error': 'Session not found'}), 404
+        if not _is_my_session(sess):
+            return jsonify({'error': 'Access denied'}), 403
+        logs = db_get_session_attendance(sess_id)
+        logs_by_nfc = {lg['nfc_id']: lg for lg in logs}
+        section_key = normalize_section_key(sess.get('section_key', ''))
+        sk_parts    = section_key.split('|')
+        program     = sk_parts[0] if len(sk_parts) > 0 else ''
+        year_level  = sk_parts[1] if len(sk_parts) > 1 else ''
+        section_val = sk_parts[2] if len(sk_parts) > 2 else ''
 
-    # Get excuse request details
-    excuse_details = {}
-    with get_db() as _conn:
-        excuses = _conn.execute(
-            "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
-            (sess_id,)
-        ).fetchall()
-        for exc in excuses:
-            excuse_details[exc['nfc_id']] = {
-                'reason': exc['reason_type'],
-                'reason_detail': exc['reason_detail'],
-                'attachment_file': exc['attachment_file'],
+        # Get excuse request details
+        excuse_details = {}
+        with get_db() as _conn:
+            excuses = _conn.execute(
+                "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
+                (sess_id,)
+            ).fetchall()
+            for exc in excuses:
+                excuse_details[exc['nfc_id']] = {
+                    'reason': exc['reason_type'],
+                    'reason_detail': exc['reason_detail'],
+                    'attachment_file': exc['attachment_file'],
+                }
+
+        # Historical-first view:
+        # - always include students who have logs in this session (even if moved section later)
+        # - also include currently enrolled students with no logs as "absent"
+        students_map = {}
+
+        for lg in logs:
+            nid = lg['nfc_id']
+            st  = get_student_by_nfc_cached(nid) or {}
+            excuse_info = excuse_details.get(nid, {})
+            students_map[nid] = {
+                'nfc_id':     nid,
+                'name':       lg.get('student_name') or st.get('name') or nid,
+                'student_id': lg.get('student_id')   or st.get('student_id', ''),
+                'status':     (lg.get('status') or 'absent').lower(),
+                'tx_hash':    lg.get('tx_hash') or '',
+                'block':      str(lg.get('block_number') or ''),
+                'time':       lg.get('tap_time') or '',
+                'reason':     excuse_info.get('reason') or lg.get('excuse_note') or '',
+                'reason_detail': excuse_info.get('reason_detail') or '',
+                'attachment_url': url_for('admin_excuse_attachment', excuse_id=lg.get('excuse_request_id')) if lg.get('excuse_request_id') else '',
             }
 
-    # Historical-first view:
-    # - always include students who have logs in this session (even if moved section later)
-    # - also include currently enrolled students with no logs as "absent"
-    students_map = {}
+        # Primary approach: use get_all_students() and match by section_key
+        # This is more reliable as it handles both blockchain-sourced and database students
+        all_students = get_all_students()
+        enrolled = [s for s in all_students if build_student_section_key(s) == section_key]
 
-    for lg in logs:
-        nid = lg['nfc_id']
-        st  = get_student_by_nfc_cached(nid) or {}
-        excuse_info = excuse_details.get(nid, {})
-        students_map[nid] = {
-            'nfc_id':     nid,
-            'name':       lg.get('student_name') or st.get('name') or nid,
-            'student_id': lg.get('student_id')   or st.get('student_id', ''),
-            'status':     (lg.get('status') or 'absent').lower(),
-            'tx_hash':    lg.get('tx_hash') or '',
-            'block':      str(lg.get('block_number') or ''),
-            'time':       lg.get('tap_time') or '',
-            'reason':     excuse_info.get('reason') or lg.get('excuse_note') or '',
-            'reason_detail': excuse_info.get('reason_detail') or '',
-            'attachment_url': url_for('admin_excuse_attachment', excuse_id=lg.get('excuse_request_id')) if lg.get('excuse_request_id') else '',
-        }
+        # Fallback: if no students found via section_key, try exact database query
+        if not enrolled and program and year_level and section_val:
+            with get_db() as _conn:
+                _rows = _conn.execute(
+                    "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
+                    (program, year_level, section_val)
+                ).fetchall()
+            enrolled = [_student_row(r) for r in _rows]
 
-    # Primary approach: use get_all_students() and match by section_key
-    # This is more reliable as it handles both blockchain-sourced and database students
-    all_students = get_all_students()
-    enrolled = [s for s in all_students if build_student_section_key(s) == section_key]
+        for s in enrolled:
+            nid = s['nfcId']
+            if nid in students_map:
+                continue
+            students_map[nid] = {
+                'nfc_id':     nid,
+                'name':       s.get('name', nid),
+                'student_id': s.get('student_id', ''),
+                'status':     'absent',
+                'tx_hash':    '',
+                'block':      '',
+                'time':       '',
+                'reason':     '',
+                'reason_detail': '',
+                'attachment_url': '',
+            }
 
-    # Fallback: if no students found via section_key, try exact database query
-    if not enrolled and program and year_level and section_val:
-        with get_db() as _conn:
-            _rows = _conn.execute(
-                "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
-                (program, year_level, section_val)
-            ).fetchall()
-        enrolled = [_student_row(r) for r in _rows]
-
-    for s in enrolled:
-        nid = s['nfcId']
-        if nid in students_map:
-            continue
-        students_map[nid] = {
-            'nfc_id':     nid,
-            'name':       s.get('name', nid),
-            'student_id': s.get('student_id', ''),
-            'status':     'absent',
-            'tx_hash':    '',
-            'block':      '',
-            'time':       '',
-            'reason':     '',
-            'reason_detail': '',
-            'attachment_url': '',
-        }
-
-    students_out = sorted(students_map.values(), key=lambda x: x['name'].lower())
-    return jsonify({
-        'students':     students_out,
-        'subject_name': sess.get('subject_name', ''),
-        'course_code':  sess.get('course_code', ''),
-        'section_key':  section_key,
-        'time_slot':    sess.get('time_slot', ''),
-        'started_at':   sess.get('started_at', ''),
-        'ended_at':     sess.get('ended_at', ''),
-    })
+        students_out = sorted(students_map.values(), key=lambda x: (x.get('name') or 'Unknown').lower())
+        return jsonify({
+            'students':     students_out,
+            'subject_name': sess.get('subject_name', ''),
+            'course_code':  sess.get('course_code', ''),
+            'section_key':  section_key,
+            'time_slot':    sess.get('time_slot', ''),
+            'started_at':   sess.get('started_at', ''),
+            'ended_at':     sess.get('ended_at', ''),
+        })
+    except Exception as e:
+        import traceback
+        print(f"[ERROR api_session_attendance] {e}\n{traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/teacher/subjects/add', methods=['POST'])
 @login_required
@@ -4752,8 +4757,28 @@ def export_session_attendance(sess_id):
         excused_ids  = set(sess.get('excused', []))
         att_logs     = {lg['nfc_id']: lg for lg in db_get_session_attendance(sess_id)}
 
+        # Get excuse request details
+        excuse_details = {}
+        with get_db() as _conn:
+            excuses = _conn.execute(
+                "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
+                (sess_id,)
+            ).fetchall()
+            for exc in excuses:
+                excuse_details[exc['nfc_id']] = {
+                    'reason': exc['reason_type'],
+                    'reason_detail': exc['reason_detail'],
+                    'attachment_file': exc['attachment_file'],
+                }
+
         counts = {'Present':0,'Late':0,'Absent':0,'Excused':0}
         rows = []
+        REASON_LABELS = {
+            'sickness': 'Sickness / Illness', 'lbm': 'LBM', 'emergency': 'Family Emergency',
+            'bereavement': 'Bereavement', 'medical': 'Medical Appointment', 'accident': 'Accident / Injury',
+            'official': 'Official School Business', 'weather': 'Extreme Weather / Calamity',
+            'transport': 'Transportation Problem', 'others': 'Others'
+        }
         for st in enrolled:
             nid = st['nfcId']
             if   nid in excused_ids: status = 'Excused'
@@ -4762,6 +4787,12 @@ def export_session_attendance(sess_id):
             else:                    status = 'Absent'
             counts[status] += 1
             lg = att_logs.get(nid, {})
+            excuse_info = excuse_details.get(nid, {})
+            excuse_reason = ''
+            if excuse_info.get('reason'):
+                excuse_reason = REASON_LABELS.get(excuse_info['reason'], excuse_info['reason'])
+                if excuse_info.get('reason_detail'):
+                    excuse_reason += f" ({excuse_info['reason_detail']})"
             rows.append({
                 'name':       st['name'],
                 'student_id': st.get('student_id','—'),
@@ -4773,7 +4804,8 @@ def export_session_attendance(sess_id):
                 'tap_time':   lg.get('tap_time','') or '—',
                 'tx_hash':    lg.get('tx_hash','')  or '—',
                 'block':      str(lg.get('block_number','')) if lg.get('block_number') else '—',
-                'excuse':     lg.get('excuse_note','') or '',
+                'excuse_reason': excuse_reason,
+                'excuse_document': excuse_info.get('attachment_file', '') or '',
             })
 
         H = _xl_helpers(); C = H['C']
@@ -4786,7 +4818,7 @@ def export_session_attendance(sess_id):
         slot  = sess.get('time_slot','—')
         started = sess.get('started_at','—')
         ended   = sess.get('ended_at','Still running')
-        n_cols  = 10
+        n_cols  = 13
         subtitles = [
             'Cavite State University — DAVS Session Attendance Report',
             f'Subject: {subj}  {"["+code+"]" if code else ""}',
@@ -4797,8 +4829,8 @@ def export_session_attendance(sess_id):
         first_data = H['title_block'](ws, 'Session Attendance Report', subtitles, n_cols)
         first_data = H['stat_block'](ws, first_data, counts, n_cols)
         headers = ['#','Student Name','Student ID','NFC Card UID',
-                   'Program','Year','Sec','Status','Tap Time','TX Hash','Block #','Excuse']
-        widths  = [4, 28, 14, 14, 28, 10, 6, 10, 12, 52, 10, 20]
+                   'Program','Year','Sec','Status','Tap Time','TX Hash','Block #','Excuse Reason','Document']
+        widths  = [4, 28, 14, 14, 28, 10, 6, 10, 12, 52, 10, 30, 20]
         H['make_header_row'](ws, first_data, headers, widths)
         first_data += 1
         col_fmt = {8: ('status',), 10: ('tx',), 11: ('num',)}
@@ -4806,13 +4838,13 @@ def export_session_attendance(sess_id):
             H['data_row'](ws, ri, [
                 ri-first_data+1, row['name'], row['student_id'], row['nfc_id'],
                 row['program'], row['year'], row['section'],
-                row['status'], row['tap_time'], row['tx_hash'], row['block'], row['excuse'],
+                row['status'], row['tap_time'], row['tx_hash'], row['block'], row['excuse_reason'], row['excuse_document'],
             ], alt=(ri%2==0), col_formats=col_fmt)
         last_data = first_data + len(rows) - 1
         total_row_vals = ['TOTAL',f'{len(enrolled)} enrolled','','',
                           '','','',
                           f"{counts['Present']}P/{counts['Late']}L/{counts['Absent']}A/{counts['Excused']}E",
-                          '','','','']
+                          '','','','','']
         H['totals_row'](ws, last_data+1, total_row_vals, len(headers))
         ws.cell(row=last_data+3, column=1,
                 value=f'Generated by DAVS on {now.strftime("%B %d, %Y %I:%M %p")}') \
@@ -4993,6 +5025,12 @@ def export_stats_xlsx():
 
         donut  = {'Present':0,'Late':0,'Absent':0,'Excused':0}
         trend  = {}; subj_d = {}; sess_rows = []; detail_rows = []; by_section = {}
+        REASON_LABELS = {
+            'sickness': 'Sickness / Illness', 'lbm': 'LBM', 'emergency': 'Family Emergency',
+            'bereavement': 'Bereavement', 'medical': 'Medical Appointment', 'accident': 'Accident / Injury',
+            'official': 'Official School Business', 'weather': 'Extreme Weather / Calamity',
+            'transport': 'Transportation Problem', 'others': 'Others'
+        }
 
         for sid, s in sorted(filtered.items(), key=lambda x: x[1].get('started_at','')):
             sk       = normalize_section_key(s.get('section_key',''))
@@ -5021,6 +5059,19 @@ def export_stats_xlsx():
                               cnt['enrolled'], cnt['present'], cnt['late'],
                               cnt['absent'],   cnt['excused'], rate])
             att_logs = {lg['nfc_id']: lg for lg in db_get_session_attendance(sid)}
+            # Get excuse request details for this session
+            excuse_details = {}
+            with get_db() as _conn:
+                excuses = _conn.execute(
+                    "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
+                    (sid,)
+                ).fetchall()
+                for exc_row in excuses:
+                    excuse_details[exc_row['nfc_id']] = {
+                        'reason': exc_row['reason_type'],
+                        'reason_detail': exc_row['reason_detail'],
+                        'attachment_file': exc_row['attachment_file'],
+                    }
             for st in enrolled:
                 nid = st['nfcId']
                 if   nid in exc:  status = 'Excused'
@@ -5028,6 +5079,12 @@ def export_stats_xlsx():
                 elif nid in pre:  status = 'Present'
                 else:             status = 'Absent'
                 lg = att_logs.get(nid,{})
+                excuse_info = excuse_details.get(nid, {})
+                excuse_reason = ''
+                if excuse_info.get('reason'):
+                    excuse_reason = REASON_LABELS.get(excuse_info['reason'], excuse_info['reason'])
+                    if excuse_info.get('reason_detail'):
+                        excuse_reason += f" ({excuse_info['reason_detail']})"
                 detail_rows.append([
                     st['name'], st.get('student_id',''), nid,
                     st.get('course',''), st.get('year_level',''), st.get('section',''),
@@ -5035,7 +5092,8 @@ def export_stats_xlsx():
                     s.get('teacher_name',''), status,
                     lg.get('tx_hash','') or s.get('tx_hashes',{}).get(nid,{}).get('tx_hash',''),
                     str(lg.get('block_number','') or s.get('tx_hashes',{}).get(nid,{}).get('block','')),
-                    lg.get('excuse_note','') or '',
+                    excuse_reason,
+                    excuse_info.get('attachment_file', '') or '',
                 ])
 
         total_all = sum(donut.values())
@@ -5078,7 +5136,7 @@ def export_stats_xlsx():
         ws1.freeze_panes = ws1.cell(row=first_row, column=1)
 
         # Sheet 2: Student Detail
-        ws2 = wb.create_sheet('Student Detail'); n2 = 14
+        ws2 = wb.create_sheet('Student Detail'); n2 = 16
         subtitles2 = [
             'Cavite State University — DAVS',
             f'Period: {period_label}  |  Filters: {filter_label}',
@@ -5087,8 +5145,8 @@ def export_stats_xlsx():
         dr = H['title_block'](ws2, 'Student Attendance Detail', subtitles2, n2)
         det_hdrs = ['Student Name','Student ID','NFC Card UID','Program','Year','Sec',
                     'Subject','Session Date','Time Slot','Instructor',
-                    'Status','TX Hash','Block #','Excuse Note']
-        det_wids = [28,14,14,28,10,6,32,20,16,22,10,52,10,22]
+                    'Status','TX Hash','Block #','Excuse Reason','Document']
+        det_wids = [28,14,14,28,10,6,32,20,16,22,10,52,10,26,20]
         H['make_header_row'](ws2, dr, det_hdrs, det_wids)
         dr += 1
         for ri, row in enumerate(detail_rows, dr):

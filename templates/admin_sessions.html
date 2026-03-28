@@ -1,0 +1,1171 @@
+{% extends "base.html" %}
+{% block title %}Classroom Sessions — DAVS{% endblock %}
+{% block page_title %}CLASSROOM SESSIONS{% endblock %}
+{% block content %}
+<style>
+  /* ── Session rows ── */
+  .sess-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 7px;
+    transition: border-color .2s;
+    flex-wrap: wrap;
+    cursor: pointer;
+  }
+
+  .sess-row:hover {
+    border-color: rgba(45, 106, 39, .4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .07);
+  }
+
+  .sess-row.live-row {
+    border-color: rgba(45, 106, 39, .4);
+    box-shadow: 0 0 0 1px rgba(45, 106, 39, .08);
+  }
+
+  .sr-name {
+    font-weight: 700;
+    font-size: 14px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sr-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .btn-vr {
+    background: rgba(45, 106, 39, .08);
+    border: 1px solid rgba(45, 106, 39, .2);
+    color: var(--accent);
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all .2s;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .btn-vr:hover {
+    background: rgba(45, 106, 39, .18);
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--success);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: .2;
+    }
+  }
+
+  .badge-live {
+    background: rgba(45, 106, 39, .12);
+    color: var(--success);
+    border: 1px solid rgba(45, 106, 39, .25);
+    border-radius: 20px;
+    padding: 2px 9px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .badge-done {
+    background: rgba(100, 116, 139, .08);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 9px;
+    font-size: 10px;
+  }
+
+  .tab-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    flex-wrap: wrap;
+  }
+
+  .tab-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 9px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .tab-btn.active {
+    background: rgba(45, 106, 39, .1);
+    color: var(--accent);
+  }
+
+  .tab-pane {
+    display: none;
+  }
+
+  .tab-pane.active {
+    display: block;
+  }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 12px;
+  }
+
+  .fg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 130px;
+  }
+
+  .fl {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .fs {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    appearance: none;
+    transition: border-color .2s;
+  }
+
+  .fs:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .btn-rst {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 7px;
+    padding: 7px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    align-self: flex-end;
+    white-space: nowrap;
+    transition: all .2s;
+  }
+
+  .btn-rst:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  /* ══ SESSION DETAIL MODAL (matches teacher sessions & students style) ══ */
+  .sess-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    padding: 16px;
+  }
+
+  .sess-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .sess-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform: scale(.93);
+    transition: transform .25s cubic-bezier(.34, 1.56, .64, 1);
+  }
+
+  .sess-overlay.show .sess-modal {
+    transform: scale(1);
+  }
+
+  .sm-bar {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    background: var(--surface);
+  }
+
+  .sm-bar h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .sm-back {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    transition: all .2s;
+  }
+
+  .sm-back:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .sm-itabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+
+  .sm-itab {
+    padding: 11px 20px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .sm-itab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .sm-ipane {
+    display: none;
+    overflow-y: auto;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .sm-ipane.active {
+    display: flex;
+  }
+
+  /* Info grid inside modal */
+  .sm-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 16px 20px;
+  }
+
+  @media(max-width:480px) {
+    .sm-info-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .sm-info-box {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px;
+  }
+
+  .sm-info-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+  }
+
+  .sm-info-val {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* Stat boxes inside modal */
+  .sm-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 0 20px 16px;
+  }
+
+  @media(max-width:500px) {
+    .sm-stat-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .sm-stat {
+    text-align: center;
+    padding: 12px 8px;
+    border-radius: 10px;
+    border: 1px solid;
+  }
+
+  .sm-stat-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .sm-stat-lbl {
+    font-size: 10px;
+    margin-top: 4px;
+    font-weight: 600;
+  }
+
+  /* Attendance tab inside modal */
+  .att-tab-top {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 8px;
+    background: var(--surface);
+  }
+
+  .att-tab-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .btn-export-xl {
+    background: rgba(16, 185, 129, .1);
+    border: 1px solid rgba(16, 185, 129, .3);
+    color: var(--success);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .btn-export-xl:hover {
+    background: rgba(16, 185, 129, .2);
+  }
+
+  /* Attendance table */
+  .att-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .att-table th {
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+    background: var(--bg);
+  }
+
+  .att-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text);
+  }
+
+  .att-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .att-table tr:hover td {
+    background: rgba(45, 106, 39, .03);
+  }
+
+  .att-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .att-tx {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: rgba(45, 106, 39, .7);
+    background: rgba(45, 106, 39, .05);
+    border: 1px solid rgba(45, 106, 39, .15);
+    border-radius: 4px;
+    padding: 1px 5px;
+    display: inline-block;
+    word-break: break-all;
+    margin-top: 3px;
+  }
+
+  .att-scroll {
+    overflow-y: auto;
+    flex: 1;
+    padding: 0 4px;
+  }
+
+  .att-status {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-block;
+  }
+
+  .st-present {
+    background: rgba(45, 106, 39, .1);
+    color: var(--success);
+    border: 1px solid rgba(45, 106, 39, .2);
+  }
+
+  .st-late {
+    background: rgba(245, 197, 24, .1);
+    color: var(--warning);
+    border: 1px solid rgba(245, 197, 24, .2);
+  }
+
+  .st-absent {
+    background: rgba(192, 57, 43, .08);
+    color: var(--danger);
+    border: 1px solid rgba(192, 57, 43, .15);
+  }
+
+  .st-excused {
+    background: rgba(96, 165, 250, .08);
+    color: #60a5fa;
+    border: 1px solid rgba(96, 165, 250, .2);
+  }
+
+  /* ── Light mode fixes ── */
+  [data-theme="light"] .sm-info-box {
+    background: #F8FAF8;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .sm-bar {
+    background: #FFFFFF;
+    border-bottom-color: #D4DDD4;
+  }
+
+  [data-theme="light"] .sm-itabs {
+    background: #FFFFFF;
+  }
+
+  [data-theme="light"] .att-tab-top {
+    background: #FFFFFF;
+  }
+
+  [data-theme="light"] .att-table th {
+    background: #F0F5F0;
+    color: #3A5A37;
+  }
+
+  [data-theme="light"] .att-table td {
+    color: #1A1A1A;
+  }
+
+  [data-theme="light"] .sm-info-lbl {
+    color: #3A5A37;
+  }
+
+  [data-theme="light"] .sm-info-val {
+    color: #1A1A1A;
+  }
+
+  [data-theme="light"] .sm-stat-num {
+    color: #1A1A1A;
+  }
+
+  [data-theme="light"] .sess-modal {
+    border-color: #C8D8C8;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, .18);
+  }
+
+  [data-theme="light"] .fs {
+    background: #F8FAF8;
+    border-color: #C8D8C8;
+    color: #1A1A1A;
+  }
+
+  [data-theme="light"] .filter-bar {
+    background: #FFFFFF;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .tab-row {
+    background: #FFFFFF;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .tab-btn {
+    color: #5A6B5A;
+  }
+
+  [data-theme="light"] .tab-btn.active {
+    background: rgba(45, 106, 39, .12);
+    color: #2D6A27;
+  }
+
+  [data-theme="light"] .badge-done {
+    background: #EEF2EE;
+    color: #4A6B4A;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .btn-rst {
+    color: #5A6B5A;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .sm-back {
+    border-color: #C8D8C8;
+    color: #5A6B5A;
+  }
+
+  [data-theme="light"] .sm-itab {
+    color: #5A6B5A;
+  }
+
+  [data-theme="light"] .att-tab-title {
+    color: #3A5A37;
+  }
+
+  [data-theme="light"] .att-table tr:hover td {
+    background: rgba(45, 106, 39, .04);
+  }
+
+  [data-theme="light"] .sess-row {
+    background: #FFFFFF;
+    border-color: #D4DDD4;
+  }
+
+  [data-theme="light"] .sess-row:hover {
+    border-color: #2D6A27;
+    background: #F8FAF8;
+  }
+
+  @keyframes sp {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media(max-width:480px) {
+    .sr-name {
+      font-size: 13px;
+    }
+
+    .btn-vr {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+  }
+</style>
+
+<!-- SESSION DETAIL MODAL -->
+<div class="sess-overlay" id="sessModal" onclick="if(event.target===this)closeSessModal()">
+  <div class="sess-modal">
+    <div class="sm-bar">
+      <button class="sm-back" onclick="closeSessModal()"><i class="bi bi-arrow-left"></i> Back</button>
+      <h3 id="sm_title">Session Details</h3>
+      <span id="sm_badge"></span>
+    </div>
+    <div class="sm-itabs">
+      <button class="sm-itab active" id="smtab_info" onclick="switchSMTab('info',this)">
+        <i class="bi bi-info-circle"></i> Session Info
+      </button>
+      <button class="sm-itab" id="smtab_att" onclick="switchSMTab('att',this)">
+        <i class="bi bi-list-check"></i> Attendance Records
+      </button>
+    </div>
+    <div class="sm-ipane active" id="smpane_info" style="flex-direction:column;">
+      <div class="sm-info-grid" id="sm_info_grid">
+        <div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--muted);">
+          <span
+            style="display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;"></span>
+        </div>
+      </div>
+      <div class="sm-stat-grid" id="sm_stat_grid"></div>
+    </div>
+    <div class="sm-ipane" id="smpane_att" style="flex-direction:column;">
+      <div class="att-tab-top">
+        <span class="att-tab-title"><i class="bi bi-people"></i> Full Attendance List</span>
+        <button class="btn-export-xl"
+          onclick="animateExportBtn(this, '/export/session/' + currentSessId + '?filename=' + encodeURIComponent((() => { const s=sessionsData[currentSessId]; const slug=(s.subject_name||'session').replace(/[^a-zA-Z0-9]/g,'_').toLowerCase().substring(0,20); const sec=(s.section_key||'').split('|').pop().toLowerCase(); const now=new Date(); return 'session_'+slug+'_sec'+sec+'_'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+'.xlsx'; })()))">
+          <i class="bi bi-file-earmark-excel"></i> Export to Excel
+        </button>
+      </div>
+      <div class="att-scroll" id="sm_att_list" style="padding:0 20px 16px;">
+        <div style="text-align:center;padding:32px;color:var(--muted);font-size:12px;">
+          <span
+            style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;"></span>
+          <div style="margin-top:8px;">Loading attendance…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Page header -->
+<div style="margin-bottom:18px;">
+  <div
+    style="font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">//
+    SESSION MONITORING</div>
+  <h2 style="font-size:20px;font-weight:600;margin-bottom:3px;">Classroom Sessions</h2>
+  <p style="font-size:12px;color:var(--muted);">Monitor all active and completed classroom attendance sessions.</p>
+</div>
+
+<!-- Stats -->
+<div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+  <div
+    style="background:var(--surface);border:1px solid rgba(45,106,39,.3);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;flex:1;min-width:130px;">
+    <div class="card-icon green"><i class="bi bi-broadcast"></i></div>
+    <div>
+      <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;color:var(--success);">{{
+        active|length }}</div>
+      <div style="font-size:11px;color:var(--muted);">Live Sessions</div>
+    </div>
+  </div>
+  <div
+    style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;flex:1;min-width:130px;">
+    <div class="card-icon cyan"><i class="bi bi-journal-check"></i></div>
+    <div>
+      <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:700;">{{ ended|length }}</div>
+      <div style="font-size:11px;color:var(--muted);">Completed</div>
+    </div>
+  </div>
+</div>
+
+<div class="tab-row">
+  <button class="tab-btn active" onclick="switchTab('live',this)">📡 Live ({{ active|length }})</button>
+  <button class="tab-btn" onclick="switchTab('ended',this)">📋 Completed ({{ ended|length }})</button>
+</div>
+
+<!-- ── LIVE TAB ── -->
+<div class="tab-pane active" id="tab-live">
+  {% if active %}
+  <div class="filter-bar">
+    <div class="fg" style="flex:2;min-width:160px;">
+      <span class="fl"><i class="bi bi-search"></i> Search Live Sessions</span>
+      <input type="text" class="fs" id="lf_search" placeholder="Subject or instructor…" oninput="filterLive()"
+        style="appearance:none;" />
+    </div>
+    <button class="btn-rst" onclick="resetLive()"><i class="bi bi-x-circle"></i> Reset</button>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="lf_count">{{ active|length }} shown</span>
+  </div>
+  {% endif %}
+  <div style="max-height:540px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="liveList">
+    {% for sid, s in active.items() %}
+    <div class="sess-row live-row" id="lrow_{{ sid }}" data-subject="{{ s.subject_name|lower }}"
+      data-teacher="{{ s.teacher_name|lower }}" data-section="{{ s.section_key|lower }}"
+      data-program="{{ (s.section_key.split('|')[0] if '|' in s.section_key else '')|lower }}"
+      data-year="{{ (s.section_key.split('|')[1] if s.section_key.count('|') >= 1 else '')|lower }}"
+      data-secletter="{{ (s.section_key.split('|')[2] if s.section_key.count('|') >= 2 else '')|lower }}"
+      onclick="openSessModal('{{ sid }}')">
+      <div class="live-dot"></div>
+      <div style="flex:1;min-width:0;">
+        <div class="sr-name">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif
+          %}{{ s.subject_name }}</div>
+        <div class="sr-sub">{{ s.section_key.replace('|',' · ') }} · {{ s.teacher_name }}</div>
+      </div>
+      <span class="badge-live">LIVE</span>
+      <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-vr" style="text-decoration:none;"
+        onclick="event.stopPropagation()">
+        <i class="bi bi-broadcast"></i> Monitor
+      </a>
+      <i class="bi bi-chevron-right" style="font-size:14px;color:var(--muted);flex-shrink:0;"></i>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:48px;color:var(--muted);">
+      <i class="bi bi-broadcast" style="font-size:36px;opacity:.2;display:block;margin-bottom:10px;"></i>No live
+      sessions right now.
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── COMPLETED TAB ── -->
+<div class="tab-pane" id="tab-ended">
+  {% if ended %}
+  <div class="filter-bar">
+    <div class="fg" style="flex:2;min-width:160px;">
+      <span class="fl"><i class="bi bi-search"></i> Search</span>
+      <input type="text" class="fs" id="ef_search" placeholder="Subject, instructor…" oninput="filterEnded()"
+        style="appearance:none;" />
+    </div>
+    <div class="fg">
+      <span class="fl">Instructor</span>
+      <select class="fs" id="ef_teacher" onchange="filterEnded()">
+        <option value="">All Instructors</option>
+        {% set seen=[] %}{% for sid,s in ended.items() %}{% if s.teacher_name not in seen %}
+        <option value="{{ s.teacher_name|lower }}">{{ s.teacher_name }}</option>
+        {% set _=seen.append(s.teacher_name) %}{% endif %}{% endfor %}
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Program</span>
+      <select class="fs" id="ef_program" onchange="filterEnded()">
+        <option value="">All Programs</option>
+        <option value="bs computer science">BS Computer Science</option>
+        <option value="bs information technology">BS Information Technology</option>
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Year Level</span>
+      <select class="fs" id="ef_year" onchange="filterEnded()">
+        <option value="">All Years</option>
+        <option value="1st year">1st Year</option>
+        <option value="2nd year">2nd Year</option>
+        <option value="3rd year">3rd Year</option>
+        <option value="4th year">4th Year</option>
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Section</span>
+      <select class="fs" id="ef_secletter" onchange="filterEnded()">
+        <option value="">All</option>
+        <option value="a">A</option>
+        <option value="b">B</option>
+        <option value="c">C</option>
+        <option value="d">D</option>
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Subject</span>
+      <select class="fs" id="ef_subject" onchange="filterEnded()">
+        <option value="">All Subjects</option>
+        {% set seen_subj=[] %}{% for sid,s in ended.items() %}{% if s.subject_name not in seen_subj %}
+        <option value="{{ s.subject_name|lower }}">{{ s.subject_name }}</option>
+        {% set _=seen_subj.append(s.subject_name) %}{% endif %}{% endfor %}
+      </select>
+    </div>
+    <button class="btn-rst" onclick="resetEnded()"><i class="bi bi-x-circle"></i> Reset</button>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="ef_count">{{ ended|length }} shown</span>
+  </div>
+  {% endif %}
+  <div style="max-height:540px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="endedList">
+    {% for sid, s in ended.items()|sort(attribute='1.ended_at',reverse=True) %}
+    {% set sparts = s.section_key.split('|') %}
+    <div class="sess-row" id="erow_{{ sid }}" data-subject="{{ s.subject_name|lower }}"
+      data-teacher="{{ s.teacher_name|lower }}" data-section="{{ s.section_key|lower }}"
+      data-program="{{ (sparts[0] if sparts|length > 0 else '')|lower }}"
+      data-year="{{ (sparts[1] if sparts|length > 1 else '')|lower }}"
+      data-secletter="{{ (sparts[2] if sparts|length > 2 else '')|lower }}" onclick="openSessModal('{{ sid }}')">
+      <div style="flex:1;min-width:0;">
+        <div class="sr-name">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif
+          %}{{ s.subject_name }}</div>
+        <div class="sr-sub">{{ s.section_key.replace('|',' · ') }} · {{ s.teacher_name }} · {{ fmt_time(s.ended_at) }}
+        </div>
+      </div>
+      <span class="badge-done"><i class="bi bi-check-circle"></i> Done</span>
+      <i class="bi bi-chevron-right" style="font-size:14px;color:var(--muted);flex-shrink:0;"></i>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:48px;color:var(--muted);">
+      <i class="bi bi-journal-check" style="font-size:36px;opacity:.2;display:block;margin-bottom:10px;"></i>No
+      completed sessions yet.
+    </div>
+    {% endfor %}
+    <div id="ef_empty" style="display:none;text-align:center;padding:40px;color:var(--muted);">
+      <i class="bi bi-search" style="font-size:32px;opacity:.2;display:block;margin-bottom:8px;"></i>No sessions match
+      your filters.
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ── Build a flat sessions lookup from Jinja ── */
+  const sessionsData = {
+  {% for sid, s in active.items() %}
+  "{{ sid }}": {
+    subject_name: "{{ s.subject_name|e }}",
+      course_code: "{{ s.get('course_code','')|e }}",
+        section_key: "{{ s.section_key|e }}",
+          teacher_name: "{{ s.teacher_name|e }}",
+            time_slot: "{{ s.get('time_slot','')|e }}",
+              started_at: "{{ s.started_at|e }}",
+                ended_at: null,
+                  units: "{{ s.get('units','3') }}",
+  },
+  {% endfor %}
+  {% for sid, s in ended.items() %}
+  "{{ sid }}": {
+    subject_name: "{{ s.subject_name|e }}",
+      course_code: "{{ s.get('course_code','')|e }}",
+        section_key: "{{ s.section_key|e }}",
+          teacher_name: "{{ s.teacher_name|e }}",
+            time_slot: "{{ s.get('time_slot','')|e }}",
+              started_at: "{{ s.started_at|e }}",
+                ended_at: "{{ s.ended_at|e }}",
+                  units: "{{ s.get('units','3') }}",
+  },
+  {% endfor %}
+};
+
+  let currentSessId = null;
+  const sessCache = {};
+
+  /* ── Readable date formatter ── */
+  function fmtReadable(dtStr) {
+    if (!dtStr || dtStr === 'None') return '—';
+    try {
+      const d = new Date(dtStr.replace(' ', 'T'));
+      return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        + ' · '
+        + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    } catch (e) { return dtStr; }
+  }
+
+  /* ── Tab switching ── */
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  /* ── Modal inner tab switching ── */
+  function switchSMTab(id, btn) {
+    document.querySelectorAll('.sm-ipane').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
+    document.querySelectorAll('.sm-itab').forEach(b => b.classList.remove('active'));
+    const pane = document.getElementById('smpane_' + id);
+    pane.style.display = 'flex'; pane.classList.add('active');
+    btn.classList.add('active');
+  }
+
+  /* ── Open session modal ── */
+  function openSessModal(sessId) {
+    currentSessId = sessId;
+    const s = sessionsData[sessId];
+    if (!s) return;
+
+    /* Reset to Info tab */
+    switchSMTab('info', document.getElementById('smtab_info'));
+
+    document.getElementById('sm_title').textContent =
+      (s.course_code ? '[' + s.course_code + '] ' : '') + s.subject_name;
+    document.getElementById('sm_badge').innerHTML = s.ended_at
+      ? '<span style="background:rgba(100,116,139,.08);color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:10px;">Completed</span>'
+      : '<span style="background:rgba(45,106,39,.12);color:var(--success);border:1px solid rgba(45,106,39,.25);border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;">● LIVE</span>';
+
+    document.getElementById('sessModal').classList.add('show');
+
+    if (sessCache[sessId]) {
+      renderSessModal(sessId, sessCache[sessId]);
+      return;
+    }
+
+    /* Loading states */
+    document.getElementById('sm_info_grid').innerHTML =
+      '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--muted);">' +
+      '<span style="display:inline-block;width:18px;height:18px;border:2px solid var(--border);' +
+      'border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;"></span></div>';
+    document.getElementById('sm_stat_grid').innerHTML = '';
+    document.getElementById('sm_att_list').innerHTML =
+      '<div style="text-align:center;padding:32px;color:var(--muted);font-size:12px;">' +
+      '<span style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);' +
+      'border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;"></span>' +
+      '<div style="margin-top:8px;">Loading attendance…</div></div>';
+
+    fetch('/api/session_attendance/' + sessId, { credentials: 'same-origin' })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(data => { sessCache[sessId] = data; renderSessModal(sessId, data); })
+      .catch(err => {
+        document.getElementById('sm_info_grid').innerHTML =
+          '<div style="grid-column:1/-1;color:var(--danger);text-align:center;padding:24px;font-size:12px;">' +
+          'Failed to load session data: ' + err.message + '</div>';
+        document.getElementById('sm_att_list').innerHTML =
+          '<div style="color:var(--danger);text-align:center;padding:24px;font-size:12px;">' +
+          'Failed to load attendance. Please try again.</div>';
+      });
+  }
+
+  function renderSessModal(sessId, data) {
+    const s = sessionsData[sessId];
+    const sts = data.students || [];
+
+    /* Count from actual data (includes ALL statuses: present, late, absent, excused) */
+    const cnt = { present: 0, late: 0, absent: 0, excused: 0 };
+    sts.forEach(st => {
+      const status = (st.status || 'absent').toLowerCase();
+      if (cnt[status] !== undefined) cnt[status]++;
+    });
+
+    /* ── Info tab ── */
+    document.getElementById('sm_info_grid').innerHTML = `
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-book"></i> Subject</div>
+      <div class="sm-info-val">${s.subject_name}${s.course_code ? ' <code style="font-size:10px;background:rgba(45,106,39,.08);color:var(--accent);padding:1px 5px;border-radius:3px;">[' + s.course_code + ']</code>' : ''}</div>
+    </div>
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-grid"></i> Section</div>
+      <div class="sm-info-val">${(s.section_key || '').replace(/\|/g, ' · ')}</div>
+    </div>
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-person-badge"></i> Instructor</div>
+      <div class="sm-info-val">${s.teacher_name || '—'}</div>
+    </div>
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-clock"></i> Time Slot</div>
+      <div class="sm-info-val">${s.time_slot || '—'}</div>
+    </div>
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-people"></i> Total Enrolled</div>
+      <div class="sm-info-val">${sts.length} students</div>
+    </div>
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-journal"></i> Units</div>
+      <div class="sm-info-val">${s.units || '3'} Units</div>
+    </div>
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-play-circle"></i> Started</div>
+      <div class="sm-info-val">${fmtReadable(s.started_at)}</div>
+    </div>
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-stop-circle"></i> Ended</div>
+      <div class="sm-info-val">${s.ended_at && s.ended_at !== 'None'
+        ? fmtReadable(s.ended_at)
+        : '<span style="color:var(--success);font-weight:600;">Still running</span>'}</div>
+    </div>
+    ${!s.ended_at || s.ended_at === 'None'
+        ? `<div style="grid-column:1/-1;">
+           <a href="/teacher/session/${sessId}" class="btn-vr" style="text-decoration:none;width:100%;justify-content:center;">
+             <i class="bi bi-broadcast"></i> Monitor Live Session
+           </a>
+         </div>` : ''}`;
+
+    /* Stat boxes */
+    document.getElementById('sm_stat_grid').innerHTML = `
+    <div class="sm-stat" style="background:rgba(45,106,39,.07);border-color:rgba(45,106,39,.2);">
+      <div class="sm-stat-num" style="color:var(--success);">${cnt.present}</div>
+      <div class="sm-stat-lbl" style="color:var(--success);">Present</div>
+    </div>
+    <div class="sm-stat" style="background:rgba(245,197,24,.07);border-color:rgba(245,197,24,.2);">
+      <div class="sm-stat-num" style="color:var(--warning);">${cnt.late}</div>
+      <div class="sm-stat-lbl" style="color:var(--warning);">Late</div>
+    </div>
+    <div class="sm-stat" style="background:rgba(192,57,43,.07);border-color:rgba(192,57,43,.2);">
+      <div class="sm-stat-num" style="color:var(--danger);">${cnt.absent}</div>
+      <div class="sm-stat-lbl" style="color:var(--danger);">Absent</div>
+    </div>
+    <div class="sm-stat" style="background:rgba(96,165,250,.07);border-color:rgba(96,165,250,.2);">
+      <div class="sm-stat-num" style="color:#60a5fa;">${cnt.excused}</div>
+      <div class="sm-stat-lbl" style="color:#60a5fa;">Excused</div>
+    </div>`;
+
+    /* ── Attendance tab: shows ALL students including absent ── */
+    const stCls = { present: 'st-present', late: 'st-late', absent: 'st-absent', excused: 'st-excused' };
+    const stLbl = { present: '✓ Present', late: '⏱ Late', absent: '✕ Absent', excused: '◎ Excused' };
+
+    if (!sts.length) {
+      document.getElementById('sm_att_list').innerHTML =
+        '<div style="text-align:center;padding:32px;color:var(--muted);font-size:12px;">' +
+        '<i class="bi bi-people" style="font-size:28px;display:block;opacity:.2;margin-bottom:8px;"></i>' +
+        'No students found for this session.</div>';
+      return;
+    }
+
+    const REASON_LABELS = {
+      sickness: 'Sickness / Illness', lbm: 'LBM', emergency: 'Family Emergency',
+      bereavement: 'Bereavement', medical: 'Medical Appointment', accident: 'Accident / Injury',
+      official: 'Official School Business', weather: 'Extreme Weather / Calamity',
+      transport: 'Transportation Problem', others: 'Others'
+    };
+
+    document.getElementById('sm_att_list').innerHTML = `
+    <table class="att-table" style="margin-top:4px;">
+      <thead><tr>
+        <th style="width:36px;">#</th>
+        <th>Student Name</th>
+        <th>Student ID</th>
+        <th>Status</th>
+        <th>Tap Time</th>
+        <th>Excused Reason</th>
+        <th>Document</th>
+        <th>TX Hash</th>
+      </tr></thead>
+      <tbody>
+        ${sts.map((st, i) => {
+      const status = (st.status || 'absent').toLowerCase();
+      const reasonLabel = st.reason ? (REASON_LABELS[st.reason] || st.reason) : '—';
+      const reasonDetail = st.reason_detail ? `<div style="font-size:10px;color:var(--muted);font-style:italic;margin-top:2px;">"${st.reason_detail}"</div>` : '';
+      const docLink = st.attachment_url
+        ? `<a href="${st.attachment_url}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);border-radius:5px;padding:2px 7px;white-space:nowrap;"><i class="bi bi-paperclip"></i> View</a>`
+        : '<span style="color:var(--muted);font-size:11px;">—</span>';
+      return `<tr>
+            <td class="att-num">${i + 1}</td>
+            <td style="font-weight:600;">${st.name || '—'}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '—'}</td>
+            <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || status}</span></td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.time || '—'}</td>
+            <td style="font-size:11px;max-width:140px;">${status === 'excused' ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>${reasonDetail}` : '<span style="color:var(--muted);">—</span>'}</td>
+            <td>${status === 'excused' ? docLink : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+            <td>${st.tx_hash
+          ? `<span class="att-tx">${st.tx_hash.substring(0, 18)}…</span>`
+          : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+          </tr>`;
+    }).join('')}
+      </tbody>
+    </table>`;
+  }
+
+  function closeSessModal() {
+    document.getElementById('sessModal').classList.remove('show');
+    currentSessId = null;
+  }
+
+  function exportCurrentSession() {
+    if (!currentSessId) return;
+    const s = sessionsData[currentSessId];
+    if (!s) return;
+    const slug = (s.subject_name || 'session').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().substring(0, 20);
+    const sec = (s.section_key || '').split('|').pop().toLowerCase();
+    const now = new Date();
+    const fname = `session_${slug}_sec${sec}_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}.xlsx`;
+    const btn = document.querySelector('.btn-export-xl[onclick*="exportCurrentSession"]')
+      || document.querySelector('#stud_export_btn')
+      || document.querySelector('.att-tab-top .btn-export-xl');
+    if (btn) animateExportBtn(btn, '/export/session/' + currentSessId + '?filename=' + encodeURIComponent(fname));
+    else window.location.href = '/export/session/' + currentSessId + '?filename=' + encodeURIComponent(fname);
+  }
+
+  /* ── Live filter ── */
+  function filterLive() {
+    const q = document.getElementById('lf_search').value.toLowerCase();
+    let shown = 0;
+    document.querySelectorAll('#liveList .sess-row').forEach(r => {
+      const m = !q || r.dataset.subject.includes(q) || r.dataset.teacher.includes(q);
+      r.style.display = m ? '' : 'none';
+      if (m) shown++;
+    });
+    document.getElementById('lf_count').textContent = shown + ' shown';
+  }
+  function resetLive() {
+    document.getElementById('lf_search').value = '';
+    filterLive();
+  }
+
+  /* ── Ended filter (multi-filter) ── */
+  function filterEnded() {
+    const q = document.getElementById('ef_search').value.toLowerCase();
+    const t = document.getElementById('ef_teacher').value;
+    const prog = document.getElementById('ef_program').value;
+    const yr = document.getElementById('ef_year').value;
+    const sec = document.getElementById('ef_secletter').value;
+    const subj = document.getElementById('ef_subject').value;
+    let shown = 0;
+    document.querySelectorAll('#endedList .sess-row').forEach(r => {
+      const m = (!q || r.dataset.subject.includes(q) || r.dataset.teacher.includes(q))
+        && (!t || r.dataset.teacher === t)
+        && (!prog || r.dataset.program === prog)
+        && (!yr || r.dataset.year === yr)
+        && (!sec || r.dataset.secletter === sec)
+        && (!subj || r.dataset.subject === subj);
+      r.style.display = m ? '' : 'none';
+      if (m) shown++;
+    });
+    document.getElementById('ef_count').textContent = shown + ' shown';
+    const empty = document.getElementById('ef_empty');
+    if (empty) empty.style.display = shown === 0 ? 'block' : 'none';
+  }
+  function resetEnded() {
+    ['ef_search', 'ef_teacher', 'ef_program', 'ef_year', 'ef_secletter', 'ef_subject']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    filterEnded();
+  }
+</script>
+{% endblock %}

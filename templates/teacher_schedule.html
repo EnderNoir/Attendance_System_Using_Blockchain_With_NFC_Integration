@@ -1,0 +1,818 @@
+{% extends 'base.html' %}
+{% block title %}My Schedule — DAVS{% endblock %}
+{% block page_title %}MY SCHEDULE{% endblock %}
+{% block content %}
+<style>
+    .sched-page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    .sched-search-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .sched-search-wrap {
+        position: relative;
+        min-width: 240px;
+    }
+
+    .sched-search-input {
+        width: 100%;
+        background: var(--input-bg);
+        border: 1.5px solid var(--border);
+        color: var(--text);
+        border-radius: 8px;
+        padding: 9px 36px 9px 13px;
+        font-size: 13px;
+        font-family: 'DM Sans', sans-serif;
+        transition: border-color .2s;
+        box-sizing: border-box;
+    }
+
+    .sched-search-input:focus {
+        outline: none;
+        border-color: var(--accent);
+    }
+
+    .sched-search-icon {
+        position: absolute;
+        right: 11px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--muted);
+        font-size: 14px;
+        pointer-events: none;
+    }
+
+    .sched-search-dropdown {
+        position: absolute;
+        top: calc(100%+4px);
+        left: 0;
+        right: 0;
+        z-index: 3000;
+        background: var(--surface);
+        border: 1.5px solid var(--accent);
+        border-radius: 10px;
+        max-height: 260px;
+        overflow-y: auto;
+        box-shadow: 0 10px 32px rgba(0, 0, 0, .18);
+        display: none;
+    }
+
+    .sched-search-dropdown.open {
+        display: block;
+    }
+
+    .search-section-label {
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 8px 12px 3px;
+        background: rgba(45, 106, 39, .06);
+    }
+
+    .search-result-row {
+        display: grid;
+        grid-template-columns: 1fr 80px;
+        gap: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        transition: background .12s;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .search-result-row:last-of-type {
+        border-bottom: none;
+    }
+
+    .search-result-row:hover {
+        background: rgba(45, 106, 39, .09);
+    }
+
+    .search-result-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text);
+    }
+
+    .search-result-badge {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 20px;
+        text-align: right;
+        white-space: nowrap;
+        background: rgba(45, 106, 39, .12);
+        color: #1A5A17;
+        border: 1px solid rgba(45, 106, 39, .25);
+    }
+
+    [data-theme="dark"] .search-result-badge {
+        background: rgba(245, 197, 24, .1);
+        color: #F5C518;
+        border-color: rgba(245, 197, 24, .25);
+    }
+
+    .active-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 12px;
+        min-height: 28px;
+    }
+
+    .filter-chip {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        background: rgba(45, 106, 39, .1);
+        border: 1.5px solid rgba(45, 106, 39, .25);
+        color: #1A5A17;
+        border-radius: 20px;
+        padding: 3px 10px 3px 12px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    [data-theme="dark"] .filter-chip {
+        color: #F5C518;
+        border-color: rgba(245, 197, 24, .25);
+        background: rgba(245, 197, 24, .08);
+    }
+
+    .filter-chip button {
+        background: none;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        padding: 0;
+        font-size: 12px;
+        line-height: 1;
+        opacity: .7;
+    }
+
+    .filter-chip button:hover {
+        opacity: 1;
+    }
+
+    .cal-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 12px;
+        border: 1.5px solid var(--border);
+        box-shadow: 0 2px 12px rgba(0, 0, 0, .06);
+    }
+
+    .cal-table {
+        width: 100%;
+        min-width: 680px;
+        border-collapse: collapse;
+    }
+
+    .cal-table th {
+        background: rgba(45, 106, 39, .09);
+        border: 1px solid var(--border);
+        padding: 10px 14px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: .8px;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .cal-table th.time-col {
+        width: 100px;
+        background: rgba(45, 106, 39, .06);
+        color: var(--muted);
+    }
+
+    .cal-table th.today-col {
+        background: rgba(45, 106, 39, .18) !important;
+        position: relative;
+    }
+
+    .cal-table th.today-col::after {
+        content: 'TODAY';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 7px;
+        background: var(--accent);
+        color: #fff;
+        padding: 1px 5px;
+        border-radius: 3px 3px 0 0;
+        letter-spacing: 1px;
+    }
+
+    [data-theme="dark"] .cal-table th.today-col::after {
+        color: #000;
+    }
+
+    .cal-table td {
+        border: 1px solid var(--border);
+        vertical-align: top;
+        padding: 6px;
+        width: calc((100% - 100px)/7);
+        min-height: 80px;
+    }
+
+    .cal-table td.time-cell {
+        background: rgba(45, 106, 39, .04);
+        text-align: center;
+        font-family: 'Space Mono', monospace;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--muted);
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .cal-table tbody tr:hover td:not(.time-cell) {
+        background: rgba(45, 106, 39, .02);
+    }
+
+    .sched-block {
+        background: linear-gradient(135deg, rgba(45, 106, 39, .12), rgba(45, 106, 39, .06));
+        border: 1.5px solid rgba(45, 106, 39, .28);
+        border-left: 3px solid var(--accent);
+        border-radius: 7px;
+        padding: 8px 9px;
+        margin-bottom: 4px;
+        cursor: pointer;
+        transition: all .18s;
+        position: relative;
+    }
+
+    .sched-block:hover {
+        border-color: var(--accent);
+        background: rgba(45, 106, 39, .16);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, .10);
+    }
+
+    .sched-block.filtered-out {
+        opacity: .2;
+        pointer-events: none;
+    }
+
+    .sched-block .sb-subject {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .sched-block .sb-time {
+        font-size: 9px;
+        font-family: 'Space Mono', monospace;
+        color: var(--muted);
+        margin-top: 2px;
+    }
+
+    .sched-block .sb-section {
+        font-size: 9px;
+        color: var(--accent);
+        font-weight: 700;
+        margin-top: 2px;
+    }
+
+    [data-theme="dark"] .sched-block {
+        background: rgba(245, 197, 24, .06);
+        border-color: rgba(245, 197, 24, .18);
+        border-left-color: #F5C518;
+    }
+
+    /* Live / upcoming states */
+    .sched-block.live-now {
+        border-left-color: #10b981 !important;
+        background: linear-gradient(135deg, rgba(16, 185, 129, .15), rgba(16, 185, 129, .05)) !important;
+        animation: livePulse 2s infinite;
+    }
+
+    @keyframes livePulse {
+
+        0%,
+        100% {
+            box-shadow: none;
+        }
+
+        50% {
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, .15);
+        }
+    }
+
+    .sched-block.upcoming-session {
+        border-left-color: #f59e0b !important;
+        background: linear-gradient(135deg, rgba(245, 158, 11, .12), rgba(245, 158, 11, .04)) !important;
+    }
+
+    .live-badge-block {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: rgba(16, 185, 129, .15);
+        color: #10b981;
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-size: 9px;
+        font-weight: 700;
+        margin-top: 3px;
+    }
+
+    .live-dot-small {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #10b981;
+        animation: blink 1.5s infinite;
+        flex-shrink: 0;
+    }
+
+    @keyframes blink {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: .2;
+        }
+    }
+
+    /* Modal */
+    .modal-backdrop-custom {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, .55);
+        z-index: 1999;
+        display: none;
+    }
+
+    .modal-backdrop-custom.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+    }
+
+    .modal-box {
+        background: var(--surface);
+        border: 1.5px solid var(--border);
+        border-radius: 16px;
+        width: 100%;
+        max-width: 520px;
+        max-height: 92vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 56px rgba(0, 0, 0, .22);
+    }
+
+    .modal-header-custom {
+        background: var(--accent);
+        padding: 14px 18px;
+        border-radius: 14px 14px 0 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .modal-header-custom h3 {
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    [data-theme="dark"] .modal-header-custom h3 {
+        color: #000;
+    }
+
+    .modal-close-btn {
+        background: rgba(255, 255, 255, .2);
+        border: none;
+        color: #fff;
+        border-radius: 7px;
+        padding: 5px 11px;
+        cursor: pointer;
+        font-size: 15px;
+        transition: background .2s;
+    }
+
+    .modal-close-btn:hover {
+        background: rgba(255, 255, 255, .3);
+    }
+
+    [data-theme="dark"] .modal-close-btn {
+        color: #000;
+    }
+
+    .modal-body-custom {
+        padding: 22px;
+    }
+
+    .info-row-m {
+        padding: 9px 0;
+        border-bottom: 1px solid var(--border);
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 8px;
+    }
+
+    .info-row-m:last-child {
+        border-bottom: none;
+    }
+
+    .info-lbl-m {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        padding-top: 2px;
+    }
+
+    .info-val-m {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+    }
+
+    /* Pre-session notification */
+    .presession-toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 9999;
+        background: var(--surface);
+        border: 2px solid #f59e0b;
+        border-radius: 14px;
+        padding: 16px 20px;
+        max-width: 320px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, .18);
+        animation: toastSlideIn .4s cubic-bezier(.34, 1.56, .64, 1) both;
+    }
+
+    @keyframes toastSlideIn {
+        from {
+            opacity: 0;
+            transform: translateX(40px) scale(.9);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
+
+    .presession-toast.removing {
+        animation: toastSlideOut .3s ease forwards;
+    }
+
+    @keyframes toastSlideOut {
+        to {
+            opacity: 0;
+            transform: translateX(40px);
+        }
+    }
+
+    .presession-toast-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #f59e0b;
+        margin-bottom: 5px;
+    }
+
+    .presession-toast-body {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.55;
+    }
+
+    .presession-close {
+        position: absolute;
+        top: 8px;
+        right: 10px;
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 14px;
+    }
+</style>
+
+{% set dow_list = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
+
+<div id="presessionContainer"></div>
+
+<!-- PAGE HEADER -->
+<div class="sched-page-header">
+    <div>
+        <h2 style="font-size:18px;font-weight:700;margin:0;">My Weekly Schedule</h2>
+        <p style="color:var(--muted);font-size:12px;margin:4px 0 0;">
+            Your assigned class schedules. Click any block to view full details.
+        </p>
+    </div>
+    <div class="sched-search-bar">
+        <div class="sched-search-wrap">
+            <input type="text" id="schedSearchInput" class="sched-search-input" placeholder="Filter by subject…"
+                autocomplete="off" oninput="onSearchInput()" onfocus="onSearchInput()">
+            <i class="bi bi-search sched-search-icon"></i>
+            <div class="sched-search-dropdown" id="schedSearchDrop"></div>
+        </div>
+    </div>
+</div>
+
+<!-- FILTER CHIPS -->
+<div class="active-filters" id="activeFilters"></div>
+
+<!-- CALENDAR -->
+<div class="cal-wrap">
+    <table class="cal-table" id="calTable">
+        <thead>
+            <tr>
+                <th class="time-col"><i class="bi bi-clock"></i> Time</th>
+                {% for d in dow_list %}
+                <th id="th_dow_{{ loop.index0 }}">{{ d }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody id="calBody"></tbody>
+    </table>
+</div>
+
+{% if not schedules %}
+<div style="text-align:center;padding:48px 0;color:var(--muted);">
+    <i class="bi bi-calendar-x" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3;"></i>
+    <div style="font-size:14px;font-weight:600;">No schedules assigned yet.</div>
+    <div style="font-size:12px;margin-top:6px;">Contact your administrator to get schedules assigned.</div>
+</div>
+{% endif %}
+
+<!-- VIEW-ONLY MODAL -->
+<div class="modal-backdrop-custom" id="scheduleModal" onclick="if(event.target===this)closeSchedModal()">
+    <div class="modal-box">
+        <div class="modal-header-custom">
+            <h3><i class="bi bi-calendar-event"></i> Schedule Details</h3>
+            <button class="modal-close-btn" onclick="closeSchedModal()">✕</button>
+        </div>
+        <div class="modal-body-custom">
+            <div
+                style="text-align:center;margin-bottom:18px;padding-bottom:16px;border-bottom:1.5px solid var(--border);">
+                <div
+                    style="width:52px;height:52px;margin:0 auto 10px;border-radius:12px;background:rgba(45,106,39,.1);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--accent);">
+                    <i class="bi bi-calendar-event"></i>
+                </div>
+                <div style="font-size:16px;font-weight:700;" id="infoSubjectName">—</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:3px;font-family:'Space Mono',monospace;"
+                    id="infoCourseCode">—</div>
+                <div id="infoLiveIndicator" style="display:none;margin-top:8px;">
+                    <span
+                        style="background:rgba(16,185,129,.12);color:#10b981;border:1.5px solid rgba(16,185,129,.3);border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:6px;">
+                        <span
+                            style="width:6px;height:6px;border-radius:50%;background:#10b981;animation:blink 1.5s infinite;display:inline-block;"></span>
+                        Live Now
+                    </span>
+                </div>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-person-badge"></i> Teacher</span>
+                <span class="info-val-m" id="infoTeacherName">—</span>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-layers"></i> Section</span>
+                <span class="info-val-m" id="infoSectionName">—</span>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-calendar3-week"></i> Day & Time</span>
+                <span class="info-val-m" id="infoDayTime">—</span>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-hourglass-split"></i> Grace Period</span>
+                <span class="info-val-m" id="infoGrace">—</span>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-clock-history"></i> Next Class</span>
+                <span class="info-val-m" id="infoNextClass">—</span>
+            </div>
+            <div
+                style="margin-top:18px;padding-top:14px;border-top:1.5px solid var(--border);display:flex;justify-content:center;">
+                <button class="btn-outline" onclick="closeSchedModal()"><i class="bi bi-x"></i> Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const ALL_SCHEDULES = {{ schedules | tojson }};
+    const ALL_SUBJECTS = {{ subjects  | tojson if subjects else '{}' }};
+    const DOW_NAMES = {{ dow_list  | tojson }};
+
+    /* ── TIME UTILS ── */
+    function to24h(t) {
+        if (!t) return '00:00';
+        if (t.includes(':') && !t.toLowerCase().includes('m')) return t.substring(0, 5);
+        const m = t.match(/(\d{1,2}):(\d{2})\s*([ap]m?)/i);
+        if (!m) return t.substring(0, 5);
+        let h = parseInt(m[1]), mn = m[2], pm = m[3].toLowerCase().startsWith('p');
+        if (pm && h !== 12) h += 12; if (!pm && h === 12) h = 0;
+        return (h < 10 ? '0' : '') + h + ':' + mn;
+    }
+    function fmtTime(t) {
+        if (!t) return '';
+        const [h, m] = t.split(':').map(Number);
+        const ap = h >= 12 ? 'PM' : 'AM'; const hh = h % 12 || 12;
+        return hh + ':' + (m < 10 ? '0' + m : m) + ' ' + ap;
+    }
+    function timeToMins(t) { const p = to24h(t).split(':'); return parseInt(p[0]) * 60 + parseInt(p[1] || 0); }
+    function nowMins() { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+    function todayDow() { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; }
+    function isLive(s) { return s.day_of_week === todayDow() && nowMins() >= timeToMins(s.start_time) && nowMins() < timeToMins(s.end_time); }
+    function isUpcoming(s) { const diff = timeToMins(s.start_time) - nowMins(); return s.day_of_week === todayDow() && diff > 0 && diff <= 5; }
+    function minsUntil(s) { return timeToMins(s.start_time) - nowMins(); }
+
+    /* ── HIGHLIGHT TODAY COLUMN ── */
+    (function () {
+        const th = document.getElementById('th_dow_' + todayDow());
+        if (th) th.classList.add('today-col');
+    })();
+
+    /* ── CALENDAR ── */
+    const TIME_SLOTS = ['07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30',
+        '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
+        '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'];
+
+    function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+    function buildCalendar(filtered) {
+        const body = document.getElementById('calBody'); if (!body) return;
+        body.innerHTML = '';
+        const grid = {};
+        for (let d = 0; d < 7; d++) grid[d] = [];
+        (filtered || ALL_SCHEDULES).forEach(s => grid[s.day_of_week].push(s));
+
+        TIME_SLOTS.forEach((slot, idx) => {
+            const tr = document.createElement('tr');
+            const tc = document.createElement('td');
+            tc.className = 'time-cell'; tc.textContent = fmtTime(slot);
+            tr.appendChild(tc);
+            for (let d = 0; d < 7; d++) {
+                const td = document.createElement('td');
+                grid[d].filter(s => {
+                    const st = to24h(s.start_time);
+                    return st >= slot && st < (TIME_SLOTS[idx + 1] || '23:59');
+                }).forEach(s => {
+                    const div = document.createElement('div');
+                    div.className = 'sched-block';
+                    div.dataset.subject = s.subject_id || '';
+                    if (isLive(s)) div.classList.add('live-now');
+                    else if (isUpcoming(s)) div.classList.add('upcoming-session');
+                    div.onclick = () => openSchedModal(s);
+                    const liveHtml = isLive(s)
+                        ? '<div class="live-badge-block"><span class="live-dot-small"></span> LIVE</div>'
+                        : (isUpcoming(s) ? '<div style="font-size:9px;color:#f59e0b;margin-top:2px;font-weight:700;">⏱ ' + minsUntil(s) + 'm</div>' : '');
+                    div.innerHTML =
+                        '<div class="sb-subject">' + esc(s.subject_name) + '</div>' +
+                        '<div class="sb-time">' + fmtTime(to24h(s.start_time)) + ' – ' + fmtTime(to24h(s.end_time)) + '</div>' +
+                        '<div class="sb-section">' + (s.section_key || '').replace(/\|/g, ' · ') + '</div>' + liveHtml;
+                    td.appendChild(div);
+                });
+                tr.appendChild(td);
+            }
+            body.appendChild(tr);
+        });
+        applyFilter();
+    }
+
+    /* ── FILTERS ── */
+    let activeFilters = {};
+    function applyFilter() {
+        const sf = Object.values(activeFilters).filter(f => f.type === 'subject').map(f => f.value);
+        document.querySelectorAll('.sched-block').forEach(b => {
+            b.classList.toggle('filtered-out', sf.length > 0 && !sf.includes(b.dataset.subject));
+        });
+    }
+    function addFilter(type, value, label) {
+        const key = type + '_' + value;
+        if (activeFilters[key]) return;
+        activeFilters[key] = { type, value, label };
+        renderChips(); applyFilter();
+    }
+    function removeFilter(key) { delete activeFilters[key]; renderChips(); applyFilter(); }
+    function renderChips() {
+        const c = document.getElementById('activeFilters'); if (!c) return;
+        c.innerHTML = '';
+        Object.keys(activeFilters).forEach(key => {
+            const f = activeFilters[key];
+            const chip = document.createElement('div'); chip.className = 'filter-chip';
+            chip.innerHTML = '<i class="bi bi-funnel-fill" style="font-size:9px;"></i> ' + esc(f.label) +
+                '<button onclick="removeFilter(\'' + key + '\')"><i class="bi bi-x"></i></button>';
+            c.appendChild(chip);
+        });
+    }
+
+    /* ── SEARCH ── */
+    let searchTm = null;
+    function onSearchInput() { clearTimeout(searchTm); searchTm = setTimeout(doSearch, 180); }
+    function doSearch() {
+        const q = (document.getElementById('schedSearchInput').value || '').trim().toLowerCase();
+        const drop = document.getElementById('schedSearchDrop'); if (!drop) return;
+        if (!q) { drop.classList.remove('open'); return; }
+        const subjects = Object.entries(ALL_SUBJECTS).filter(e =>
+            (e[1].name || '').toLowerCase().includes(q) || (e[1].course_code || '').toLowerCase().includes(q)
+        ).slice(0, 8);
+        if (!subjects.length) { drop.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--muted);text-align:center;">No matches.</div>'; drop.classList.add('open'); return; }
+        let html = '<div class="search-section-label">Subjects</div>';
+        subjects.forEach(e => {
+            const lbl = '[' + e[1].course_code + '] ' + e[1].name;
+            html += '<div class="search-result-row" onclick="addFilter(\'subject\',\'' + e[0] + '\',\'' + esc(lbl) + '\');closeSearch()">' +
+                '<span class="search-result-name">' + esc(lbl) + '</span>' +
+                '<span class="search-result-badge">Subject</span></div>';
+        });
+        drop.innerHTML = html; drop.classList.add('open');
+    }
+    function closeSearch() { document.getElementById('schedSearchInput').value = ''; document.getElementById('schedSearchDrop').classList.remove('open'); }
+    document.addEventListener('click', e => { if (!e.target.closest('.sched-search-wrap')) document.getElementById('schedSearchDrop')?.classList.remove('open'); });
+
+    /* ── MODAL ── */
+    let selectedSched = null;
+    function openSchedModal(s) {
+        selectedSched = s;
+        document.getElementById('infoSubjectName').textContent = s.subject_name;
+        document.getElementById('infoCourseCode').textContent = s.course_code || '';
+        document.getElementById('infoTeacherName').textContent = s.teacher_name || '—';
+        document.getElementById('infoSectionName').textContent = (s.section_key || '').split('|').join(' · ');
+        document.getElementById('infoDayTime').textContent = DOW_NAMES[s.day_of_week] + ' @ ' + fmtTime(to24h(s.start_time)) + ' – ' + fmtTime(to24h(s.end_time));
+        document.getElementById('infoGrace').textContent = (s.grace_minutes || 15) + ' minutes';
+        document.getElementById('infoLiveIndicator').style.display = isLive(s) ? 'block' : 'none';
+
+        // Next class calculation
+        let nextTxt = '—';
+        if (isLive(s)) {
+            nextTxt = 'Currently in session';
+        } else {
+            const d = new Date();
+            let diff = (s.day_of_week - todayDow() + 7) % 7;
+            if (diff === 0) diff = 7;
+            const nd = new Date(d); nd.setDate(nd.getDate() + diff);
+            nextTxt = DOW_NAMES[s.day_of_week] + ', ' + nd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' @ ' + fmtTime(to24h(s.start_time));
+        }
+        document.getElementById('infoNextClass').textContent = nextTxt;
+        document.getElementById('scheduleModal').classList.add('show');
+    }
+    function closeSchedModal() { document.getElementById('scheduleModal').classList.remove('show'); selectedSched = null; }
+
+    /* ── PRE-SESSION NOTIFICATION (5 minutes) ── */
+    const notified = new Set();
+    function checkPresessions() {
+        ALL_SCHEDULES.forEach(s => {
+            const mins = minsUntil(s);
+            const key = s.schedule_id + '_' + new Date().toDateString();
+            if (mins > 0 && mins <= 5 && !notified.has(key)) {
+                notified.add(key);
+                showPresessionToast(s, mins);
+            }
+        });
+    }
+    function showPresessionToast(s, mins) {
+        const c = document.getElementById('presessionContainer');
+        const el = document.createElement('div');
+        el.className = 'presession-toast';
+        el.style.position = 'fixed'; el.style.bottom = '24px'; el.style.right = '24px'; el.style.zIndex = '9999';
+        el.innerHTML =
+            '<button class="presession-close" onclick="this.parentNode.remove()"><i class="bi bi-x"></i></button>' +
+            '<div style="font-size:26px;margin-bottom:7px;">⏰</div>' +
+            '<div class="presession-toast-title">Class Starting in ' + mins + ' Minute' + (mins !== 1 ? 's' : '') + '!</div>' +
+            '<div class="presession-toast-body">' +
+            '<strong>' + esc(s.subject_name) + '</strong><br>' +
+            (s.section_key || '').replace(/\|/g, ' · ') + '<br>' +
+            fmtTime(to24h(s.start_time)) + ' – ' + fmtTime(to24h(s.end_time)) +
+            '</div>';
+        c.appendChild(el);
+        setTimeout(() => {
+            if (el.parentNode) { el.classList.add('removing'); setTimeout(() => el.parentNode && el.remove(), 350); }
+        }, 30000);
+    }
+
+    /* ── INIT ── */
+    document.addEventListener('DOMContentLoaded', () => {
+        buildCalendar(ALL_SCHEDULES);
+        checkPresessions();
+        setInterval(() => { buildCalendar(ALL_SCHEDULES); checkPresessions(); }, 60000);
+    });
+</script>
+{% endblock %}

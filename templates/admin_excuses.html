@@ -1,0 +1,720 @@
+{% extends 'base.html' %}
+{% block title %}Excuse Records — DAVS{% endblock %}
+{% block page_title %}ADMIN / EXCUSE RECORDS{% endblock %}
+{% block content %}
+<style>
+  /* ── TAB ROW ── */
+  .tab-row {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 16px;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 8px 14px;
+    border: none;
+    background: transparent;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+    text-decoration: none;
+  }
+
+  .tab-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  [data-theme="dark"] .tab-btn.active {
+    color: #000;
+  }
+
+  .cnt-badge {
+    background: rgba(255, 255, 255, .3);
+    border-radius: 20px;
+    padding: 1px 7px;
+    font-size: 10px;
+    font-weight: 700;
+    color: inherit;
+  }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 14px;
+  }
+
+  .fg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 130px;
+  }
+
+  .fl {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .fs {
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    appearance: none;
+    width: 100%;
+  }
+
+  .fs:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .btn-rst {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 7px;
+    padding: 7px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    align-self: flex-end;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+
+  .btn-rst:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  /* ── EXCUSE TABLE ── */
+  .exc-table-wrap {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .exc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .exc-table th {
+    background: rgba(45, 106, 39, .09);
+    border-bottom: 2px solid var(--border);
+    padding: 11px 14px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    white-space: nowrap;
+    text-align: left;
+  }
+
+  .exc-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text);
+  }
+
+  .exc-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .exc-table tbody tr:hover td {
+    background: rgba(45, 106, 39, .03);
+  }
+
+  [data-theme="dark"] .exc-table tbody tr:hover td {
+    background: rgba(245, 197, 24, .04);
+  }
+
+  /* ── STATUS PILLS ── */
+  .status-pill {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .sp-pending {
+    background: rgba(90, 62, 0, .1);
+    color: #5A3E00;
+    border: 1.5px solid rgba(90, 62, 0, .25);
+  }
+
+  .sp-approved {
+    background: rgba(26, 90, 23, .1);
+    color: var(--success);
+    border: 1.5px solid rgba(26, 90, 23, .3);
+  }
+
+  .sp-rejected {
+    background: rgba(139, 26, 10, .08);
+    color: var(--danger);
+    border: 1.5px solid rgba(139, 26, 10, .2);
+  }
+
+  [data-theme="dark"] .sp-pending {
+    color: var(--warning);
+    border-color: rgba(255, 193, 7, .3);
+    background: rgba(255, 193, 7, .1);
+  }
+
+  /* ── REASON BADGE ── */
+  .reason-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(45, 106, 39, .1);
+    color: var(--accent);
+    border: 1.5px solid rgba(45, 106, 39, .25);
+  }
+
+  [data-theme="dark"] .reason-badge {
+    background: rgba(245, 197, 24, .1);
+    color: var(--accent);
+    border-color: rgba(245, 197, 24, .25);
+  }
+
+  /* ── ACTION BUTTONS ── */
+  .btn-approve {
+    background: rgba(26, 90, 23, .1);
+    border: 1.5px solid rgba(26, 90, 23, .3);
+    color: var(--success);
+    border-radius: 7px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+    white-space: nowrap;
+  }
+
+  .btn-approve:hover {
+    background: rgba(26, 90, 23, .2);
+  }
+
+  .btn-reject {
+    background: rgba(139, 26, 10, .07);
+    border: 1.5px solid rgba(139, 26, 10, .25);
+    color: var(--danger);
+    border-radius: 7px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+    white-space: nowrap;
+  }
+
+  .btn-reject:hover {
+    background: rgba(139, 26, 10, .15);
+  }
+
+  /* ── DOCUMENT LINK ── */
+  .doc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    text-decoration: none;
+    background: rgba(45, 106, 39, .07);
+    border: 1px solid rgba(45, 106, 39, .2);
+    border-radius: 6px;
+    padding: 3px 9px;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+
+  .doc-link:hover {
+    background: rgba(45, 106, 39, .15);
+    color: var(--accent);
+  }
+
+  .doc-link.pdf {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, .25);
+    background: rgba(239, 68, 68, .05);
+  }
+
+  .doc-link.pdf:hover {
+    background: rgba(239, 68, 68, .12);
+  }
+
+  .no-doc {
+    color: var(--muted);
+    font-size: 11px;
+    font-style: italic;
+  }
+
+  /* ── DETAIL CELL ── */
+  .exc-detail-quote {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+    margin-top: 3px;
+    line-height: 1.4;
+  }
+
+  .exc-student-name {
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  .exc-student-meta {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .exc-reviewed {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state-row td {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  /* ── SCROLLABLE TABLE ── */
+  .exc-table-scroll {
+    max-height: 640px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .exc-table-scroll::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .exc-table-scroll::-webkit-scrollbar-thumb {
+    background: rgba(45, 106, 39, .2);
+    border-radius: 99px;
+  }
+
+  /* ── DETAIL MODAL ── */
+  .exc-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    padding: 16px;
+  }
+
+  .exc-modal-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .exc-modal-box {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    max-width: 520px;
+    width: 100%;
+    max-height: 88vh;
+    overflow-y: auto;
+    transform: scale(.92);
+    transition: transform .25s cubic-bezier(.34, 1.56, .64, 1);
+    box-shadow: 0 20px 56px rgba(0, 0, 0, .22);
+  }
+
+  .exc-modal-overlay.show .exc-modal-box {
+    transform: scale(1);
+  }
+
+  .exc-modal-header {
+    background: var(--accent);
+    padding: 14px 18px;
+    border-radius: 14px 14px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .exc-modal-header h3 {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  [data-theme="dark"] .exc-modal-header h3 {
+    color: #000;
+  }
+
+  .exc-modal-close {
+    background: rgba(255, 255, 255, .2);
+    border: none;
+    color: #fff;
+    border-radius: 7px;
+    padding: 5px 11px;
+    cursor: pointer;
+    font-size: 15px;
+  }
+
+  [data-theme="dark"] .exc-modal-close {
+    color: #000;
+  }
+
+  .exc-modal-body {
+    padding: 20px;
+  }
+
+  .exc-detail-row {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 8px;
+  }
+
+  .exc-detail-row:last-child {
+    border-bottom: none;
+  }
+
+  .exc-detail-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding-top: 2px;
+  }
+
+  .exc-detail-val {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+</style>
+
+<!-- DETAIL MODAL -->
+<div class="exc-modal-overlay" id="excDetailModal" onclick="if(event.target===this)closeExcModal()">
+  <div class="exc-modal-box">
+    <div class="exc-modal-header">
+      <h3><i class="bi bi-journal-text"></i> Excuse Record Details</h3>
+      <button class="exc-modal-close" onclick="closeExcModal()">✕</button>
+    </div>
+    <div class="exc-modal-body" id="excModalBody">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- PAGE HEADER -->
+<div
+  style="margin-bottom:16px;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <h2 style="font-size:18px;font-weight:700;margin:0;">Excuse Records</h2>
+    <p style="color:var(--muted);font-size:12px;margin:4px 0 0;">
+      Review excuse submissions with reasons and supporting documents. Approve or reject pending requests.
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    {% if tab == 'pending' and counts.pending > 0 %}
+    <div
+      style="background:rgba(90,62,0,.1);border:1.5px solid rgba(90,62,0,.25);border-radius:8px;padding:6px 14px;font-size:12px;color:#5A3E00;font-weight:700;">
+      <i class="bi bi-hourglass-split"></i> {{ counts.pending }} pending review
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tab-row">
+  <a href="{{ url_for('admin_excuses', tab='pending') }}" class="tab-btn {% if tab == 'pending' %}active{% endif %}">
+    <i class="bi bi-clock"></i> Pending <span class="cnt-badge">{{ counts.pending }}</span>
+  </a>
+  <a href="{{ url_for('admin_excuses', tab='approved') }}" class="tab-btn {% if tab == 'approved' %}active{% endif %}">
+    <i class="bi bi-check-circle"></i> Approved <span class="cnt-badge">{{ counts.approved }}</span>
+  </a>
+  <a href="{{ url_for('admin_excuses', tab='rejected') }}" class="tab-btn {% if tab == 'rejected' %}active{% endif %}">
+    <i class="bi bi-x-circle"></i> Rejected <span class="cnt-badge">{{ counts.rejected }}</span>
+  </a>
+</div>
+
+{% if excuses %}
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <div class="fg" style="flex:2;min-width:160px;">
+    <span class="fl"><i class="bi bi-search"></i> Search</span>
+    <input type="text" class="fs" id="ef_search" placeholder="Student name, subject…" oninput="filterExcuses()"
+      style="appearance:none;" />
+  </div>
+  <div class="fg">
+    <span class="fl">Reason</span>
+    <select class="fs" id="ef_reason" onchange="filterExcuses()">
+      <option value="">All Reasons</option>
+      {% set seen_reasons = [] %}
+      {% for e in excuses %}{% if e.reason_type not in seen_reasons %}
+      <option value="{{ e.reason_type }}">{{ excuse_reasons.get(e.reason_type, e.reason_type) }}</option>
+      {% set _ = seen_reasons.append(e.reason_type) %}{% endif %}{% endfor %}
+    </select>
+  </div>
+  <div class="fg">
+    <span class="fl">Has Document</span>
+    <select class="fs" id="ef_doc" onchange="filterExcuses()">
+      <option value="">All</option>
+      <option value="yes">With Document</option>
+      <option value="no">No Document</option>
+    </select>
+  </div>
+  <button class="btn-rst" onclick="resetFilters()"><i class="bi bi-x-circle"></i> Reset</button>
+  <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="ef_count">{{ excuses|length }} record{{ 's'
+    if excuses|length != 1 else '' }}</span>
+</div>
+
+<!-- TABLE -->
+<div class="exc-table-wrap">
+  <div class="exc-table-scroll">
+    <table class="exc-table" id="excTable">
+      <thead>
+        <tr>
+          <th style="width:32px;">#</th>
+          <th>Student</th>
+          <th>Subject · Section</th>
+          <th>Excused Reason</th>
+          <th>Supporting Document</th>
+          <th>Submitted</th>
+          <th>Status</th>
+          {% if tab == 'pending' %}<th>Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody id="excTbody">
+        {% for e in excuses %}
+        {% set has_doc = e.attachment_file %}
+        <tr class="exc-row" id="exc_row_{{ e.id }}" data-name="{{ e.student_name|lower }}"
+          data-subject="{{ (e.session_subject or '')|lower }}" data-reason="{{ e.reason_type }}"
+          data-hasdoc="{{ 'yes' if has_doc else 'no' }}" style="cursor:pointer;" onclick="openExcModal({{ {
+              'id': e.id,
+              'student_name': e.student_name,
+              'student_id': e.student_id or '—',
+              'subject': e.session_subject or '—',
+              'section': (e.session_section or '').replace('|',' · '),
+              'reason': excuse_reasons.get(e.reason_type, e.reason_type),
+              'reason_detail': e.reason_detail or '',
+              'created_at': e.created_at,
+              'status': e.status,
+              'reviewed_by': e.reviewed_by or '',
+              'reviewed_at': e.reviewed_at or '',
+              'has_doc': has_doc,
+              'doc_url': url_for('admin_excuse_attachment', excuse_id=e.id) if has_doc else ''
+            }|tojson|e }})">
+          <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">{{ loop.index }}</td>
+          <td>
+            <div class="exc-student-name">{{ e.student_name }}</div>
+            <div class="exc-student-meta">
+              <i class="bi bi-person-badge"></i> {{ e.student_id or '—' }}
+            </div>
+          </td>
+          <td>
+            <div style="font-weight:600;font-size:12px;">{{ e.session_subject or '—' }}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">{{ (e.session_section or '').replace('|',' ·
+              ') }}</div>
+          </td>
+          <td>
+            <span class="reason-badge">
+              <i class="bi bi-journal-check"></i>
+              {{ excuse_reasons.get(e.reason_type, e.reason_type) }}
+            </span>
+            {% if e.reason_detail %}
+            <div class="exc-detail-quote">"{{ e.reason_detail }}"</div>
+            {% endif %}
+          </td>
+          <td onclick="event.stopPropagation();">
+            {% if has_doc %}
+            {% set ext = (e.attachment_file|lower).rsplit('.', 1)|last %}
+            <a href="{{ url_for('admin_excuse_attachment', excuse_id=e.id) }}" target="_blank"
+              class="doc-link {% if ext == 'pdf' %}pdf{% endif %}">
+              <i class="bi bi-{% if ext == 'pdf' %}file-earmark-pdf{% else %}file-earmark-image{% endif %}"></i>
+              View {{ ext|upper }}
+            </a>
+            {% else %}
+            <span class="no-doc">No document</span>
+            {% endif %}
+          </td>
+          <td style="font-size:11px;color:var(--muted);white-space:nowrap;">{{ e.created_at }}</td>
+          <td>
+            {% if e.status == 'pending' %}
+            <span class="status-pill sp-pending"><i class="bi bi-hourglass-split"></i> Pending</span>
+            {% elif e.status == 'approved' %}
+            <span class="status-pill sp-approved"><i class="bi bi-check"></i> Approved</span>
+            {% elif e.status == 'rejected' %}
+            <span class="status-pill sp-rejected"><i class="bi bi-x"></i> Rejected</span>
+            {% endif %}
+          </td>
+          {% if tab == 'pending' %}
+          <td onclick="event.stopPropagation();">
+            {% if e.status == 'pending' %}
+            <div style="display:flex;gap:6px;flex-wrap:nowrap;">
+              <form method="POST" action="{{ url_for('admin_excuse_approve', excuse_id=e.id) }}" style="margin:0;">
+                <button type="submit" class="btn-approve"><i class="bi bi-check-lg"></i> Approve</button>
+              </form>
+              <form method="POST" action="{{ url_for('admin_excuse_reject', excuse_id=e.id) }}" style="margin:0;">
+                <button type="submit" class="btn-reject" onclick="return confirm('Reject this excuse?')">
+                  <i class="bi bi-x-lg"></i> Reject
+                </button>
+              </form>
+            </div>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        <tr id="ef_empty" style="display:none;">
+          <td colspan="8" style="text-align:center;padding:40px 20px;color:var(--muted);">
+            <i class="bi bi-search" style="font-size:28px;opacity:.2;display:block;margin-bottom:8px;"></i>
+            No records match your filters.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="card" style="padding:48px;text-align:center;">
+  <i class="bi bi-inbox" style="font-size:36px;color:var(--muted);opacity:.3;display:block;margin-bottom:10px;"></i>
+  <p style="color:var(--muted);margin:0;">No {{ tab }} excuse records found.</p>
+</div>
+{% endif %}
+
+<script>
+  const EXCUSE_REASONS = {{ excuse_reasons | tojson }};
+
+  /* ── FILTER ── */
+  function filterExcuses() {
+    const q = document.getElementById('ef_search').value.toLowerCase();
+    const reason = document.getElementById('ef_reason').value;
+    const doc = document.getElementById('ef_doc').value;
+    let shown = 0;
+    document.querySelectorAll('#excTbody .exc-row').forEach(r => {
+      const m = (!q || r.dataset.name.includes(q) || r.dataset.subject.includes(q))
+        && (!reason || r.dataset.reason === reason)
+        && (!doc || r.dataset.hasdoc === doc);
+      r.style.display = m ? '' : 'none';
+      if (m) shown++;
+    });
+    const cnt = document.getElementById('ef_count');
+    if (cnt) cnt.textContent = shown + ' record' + (shown !== 1 ? 's' : '');
+    const empty = document.getElementById('ef_empty');
+    if (empty) empty.style.display = shown === 0 ? '' : 'none';
+  }
+
+  function resetFilters() {
+    ['ef_search', 'ef_reason', 'ef_doc'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    filterExcuses();
+  }
+
+  /* ── DETAIL MODAL ── */
+  function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function openExcModal(data) {
+    const ext = data.doc_url ? data.doc_url.split('.').pop().toLowerCase() : '';
+    const docHtml = data.has_doc
+      ? '<a href="' + esc(data.doc_url) + '" target="_blank" class="doc-link ' + (ext === 'pdf' ? 'pdf' : '') + '" style="display:inline-flex;">' +
+      '<i class="bi bi-' + (ext === 'pdf' ? 'file-earmark-pdf' : 'file-earmark-image') + '"></i> View ' + ext.toUpperCase() + ' Document</a>'
+      : '<span class="no-doc">No supporting document attached</span>';
+
+    const statusHtml = data.status === 'pending'
+      ? '<span class="status-pill sp-pending"><i class="bi bi-hourglass-split"></i> Pending</span>'
+      : data.status === 'approved'
+        ? '<span class="status-pill sp-approved"><i class="bi bi-check"></i> Approved</span>'
+        : '<span class="status-pill sp-rejected"><i class="bi bi-x"></i> Rejected</span>';
+
+    document.getElementById('excModalBody').innerHTML = `
+    <div style="text-align:center;margin-bottom:18px;padding-bottom:14px;border-bottom:1.5px solid var(--border);">
+      <div style="width:48px;height:48px;margin:0 auto 10px;border-radius:12px;background:rgba(45,106,39,.1);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--accent);">
+        <i class="bi bi-journal-check"></i>
+      </div>
+      <div style="font-size:15px;font-weight:700;">${esc(data.student_name)}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px;">${esc(data.student_id)}</div>
+    </div>
+    <div class="exc-detail-row"><span class="exc-detail-lbl">Subject</span><span class="exc-detail-val">${esc(data.subject)}</span></div>
+    <div class="exc-detail-row"><span class="exc-detail-lbl">Section</span><span class="exc-detail-val">${esc(data.section)}</span></div>
+    <div class="exc-detail-row">
+      <span class="exc-detail-lbl">Reason</span>
+      <div>
+        <span class="reason-badge"><i class="bi bi-journal-check"></i> ${esc(data.reason)}</span>
+        ${data.reason_detail ? '<div class="exc-detail-quote" style="margin-top:5px;">"' + esc(data.reason_detail) + '"</div>' : ''}
+      </div>
+    </div>
+    <div class="exc-detail-row"><span class="exc-detail-lbl">Document</span><span class="exc-detail-val">${docHtml}</span></div>
+    <div class="exc-detail-row"><span class="exc-detail-lbl">Submitted</span><span class="exc-detail-val">${esc(data.created_at)}</span></div>
+    <div class="exc-detail-row"><span class="exc-detail-lbl">Status</span><span class="exc-detail-val">${statusHtml}</span></div>
+    ${data.reviewed_by ? '<div class="exc-detail-row"><span class="exc-detail-lbl">Reviewed By</span><span class="exc-detail-val">' + esc(data.reviewed_by) + ' on ' + esc(data.reviewed_at) + '</span></div>' : ''}
+    <div style="margin-top:18px;text-align:center;">
+      <button class="btn-outline" onclick="closeExcModal()"><i class="bi bi-x"></i> Close</button>
+    </div>`;
+
+    document.getElementById('excDetailModal').classList.add('show');
+  }
+
+  function closeExcModal() {
+    document.getElementById('excDetailModal').classList.remove('show');
+  }
+</script>
+{% endblock %}

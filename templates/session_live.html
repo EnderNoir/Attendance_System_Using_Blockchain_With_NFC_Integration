@@ -825,6 +825,110 @@
       padding: 20px;
     }
   }
+
+  @media(max-width:768px) {
+    .session-header h2 {
+      font-size: 19px !important;
+      line-height: 1.25;
+    }
+
+    .nfc-tap-strip {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .nfc-strip-uid,
+    .nfc-strip-status {
+      width: 100%;
+    }
+
+    .nfc-strip-status {
+      text-align: left;
+      min-width: 0;
+      font-size: 11px;
+    }
+
+    .stat-mini-row {
+      gap: 8px;
+    }
+
+    .stat-mini {
+      min-width: calc(50% - 4px);
+      padding: 10px 12px;
+    }
+
+    .student-row {
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .status-badge,
+    .btn-excuse {
+      margin-left: 42px;
+    }
+
+    .scroll-list {
+      padding: 0 12px 10px;
+      max-height: 52vh;
+    }
+
+    .end-box ul {
+      margin-left: 14px !important;
+    }
+
+    #toastContainer {
+      right: 10px;
+      left: 10px;
+      bottom: 10px;
+    }
+
+    .toast {
+      min-width: 0;
+      width: 100%;
+      max-width: none;
+    }
+  }
+
+  @media(max-width:480px) {
+    .live-badge,
+    .ended-badge {
+      font-size: 10px;
+      padding: 3px 10px;
+    }
+
+    .tap-modal {
+      border-radius: 14px;
+      padding: 22px 16px;
+    }
+
+    .modal-icon-ring {
+      width: 64px;
+      height: 64px;
+      font-size: 30px;
+      margin-bottom: 14px;
+    }
+
+    .modal-name {
+      font-size: 18px;
+    }
+
+    .end-box {
+      border-radius: 14px;
+    }
+
+    .end-box button,
+    .end-box form {
+      min-width: 100% !important;
+      width: 100%;
+    }
+
+    .stat-mini {
+      min-width: 100%;
+    }
+  }
 </style>
 
 <!-- TOAST CONTAINER -->

@@ -77,6 +77,21 @@
   }
   .nfc-uid-display.has-uid{border-color:var(--success);color:var(--success);}
   .nfc-uid-display.no-uid{color:var(--muted);}
+
+  @media(max-width:768px){
+    .steps-box{padding:10px 12px;}
+    .upload-banner{padding:12px 14px;}
+    .btn-upload{width:100%;justify-content:center;}
+    .nfc-card-strip{padding:12px;align-items:flex-start;}
+    .nfc-uid-display{max-width:100%;overflow-wrap:anywhere;word-break:break-all;letter-spacing:1px;}
+  }
+
+  @media(max-width:480px){
+    .photo-row .btn-outline{width:100%;justify-content:center;}
+    .nfc-card-strip{gap:10px;}
+    .nfc-strip-title{font-size:12px;}
+    .nfc-strip-sub{font-size:11px;line-height:1.4;}
+  }
 </style>
 
 <!--

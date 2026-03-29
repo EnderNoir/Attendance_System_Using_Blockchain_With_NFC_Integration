@@ -2,14 +2,28 @@
 {% block title %}Create Instructor — DAVS{% endblock %}
 {% block page_title %}ADMIN / CREATE INSTRUCTOR{% endblock %}
 {% block content %}
-<div style="max-width:480px;margin:0 auto;">
+<style>
+  @media(max-width:768px){
+    .aci-wrap{max-width:100% !important;}
+    .aci-form{padding:14px !important;border-radius:12px;}
+    .aci-actions{flex-wrap:wrap;}
+    .aci-actions .btn-outline,
+    .aci-actions .btn-primary{width:100%;justify-content:center;}
+  }
+
+  @media(max-width:480px){
+    .aci-wrap h2{font-size:16px !important;}
+    .aci-wrap p{line-height:1.5;}
+  }
+</style>
+<div class="aci-wrap" style="max-width:480px;margin:0 auto;">
   <a href="{{ url_for('manage_users') }}" class="btn-outline" style="margin-bottom:14px;display:inline-flex;"><i class="bi bi-arrow-left"></i> Back to Faculty Accounts</a>
   <h2 style="font-size:18px;font-weight:700;margin-bottom:4px;">Create Instructor Account</h2>
   <p style="color:var(--muted);font-size:12px;margin-bottom:18px;">
     Creates an approved Instructor account. Only Super Admin can create Admin accounts.
   </p>
 
-  <form method="POST" class="card" style="padding:22px;">
+  <form method="POST" class="card aci-form" style="padding:22px;">
     <div class="mb-3">
       <label class="form-label">Full Name *</label>
       <input type="text" name="full_name" class="form-control" placeholder="e.g. Juan dela Cruz" required>
@@ -31,7 +45,7 @@
       <i class="bi bi-info-circle" style="color:var(--accent);"></i>
       The instructor will be able to change their password after first login from their profile page.
     </div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:10px;border-top:1.5px solid var(--border);">
+    <div class="aci-actions" style="display:flex;gap:10px;justify-content:flex-end;padding-top:10px;border-top:1.5px solid var(--border);">
       <a href="{{ url_for('manage_users') }}" class="btn-outline">Cancel</a>
       <button type="submit" class="btn-primary"><i class="bi bi-person-check"></i> Create Instructor</button>
     </div>

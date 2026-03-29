@@ -772,6 +772,132 @@
     display: block;
     margin-bottom: 10px;
   }
+
+  @media(max-width:768px) {
+    .main-tabs {
+      padding: 6px;
+      gap: 6px;
+      border-radius: 10px;
+    }
+
+    .main-tab {
+      padding: 10px;
+      font-size: 12px;
+      justify-content: space-between;
+    }
+
+    .sec-mono {
+      margin-bottom: 6px;
+    }
+
+    .filter-bar {
+      padding: 10px;
+      gap: 10px;
+    }
+
+    .session-card {
+      padding: 12px;
+      border-radius: 10px;
+    }
+
+    .sc-top {
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn-monitor-live {
+      width: 100%;
+      justify-content: center;
+      order: 3;
+    }
+
+    .sc-chevron {
+      display: none;
+    }
+
+    .sm-bar,
+    .att-tab-top,
+    .stud-bar,
+    .stud-meta {
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+
+    .sm-itabs {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+    }
+
+    .sm-itab {
+      flex: 0 0 auto;
+      padding: 10px 14px;
+      font-size: 11px;
+    }
+
+    .sm-info-grid,
+    .sm-stat-grid,
+    .att-scroll,
+    .hist-table-wrap {
+      padding-left: 12px !important;
+      padding-right: 12px !important;
+    }
+
+    .att-table,
+    .hist-table {
+      min-width: 620px;
+    }
+
+    .student-card {
+      border-radius: 10px;
+    }
+
+    .sc-st-top {
+      padding: 12px;
+    }
+  }
+
+  @media(max-width:480px) {
+    .main-tabs {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .main-tab {
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .main-tab .tab-count {
+      margin-left: 4px;
+    }
+
+    .sm-back,
+    .btn-export-xl {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .stud-bar h3,
+    .sm-bar h3 {
+      width: 100%;
+      order: 3;
+      white-space: normal;
+    }
+
+    .stud-meta-item {
+      width: 100%;
+    }
+
+    .sc-st-name {
+      font-size: 13px;
+    }
+
+    .sc-st-sub {
+      line-height: 1.45;
+    }
+  }
 </style>
 
 <!-- SESSION MODAL -->

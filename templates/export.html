@@ -85,6 +85,25 @@
   .ac-title{font-family:'Space Mono',monospace;font-size:12px;font-weight:700;margin-bottom:4px;}
   .ac-desc{font-size:12px;color:var(--muted);line-height:1.6;flex:1;}
   .ac-hint{font-size:10px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+
+  @media(max-width:768px){
+    .ap-topbar{padding:14px 12px 0;}
+    .chart-tabs{padding:0 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
+    .ctab{flex:0 0 auto;padding:9px 12px;}
+    .chart-pane{padding:12px 12px 14px;}
+    .chip{padding:9px 10px;}
+    .chip-val{font-size:17px;}
+    .chart-filter-row{padding:10px;gap:7px;}
+    .cf-group{min-width:100%;}
+    .btn-cf-apply,.btn-cf-reset{width:100%;min-height:38px;justify-content:center;display:inline-flex;align-items:center;}
+  }
+
+  @media(max-width:480px){
+    .analytics-panel{border-radius:12px;}
+    .ptab{padding:6px 10px;font-size:10px;}
+    .chip-row{grid-template-columns:1fr;}
+    .hero-info{padding:10px 12px;line-height:1.55;}
+  }
 </style>
 
 <!-- ── Compact hero info ── -->

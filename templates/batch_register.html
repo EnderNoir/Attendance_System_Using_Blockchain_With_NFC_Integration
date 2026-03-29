@@ -192,6 +192,33 @@
   border-bottom:1px solid var(--border);margin-bottom:16px;}
 .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
 .btn-row .btn-primary{flex:1;min-width:160px;justify-content:center;padding:12px;font-size:14px;}
+
+@media(max-width:768px){
+  .be-steps{flex-direction:column;}
+  .be-step{border-right:none;border-bottom:1px solid var(--border);text-align:left;padding:10px 12px;display:flex;align-items:center;gap:8px;}
+  .be-step:last-child{border-bottom:none;}
+  .be-step-num{margin-bottom:0;}
+  .upload-banner{padding:14px;}
+  .btn-upload{width:100%;justify-content:center;}
+  .curr-card{padding:14px;gap:12px;}
+  .curr-avatar{width:52px;height:52px;font-size:22px;}
+  .nfc-panel-body{padding:14px;}
+  .tap-zone{padding:18px 12px;}
+  .tap-uid-display{font-size:14px;letter-spacing:1px;width:100%;overflow-wrap:anywhere;}
+  .summary-grid{grid-template-columns:1fr;}
+  .btn-row .btn-primary,
+  .btn-row .btn-outline,
+  .nfc-actions button{width:100%;justify-content:center;}
+}
+
+@media(max-width:480px){
+  .st-table-wrap,
+  .res-table-wrap{overflow-x:auto;}
+  .st-table,
+  .res-table{min-width:640px;}
+  .ie-grid{grid-template-columns:1fr;}
+  .ub-title{font-size:12px;}
+}
 </style>
 
 <!-- Hidden NFC HID input — captures USB reader keystrokes globally -->

@@ -100,6 +100,22 @@
 .sec-cb-wrap label{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid var(--border);border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);transition:all .2s;font-family:'Space Mono',monospace;}
 .sec-cb-wrap label:hover{border-color:var(--accent);color:var(--text);}
 .sec-cb-wrap input:checked + label{border-color:var(--accent);background:rgba(45,106,39,.12);color:var(--accent);}
+
+@media(max-width:768px){
+  .tab-row{overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
+  .tab-btn{flex:0 0 auto;}
+  .filter-bar{padding:10px;}
+  .person-row{flex-direction:column;align-items:flex-start;gap:8px;padding:12px;}
+  .person-row>div{width:100%;}
+  .prow-name{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35;}
+  .btn-vr{width:100%;justify-content:center;}
+}
+
+@media(max-width:480px){
+  .upd-topbar,.modal-tabs,.mpane,.upd-footer{padding-left:12px;padding-right:12px;}
+  .modal-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
+  .mtab{flex:0 0 auto;padding:10px 12px;}
+}
 </style>
 
 <!-- Update Modal -->

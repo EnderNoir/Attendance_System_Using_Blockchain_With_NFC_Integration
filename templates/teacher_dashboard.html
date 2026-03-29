@@ -84,6 +84,26 @@
   .sb-sub{font-size:11px;color:var(--muted);margin-top:2px;}
   .sb-num{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);}
   .sb-nlbl{font-size:10px;color:var(--muted);text-align:right;}
+
+  @media(max-width:768px){
+    .ap-head{padding:14px 12px;}
+    .filter-row{padding:12px;}
+    .sum-grid{padding:12px;gap:8px;}
+    .showing-bar{margin:0 12px 12px;padding:10px 12px;}
+    .cpane{padding:14px 12px 16px;}
+    .ctabs{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+    .ctab{flex:0 0 auto;padding:10px 12px;}
+    #donutContent>div{display:block !important;}
+    #donutChart{display:block;margin:0 auto 12px;width:190px !important;height:190px !important;}
+    #donutContent>div>div:last-child{width:100%;min-width:0 !important;}
+  }
+
+  @media(max-width:480px){
+    .sum-grid{grid-template-columns:1fr;padding:10px;}
+    .sum-box{padding:12px 10px;}
+    .sum-box .sn{font-size:30px;}
+    .stats-row{grid-template-columns:1fr;}
+  }
 </style>
 
 <!-- Welcome bar -->

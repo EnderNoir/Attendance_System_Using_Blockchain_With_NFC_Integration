@@ -17,6 +17,22 @@
   .btn-reset{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 13px;font-size:12px;cursor:pointer;align-self:flex-end;transition:all .2s;}
   .btn-reset:hover{border-color:var(--danger);color:var(--danger);}
   .filter-count{font-size:11px;color:var(--muted);align-self:flex-end;white-space:nowrap;}
+
+  @media(max-width:768px){
+    .filter-bar{padding:10px;gap:8px;}
+    .filter-group{min-width:100%;}
+    .btn-reset{width:100%;}
+    #reportList{grid-template-columns:repeat(2,1fr) !important;gap:10px !important;}
+    .student-card{padding:12px;}
+    .student-card a.btn-success-custom{width:100%;justify-content:center;}
+  }
+
+  @media(max-width:480px){
+    #reportList{grid-template-columns:1fr !important;}
+    .student-card>div>div:nth-child(2){gap:8px !important;justify-content:space-between;}
+    .student-card>div>div:nth-child(2)>div{flex:1;}
+    .filter-count{width:100%;text-align:left;}
+  }
 </style>
 
 <div style="margin-bottom:18px;">

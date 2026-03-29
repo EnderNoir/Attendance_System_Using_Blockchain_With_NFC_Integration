@@ -75,6 +75,25 @@
     .flash-item.error{background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);color:var(--danger);}
     .flash-item.success{background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);color:var(--success);}
     .flash-item.info{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.25);color:var(--warning);}
+
+    @media(max-width:768px){
+      body{padding:14px;align-items:flex-start;}
+      .theme-toggle{top:10px;right:10px;padding:6px 10px;font-size:11px;}
+      .auth-logo{margin-top:46px;margin-bottom:18px;}
+      .auth-card{padding:18px;border-radius:12px;}
+      .card-header{padding:10px 12px;margin-bottom:16px;}
+      .card-header h2{font-size:12px;}
+      .form-control{min-height:40px;font-size:13px;padding:10px 12px;}
+      .btn-submit{min-height:40px;font-size:13px;padding:11px;}
+    }
+
+    @media(max-width:480px){
+      .logo-box{width:56px;height:56px;font-size:24px;}
+      .app-name{font-size:16px;}
+      .auth-footer{font-size:12px;}
+      .form-control{min-height:38px;font-size:12px;}
+      .btn-submit{min-height:38px;padding:10px;font-size:12px;}
+    }
   </style>
 </head>
 <body>

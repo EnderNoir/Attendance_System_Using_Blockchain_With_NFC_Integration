@@ -72,6 +72,34 @@
     .selected-count{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);margin-top:8px;margin-bottom:4px;}
     /* Username field hint */
     .username-preview{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);margin-top:4px;min-height:16px;}
+
+    @media(max-width:768px){
+      body{padding:14px 12px 26px;}
+      .theme-toggle{top:10px;right:10px;padding:6px 10px;font-size:11px;}
+      .auth-wrap{max-width:100%;}
+      .auth-logo{margin-top:42px;margin-bottom:16px;}
+      .auth-card{padding:16px 14px;border-radius:12px;}
+      .auth-title{font-size:13px;margin-bottom:14px;}
+      .section-label{margin:14px 0 10px;}
+      .two-col{grid-template-columns:1fr;gap:10px;}
+      .field-wrap{margin-bottom:10px;}
+      .form-control{min-height:40px;font-size:13px;padding:10px 12px;}
+      .btn-primary{min-height:40px;font-size:13px;padding:11px;}
+      .role-label{padding:10px 8px;}
+      .role-label .role-icon{font-size:20px;}
+      .course-header{padding:10px 12px;font-size:13px;}
+      .year-row{padding:10px 12px;}
+      .check-pill label{width:32px;height:32px;}
+    }
+
+    @media(max-width:480px){
+      .auth-logo .logo-box{width:40px;height:40px;font-size:18px;border-radius:10px;}
+      .auth-logo .app-name{font-size:13px;}
+      .role-toggle{grid-template-columns:1fr;}
+      .form-control{min-height:38px;font-size:12px;}
+      .btn-primary{min-height:38px;font-size:12px;}
+      .auth-footer{font-size:12px;}
+    }
   </style>
 </head>
 <body>

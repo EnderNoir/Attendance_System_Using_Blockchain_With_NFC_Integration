@@ -784,6 +784,46 @@
     justify-content: center;
     padding: 12px;
   }
+
+  @media(max-width:768px) {
+    .sched-page-header,
+    .sched-search-bar {
+      width: 100%;
+    }
+
+    .sched-search-wrap {
+      min-width: 0;
+      width: 100%;
+    }
+
+    .active-filters {
+      margin-bottom: 10px;
+    }
+
+    .cal-wrap {
+      border-radius: 10px;
+    }
+
+    .presession-toast {
+      right: 10px;
+      left: 10px;
+      bottom: 10px;
+      width: auto;
+      max-width: none;
+    }
+  }
+
+  @media(max-width:480px) {
+    .search-result-row {
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+
+    .search-result-badge {
+      text-align: left;
+      width: fit-content;
+    }
+  }
 </style>
 
 {% set dow_list = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}

@@ -1756,6 +1756,239 @@
         display: none !important;
       }
     }
+
+    /* ══ MOBILE POLISH LAYER ══ */
+    @media(max-width:768px) {
+      .page-body {
+        padding: 12px;
+      }
+
+      .page-body h1,
+      .page-body h2 {
+        line-height: 1.3;
+      }
+
+      .page-body h3,
+      .page-body h4 {
+        line-height: 1.35;
+      }
+
+      .page-body p,
+      .page-body li,
+      .page-body .text-muted {
+        line-height: 1.5;
+      }
+
+      .page-body .form-control,
+      .page-body .form-select,
+      .page-body input:not([type="checkbox"]):not([type="radio"]),
+      .page-body select,
+      .page-body textarea,
+      .pm-input,
+      .filter-select,
+      .ie-input {
+        min-height: 40px;
+        font-size: 14px;
+        border-radius: 8px;
+      }
+
+      .btn,
+      .btn-primary,
+      .btn-outline,
+      .btn-success-custom,
+      .btn-apply,
+      .btn-export,
+      .btn-vr,
+      .btn-rst,
+      .btn-cf-apply,
+      .btn-upload,
+      .btn-monitor-live,
+      .btn-export-xl,
+      .btn-submit {
+        min-height: 40px;
+        border-radius: 9px;
+        font-size: 13px;
+        gap: 7px;
+      }
+
+      .card,
+      .stat-chip,
+      .table-container {
+        border-radius: 10px;
+      }
+
+      .filter-bar,
+      .filter-row,
+      .button-group,
+      .submit-row,
+      .btn-row,
+      .start-form,
+      .chip-row,
+      .ap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .fg,
+      .filter-group,
+      .cf-group,
+      .field-wrap,
+      .sf-field,
+      .sf-field-sm {
+        min-width: 0 !important;
+        flex: 1 1 100% !important;
+      }
+
+      .btn-primary,
+      .btn-outline,
+      .btn-success-custom,
+      .btn-apply,
+      .btn-export,
+      .btn-vr,
+      .btn-rst,
+      .btn-cf-apply,
+      .btn-upload {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .table-wrap,
+      .user-table-wrap,
+      .table-container,
+      .subj-table-wrap,
+      .sched-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .page-body .table {
+        min-width: 560px;
+      }
+
+      .tab-row,
+      .main-tabs,
+      .fa-tabs,
+      .ctab-row,
+      .ptab-row {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        white-space: nowrap;
+      }
+
+      .tab-btn,
+      .main-tab,
+      .fatab,
+      .ctab,
+      .ptab {
+        flex: 0 0 auto;
+      }
+
+      .pm-modal,
+      .fa-box,
+      .subj-box,
+      .upd-box,
+      .sess-modal,
+      .stud-modal {
+        width: 100% !important;
+        max-width: none !important;
+        border-radius: 14px;
+      }
+
+      .pm-info-row {
+        grid-template-columns: 84px 1fr;
+      }
+
+      .sched-search-wrap {
+        min-width: 0 !important;
+        width: 100% !important;
+      }
+
+      .ctabs,
+      .subj-tabs,
+      .modal-tabs,
+      .fa-tabs,
+      .sm-itabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .person-row .prow-name,
+      .sess-row .sr-name {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+      }
+
+      .person-row .btn-vr,
+      .sess-row .btn-vr,
+      .session-card .btn-monitor-live,
+      .student-card .btn-vr {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    @media(max-width:480px) {
+      .topbar {
+        padding: 0 10px;
+      }
+
+      .topbar-title {
+        max-width: 120px;
+      }
+
+      .page-body {
+        padding: 10px;
+      }
+
+      .page-body h2 {
+        font-size: 18px;
+      }
+
+      .page-body h3 {
+        font-size: 16px;
+      }
+
+      .page-body .form-control,
+      .page-body .form-select,
+      .page-body input:not([type="checkbox"]):not([type="radio"]),
+      .page-body select,
+      .page-body textarea,
+      .pm-input,
+      .filter-select,
+      .ie-input {
+        min-height: 38px;
+        font-size: 13px;
+      }
+
+      .btn,
+      .btn-primary,
+      .btn-outline,
+      .btn-success-custom,
+      .btn-apply,
+      .btn-export,
+      .btn-vr,
+      .btn-rst,
+      .btn-cf-apply,
+      .btn-upload,
+      .btn-monitor-live,
+      .btn-export-xl,
+      .btn-submit {
+        min-height: 38px;
+        font-size: 12px;
+      }
+
+      .flash-item,
+      .custom-toast {
+        border-radius: 9px;
+      }
+
+      .pm-body {
+        padding: 14px;
+      }
+    }
   </style>
 </head>
 

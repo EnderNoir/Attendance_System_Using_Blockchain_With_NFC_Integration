@@ -4500,6 +4500,208 @@ def api_block_number():
     try: return jsonify({'block':web3.eth.block_number})
     except: return jsonify({'block':None})
 
+
+def _network_name_from_chain_id(chain_id: int) -> str:
+    if chain_id == 31337:
+        return 'Hardhat Local'
+    if chain_id == 1337:
+        return 'Local Dev Chain'
+    if chain_id == 1:
+        return 'Ethereum Mainnet'
+    if chain_id == 11155111:
+        return 'Sepolia Testnet'
+    return f'Chain {chain_id}'
+
+
+@app.route('/blockchain-visualization')
+def public_blockchain_visualization():
+    return render_template('public_blockchain_visualization.html')
+
+
+@app.route('/api/public/blockchain/visualization')
+def api_public_blockchain_visualization():
+    """
+    Public-safe blockchain visualization payload.
+
+    IMPORTANT: exposes no student identities or attendance payload details.
+    Only block metadata and transaction hashes are returned.
+    """
+    limit = request.args.get('limit', type=int, default=20) or 20
+    limit = max(5, min(limit, 100))
+    subject = (request.args.get('subject') or '').strip()
+    year = (request.args.get('year') or '').strip()
+
+    available_subjects = []
+    available_years = []
+    filtered_tx_hashes = set()
+    context_summary = {
+        'subject': subject or 'All Subjects',
+        'year': year or 'All Years',
+        'attendance_logs': 0,
+        'attendance_logs_on_chain': 0,
+        'subject_options': [],
+        'year_options': [],
+        'is_filtered': bool(subject or year),
+        'note': 'This blockchain view uses the same DAVS smart contract used to anchor attendance transaction hashes.',
+    }
+
+    try:
+        with get_db() as conn:
+            available_subjects = [
+                r['subject_name'] for r in conn.execute(
+                    "SELECT DISTINCT subject_name FROM sessions WHERE TRIM(subject_name) <> '' ORDER BY subject_name"
+                ).fetchall()
+            ]
+            available_years = [
+                r['year'] for r in conn.execute(
+                    "SELECT DISTINCT substr(tap_time,1,4) AS year "
+                    "FROM attendance_logs "
+                    "WHERE LENGTH(tap_time) >= 4 AND tap_time GLOB '[0-9][0-9][0-9][0-9]*' "
+                    "ORDER BY year DESC"
+                ).fetchall()
+                if r['year']
+            ]
+
+            where_parts = ["1=1"]
+            params = []
+            if subject:
+                where_parts.append("s.subject_name = ?")
+                params.append(subject)
+            if year:
+                where_parts.append("substr(a.tap_time,1,4) = ?")
+                params.append(year)
+            where_sql = " AND ".join(where_parts)
+
+            totals = conn.execute(
+                "SELECT COUNT(*) AS total_logs, "
+                "SUM(CASE WHEN TRIM(COALESCE(a.tx_hash,'')) <> '' THEN 1 ELSE 0 END) AS onchain_logs "
+                "FROM attendance_logs a "
+                "JOIN sessions s ON s.sess_id = a.sess_id "
+                "WHERE " + where_sql,
+                params,
+            ).fetchone()
+
+            context_summary['attendance_logs'] = int((totals['total_logs'] or 0) if totals else 0)
+            context_summary['attendance_logs_on_chain'] = int((totals['onchain_logs'] or 0) if totals else 0)
+
+            context_summary['subject_options'] = available_subjects
+            context_summary['year_options'] = available_years
+
+            if subject or year:
+                tx_rows = conn.execute(
+                    "SELECT DISTINCT lower(TRIM(COALESCE(a.tx_hash,''))) AS tx_hash "
+                    "FROM attendance_logs a "
+                    "JOIN sessions s ON s.sess_id = a.sess_id "
+                    "WHERE " + where_sql + " AND TRIM(COALESCE(a.tx_hash,'')) <> ''",
+                    params,
+                ).fetchall()
+                filtered_tx_hashes = {r['tx_hash'] for r in tx_rows if r['tx_hash']}
+    except Exception:
+        # Keep this endpoint resilient for public access.
+        context_summary['subject_options'] = []
+        context_summary['year_options'] = []
+
+    if not web3.is_connected():
+        return jsonify({
+            'ok': False,
+            'online': False,
+            'message': 'Blockchain node is offline.',
+            'network': 'Offline',
+            'latest_block': None,
+            'chain_valid': False,
+            'blocks': [],
+            'context': context_summary,
+        }), 200
+
+    try:
+        chain_id = int(web3.eth.chain_id)
+        latest_block = int(web3.eth.block_number)
+        start_block = max(0, latest_block - limit + 1)
+
+        contract_addr = ''
+        try:
+            if contract is not None:
+                contract_addr = (contract.address or '').lower()
+            else:
+                cdata = globals().get('contract_data')
+                if isinstance(cdata, dict):
+                    contract_addr = (cdata.get('address') or '').lower()
+        except Exception:
+            contract_addr = ''
+
+        blocks = []
+        prev_hash = None
+        chain_valid = True
+
+        for n in range(start_block, latest_block + 1):
+            b = web3.eth.get_block(n, full_transactions=False)
+            block_hash = b.hash.hex()
+            parent_hash = b.parentHash.hex()
+            all_tx_hashes = [tx.hex() for tx in b.transactions]
+
+            project_tx_hashes = []
+            if contract_addr:
+                for txh in all_tx_hashes:
+                    try:
+                        r = web3.eth.get_transaction_receipt(txh)
+                        to_addr = (r.get('to') or '').lower() if isinstance(r, dict) else (getattr(r, 'to', '') or '').lower()
+                        c_addr = (r.get('contractAddress') or '').lower() if isinstance(r, dict) else (getattr(r, 'contractAddress', '') or '').lower()
+                        logs = r.get('logs', []) if isinstance(r, dict) else getattr(r, 'logs', [])
+
+                        is_project_tx = (to_addr == contract_addr) or (c_addr == contract_addr)
+                        if not is_project_tx:
+                            for lg in logs:
+                                lg_addr = (lg.get('address') or '').lower() if isinstance(lg, dict) else (getattr(lg, 'address', '') or '').lower()
+                                if lg_addr == contract_addr:
+                                    is_project_tx = True
+                                    break
+                        if is_project_tx:
+                            txh_l = txh.lower()
+                            if filtered_tx_hashes and txh_l not in filtered_tx_hashes:
+                                continue
+                            project_tx_hashes.append(txh)
+                    except Exception:
+                        continue
+            else:
+                if filtered_tx_hashes:
+                    project_tx_hashes = [txh for txh in all_tx_hashes if txh.lower() in filtered_tx_hashes]
+                else:
+                    project_tx_hashes = all_tx_hashes
+
+            if prev_hash is not None and parent_hash != prev_hash:
+                chain_valid = False
+            prev_hash = block_hash
+
+            blocks.append({
+                'number': int(b.number),
+                'timestamp': datetime.fromtimestamp(int(b.timestamp)).strftime('%Y-%m-%d %H:%M:%S'),
+                'hash': block_hash,
+                'previous_hash': parent_hash,
+                'tx_hashes': project_tx_hashes,
+                'tx_count': len(project_tx_hashes),
+            })
+
+        return jsonify({
+            'ok': True,
+            'online': True,
+            'network': _network_name_from_chain_id(chain_id),
+            'latest_block': latest_block,
+            'chain_valid': chain_valid,
+            'blocks': blocks,
+            'context': context_summary,
+        })
+    except Exception as e:
+        return jsonify({
+            'ok': False,
+            'online': False,
+            'message': f'Unable to load blockchain data: {e}',
+            'network': 'Unknown',
+            'latest_block': None,
+            'chain_valid': False,
+            'blocks': [],
+            'context': context_summary,
+        }), 500
+
 # ── MARK PICO (NFC tap handler) ───────────────────────────────────────────────
 
 @app.route('/mark_pico', methods=['POST'])

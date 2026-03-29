@@ -65,6 +65,8 @@
     .btn-submit{width:100%;background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:13px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;}
     [data-theme="dark"] .btn-submit{color:#000;}
     .btn-submit:hover{opacity:.9;transform:translateY(-1px);}
+    .btn-public{width:100%;background:transparent;border:1.5px solid var(--border);color:var(--text);font-weight:700;border-radius:8px;padding:11px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;text-decoration:none;}
+    .btn-public:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px);}
 
     .auth-footer{text-align:center;margin-top:18px;font-size:13px;color:var(--muted);}
     .auth-footer a{color:var(--accent);text-decoration:none;font-weight:600;}
@@ -142,6 +144,9 @@
       <button type="submit" class="btn-submit">
         <i class="bi bi-box-arrow-in-right"></i> Sign In
       </button>
+      <a class="btn-public" href="{{ url_for('public_blockchain_visualization') }}">
+        <i class="bi bi-diagram-3"></i> Open Public Blockchain Page
+      </a>
     </form>
   </div>
 

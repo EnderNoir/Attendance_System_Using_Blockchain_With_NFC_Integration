@@ -2243,6 +2243,8 @@
       <a href="{{ url_for('admin_settings') }}"
         class="nav-link {% if request.endpoint in ('admin_settings','admin_settings_save','admin_settings_test') %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-gear-fill"></i> Settings</a>
+      <a href="{{ url_for('public_blockchain_visualization') }}" class="nav-link" onclick="closeSidebar()"><i
+          class="bi bi-diagram-3"></i> Public Blockchain View</a>
       {% elif session.get('role') == 'admin' %}
       <div class="nav-section-label">Main</div>
       <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
@@ -2275,6 +2277,8 @@
       <a href="{{ url_for('admin_settings') }}"
         class="nav-link {% if request.endpoint in ('admin_settings','admin_settings_save','admin_settings_test') %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-gear-fill"></i> System Settings</a>
+      <a href="{{ url_for('public_blockchain_visualization') }}" class="nav-link" onclick="closeSidebar()"><i
+          class="bi bi-diagram-3"></i> Public Blockchain View</a>
       {% else %}
       <div class="nav-section-label">My Classroom</div>
       <a href="{{ url_for('teacher_dashboard') }}"

@@ -304,9 +304,9 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 18px;
-    max-width: 660px;
+    max-width: 1200px;
     width: 100%;
-    max-height: 90vh;
+    max-height: 95vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -520,6 +520,7 @@
     padding: 9px 12px;
     border-bottom: 1px solid var(--border);
     vertical-align: top;
+    white-space: nowrap;
   }
 
   .att-table tr:last-child td {
@@ -550,7 +551,7 @@
   }
 
   .att-scroll {
-    overflow-y: auto;
+    overflow: auto;
     flex: 1;
     padding: 0 4px;
   }
@@ -612,9 +613,9 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 18px;
-    max-width: 680px;
+    max-width: 1200px;
     width: 100%;
-    max-height: 90vh;
+    max-height: 95vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -668,7 +669,7 @@
 
   /* Student history table */
   .hist-table-wrap {
-    overflow-y: auto;
+    overflow: auto;
     flex: 1;
     padding: 4px 20px 16px;
   }
@@ -699,6 +700,7 @@
     padding: 9px 12px;
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
+    white-space: nowrap;
   }
 
   .hist-table tr:last-child td {
@@ -1197,7 +1199,7 @@
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '—'}</td>
             <td><span class="att-status ${stCls[st.status] || 'st-absent'}">${stLbl[st.status] || '—'}</span></td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.time || '—'}</td>
-            <td style="font-size:11px;max-width:140px;">${reasonHtml}</td>
+            <td style="font-size:11px;">${reasonHtml}</td>
             <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
             <td>${st.tx_hash ? `<span class="att-tx">${st.tx_hash.substring(0, 18)}…</span>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
           </tr>`;
@@ -1285,7 +1287,7 @@
             <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.date}</td>
             <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${s.time_slot || '—'}</td>
             <td><span class="att-status ${stCls[s.status] || 'st-absent'}">${stLbl[s.status] || '—'}</span></td>
-            <td style="font-size:11px;max-width:130px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>
+            <td style="font-size:11px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>
             <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
           </tr>`;
     }).join('')}

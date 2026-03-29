@@ -796,7 +796,7 @@
   <div>
     <h2 style="font-size:18px;font-weight:700;margin:0;">Weekly Schedules</h2>
     <p style="color:var(--muted);font-size:12px;margin:4px 0 0;">
-      {% if is_super_admin %}All schedules — click a block to view, edit, or delete.{% else %}All scheduled classes.
+      {% if can_manage_schedules %}All schedules — click a block to view, edit, or delete.{% else %}All scheduled classes.
       Click a block to view or edit.{% endif %}
     </p>
   </div>
@@ -807,7 +807,7 @@
       <i class="bi bi-search sched-search-icon"></i>
       <div class="sched-search-dropdown" id="schedSearchDrop"></div>
     </div>
-    {% if is_super_admin %}
+    {% if can_manage_schedules %}
     <button class="btn-primary" onclick="openAddModal()"><i class="bi bi-plus-lg"></i> Add Schedule</button>
     {% endif %}
   </div>
@@ -834,7 +834,7 @@
 <div style="text-align:center;padding:48px 0;color:var(--muted);">
   <i class="bi bi-calendar-x" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3;"></i>
   <div style="font-size:14px;font-weight:600;">No schedules found.</div>
-  {% if is_super_admin %}<div style="font-size:12px;margin-top:6px;">Click <b>Add Schedule</b> to create one.</div>{%
+  {% if can_manage_schedules %}<div style="font-size:12px;margin-top:6px;">Click <b>Add Schedule</b> to create one.</div>{%
   endif %}
 </div>
 {% endif %}
@@ -852,7 +852,7 @@
       <button class="pm-tab active-tab" id="tab-info-btn" onclick="switchSchedTab('info')">
         <i class="bi bi-info-circle"></i> Info
       </button>
-      {% if is_super_admin %}
+      {% if can_manage_schedules %}
       <button class="pm-tab" id="tab-edit-btn" onclick="switchSchedTab('edit')">
         <i class="bi bi-pencil-square"></i> Edit
       </button>
@@ -910,7 +910,7 @@
       </div>
 
       <!-- ── EDIT PANE (admin & super admin) ── -->
-      {% if is_super_admin %}
+      {% if can_manage_schedules %}
       <div id="pane-edit" class="sched-pane">
         <form id="editForm" method="POST" onsubmit="return validateSchedForm('edit')">
           <div class="mb-3">
@@ -995,7 +995,7 @@
 </div>
 
 <!-- ── ADD SCHEDULE MODAL ── -->
-{% if is_super_admin %}
+{% if can_manage_schedules %}
 <div class="add-modal-backdrop" id="addModal" onclick="if(event.target===this)closeAddModal()">
   <div class="modal-box">
     <div class="modal-header-cs">
@@ -1117,7 +1117,7 @@
   const ALL_SUBJECTS = {{ subjects  | tojson if subjects else '{}' }};
   const ALL_TEACHERS = {{ teachers  | tojson if teachers else '{}' }};
   const DOW_NAMES = {{ dow_list  | tojson }};
-  const IS_SUPER = {{ 'true' if is_super_admin else 'false' }};
+  const IS_SUPER = {{ 'true' if can_manage_schedules else 'false' }};
   const TEACHER_VIEW = {{ 'true' if teacher_view else 'false' }};
 
   /* ── TIME UTILS ── */

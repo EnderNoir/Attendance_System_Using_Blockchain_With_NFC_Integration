@@ -917,7 +917,6 @@
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <a href="{{ url_for('teacher_dashboard') }}" class="btn-outline-sm"><i class="bi bi-arrow-left"></i> Back</a>
-      <a href="{{ url_for('live_session', sess_id=sess_id) }}" class="btn-outline-sm" target="_blank"><i class="bi bi-broadcast"></i> Monitor Live</a>
       {% if is_active and session.get('role') != 'admin' %}
       <button type="button" class="btn-end" onclick="openEndModal()">
         <i class="bi bi-stop-fill"></i> End Class Session

@@ -3287,13 +3287,7 @@ def delete_photo():
 @app.route('/reports')
 @admin_required
 def attendance_report():
-    report = []
-    for s in get_all_students():
-        stats = get_student_attendance_stats(s['nfcId'])
-        report.append({**s, **stats})
-    return render_template('attendance_report.html',
-                           students=sorted(report, key=lambda x: -x['rate']),
-                           subjects_db=db_get_all_subjects(), fmt_time=fmt_time)
+    return redirect(url_for('admin_sessions'))
 
 @app.route('/view/<nfc_id>')
 @login_required
@@ -3313,7 +3307,7 @@ def student_sessions_api(nfc_id):
     with get_db() as conn:
         log_rows = conn.execute(
             "SELECT al.nfc_id, al.status, al.tx_hash, al.block_number, "
-            "al.tap_time, al.excuse_note, "
+            "al.tap_time, al.excuse_note, al.excuse_request_id, "
             "s.sess_id, s.subject_name, s.course_code, s.section_key, "
             "s.teacher_name, s.time_slot, s.started_at "
             "FROM attendance_logs al "
@@ -3326,6 +3320,27 @@ def student_sessions_api(nfc_id):
     seen_sessions = set()
     for row in log_rows:
         seen_sessions.add(row['sess_id'])
+        attachment_url = ''
+        if (row['status'] or '').lower() == 'excused':
+            resolved_excuse_id = row.get('excuse_request_id')
+            if not resolved_excuse_id:
+                try:
+                    with get_db() as _conn:
+                        pk_col = _excuse_pk_column(_conn)
+                        pk_expr = pk_col if pk_col != 'rowid' else 'rowid'
+                        ex_row = _conn.execute(
+                            f"SELECT {pk_expr} AS id, rowid AS rid "
+                            "FROM excuse_requests "
+                            "WHERE sess_id=? AND nfc_id=? AND status='approved' "
+                            "ORDER BY COALESCE(created_at, submitted_at, '') DESC LIMIT 1",
+                            (row['sess_id'], row['nfc_id'])
+                        ).fetchone()
+                    if ex_row:
+                        resolved_excuse_id = ex_row['id'] if ex_row['id'] not in (None, '') else ex_row['rid']
+                except Exception:
+                    resolved_excuse_id = None
+            if resolved_excuse_id:
+                attachment_url = url_for('admin_excuse_attachment', excuse_id=resolved_excuse_id)
         result.append({
             'subject_name': row['subject_name'] or '',
             'course_code':  row['course_code']  or '',
@@ -3339,6 +3354,7 @@ def student_sessions_api(nfc_id):
             'tx_hash':      row['tx_hash']       or '',
             'block':        str(row['block_number']) if row['block_number'] else '',
             'excuse_note':  row['excuse_note']   or '',
+            'attachment_url': attachment_url,
         })
     if not result:
         all_students    = get_all_students()
@@ -3372,6 +3388,7 @@ def student_sessions_api(nfc_id):
                 'tx_hash':      tx_info.get('tx_hash',''),
                 'block':        str(tx_info.get('block','')),
                 'excuse_note':  '',
+                'attachment_url': '',
             })
     result.sort(key=lambda x: x['date'], reverse=True)
     return jsonify(result)
@@ -3737,7 +3754,7 @@ def teacher_create_session():
 @app.route('/teacher/records')
 @login_required
 def teacher_records():
-    if session.get('role') == 'admin': return redirect(url_for('attendance_report'))
+    if session.get('role') == 'admin': return redirect(url_for('admin_sessions'))
     user = get_current_user()
     with get_db() as conn:
         rows = conn.execute(
@@ -4238,7 +4255,7 @@ def teacher_sessions():
 @app.route('/teacher/reports')
 @login_required
 def teacher_reports():
-    if session.get('role') == 'admin': return redirect(url_for('attendance_report'))
+    if session.get('role') == 'admin': return redirect(url_for('admin_sessions'))
     user   = get_current_user()
     report = []
     for s in teacher_students(user):
@@ -5913,20 +5930,17 @@ def admin_schedules():
     # Only show teacher-role accounts in the instructor dropdown
     teachers   = {u: v for u, v in users.items() if v.get('role') == 'teacher' and v.get('status') == 'approved'}
     sections   = _get_all_section_keys()
-    # Access control: normal admin only sees schedules they are assigned to
+    # Admin and Super Admin can both see all schedules.
     current_role = session.get('role', '')
-    current_username = session.get('username', '')
-    if current_role == 'super_admin':
-        schedules = all_schedules
-    else:
-        schedules = [s for s in all_schedules if s.get('teacher_username') == current_username]
+    schedules = all_schedules
     return render_template('admin_schedules.html',
                            schedules=schedules,
                            subjects=subjects,
                            teachers=teachers,
                            sections=sections,
                            dow_names=DOW_NAMES,
-                           is_super_admin=(current_role == 'super_admin'))
+                           is_super_admin=(current_role == 'super_admin'),
+                           can_manage_schedules=(current_role in ADMIN_ROLES))
 
 @app.route('/admin/schedules/create', methods=['POST'])
 @admin_required
@@ -6178,62 +6192,25 @@ def excuse_submit(sess_id, nfc_id):
         return jsonify({'status': 'ok', 'message': msg, 'nfc_id': nfc_id, 'reason': reason_text})
     
     flash(msg, 'success')
-    return redirect(url_for('admin_excuses') if is_admin else url_for('teacher_records'))
-
-@app.route('/admin/excuses')
-@admin_required
-def admin_excuses():
-    tab    = request.args.get('tab', 'pending')
-    filter_status = tab if tab in ('pending','approved','rejected') else None
-    excuses = db_get_all_excuse_requests(filter_status)
-    counts  = {
-        'pending':  len(db_get_all_excuse_requests('pending')),
-        'approved': len(db_get_all_excuse_requests('approved')),
-        'rejected': len(db_get_all_excuse_requests('rejected')),
-    }
-    return render_template('admin_excuses.html',
-                           excuses=excuses, tab=tab, counts=counts,
-                           excuse_reasons=dict(EXCUSE_REASONS))
-
-@app.route('/admin/excuses/<int:excuse_id>/approve', methods=['POST'])
-@admin_required
-def admin_excuse_approve(excuse_id):
-    row = db_resolve_excuse(excuse_id, 'approved', session.get('username',''))
-    if row:
-        _send_excuse_resolved_email(
-            row.get('student_email',''), row.get('student_name',''),
-            row.get('reason_type',''), 'approved'
-        )
-        flash('Excuse approved and attendance updated to Excused.', 'success')
-    else:
-        flash('Excuse request not found.', 'danger')
-    return redirect(url_for('admin_excuses'))
-
-@app.route('/admin/excuses/<int:excuse_id>/reject', methods=['POST'])
-@admin_required
-def admin_excuse_reject(excuse_id):
-    row = db_resolve_excuse(excuse_id, 'rejected', session.get('username',''))
-    if row:
-        _send_excuse_resolved_email(
-            row.get('student_email',''), row.get('student_name',''),
-            row.get('reason_type',''), 'rejected'
-        )
-        flash('Excuse request rejected.', 'warning')
-    else:
-        flash('Excuse request not found.', 'danger')
-    return redirect(url_for('admin_excuses'))
+    return redirect(url_for('admin_sessions') if is_admin else url_for('teacher_records'))
 
 @app.route('/admin/excuses/<int:excuse_id>/attachment')
-@admin_required
+@login_required
 def admin_excuse_attachment(excuse_id):
     exc = db_get_excuse_request(excuse_id)
     if not exc or not exc.get('attachment_file'):
         flash('Attachment not found.', 'danger')
-        return redirect(url_for('admin_excuses'))
+        return redirect(url_for('dashboard'))
+    role = session.get('role', '')
+    if role not in ADMIN_ROLES:
+        sess = load_session(exc.get('sess_id', '')) if exc.get('sess_id') else None
+        if role != 'teacher' or not sess or not _is_my_session(sess):
+            flash('Access denied.', 'danger')
+            return redirect(url_for('teacher_sessions_students'))
     fpath = _resolve_excuse_attachment_path(exc['attachment_file'])
     if not fpath or not os.path.exists(fpath):
         flash('Attachment file missing from server.', 'danger')
-        return redirect(url_for('admin_excuses'))
+        return redirect(url_for('dashboard' if role in ADMIN_ROLES else 'teacher_sessions_students'))
     from flask import send_file
     return send_file(fpath, as_attachment=False)
 

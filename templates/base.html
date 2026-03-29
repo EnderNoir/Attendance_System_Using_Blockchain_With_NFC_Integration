@@ -1989,9 +1989,6 @@
       <a href="{{ url_for('admin_schedules') }}"
         class="nav-link {% if request.endpoint in ('admin_schedules','admin_schedule_create') %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-calendar3-week"></i> Schedules</a>
-      <a href="{{ url_for('admin_excuses') }}"
-        class="nav-link {% if request.endpoint == 'admin_excuses' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-file-earmark-text"></i> Excuse Requests</a>
       <div class="nav-section-label" style="margin-top:6px;">Students</div>
       <a href="{{ url_for('register') }}"
         class="nav-link {% if request.endpoint in ('register', 'batch_register') %}active{% endif %}"
@@ -2036,10 +2033,6 @@
       <a href="{{ url_for('admin_schedules') }}"
         class="nav-link {% if request.endpoint in ('admin_schedules','admin_schedule_create') %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-calendar3-week"></i> Schedules</a>
-      <a href="{{ url_for('admin_excuses') }}"
-        class="nav-link {% if request.endpoint == 'admin_excuses' %}active{% endif %}" onclick="closeSidebar()">
-        <i class="bi bi-file-earmark-text"></i> Excuse Requests
-      </a>
       <a href="{{ url_for('admin_sessions') }}"
         class="nav-link {% if request.endpoint == 'admin_sessions' %}active{% endif %}" onclick="closeSidebar()"><i
           class="bi bi-broadcast"></i> Classroom Sessions</a>

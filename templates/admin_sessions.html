@@ -229,9 +229,9 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 18px;
-    max-width: 700px;
+    max-width: 1200px;
     width: 100%;
-    max-height: 90vh;
+    max-height: 95vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -462,6 +462,7 @@
     border-bottom: 1px solid var(--border);
     vertical-align: top;
     color: var(--text);
+    white-space: nowrap;
   }
 
   .att-table tr:last-child td {
@@ -487,12 +488,12 @@
     border-radius: 4px;
     padding: 1px 5px;
     display: inline-block;
-    word-break: break-all;
+    white-space: nowrap;
     margin-top: 3px;
   }
 
   .att-scroll {
-    overflow-y: auto;
+    overflow: auto;
     flex: 1;
     padding: 0 4px;
   }
@@ -1092,7 +1093,7 @@
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '—'}</td>
             <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || status}</span></td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.time || '—'}</td>
-            <td style="font-size:11px;max-width:140px;">${status === 'excused' ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>${reasonDetail}` : '<span style="color:var(--muted);">—</span>'}</td>
+            <td style="font-size:11px;">${status === 'excused' ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>${reasonDetail}` : '<span style="color:var(--muted);">—</span>'}</td>
             <td>${status === 'excused' ? docLink : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
             <td>${st.tx_hash
           ? `<span class="att-tx">${st.tx_hash.substring(0, 18)}…</span>`

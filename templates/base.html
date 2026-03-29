@@ -2022,11 +2022,14 @@
       <div class="nav-section-label" style="margin-top:6px;">Administration</div>
       <a href="{{ url_for('manage_users') }}"
         class="nav-link {% if request.endpoint == 'manage_users' %}active{% endif %}" onclick="closeSidebar()">
-        <i class="bi bi-shield-check"></i> Faculty Accounts
+        <i class="bi bi-shield-check"></i> User Management
         {% if pending_count is defined and pending_count %}<span
           style="margin-left:auto;background:var(--warning);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;">{{
           pending_count }}</span>{% endif %}
       </a>
+      <a href="{{ url_for('admin_create_instructor') }}"
+        class="nav-link {% if request.endpoint == 'admin_create_instructor' %}active{% endif %}" onclick="closeSidebar()"><i
+          class="bi bi-person-plus"></i> Create Teacher Account</a>
       <a href="{{ url_for('manage_subjects') }}"
         class="nav-link {% if request.endpoint == 'manage_subjects' %}active{% endif %}" onclick="closeSidebar()"><i
           class="bi bi-book"></i> Subject Catalogue</a>

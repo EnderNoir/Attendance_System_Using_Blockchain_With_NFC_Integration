@@ -3322,7 +3322,7 @@ def student_sessions_api(nfc_id):
         seen_sessions.add(row['sess_id'])
         attachment_url = ''
         if (row['status'] or '').lower() == 'excused':
-            resolved_excuse_id = row.get('excuse_request_id')
+            resolved_excuse_id = row['excuse_request_id'] if 'excuse_request_id' in row.keys() else None
             if not resolved_excuse_id:
                 try:
                     with get_db() as _conn:
@@ -3440,20 +3440,18 @@ def update_faculty():
     username = data.get('username','').strip()
     user     = db_get_user(username)
     if not user: return jsonify({'error':'User not found'}), 404
+    requester_role = session.get('role', '')
+    if requester_role != 'super_admin':
+        return jsonify({'error': 'Only Super Admin can edit user accounts.'}), 403
     if data.get('full_name'):  user['full_name'] = data['full_name'].strip()
     if data.get('email') is not None: user['email'] = data['email'].strip()
-    # Role update: normal admin can only set 'teacher'; super_admin can set any role
+    # Role update: super_admin can set any supported role
     new_role = data.get('role', '')
-    requester_role = session.get('role', '')
     if new_role:
-        if requester_role == 'super_admin' and new_role in ('teacher', 'admin', 'super_admin'):
-            user['role'] = new_role
-        elif requester_role == 'admin' and new_role == 'teacher':
+        if new_role in ('teacher', 'admin', 'super_admin'):
             user['role'] = new_role
         elif new_role not in ('teacher', 'admin', 'super_admin'):
             return jsonify({'error': 'Invalid role.'}), 400
-        else:
-            return jsonify({'error': 'You do not have permission to assign this role.'}), 403
     if data.get('status') in ('approved','pending','rejected'): user['status'] = data['status']
     if 'sections' in data and isinstance(data['sections'], list):
         user['sections'] = [normalize_section_key(s) for s in data['sections']]
@@ -3515,7 +3513,8 @@ def manage_users():
     rejected = {u:d for u,d in all_u.items() if d['status']=='rejected'}
     photos_db = db_get_all_photos()
     return render_template('admin_users.html', pending=pending, approved=approved,
-                           rejected=rejected, fmt_time=fmt_time, photos_db=photos_db)
+                           rejected=rejected, fmt_time=fmt_time, photos_db=photos_db,
+                           can_edit_roles=(session.get('role') == 'super_admin'))
 
 
 @app.route('/admin/approve/<username>', methods=['POST'])
@@ -5914,7 +5913,7 @@ def admin_create_instructor():
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         flash(f'Instructor account "{username}" created successfully.', 'success')
-        return redirect(url_for('admin_users'))
+        return redirect(url_for('manage_users'))
     return render_template('admin_create_instructor.html')
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -18,6 +18,7 @@
 .tab-btn{flex:1;min-width:80px;padding:9px;border:none;background:transparent;color:var(--muted);border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;}
 .tab-btn.active{background:rgba(45,106,39,.1);color:var(--accent);}
 .fa-tab-pane{display:none;}.fa-tab-pane.active{display:block;}
+.role-readonly{font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap;}
 
 /* Modal */
 .fa-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s;}
@@ -104,10 +105,13 @@
     </div>
     <div class="fa-tabs">
       <button class="fatab active" onclick="switchFaTab('info',this)"><i class="bi bi-person-lines-fill"></i> Info</button>
+      {% if can_edit_roles %}
       <button class="fatab" onclick="switchFaTab('edit',this)"><i class="bi bi-pencil-square"></i> Update</button>
       <button class="fatab" onclick="switchFaTab('actions',this)"><i class="bi bi-shield-check"></i> Actions</button>
+      {% endif %}
     </div>
     <div class="fapane active" id="fapane-info"><div id="faInfoContent"></div></div>
+    {% if can_edit_roles %}
     <div class="fapane" id="fapane-edit">
       <div id="faEditContent"></div>
       <div class="fa-footer">
@@ -117,6 +121,7 @@
       </div>
     </div>
     <div class="fapane" id="fapane-actions"><div id="faActionsContent"></div></div>
+    {% endif %}
   </div>
 </div>
 
@@ -179,6 +184,7 @@
         </div>
       </div>
       <!-- Actions Column: inline role selector -->
+      {% if can_edit_roles %}
       <div class="actions-col" title="Change Role">
         <select class="role-select-inline" id="rolesel_{{ username }}" onchange="markRoleDirty('{{ username }}')">
           <option value="teacher" {{ 'selected' if u.role == 'teacher' else '' }}>Teacher</option>
@@ -191,6 +197,11 @@
           <i class="bi bi-check-lg"></i> Apply
         </button>
       </div>
+      {% else %}
+      <div class="actions-col">
+        <span class="role-readonly"><i class="bi bi-eye"></i> View only</span>
+      </div>
+      {% endif %}
       <button class="btn-vr" onclick='openFaModal({{ {"username":username,"name":u.full_name,"email":u.email or "","role":u.role,"status":"approved","created":u.created_at or "","sections":u.sections,"photo":photos_db.get(username,"")}|tojson|e }})'>
         <i class="bi bi-eye"></i> View
       </button>
@@ -228,6 +239,7 @@
 
 <script>
 let curFaUser = null;
+const CAN_EDIT_ROLES = {{ 'true' if can_edit_roles else 'false' }};
 
 // ── Inline Role Actions Column ────────────────────────────────────────────
 function markRoleDirty(username) {
@@ -373,6 +385,16 @@ function openFaModal(u) {
       <div style="padding:4px 0;">${secAccordionHtml}</div>
     </div>`;
 
+  if (!CAN_EDIT_ROLES) {
+    document.querySelectorAll('.fapane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.fatab').forEach(b => b.classList.remove('active'));
+    document.getElementById('fapane-info').classList.add('active');
+    const firstTab = document.querySelector('.fatab');
+    if (firstTab) firstTab.classList.add('active');
+    document.getElementById('faModal').classList.add('show');
+    return;
+  }
+
   // ── UPDATE TAB: photo upload + all fields + editable section checkboxes ──
   const roleOpts  = ['teacher','admin'].map(v=>`<option value="${v}" ${u.role===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
   const stOpts    = ['approved','pending','rejected'].map(v=>`<option value="${v}" ${st===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
@@ -495,6 +517,7 @@ function uploadFaPhoto(input) {
 }
 
 function saveFaculty() {
+  if (!CAN_EDIT_ROLES) return;
   if (!curFaUser) return;
   const v1 = validateFaField(document.getElementById('fa_name'),     'fa_name_err',  'required');
   const v2 = validateFaField(document.getElementById('fa_username'), 'fa_uname_err', 'required');

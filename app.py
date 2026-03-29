@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from web3 import Web3
 from datetime import datetime
 from functools import wraps
+from threading import Thread, Lock
 import json, os, secrets, time, csv, io, hashlib, uuid, re, sqlite3, calendar as _cal
 from collections import deque
 from werkzeug.utils import secure_filename
@@ -87,6 +88,8 @@ _COURSE_ALIASES: dict[str, list[str]] = {
     'BS Mechanical Engineering':  ['BSME', 'B.S. Mechanical Engineering'],
 }
 
+AUTO_THREAD = None
+AUTO_THREAD_LOCK = Lock()
 _ALIAS_TO_CANONICAL: dict[str, str] = {}
 for _canon, _aliases in _COURSE_ALIASES.items():
     _ALIAS_TO_CANONICAL[_canon.lower()] = _canon
@@ -774,8 +777,7 @@ def normalize_section_key(key):
     return key
 
 def build_student_section_key(student):
-    # Try 'program' first (new field), then 'course' (legacy field)
-    course     = (student.get('program') or student.get('course') or '').strip()
+    course     = (student.get('course') or '').strip()
     year_level = (student.get('year_level') or '').strip()
     section    = (student.get('section') or '').strip().upper()
     if not course or not year_level or not section:
@@ -871,6 +873,7 @@ def init_db():
             auto_end_at     TEXT,
             ended_at        TEXT,
             grace_period    INTEGER NOT NULL DEFAULT 15,
+            schedule_id     TEXT DEFAULT NULL,
             total_enrolled  INTEGER NOT NULL DEFAULT 0,
             total_present   INTEGER NOT NULL DEFAULT 0,
             total_late      INTEGER NOT NULL DEFAULT 0,
@@ -1217,14 +1220,15 @@ def save_session(sess_id, s):
     sk = normalize_section_key(s.get('section_key', ''))
     teacher_uname = s.get('teacher_username') or s.get('teacher') or ''
     teacher_name  = s.get('teacher_name', '')
+    schedule_id   = s.get('schedule_id')
     with get_db() as conn:
         conn.execute(
             "INSERT INTO sessions "
             "(sess_id,subject_id,subject_name,course_code,units,time_slot,"
             " section_key,teacher_username,teacher_name,started_at,late_cutoff,"
-            " auto_end_at,ended_at,grace_period,"
+            " auto_end_at,ended_at,grace_period,schedule_id,"
             " warn_log_json,invalid_log_json) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(sess_id) DO UPDATE SET "
             "subject_id=excluded.subject_id, subject_name=excluded.subject_name, "
             "course_code=excluded.course_code, units=excluded.units, "
@@ -1235,6 +1239,7 @@ def save_session(sess_id, s):
             "auto_end_at=excluded.auto_end_at, "
             "ended_at=excluded.ended_at, "
             "grace_period=excluded.grace_period, "
+            "schedule_id=excluded.schedule_id, "
             "warn_log_json=excluded.warn_log_json, "
             "invalid_log_json=excluded.invalid_log_json",
             (sess_id, s.get('subject_id', ''), s.get('subject_name', ''),
@@ -1242,7 +1247,7 @@ def save_session(sess_id, s):
              sk, teacher_uname, teacher_name,
              s.get('started_at', ''), s.get('late_cutoff', ''),
              s.get('auto_end_at'), s.get('ended_at'),
-             s.get('grace_period', 15),
+             s.get('grace_period', 15), schedule_id,
              json.dumps(s.get('warn_log', [])), json.dumps(s.get('invalid_log', [])))
         )
         counts = conn.execute(
@@ -1372,9 +1377,7 @@ def _student_row(row):
     d = dict(row)
     d['nfcId']    = d.get('nfc_id', '')
     d['name']     = d.get('full_name', '')
-    # Keep both 'program' and 'course' for compatibility
-    if d.get('program') and not d.get('course'):
-        d['course'] = d.get('program', '')
+    d['course']   = d.get('program', '')
     d['address']  = d.get('eth_address', '')
     d['tx_hash']  = d.get('reg_tx_hash', '')
     d['section']  = (d.get('section') or '').strip().upper()
@@ -1668,6 +1671,39 @@ def db_get_teacher_sessions(username):
         ).fetchall()
     return [_session_row_with_logs(conn, r) for r in rows]
 
+def _normalize_hhmm(value):
+    """Normalize schedule time values to HH:MM (supports HH:MM, HH:MM:SS, and AM/PM formats)."""
+    raw = str(value or '').strip()
+    if not raw:
+        return None
+    # 24h HH:MM
+    try:
+        dt = datetime.strptime(raw, '%H:%M')
+        return dt.strftime('%H:%M')
+    except Exception:
+        pass
+    # 24h HH:MM:SS
+    try:
+        dt = datetime.strptime(raw, '%H:%M:%S')
+        return dt.strftime('%H:%M')
+    except Exception:
+        pass
+    # 12h formats, with and without space before AM/PM
+    for fmt in ('%I:%M %p', '%I:%M%p'):
+        try:
+            dt = datetime.strptime(raw.upper(), fmt)
+            return dt.strftime('%H:%M')
+        except Exception:
+            continue
+    return None
+
+def _time_mins(value):
+    hhmm = _normalize_hhmm(value)
+    if not hhmm:
+        return None
+    h, m = hhmm.split(':')
+    return int(h) * 60 + int(m)
+
 def check_and_start_scheduled_sessions():
     """
     Background-friendly function:
@@ -1686,23 +1722,52 @@ def check_and_start_scheduled_sessions():
         for s in schedules:
             start_time = s['start_time']
             end_time   = s['end_time']
+            start_hhmm = _normalize_hhmm(start_time)
+            end_hhmm = _normalize_hhmm(end_time)
+            if not start_hhmm or not end_hhmm:
+                print(f"[AUTO WARN] Invalid schedule time format for schedule_id={s.get('schedule_id')} start={start_time} end={end_time}")
+                continue
             
-            # 1. Start session if time matches exactly or we missed it by up to 5 mins
-            # and no active session for this teacher + subject + section exists
-            # Optimized Check: Only start if NO session exists for this subject/section/date yet.
-            # This prevents restarts if a teacher ends it early.
+            # Start at schedule trigger time if this specific schedule has not run yet today.
+            # Using schedule_id avoids false blocks from other sessions with same subject/section.
             today_prefix = now_dt.strftime('%Y-%m-%d') + '%'
             with get_db() as conn:
-                already_ran = conn.execute(
-                    "SELECT 1 FROM sessions WHERE subject_id=? AND section_key=? AND started_at LIKE ?",
-                    (s['subject_id'], s['section_key'], today_prefix)
-                ).fetchone()
+                schedule_id = s.get('schedule_id')
+                if schedule_id:
+                    already_ran = conn.execute(
+                        "SELECT 1 FROM sessions WHERE schedule_id=? AND started_at LIKE ?",
+                        (str(schedule_id), today_prefix)
+                    ).fetchone()
+                else:
+                    # Legacy fallback for rows without schedule_id.
+                    already_ran = conn.execute(
+                        "SELECT 1 FROM sessions "
+                        "WHERE teacher_username=? AND subject_id=? AND section_key=? AND started_at LIKE ?",
+                        (
+                            s.get('teacher_username', ''),
+                            s['subject_id'],
+                            normalize_section_key(s['section_key']),
+                            today_prefix,
+                        )
+                    ).fetchone()
             
-            if not already_ran and start_time <= current_time_str < end_time:
+            start_dt = datetime.strptime(
+                f"{now_dt.strftime('%Y-%m-%d')} {start_hhmm}:00",
+                '%Y-%m-%d %H:%M:%S'
+            )
+            end_dt = datetime.strptime(
+                f"{now_dt.strftime('%Y-%m-%d')} {end_hhmm}:00",
+                '%Y-%m-%d %H:%M:%S'
+            )
+            if end_dt <= start_dt:
+                print(f"[AUTO WARN] Invalid schedule window schedule_id={s.get('schedule_id')} start={start_hhmm} end={end_hhmm}")
+                continue
+
+            if not already_ran and start_dt <= now_dt < end_dt:
                 # Automate session start
                 sess_id = str(uuid.uuid4())[:13]
                 subj = db_get_subject(s['subject_id'])
-                late_cutoff_dt = datetime.strptime(start_time, '%H:%M') + timedelta(minutes=s.get('grace_minutes', 15))
+                late_cutoff_dt = datetime.strptime(start_hhmm, '%H:%M') + timedelta(minutes=s.get('grace_minutes', 15))
                 late_cutoff = late_cutoff_dt.strftime('%H:%M')
                 
                 new_sess = {
@@ -1711,18 +1776,20 @@ def check_and_start_scheduled_sessions():
                     'subject_name': s['subject_name'],
                     'course_code': s['course_code'],
                     'units': subj.get('units', 3) if subj else 3,
-                    'time_slot': f"{start_time} - {end_time}",
+                    'time_slot': f"{start_hhmm} - {end_hhmm}",
                     'section_key': s['section_key'],
                     'teacher_username': s['teacher_username'],
                     'teacher_name': s['teacher_name'],
                     'started_at': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
                     'late_cutoff': f"{now_dt.strftime('%Y-%m-%d')} {late_cutoff}:00",
-                    'auto_end_at': f"{now_dt.strftime('%Y-%m-%d')} {end_time}:00",
+                    'auto_end_at': f"{now_dt.strftime('%Y-%m-%d')} {end_hhmm}:00",
                     'grace_period': s.get('grace_minutes', 15),
                     'schedule_id': s['schedule_id']
                 }
                 save_session(sess_id, new_sess)
                 print(f"[AUTO] Started session {sess_id} for {s['subject_name']} ({s['teacher_username']})")
+            elif already_ran and start_dt <= now_dt < end_dt:
+                print(f"[AUTO] Skipped schedule_id={s.get('schedule_id')} (already ran today)")
 
         # 2. End sessions that passed their auto_end_at
         for sid, asess in active_sessions.items():
@@ -1731,70 +1798,180 @@ def check_and_start_scheduled_sessions():
                 try:
                     end_dt = datetime.strptime(auto_end, '%Y-%m-%d %H:%M:%S')
                     if now_dt >= end_dt:
-                        # Auto end
-                        with get_db() as conn:
-                            conn.execute(
-                                "UPDATE sessions SET ended_at=? WHERE sess_id=?",
-                                (now_dt.strftime('%Y-%m-%d %H:%M:%S'), sid)
-                            )
-                        print(f"[AUTO] Ended session {sid} automatically.")
+                        result = _finalize_session(
+                            sid,
+                            ended_time=now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                            async_chain_and_email=True,
+                        )
+                        if result and not result.get('already_ended'):
+                            print(f"[AUTO] Ended session {sid} automatically.")
                 except:
                     pass
 
 def check_and_end_expired_sessions():
-    """System-wide check to end sessions after their end_time."""
-    current_time_str = datetime.now().strftime('%H:%M')
+    """System-wide safety check to end sessions after their own configured end time."""
+    now_dt = datetime.now()
+    now_str = now_dt.strftime('%Y-%m-%d %H:%M:%S')
+
     with get_db() as conn:
-        active = conn.execute("SELECT sess_id, section_key, subject_id FROM sessions WHERE ended_at IS NULL").fetchall()
-        for s in active:
-            sched = conn.execute("SELECT end_time FROM schedules WHERE subject_id=? AND section_key=?", (s['subject_id'], s['section_key'])).fetchone()
-            if sched and current_time_str >= sched['end_time']:
-                now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                conn.execute("UPDATE sessions SET ended_at=? WHERE sess_id=?", (now_str, s['sess_id']))
-                print(f"[AUTO] Ended session {s['sess_id']} (Time Expired)")
+        active = conn.execute(
+            "SELECT sess_id, auto_end_at, schedule_id, subject_id, section_key "
+            "FROM sessions WHERE ended_at IS NULL"
+        ).fetchall()
+
+    for s in active:
+        sess_id = s['sess_id']
+
+        # Primary source of truth: per-session auto_end_at stamped at session creation.
+        auto_end_at = (s['auto_end_at'] or '').strip()
+        if auto_end_at:
+            try:
+                end_dt = datetime.strptime(auto_end_at, '%Y-%m-%d %H:%M:%S')
+                if now_dt >= end_dt:
+                    result = _finalize_session(sess_id, ended_time=now_str, async_chain_and_email=True)
+                    if result and not result.get('already_ended'):
+                        print(f"[AUTO] Ended session {sess_id} (Auto End Reached)")
+                continue
+            except Exception:
+                # If stored timestamp is malformed, fall back to schedule lookup below.
+                pass
+
+        # Fallback for legacy sessions missing auto_end_at: prefer exact schedule_id lookup.
+        end_mins = None
+        with get_db() as conn:
+            schedule_id = (s['schedule_id'] or '').strip()
+            sched = None
+            if schedule_id:
+                sched = conn.execute(
+                    "SELECT end_time FROM schedules WHERE schedule_id=? AND is_active=1",
+                    (schedule_id,)
+                ).fetchone()
+            if not sched:
+                # Legacy fallback only.
+                sched = conn.execute(
+                    "SELECT end_time FROM schedules WHERE subject_id=? AND section_key=? AND is_active=1 "
+                    "ORDER BY updated_at DESC LIMIT 1",
+                    (s['subject_id'], s['section_key'])
+                ).fetchone()
+
+        if sched:
+            end_mins = _time_mins(sched['end_time'])
+
+        current_time_mins = _time_mins(now_dt.strftime('%H:%M'))
+        if end_mins is None or current_time_mins is None:
+            continue
+        if current_time_mins >= end_mins:
+            result = _finalize_session(sess_id, ended_time=now_str, async_chain_and_email=True)
+            if result and not result.get('already_ended'):
+                print(f"[AUTO] Ended session {sess_id} (Schedule End Time Reached)")
 
 def automation_loop():
-    """Single master loop for DAVS automation/synchronization."""
+    """Single master loop for DAVS automation/synchronization.
+    
+    Runs every few seconds so scheduled sessions start almost immediately
+    after the trigger time while still being lightweight.
+    """
+    poll_seconds = 5
     while True:
         try:
             check_and_start_scheduled_sessions()
             check_and_end_expired_sessions()
         except Exception as e:
             print(f"[AUTO ERROR] {e}")
-        time.sleep(15) # Optimized: minimize creation delay
+        time.sleep(poll_seconds)
 
-from threading import Thread
+def ensure_automation_thread_running():
+    """Start automation loop once per process even under flask/wsgi launch modes."""
+    global AUTO_THREAD
+    with AUTO_THREAD_LOCK:
+        if AUTO_THREAD and AUTO_THREAD.is_alive():
+            return
+        AUTO_THREAD = Thread(target=automation_loop, daemon=True, name='davs-automation-loop')
+        AUTO_THREAD.start()
+        print('[AUTO] Automation loop started.')
+
+@app.before_request
+def _ensure_automation_thread_running():
+    ensure_automation_thread_running()
+
 from datetime import timedelta
 
 DOW_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 # ── Excuse Request DB helpers ──────────────────────────────────────────────
 
+def _excuse_pk_column(conn) -> str:
+    cols = [r['name'] for r in conn.execute("PRAGMA table_info(excuse_requests)").fetchall()]
+    for cand in ('id', 'excuse_id', 'request_id'):
+        if cand in cols:
+            return cand
+    return 'rowid'
+
+def _excuse_order_expr(conn) -> str:
+    cols = [r['name'] for r in conn.execute("PRAGMA table_info(excuse_requests)").fetchall()]
+    if 'created_at' in cols and 'submitted_at' in cols:
+        return "COALESCE(er.created_at, er.submitted_at, '')"
+    if 'created_at' in cols:
+        return "er.created_at"
+    if 'submitted_at' in cols:
+        return "er.submitted_at"
+    return "''"
+
 def db_save_excuse_request(data: dict) -> int:
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     with get_db() as conn:
-        cur = conn.execute(
-            "INSERT INTO excuse_requests "
-            "(sess_id,nfc_id,student_name,student_id,student_email,"
-            " reason_type,reason_detail,attachment_file,status,created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (data.get('sess_id', ''), data.get('nfc_id', ''),
-             data.get('student_name', ''), data.get('student_id', ''),
-             data.get('student_email', ''),
-             data.get('reason_type', ''), data.get('reason_detail', ''),
-             data.get('attachment_file', ''), 'pending', now)
-        )
-        return cur.lastrowid
+        cols = [r['name'] for r in conn.execute("PRAGMA table_info(excuse_requests)").fetchall()]
+        insert_cols = [
+            'sess_id', 'nfc_id', 'student_name', 'student_id', 'student_email',
+            'reason_type', 'reason_detail', 'attachment_file', 'status'
+        ]
+        values = [
+            data.get('sess_id', ''), data.get('nfc_id', ''),
+            data.get('student_name', ''), data.get('student_id', ''),
+            data.get('student_email', ''), data.get('reason_type', ''),
+            data.get('reason_detail', ''), data.get('attachment_file', ''),
+            'pending'
+        ]
+
+        # Support both legacy and current schemas.
+        if 'created_at' in cols:
+            insert_cols.append('created_at')
+            values.append(now)
+        if 'submitted_at' in cols:
+            insert_cols.append('submitted_at')
+            values.append(now)
+
+        placeholders = ','.join(['?'] * len(insert_cols))
+        sql = f"INSERT INTO excuse_requests ({','.join(insert_cols)}) VALUES ({placeholders})"
+        cur = conn.execute(sql, tuple(values))
+        pk_col = _excuse_pk_column(conn)
+        inserted_id = cur.lastrowid
+        if pk_col != 'rowid':
+            try:
+                row = conn.execute(
+                    f"SELECT {pk_col} AS pk FROM excuse_requests WHERE rowid=?",
+                    (cur.lastrowid,)
+                ).fetchone()
+                pk_val = row['pk'] if row else None
+                if pk_val is not None and str(pk_val).strip() != '':
+                    inserted_id = pk_val
+            except Exception:
+                pass
+        return inserted_id
 
 def db_get_all_excuse_requests(status_filter=None):
     try:
         with get_db() as conn:
+            pk_col = _excuse_pk_column(conn)
+            order_expr = _excuse_order_expr(conn)
+            pk_select = f"er.{pk_col}" if pk_col != 'rowid' else "er.rowid"
             # Explicitly alias er.id to avoid any column shadowing from JOIN
             base_sql = (
-                "SELECT er.id AS id, er.sess_id, er.nfc_id, "
+                f"SELECT {pk_select} AS id, er.rowid AS _rowid, er.sess_id, er.nfc_id, "
                 "er.student_name, er.student_id, er.student_email, "
                 "er.reason_type, er.reason_detail, er.attachment_file, "
-                "er.status, er.reviewed_by, er.reviewed_at, er.created_at, "
+                "er.status, er.reviewed_by, er.reviewed_at, "
+                "COALESCE(er.created_at, er.submitted_at, '') AS created_at, "
                 "s.subject_name AS session_subject, "
                 "s.section_key AS session_section "
                 "FROM excuse_requests er "
@@ -1802,54 +1979,134 @@ def db_get_all_excuse_requests(status_filter=None):
             )
             if status_filter:
                 rows = conn.execute(
-                    base_sql + "WHERE er.status=? ORDER BY er.created_at DESC",
+                    base_sql + f"WHERE er.status=? ORDER BY {order_expr} DESC",
                     (status_filter,)
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    base_sql + "ORDER BY er.created_at DESC"
+                    base_sql + f"ORDER BY {order_expr} DESC"
                 ).fetchall()
-        return [dict(r) for r in rows]
+        out = []
+        for r in rows:
+            d = dict(r)
+            if d.get('id') is None or str(d.get('id')).strip() == '':
+                d['id'] = d.get('_rowid')
+            d.pop('_rowid', None)
+            out.append(d)
+        return out
     except Exception as e:
         print(f'[DB] db_get_all_excuse_requests error: {e}')
         return []
 
 def db_get_excuse_request(excuse_id):
     with get_db() as conn:
-        row = conn.execute("SELECT * FROM excuse_requests WHERE id=?", (excuse_id,)).fetchone()
-    return dict(row) if row else None
+        pk_col = _excuse_pk_column(conn)
+        pk_where = pk_col if pk_col != 'rowid' else 'rowid'
+        row = conn.execute(
+            f"SELECT *, {pk_where} AS id, rowid AS _rowid FROM excuse_requests WHERE {pk_where}=?",
+            (excuse_id,)
+        ).fetchone()
+        if not row and pk_where != 'rowid':
+            row = conn.execute(
+                "SELECT *, rowid AS id, rowid AS _rowid FROM excuse_requests WHERE rowid=?",
+                (excuse_id,)
+            ).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    if d.get('id') is None or str(d.get('id')).strip() == '':
+        d['id'] = d.get('_rowid')
+    d.pop('_rowid', None)
+    return d
 
 def db_resolve_excuse(excuse_id: int, resolution: str, reviewed_by: str) -> dict | None:
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    session_sync = None
     with get_db() as conn:
-        row = conn.execute("SELECT * FROM excuse_requests WHERE id=?", (excuse_id,)).fetchone()
+        pk_col = _excuse_pk_column(conn)
+        pk_where = pk_col if pk_col != 'rowid' else 'rowid'
+        where_col = pk_where
+        where_val = excuse_id
+        row = conn.execute(
+            f"SELECT *, {pk_where} AS id, rowid AS _rowid FROM excuse_requests WHERE {pk_where}=?",
+            (excuse_id,)
+        ).fetchone()
+        if not row and pk_where != 'rowid':
+            row = conn.execute(
+                "SELECT *, rowid AS id, rowid AS _rowid FROM excuse_requests WHERE rowid=?",
+                (excuse_id,)
+            ).fetchone()
+            if row:
+                where_col = 'rowid'
+                where_val = excuse_id
         if not row:
             return None
+        row_dict = dict(row)
+        if row_dict.get('id') is None or str(row_dict.get('id')).strip() == '':
+            row_dict['id'] = row_dict.get('_rowid')
         conn.execute(
-            "UPDATE excuse_requests SET status=?, reviewed_by=?, reviewed_at=? WHERE id=?",
-            (resolution, reviewed_by, now, excuse_id)
+            f"UPDATE excuse_requests SET status=?, reviewed_by=?, reviewed_at=? WHERE {where_col}=?",
+            (resolution, reviewed_by, now, where_val)
         )
         if resolution == 'approved':
-            r_type = dict(row).get('reason_type', 'others')
+            r_type = row_dict.get('reason_type', 'others')
             r_label = dict(EXCUSE_REASONS).get(r_type, r_type.title())
-            r_detail = dict(row).get('reason_detail', '')
+            r_detail = row_dict.get('reason_detail', '')
             note = f"{r_label}{' — ' + r_detail if r_detail else ''}"
+            resolved_excuse_id = row_dict.get('id') or excuse_id
             
+            # ✅ CRITICAL FIX: Use UPSERT to create record if student hasn't tapped yet
+            # If student has no attendance_logs record, INSERT will create one
+            # If record exists, UPDATE will mark it as excused
             conn.execute(
-                "UPDATE attendance_logs SET status='excused', excuse_note=?, excuse_request_id=? "
-                "WHERE sess_id=? AND nfc_id=?",
-                (note, excuse_id, row['sess_id'], row['nfc_id'])
+                "INSERT INTO attendance_logs "
+                "(sess_id, nfc_id, student_name, student_id, status, tap_time, "
+                " tx_hash, block_number, excuse_note, excuse_request_id, created_at) "
+                "VALUES (?, ?, ?, ?, 'excused', ?, '', 0, ?, ?, ?) "
+                "ON CONFLICT(sess_id, nfc_id) DO UPDATE SET "
+                "status='excused', excuse_note=excluded.excuse_note, "
+                "excuse_request_id=excluded.excuse_request_id",
+                (row_dict['sess_id'], row_dict['nfc_id'], row_dict['student_name'], row_dict['student_id'],
+                 now, note, resolved_excuse_id, now)
             )
-            # Sync with live session if active
-            sess = load_session(row['sess_id'])
-            if sess:
-                excused = sess.setdefault('excused', [])
-                if row['nfc_id'] not in excused: excused.append(row['nfc_id'])
-                if row['nfc_id'] in sess.get('absent', []): sess['absent'].remove(row['nfc_id'])
-                sess.setdefault('excuse_notes', {})[row['nfc_id']] = note
-                save_session(row['sess_id'], sess)
-                sessions_db[row['sess_id']] = sess
-        return dict(row)
+            # Defer session save_session sync until after this DB transaction closes.
+            session_sync = {
+                'sess_id': row_dict['sess_id'],
+                'nfc_id': row_dict['nfc_id'],
+                'note': note,
+            }
+        row_dict.pop('_rowid', None)
+    # Sync with live session if active (outside transaction to avoid sqlite write lock).
+    if session_sync:
+        sess = load_session(session_sync['sess_id'])
+        if sess:
+            excused = sess.setdefault('excused', [])
+            if session_sync['nfc_id'] not in excused:
+                excused.append(session_sync['nfc_id'])
+            if session_sync['nfc_id'] in sess.get('absent', []):
+                sess['absent'].remove(session_sync['nfc_id'])
+            sess.setdefault('excuse_notes', {})[session_sync['nfc_id']] = session_sync['note']
+            save_session(session_sync['sess_id'], sess)
+            sessions_db[session_sync['sess_id']] = sess
+    return row_dict
+
+def _resolve_excuse_attachment_path(stored_value: str) -> str | None:
+    """Resolve attachment paths across legacy/new storage styles."""
+    raw = str(stored_value or '').strip()
+    if not raw:
+        return None
+    raw_norm = raw.replace('\\', '/').lstrip('/')
+    base = os.path.basename(raw_norm)
+    candidates = [
+        os.path.join(UPLOAD_FOLDER_EXCUSES, raw_norm),
+        os.path.join(UPLOAD_FOLDER_EXCUSES, base),
+        os.path.join(BASE_DIR, 'uploads', 'excuses', base),
+        os.path.join(BASE_DIR, 'static', 'uploads', 'excuses', base),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
 
 def _save_excuse_attachment(file_storage) -> str:
     """Save uploaded excuse file; returns stored filename. Raises ValueError on bad input."""
@@ -2204,6 +2461,173 @@ def get_active_sessions():
             s = _session_row_with_logs(conn, r)
             result[r['sess_id']] = s
     return result
+
+def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
+    """Finalize a live session and keep DB/UI/blockchain/email in sync."""
+    sess = load_session(sess_id)
+    if not sess:
+        return None
+    if sess.get('ended_at'):
+        return {'already_ended': True, 'ended_at': sess.get('ended_at', '')}
+
+    all_students = get_all_students()
+    section_key = normalize_section_key(sess.get('section_key', ''))
+    section_students = [s for s in all_students if build_student_section_key(s) == section_key]
+
+    present_set = set(sess.get('present', []))
+    late_set = set(sess.get('late', []))
+    excused_set = set(sess.get('excused', []))
+    with get_db() as conn:
+        excused_from_db = conn.execute(
+            "SELECT DISTINCT nfc_id FROM attendance_logs WHERE sess_id=? AND status='excused'",
+            (sess_id,)
+        ).fetchall()
+        approved_excuse_requests = conn.execute(
+            "SELECT DISTINCT nfc_id FROM excuse_requests WHERE sess_id=? AND status='approved'",
+            (sess_id,)
+        ).fetchall()
+    excused_set.update([row['nfc_id'] for row in excused_from_db])
+    excused_set.update([row['nfc_id'] for row in approved_excuse_requests])
+
+    ended_at = ended_time or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    absent_ids = []
+    for st in section_students:
+        nid = st['nfcId']
+        if nid in present_set or nid in excused_set:
+            continue
+        db_save_attendance_log(
+            sess_id=sess_id,
+            nfc_id=nid,
+            student_name=st.get('name', ''),
+            student_id=st.get('student_id', ''),
+            status='absent',
+            tap_time=ended_at,
+            tx_hash='',
+            block_number=0,
+        )
+        absent_ids.append(nid)
+
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
+            (len(section_students), ended_at, sess_id)
+        )
+
+    sess['ended_at'] = ended_at
+    sess['absent'] = absent_ids
+    save_session(sess_id, sess)
+    sessions_db[sess_id] = sess
+
+    def _post_finalize_worker():
+        with app.app_context():
+            if BLOCKCHAIN_ONLINE and contract and admin_account:
+                for st in section_students:
+                    nid = st['nfcId']
+                    if nid in present_set or nid in excused_set:
+                        continue
+                    with get_db() as conn:
+                        current = conn.execute(
+                            "SELECT status FROM attendance_logs WHERE sess_id=? AND nfc_id=?",
+                            (sess_id, nid)
+                        ).fetchone()
+                    if current and current['status'] == 'excused':
+                        continue
+                    try:
+                        abs_tx, abs_block = mark_attendance_on_chain(nid, 'absent')
+                        with get_db() as conn:
+                            conn.execute(
+                                "UPDATE attendance_logs SET tx_hash=?, block_number=? WHERE sess_id=? AND nfc_id=?",
+                                (abs_tx, abs_block, sess_id, nid)
+                            )
+                    except Exception as e:
+                        print(f"[WARN] Failed absent chain mark for {nid}: {e}")
+
+            for st in section_students:
+                nid = st['nfcId']
+                if nid in present_set or nid in excused_set:
+                    continue
+                try:
+                    with get_db() as conn:
+                        lg = conn.execute(
+                            "SELECT tx_hash, block_number FROM attendance_logs WHERE sess_id=? AND nfc_id=?",
+                            (sess_id, nid)
+                        ).fetchone()
+                    send_student_attendance_receipt(
+                        student_name=st.get('name', nid),
+                        student_email=st.get('email', ''),
+                        student_id=st.get('student_id', ''),
+                        subject_name=sess.get('subject_name', ''),
+                        section_key=sess.get('section_key', ''),
+                        teacher_name=sess.get('teacher_name', ''),
+                        tap_time=ended_at,
+                        status='absent',
+                        tx_hash=lg['tx_hash'] if lg else '',
+                        block_num=lg['block_number'] if lg else '',
+                        sess_id=sess_id,
+                        nfc_id=nid,
+                    )
+                except Exception as e:
+                    print(f"[EMAIL] Failed absence email for {nid}: {e}")
+
+            try:
+                users = db_get_all_users()
+                teacher_username = sess.get('teacher', '')
+                teacher_email = users.get(teacher_username, {}).get('email', '')
+                if teacher_email:
+                    logs = {lg['nfc_id']: lg for lg in db_get_session_attendance(sess_id)}
+                    present_count = late_count = absent_count = excused_count = 0
+                    rows = []
+                    for st in section_students:
+                        nid = st['nfcId']
+                        lg = logs.get(nid, {})
+                        st_status = (lg.get('status') or 'absent').lower() if lg else 'absent'
+                        if st_status == 'late':
+                            late_count += 1
+                        elif st_status == 'present':
+                            present_count += 1
+                        elif st_status == 'excused':
+                            excused_count += 1
+                        else:
+                            absent_count += 1
+                        rows.append({
+                            'name': st.get('name', '—'),
+                            'student_id': st.get('student_id', ''),
+                            'status': st_status,
+                            'tap_time': lg.get('tap_time', '—') if lg else '—',
+                            'tx_hash': lg.get('tx_hash', '') if lg else '',
+                            'block_num': lg.get('block_number', '') if lg else '',
+                        })
+                    send_teacher_session_summary(
+                        teacher_email=teacher_email,
+                        teacher_name=sess.get('teacher_name', ''),
+                        subject_name=sess.get('subject_name', ''),
+                        section_key=sess.get('section_key', ''),
+                        time_slot=sess.get('time_slot', ''),
+                        started_at=sess.get('started_at', ''),
+                        ended_at=ended_at,
+                        present_count=present_count,
+                        late_count=late_count,
+                        absent_count=absent_count,
+                        excused_count=excused_count,
+                        student_rows=rows,
+                    )
+            except Exception as e:
+                print(f"[EMAIL] Teacher summary error: {e}")
+
+    if async_chain_and_email:
+        Thread(target=_post_finalize_worker, daemon=True).start()
+    else:
+        _post_finalize_worker()
+
+    return {
+        'already_ended': False,
+        'ended_at': ended_at,
+        'present_count': len([n for n in present_set if n not in late_set]),
+        'late_count': len(late_set),
+        'absent_count': len(absent_ids),
+        'excused_count': len(excused_set),
+        'total_enrolled': len(section_students),
+    }
 
 def get_active_session_for_nfc(nfc_id):
     all_students = get_all_students()
@@ -3358,9 +3782,6 @@ def api_session_attendance(sess_id):
                     'attachment_file': exc['attachment_file'],
                 }
 
-        # Get session's excused list
-        excused_set = set(sess.get('excused', []))
-
         # Historical-first view:
         # - always include students who have logs in this session (even if moved section later)
         # - also include currently enrolled students with no logs as "absent"
@@ -3401,24 +3822,17 @@ def api_session_attendance(sess_id):
             nid = s['nfcId']
             if nid in students_map:
                 continue
-            # Check if student is in excused list
-            if nid in excused_set:
-                status_val = 'excused'
-                reason_info = excuse_details.get(nid, {})
-            else:
-                status_val = 'absent'
-                reason_info = {}
             students_map[nid] = {
                 'nfc_id':     nid,
                 'name':       s.get('name', nid),
                 'student_id': s.get('student_id', ''),
-                'status':     status_val,
+                'status':     'absent',
                 'tx_hash':    '',
                 'block':      '',
                 'time':       '',
-                'reason':     reason_info.get('reason', ''),
-                'reason_detail': reason_info.get('reason_detail', ''),
-                'attachment_url': url_for('admin_excuse_attachment', excuse_id=nid) if reason_info.get('attachment_file') else '',
+                'reason':     '',
+                'reason_detail': '',
+                'attachment_url': '',
             }
 
         students_out = sorted(students_map.values(), key=lambda x: (x.get('name') or 'Unknown').lower())
@@ -3533,104 +3947,13 @@ def _auto_end_session_thread(sess_id, auto_end_at_str, app_context):
                 return
  
             print(f"[AUTO-END] Auto-ending session {sess_id}...")
- 
-            # Replicate end_session logic
-            all_students_list = get_all_students()
-            sk               = current.get('section_key', '')
-            section_students = [s for s in all_students_list
-                                 if build_student_section_key(s) == normalize_section_key(sk)]
-            present_set  = set(current.get('present', []))
-            excused_set  = set(current.get('excused', []))
-            ended_time   = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
- 
-            if BLOCKCHAIN_ONLINE and contract and admin_account:
-                for s in section_students:
-                    nid = s['nfcId']
-                    if nid not in present_set and nid not in excused_set:
-                        try:
-                            tx_hash, block_num = mark_attendance_on_chain(nid, 'absent')
-                            db_save_attendance_log(
-                                sess_id=sess_id, nfc_id=nid,
-                                student_name=s.get('name',''), student_id=s.get('student_id',''),
-                                status='absent', tap_time=ended_time,
-                                tx_hash=tx_hash,
-                                block_number=block_num
-                            )
-                            send_student_attendance_receipt(
-                                student_name=s.get('name', nid),
-                                student_email=s.get('email', ''),
-                                student_id=s.get('student_id', ''),
-                                subject_name=current.get('subject_name', ''),
-                                section_key=current.get('section_key', ''),
-                                teacher_name=current.get('teacher_name', ''),
-                                tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
-                                status='absent',
-                                tx_hash=tx_hash,
-                                block_num=block_num,
-                            )
-                        except Exception as _ae:
-                            db_save_attendance_log(
-                                sess_id=sess_id, nfc_id=nid,
-                                student_name=s.get('name',''), student_id=s.get('student_id',''),
-                                status='absent', tap_time=ended_time
-                            )
-                            send_student_attendance_receipt(
-                                student_name=s.get('name', nid),
-                                student_email=s.get('email', ''),
-                                student_id=s.get('student_id', ''),
-                                subject_name=current.get('subject_name', ''),
-                                section_key=current.get('section_key', ''),
-                                teacher_name=current.get('teacher_name', ''),
-                                tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
-                                status='absent',
-                                tx_hash='',
-                                block_num='',
-                            )
-            else:
-                for s in section_students:
-                    nid = s['nfcId']
-                    if nid not in present_set and nid not in excused_set:
-                        db_save_attendance_log(
-                            sess_id=sess_id, nfc_id=nid,
-                            student_name=s.get('name',''), student_id=s.get('student_id',''),
-                            status='absent', tap_time=ended_time
-                        )
-                        send_student_attendance_receipt(
-                            student_name=s.get('name', nid),
-                            student_email=s.get('email', ''),
-                            student_id=s.get('student_id', ''),
-                            subject_name=current.get('subject_name', ''),
-                            section_key=current.get('section_key', ''),
-                            teacher_name=current.get('teacher_name', ''),
-                            tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
-                            status='absent',
-                            tx_hash='',
-                            block_num='',
-                        )
- 
-            with get_db() as conn:
-                conn.execute(
-                    "UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
-                    (len(section_students), ended_time, sess_id)
-                )
-                # Recalculate attendance statistics from logs
-                counts = conn.execute(
-                    "SELECT status, COUNT(*) as cnt FROM attendance_logs "
-                    "WHERE sess_id=? GROUP BY status", (sess_id,)
-                ).fetchall()
-                totals = {r['status']: r['cnt'] for r in counts}
-                conn.execute(
-                    "UPDATE sessions SET total_present=?,total_late=?,total_absent=?,total_excused=? "
-                    "WHERE sess_id=?",
-                    (totals.get('present', 0) + totals.get('late', 0),
-                     totals.get('late', 0), totals.get('absent', 0),
-                     totals.get('excused', 0), sess_id)
-                )
- 
-            current['ended_at'] = ended_time
-            save_session(sess_id, current)
-            sessions_db[sess_id] = current
-            print(f"[AUTO-END] Session {sess_id} ended automatically at {ended_time}.")
+            result = _finalize_session(
+                sess_id,
+                ended_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                async_chain_and_email=True,
+            )
+            if result and not result.get('already_ended'):
+                print(f"[AUTO-END] Session {sess_id} ended automatically at {result.get('ended_at')}")
  
     except Exception as _ate:
         print(f"[AUTO-END] Error in auto-end thread for {sess_id}: {_ate}")
@@ -3773,141 +4096,23 @@ def live_session(sess_id):
 @app.route('/teacher/session/<sess_id>/end', methods=['POST'])
 @login_required
 def end_session(sess_id):
-    if sess_id not in sessions_db: flash('Session not found.'); return redirect(url_for('teacher_dashboard'))
-    sess = sessions_db[sess_id]
+    sess = load_session(sess_id)
+    if sess is None:
+        flash('Session not found.'); return redirect(url_for('teacher_dashboard'))
+    
     if not _is_my_session(sess):
         flash('Access denied.'); return redirect(url_for('teacher_dashboard'))
-    all_students     = get_all_students()
-    section_key      = sess.get('section_key','')
-    section_students = [s for s in all_students
-                        if build_student_section_key(s) == normalize_section_key(section_key)]
-    present_set = set(sess.get('present', []))
-    excused_set = set(sess.get('excused', []))
-    absent_list = [s['nfcId'] for s in section_students
-                   if s['nfcId'] not in present_set and s['nfcId'] not in excused_set]
-    ended_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    if BLOCKCHAIN_ONLINE and contract and admin_account:
-        try:
-            for s in section_students:
-                nid = s['nfcId']
-                if nid not in present_set and nid not in excused_set:
-                    try:
-                        abs_tx, abs_block = mark_attendance_on_chain(nid, 'absent')
-                        db_save_attendance_log(
-                            sess_id=sess_id, nfc_id=nid,
-                            student_name=s.get('name',''), student_id=s.get('student_id',''),
-                            status='absent', tap_time=ended_time,
-                            tx_hash=abs_tx, block_number=abs_block
-                        )
-                        send_student_attendance_receipt(
-                            student_name=s.get('name', nid),
-                            student_email=s.get('email', ''),
-                            student_id=s.get('student_id', ''),
-                            subject_name=sess.get('subject_name', ''),
-                            section_key=sess.get('section_key', ''),
-                            teacher_name=sess.get('teacher_name', ''),
-                            tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
-                            status='absent',
-                            tx_hash=abs_tx if 'abs_tx' in locals() else '',
-                            block_num=abs_block if 'abs_block' in locals() else '',
-                            sess_id=sess_id,
-                            nfc_id=nid
-                        )
-                    except Exception as _e:
-                        print(f"[WARN] absent blockchain tx failed for {nid}: {_e}")
-                        db_save_attendance_log(
-                            sess_id=sess_id, nfc_id=nid,
-                            student_name=s.get('name',''), student_id=s.get('student_id',''),
-                            status='absent', tap_time=ended_time
-                        )
-                        send_student_attendance_receipt(
-                            student_name=s.get('name', nid),
-                            student_email=s.get('email', ''),
-                            student_id=s.get('student_id', ''),
-                            subject_name=sess.get('subject_name', ''),
-                            section_key=sess.get('section_key', ''),
-                            teacher_name=sess.get('teacher_name', ''),
-                            tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
-                            status='absent',
-                            tx_hash='',
-                            block_num='',
-                        )
-        except Exception as _be:
-            print(f"[WARN] blockchain absent recording failed: {_be}")
-    else:
-        for s in section_students:
-            nid = s['nfcId']
-            if nid not in present_set and nid not in excused_set:
-                db_save_attendance_log(
-                    sess_id=sess_id, nfc_id=nid,
-                    student_name=s.get('name',''), student_id=s.get('student_id',''),
-                    status='absent', tap_time=ended_time
-                )
-                send_student_attendance_receipt(
-                    student_name=s.get('name', nid),
-                    student_email=s.get('email', ''),
-                    student_id=s.get('student_id', ''),
-                    subject_name=sess.get('subject_name', ''),
-                    section_key=sess.get('section_key', ''),
-                    teacher_name=sess.get('teacher_name', ''),
-                    tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
-                    status='absent',
-                    tx_hash='',
-                    block_num='',
-                )
-    with get_db() as conn:
-        conn.execute("UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
-                     (len(section_students), ended_time, sess_id))
-    sess['absent']   = absent_list
-    sess['ended_at'] = ended_time
-    save_session(sess_id, sess)
-    sessions_db[sess_id] = sess
-    present_count = len([n for n in present_set if n not in sess.get('late',[])])
-    late_count    = len(sess.get('late', []))
-    flash(f'Session ended. {present_count} present, {late_count} late, {len(absent_list)} absent.')
-    # ── Email: send session summary to teacher ────────────────────────────
-    try:
-        teacher_username = sess.get('teacher', '')
-        all_users        = db_get_all_users()
-        teacher_user     = all_users.get(teacher_username, {})
-        teacher_email    = teacher_user.get('email', '')
-        if teacher_email:
-            att_logs = {lg['nfc_id']: lg for lg in db_get_session_attendance(sess_id)}
-            late_set  = set(sess.get('late', []))
-            exc_set   = set(sess.get('excused', []))
-            student_rows = []
-            for st in section_students:
-                nid    = st['nfcId']
-                if   nid in exc_set:     st_status = 'excused'
-                elif nid in late_set:    st_status = 'late'
-                elif nid in present_set: st_status = 'present'
-                else:                    st_status = 'absent'
-                lg = att_logs.get(nid, {})
-                student_rows.append({
-                    'name':       st.get('name', '—'),
-                    'student_id': st.get('student_id', ''),
-                    'status':     st_status,
-                    'tap_time':   lg.get('tap_time', '—') if lg else '—',
-                    'tx_hash':    lg.get('tx_hash', '') if lg else '',
-                    'block_num':  lg.get('block_number', '') if lg else '',
-                })
-            excused_count = len(exc_set)
-            send_teacher_session_summary(
-                teacher_email  = teacher_email,
-                teacher_name   = sess.get('teacher_name', ''),
-                subject_name   = sess.get('subject_name', ''),
-                section_key    = sess.get('section_key', ''),
-                time_slot      = sess.get('time_slot', ''),
-                started_at     = sess.get('started_at', ''),
-                ended_at       = ended_time,
-                present_count  = present_count,
-                late_count     = late_count,
-                absent_count   = len(absent_list),
-                excused_count  = excused_count,
-                student_rows   = student_rows,
-            )
-    except Exception as _email_err:
-        print(f'[EMAIL] Teacher summary error: {_email_err}')
+    result = _finalize_session(
+        sess_id,
+        ended_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        async_chain_and_email=True,
+    )
+    if not result:
+        flash('Session not found.'); return redirect(url_for('teacher_dashboard'))
+
+    flash(
+        f"Session ended. {result.get('present_count', 0)} present, "
+        f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
     return redirect(url_for('teacher_dashboard'))
 
 @app.route('/teacher/session/<sess_id>/excuse', methods=['POST'])
@@ -3939,39 +4144,24 @@ def excuse_student(sess_id):
             except ValueError as ve:
                 return jsonify({'error': str(ve)}), 400
     
-    student = db_get_student(nfc_id)
+    student = db_get_student(nfc_id) or get_student_by_nfc_cached(nfc_id)
     if not student:
         return jsonify({'error': 'Student not found'}), 404
     
     reason_label = dict(EXCUSE_REASONS).get(reason_type, reason_type.title())
-    excuse_note  = f"{reason_label}{' — ' + reason_detail if reason_detail else ''}"
-    
-    # Save excuse request to DB so admins can review it
-    try:
-        db_save_excuse_request({
-            'sess_id':        sess_id,
-            'nfc_id':         nfc_id,
-            'student_name':   student.get('name', nfc_id),
-            'student_id':     student.get('student_id', ''),
-            'student_email':  student.get('email', ''),
-            'reason_type':    reason_type,
-            'reason_detail':  reason_detail,
-            'attachment_file': attachment_file,
-        })
-    except Exception as _er:
-        print(f'[WARN] excuse_requests DB save failed: {_er}')
-    
-    # Mark as excused immediately in the live session
-    excused = sess.setdefault('excused', [])
-    if nfc_id not in excused:
-        excused.append(nfc_id)
-    if nfc_id in sess.get('absent', []):
-        sess['absent'].remove(nfc_id)
-    
-    excuse_notes = sess.setdefault('excuse_notes', {})
-    excuse_notes[nfc_id] = excuse_note
-    save_session(sess_id, sess)
-    sessions_db[sess_id] = sess
+
+    excuse_id = db_save_excuse_request({
+        'sess_id':        sess_id,
+        'nfc_id':         nfc_id,
+        'student_name':   student.get('name', nfc_id),
+        'student_id':     student.get('student_id', ''),
+        'student_email':  student.get('email', ''),
+        'reason_type':    reason_type,
+        'reason_detail':  reason_detail,
+        'attachment_file': attachment_file,
+    })
+    db_resolve_excuse(excuse_id, 'approved', session.get('username', ''))
+    sess = load_session(sess_id) or sess
     
     # Blockchain with auto-registration
     exc_tx = ''; exc_block = 0
@@ -4009,10 +4199,15 @@ def excuse_student(sess_id):
         student_name=student.get('name', nfc_id),
         student_id=student.get('student_id', ''),
         status='excused',
-        tap_time=datetime.now().strftime('%H:%M:%S'),
+        tap_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         tx_hash=exc_tx, block_number=exc_block,
-        excuse_note=excuse_note
+        excuse_note=f"{reason_label}{' — ' + reason_detail if reason_detail else ''}"
     )
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE attendance_logs SET excuse_request_id=? WHERE sess_id=? AND nfc_id=?",
+            (excuse_id, sess_id, nfc_id)
+        )
     
     send_student_attendance_receipt(
         student_name=student.get('name', ''),
@@ -4302,13 +4497,23 @@ def mark_pico():
         nfc_set_uid(nfc_id)
         return jsonify({'status':'registration','uid':nfc_id})
 
-    # Block taps if student is already excused in any active session
-    _active_check = get_active_sessions()
-    for _sid, _asess in _active_check.items():
-        if nfc_id in _asess.get('excused', []):
-            return jsonify({'status': 'excused',
-                            'message': 'This student is marked as Excused and cannot tap in.',
-                            'nfc_id': nfc_id})
+    # ✅ FIX: Check DB for excused students instead of in-memory sessions_db
+    # This ensures that after app restart, excused students are still blocked
+    with get_db() as conn:
+        excused_logs = conn.execute(
+            "SELECT DISTINCT sess_id FROM attendance_logs "
+            "WHERE nfc_id=? AND status='excused'",
+            (nfc_id,)
+        ).fetchall()
+    
+    # Check if any of those sessions are still active
+    if excused_logs:
+        active_sessions = get_active_sessions()
+        for log in excused_logs:
+            if log['sess_id'] in active_sessions:
+                return jsonify({'status': 'excused',
+                                'message': 'This student is marked as Excused and cannot tap in.',
+                                'nfc_id': nfc_id})
 
     sess_id, sess = get_active_session_for_nfc(nfc_id)
     if not sess:
@@ -4330,15 +4535,15 @@ def mark_pico():
     student_info= next((s for s in all_s if s['nfcId']==nfc_id),{})
     student_id  = student_info.get('student_id','')
 
-    # FIX #4: Check for duplicate/multiple tap - block if already present or late (one tap per session only)
-    if nfc_id in sess.get('present',[]) or nfc_id in sess.get('late',[]):
+    # Check duplicate tap
+    if nfc_id in sess.get('present',[]):
         warn_entry={'nfc_id':nfc_id,'name':name,'student_id':student_id,'timestamp':time.time()}
         if nfc_id not in sess.get('warned',[]): sess.setdefault('warned',[]).append(nfc_id)
         sess.setdefault('warn_log',[]).append(warn_entry)
         save_session(sess_id, sess)
         sessions_db[sess_id] = sess
         return jsonify({'status':'already_marked','name':name,'student_id':student_id,
-                        'message':f'{name} is already marked present or late.'})
+                        'message':f'{name} is already marked present.'})
 
     # Determine late status
     now_dt       = datetime.now()
@@ -5708,17 +5913,20 @@ def admin_schedules():
     # Only show teacher-role accounts in the instructor dropdown
     teachers   = {u: v for u, v in users.items() if v.get('role') == 'teacher' and v.get('status') == 'approved'}
     sections   = _get_all_section_keys()
+    # Access control: normal admin only sees schedules they are assigned to
     current_role = session.get('role', '')
-    # FIX #6: Both Admin and Super Admin can see all schedules and edit them (same permissions)
-    schedules = all_schedules
-    is_super = (current_role == 'super_admin')
+    current_username = session.get('username', '')
+    if current_role == 'super_admin':
+        schedules = all_schedules
+    else:
+        schedules = [s for s in all_schedules if s.get('teacher_username') == current_username]
     return render_template('admin_schedules.html',
                            schedules=schedules,
                            subjects=subjects,
                            teachers=teachers,
                            sections=sections,
                            dow_names=DOW_NAMES,
-                           is_super_admin=is_super)
+                           is_super_admin=(current_role == 'super_admin'))
 
 @app.route('/admin/schedules/create', methods=['POST'])
 @admin_required
@@ -5750,6 +5958,11 @@ def admin_schedule_create():
         if not section_key or not start_time or not end_time:
             flash('Section, start time, and end time are required.', 'danger')
             return redirect(url_for('admin_schedules'))
+        start_mins = _time_mins(start_time)
+        end_mins = _time_mins(end_time)
+        if start_mins is None or end_mins is None or end_mins <= start_mins:
+            flash('End time must be later than start time.', 'danger')
+            return redirect(url_for('admin_schedules'))
         db_save_schedule({
             'section_key': section_key,
             'subject_id':  subject_id,
@@ -5776,6 +5989,22 @@ def admin_schedule_edit(schedule_id):
         if not sched:
             flash('Schedule not found.', 'danger')
             return redirect(url_for('admin_schedules'))
+        
+        # ✅ FIX: Check if schedule is within 5 minutes of start time
+        today_dow = datetime.now().weekday()
+        if int(sched['day_of_week']) == today_dow:
+            current_time = datetime.now().strftime('%H:%M')
+            start_time = sched['start_time']
+            try:
+                now_dt = datetime.strptime(current_time, '%H:%M')
+                start_dt = datetime.strptime(start_time, '%H:%M')
+                time_diff = (start_dt - now_dt).total_seconds() / 60
+                if 0 <= time_diff <= 5:
+                    flash('Cannot edit schedule within 5 minutes before start time. Delete and recreate if changes are needed.', 'warning')
+                    return redirect(url_for('admin_schedules'))
+            except:
+                pass
+        
         subject_id  = request.form.get('subject_id', sched['subject_id'])
         subj        = db_get_subject(subject_id)
         teacher_u   = request.form.get('teacher_username', sched['teacher_username'])
@@ -5787,7 +6016,14 @@ def admin_schedule_edit(schedule_id):
             new_section = normalize_section_key(f"{program}|{year_level}|{sec_letter}")
         else:
             new_section = normalize_section_key(request.form.get('section_key', sched['section_key']))
-
+        new_start_time = request.form.get('start_time', sched['start_time'])
+        new_end_time = request.form.get('end_time', sched['end_time'])
+        start_mins = _time_mins(new_start_time)
+        end_mins = _time_mins(new_end_time)
+        if start_mins is None or end_mins is None or end_mins <= start_mins:
+            flash('End time must be later than start time.', 'danger')
+            return redirect(url_for('admin_schedules'))
+            
         db_save_schedule({
             'schedule_id': schedule_id,
             'section_key': new_section,
@@ -5797,27 +6033,14 @@ def admin_schedule_edit(schedule_id):
             'teacher_username': teacher_u,
             'teacher_name': teacher.get('full_name', teacher_u) if teacher else sched['teacher_name'],
             'day_of_week': int(request.form.get('day_of_week', sched['day_of_week'])),
-            'start_time':  request.form.get('start_time', sched['start_time']),
-            'end_time':    request.form.get('end_time', sched['end_time']),
+            'start_time':  new_start_time,
+            'end_time':    new_end_time,
             'grace_minutes': int(request.form.get('grace_minutes', sched['grace_minutes'])),
             'created_by':  sched['created_by'],
         })
-
-        # FIX #2: Invalidate any active sessions created from this schedule
-        # so they reload with updated schedule data on next poll
-        for sess_id, sess in list(sessions_db.items()):
-            if sess.get('schedule_id') == schedule_id and not sess.get('ended_at'):
-                print(f"[SCHEDULE-EDIT] Invalidating session {sess_id} due to schedule change")
-                # Reload from DB to get fresh data
-                updated_sess = load_session(sess_id)
-                if updated_sess:
-                    sessions_db[sess_id] = updated_sess
-
         flash('Schedule updated.', 'success')
     except Exception as e:
         flash(f'Error updating schedule: {e}', 'danger')
-        import traceback
-        print(f"[ERROR schedule_edit] {e}\n{traceback.format_exc()}")
     return redirect(url_for('admin_schedules'))
 
 @app.route('/admin/schedules/<schedule_id>/delete', methods=['POST'])
@@ -5857,6 +6080,27 @@ def api_schedules_search():
         if not q or q in label.lower() or q in code.lower():
             subj_results.append({'value': sid, 'code': code, 'label': label})
     return jsonify({'teachers': results[:20], 'subjects': subj_results[:20]})
+
+@app.route('/api/active_sessions_info')
+@login_required
+def api_active_sessions_info():
+    """Return active sessions keyed by session id for schedule live indicators."""
+    active = get_active_sessions()
+    current_role = session.get('role', '')
+    out = {}
+    for sid, s in active.items():
+        if current_role not in ADMIN_ROLES and not _is_my_session(s):
+            continue
+        out[sid] = {
+            'sess_id': sid,
+            'schedule_id': s.get('schedule_id') or '',
+            'subject_id': s.get('subject_id', ''),
+            'section_key': normalize_section_key(s.get('section_key', '')),
+            'teacher_username': s.get('teacher_username', s.get('teacher', '')),
+            'teacher_name': s.get('teacher_name', ''),
+            'is_active': not bool(s.get('ended_at')),
+        }
+    return jsonify(out)
 
 
 @app.route('/excuse/submit/<sess_id>/<nfc_id>', methods=['GET', 'POST'])
@@ -5909,11 +6153,11 @@ def excuse_submit(sess_id, nfc_id):
     })
 
     # Auto-approve if submitted by teacher for their own session or by any admin
-    is_admin = session.get('role') == 'admin'
-    is_teacher = sess.get('teacher') == session['username']
+    is_admin = session.get('role') in ADMIN_ROLES
+    is_teacher = sess.get('teacher') == session.get('username', '')
     
     if is_admin or is_teacher:
-        res = db_resolve_excuse(excuse_id, 'approved', session['username'])
+        res = db_resolve_excuse(excuse_id, 'approved', session.get('username', 'system'))
         msg = 'Student marked as excused successfully.'
         reason_text = res.get('reason_detail', '') # fallback
         # Wait, db_resolve_excuse returns the row. 
@@ -5986,8 +6230,8 @@ def admin_excuse_attachment(excuse_id):
     if not exc or not exc.get('attachment_file'):
         flash('Attachment not found.', 'danger')
         return redirect(url_for('admin_excuses'))
-    fpath = os.path.join(UPLOAD_FOLDER_EXCUSES, exc['attachment_file'])
-    if not os.path.exists(fpath):
+    fpath = _resolve_excuse_attachment_path(exc['attachment_file'])
+    if not fpath or not os.path.exists(fpath):
         flash('Attachment file missing from server.', 'danger')
         return redirect(url_for('admin_excuses'))
     from flask import send_file
@@ -6111,10 +6355,10 @@ def teacher_schedule():
     username = session.get('username')
     # Filter only for the current teacher
     schedules = db_get_schedules_for_teacher(username)
-    return render_template('admin_schedules.html', 
-                           schedules=schedules, 
-                           teacher_view=True,
-                           is_super_admin=False)
+    subjects = db_get_all_subjects()
+    return render_template('teacher_schedule.html',
+                           schedules=schedules,
+                           subjects=subjects)
 
 @app.route('/api/schedules/upcoming')
 @login_required
@@ -6166,8 +6410,6 @@ def _launch_nfc_listener():
     print("[NFC] Check nfc_listener.log for tap activity.")
 
 if __name__ == '__main__':
-    # Start automation thread for recurring sessions
-    auto_thread = Thread(target=automation_loop, daemon=True)
-    auto_thread.start()
+    ensure_automation_thread_running()
     _launch_nfc_listener()
     app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)

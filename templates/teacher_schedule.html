@@ -611,6 +611,9 @@
             </div>
             <div
                 style="margin-top:18px;padding-top:14px;border-top:1.5px solid var(--border);display:flex;justify-content:center;">
+                <a id="monitorLiveBtn" class="btn-primary" href="#" style="display:none;margin-right:8px;">
+                    <i class="bi bi-broadcast"></i> Monitor Live
+                </a>
                 <button class="btn-outline" onclick="closeSchedModal()"><i class="bi bi-x"></i> Close</button>
             </div>
         </div>
@@ -641,7 +644,58 @@
     function timeToMins(t) { const p = to24h(t).split(':'); return parseInt(p[0]) * 60 + parseInt(p[1] || 0); }
     function nowMins() { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
     function todayDow() { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; }
-    function isLive(s) { return s.day_of_week === todayDow() && nowMins() >= timeToMins(s.start_time) && nowMins() < timeToMins(s.end_time); }
+
+    // Track active sessions to hide Live indicator if session has been ended prematurely
+    let activeSessions = {};
+    async function refreshActiveSessions() {
+        try {
+            const resp = await fetch('/api/active_sessions_info');
+            if (resp.ok) {
+                const data = await resp.json();
+                activeSessions = data;
+            }
+        } catch (e) {
+            console.warn('Could not fetch active sessions:', e);
+        }
+    }
+
+    function sameId(a, b) {
+        return String(a || '').trim() !== '' && String(a || '').trim() === String(b || '').trim();
+    }
+
+    function normalizeSectionKeyJs(v) {
+        return String(v || '').trim().toUpperCase().replace(/\s+/g, '');
+    }
+
+    function findActiveSessionIdForSchedule(s) {
+        const schedId = s.schedule_id;
+        const schedSubj = String(s.subject_id || '');
+        const schedSection = normalizeSectionKeyJs(s.section_key || '');
+        for (const sid in activeSessions) {
+            const sess = activeSessions[sid] || {};
+            if (!sess.is_active) continue;
+            // Primary: schedule-id match (supports number/string mismatches)
+            if (sameId(sess.schedule_id, schedId)) return sid;
+            // Fallback: subject + section match
+            if (
+                String(sess.subject_id || '') === schedSubj &&
+                normalizeSectionKeyJs(sess.section_key || '') === schedSection
+            ) {
+                return sid;
+            }
+        }
+        return null;
+    }
+
+    function isSessionActive(s) {
+        return !!findActiveSessionIdForSchedule(s);
+    }
+
+    function isLive(s) {
+        const isScheduleLive = s.day_of_week === todayDow() && nowMins() >= timeToMins(s.start_time) && nowMins() < timeToMins(s.end_time);
+        // Only show Live if schedule is in the live time AND there's an active session (not ended prematurely)
+        return isScheduleLive && isSessionActive(s);
+    }
     function isUpcoming(s) { const diff = timeToMins(s.start_time) - nowMins(); return s.day_of_week === todayDow() && diff > 0 && diff <= 5; }
     function minsUntil(s) { return timeToMins(s.start_time) - nowMins(); }
 
@@ -759,6 +813,17 @@
         document.getElementById('infoDayTime').textContent = DOW_NAMES[s.day_of_week] + ' @ ' + fmtTime(to24h(s.start_time)) + ' – ' + fmtTime(to24h(s.end_time));
         document.getElementById('infoGrace').textContent = (s.grace_minutes || 15) + ' minutes';
         document.getElementById('infoLiveIndicator').style.display = isLive(s) ? 'block' : 'none';
+        const monitorBtn = document.getElementById('monitorLiveBtn');
+        const activeSessId = findActiveSessionIdForSchedule(s);
+        if (monitorBtn) {
+            if (activeSessId) {
+                monitorBtn.href = '/teacher/session/' + encodeURIComponent(activeSessId);
+                monitorBtn.style.display = 'inline-flex';
+            } else {
+                monitorBtn.href = '#';
+                monitorBtn.style.display = 'none';
+            }
+        }
 
         // Next class calculation
         let nextTxt = '—';
@@ -810,9 +875,17 @@
 
     /* ── INIT ── */
     document.addEventListener('DOMContentLoaded', () => {
-        buildCalendar(ALL_SCHEDULES);
-        checkPresessions();
-        setInterval(() => { buildCalendar(ALL_SCHEDULES); checkPresessions(); }, 60000);
+        const tick = async () => {
+            await refreshActiveSessions();
+            buildCalendar(ALL_SCHEDULES);
+            checkPresessions();
+            if (selectedSched) {
+                // Keep modal live/monitor state synced while it is open.
+                openSchedModal(selectedSched);
+            }
+        };
+        tick();
+        setInterval(tick, 3000);
     });
 </script>
 {% endblock %}

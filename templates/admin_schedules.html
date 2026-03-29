@@ -407,12 +407,10 @@
     border: 1.5px solid var(--border);
     border-radius: 16px;
     width: 100%;
-    max-width: 800px;
+    max-width: 560px;
     max-height: 92vh;
     overflow-y: auto;
-    overflow-x: visible;
     box-shadow: 0 20px 56px rgba(0, 0, 0, .22);
-    position: relative;
   }
 
   .modal-header-cs {
@@ -572,19 +570,17 @@
 
   .ac-dropdown {
     position: absolute;
-    top: calc(100%+6px);
+    top: calc(100%+4px);
     left: 0;
     right: 0;
     z-index: 3000;
     background: var(--surface);
     border: 1.5px solid var(--accent);
     border-radius: 10px;
-    max-height: 240px;
+    max-height: 230px;
     overflow-y: auto;
-    overflow-x: hidden;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, .35);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .20);
     display: none;
-    backdrop-filter: blur(0);
   }
 
   .ac-dropdown.open {
@@ -613,20 +609,19 @@
 
   .ac-tr:hover,
   .ac-tr.highlighted {
-    background: rgba(45, 106, 39, .15);
+    background: rgba(45, 106, 39, .1);
   }
 
   .ac-td {
-    padding: 10px 12px;
-    font-size: 13px;
+    padding: 7px 12px;
+    font-size: 12px;
     color: var(--text);
     border-bottom: 1px solid var(--border);
-    background: var(--surface);
   }
 
   .ac-td.muted {
     color: var(--muted);
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .ac-tr:last-child .ac-td {
@@ -906,6 +901,10 @@
         </div>
 
         <div style="margin-top:20px;text-align:center;">
+          <a id="infoMonitorBtn" class="btn-primary" style="display:none;justify-content:center;margin-bottom:10px;"
+            href="#" target="_blank"><i class="bi bi-broadcast"></i> Monitor Live</a>
+        </div>
+        <div style="text-align:center;">
           <button class="btn-outline" onclick="closeSchedModal()">Close</button>
         </div>
       </div>
@@ -942,17 +941,8 @@
           <div class="mb-3">
             <label class="form-label-sm">Section *</label>
             <div class="section-fields">
-              <div><label class="form-label-sm" style="margin-top:0;">Program</label>
-                <div class="ac-wrap" id="editProgramWrap">
-                  <input type="text" class="ac-input" id="editProgramInput" placeholder="Search program…" autocomplete="off">
-                  <input type="hidden" name="program" id="editProgramHidden">
-                  <div class="ac-dropdown" id="editProgramDrop">
-                    <table class="ac-table">
-                      <tbody id="editProgramBody"></tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
+              <div><label class="form-label-sm" style="margin-top:0;">Program</label><input class="ac-input"
+                  name="program" id="editProgram" required></div>
               <div><label class="form-label-sm" style="margin-top:0;">Year</label>
                 <select class="ac-input" name="year_level" id="editYear" required>
                   <option>1st Year</option>
@@ -961,17 +951,8 @@
                   <option>4th Year</option>
                 </select>
               </div>
-              <div><label class="form-label-sm" style="margin-top:0;">Section</label>
-                <div class="ac-wrap" id="editSectionWrap">
-                  <input type="text" class="ac-input" id="editSectionInput" placeholder="Section…" autocomplete="off">
-                  <input type="hidden" name="section" id="editSectionHidden">
-                  <div class="ac-dropdown" id="editSectionDrop">
-                    <table class="ac-table">
-                      <tbody id="editSectionBody"></tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
+              <div><label class="form-label-sm" style="margin-top:0;">Section</label><input class="ac-input"
+                  name="section" id="editSection" required></div>
             </div>
           </div>
           <div class="mb-3">
@@ -1067,15 +1048,7 @@
           <div class="section-fields">
             <div>
               <label class="form-label-sm" style="margin-top:0;">Program</label>
-              <div class="ac-wrap" id="addProgramWrap">
-                <input type="text" class="ac-input" id="addProgramInput" placeholder="Search program…" autocomplete="off">
-                <input type="hidden" name="program" id="addProgramHidden">
-                <div class="ac-dropdown" id="addProgramDrop">
-                  <table class="ac-table">
-                    <tbody id="addProgramBody"></tbody>
-                  </table>
-                </div>
-              </div>
+              <input class="ac-input" name="program" id="addProgram" placeholder="e.g. BSCS" required>
             </div>
             <div>
               <label class="form-label-sm" style="margin-top:0;">Year Level</label>
@@ -1089,15 +1062,7 @@
             </div>
             <div>
               <label class="form-label-sm" style="margin-top:0;">Section</label>
-              <div class="ac-wrap" id="addSectionWrap">
-                <input type="text" class="ac-input" id="addSectionInput" placeholder="Section…" autocomplete="off">
-                <input type="hidden" name="section" id="addSectionHidden">
-                <div class="ac-dropdown" id="addSectionDrop">
-                  <table class="ac-table">
-                    <tbody id="addSectionBody"></tbody>
-                  </table>
-                </div>
-              </div>
+              <input class="ac-input" name="section" id="addSection" placeholder="e.g. A" required>
             </div>
           </div>
         </div>
@@ -1174,7 +1139,48 @@
   function timeToMins(t) { const p = to24h(t).split(':'); return parseInt(p[0]) * 60 + parseInt(p[1] || 0); }
   function nowMins() { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
   function todayDow() { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; }
-  function isLive(s) { return s.day_of_week === todayDow() && nowMins() >= timeToMins(s.start_time) && nowMins() < timeToMins(s.end_time); }
+  let activeSessions = {};
+
+  async function refreshActiveSessions() {
+    try {
+      const resp = await fetch('/api/active_sessions_info');
+      if (!resp.ok) return;
+      activeSessions = await resp.json();
+    } catch (e) {
+      console.warn('Could not fetch active sessions:', e);
+    }
+  }
+
+  function getSessionForSchedule(s) {
+    const targetSection = (s.section_key || '').trim();
+    for (const sid in activeSessions) {
+      const live = activeSessions[sid] || {};
+      if (!live.is_active) continue;
+      if (live.schedule_id && live.schedule_id === s.schedule_id) {
+        return live;
+      }
+      if (
+        (live.subject_id || '') === (s.subject_id || '') &&
+        (live.section_key || '') === targetSection &&
+        (live.teacher_username || '') === (s.teacher_username || '')
+      ) {
+        return live;
+      }
+    }
+    return null;
+  }
+
+  function isSessionActive(s) {
+    return !!getSessionForSchedule(s);
+  }
+
+  function isLive(s) {
+    const inScheduleWindow =
+      s.day_of_week === todayDow() &&
+      nowMins() >= timeToMins(s.start_time) &&
+      nowMins() < timeToMins(s.end_time);
+    return inScheduleWindow && isSessionActive(s);
+  }
   function isUpcoming(s) { const diff = timeToMins(s.start_time) - nowMins(); return s.day_of_week === todayDow() && diff > 0 && diff <= 10; }
   function minsUntil(s) { return timeToMins(s.start_time) - nowMins(); }
 
@@ -1306,6 +1312,17 @@
     document.getElementById('infoGrace').textContent = (s.grace_minutes || 15) + ' minutes';
     const liveBadge = document.getElementById('infoLiveBadge');
     if (liveBadge) liveBadge.style.display = isLive(s) ? 'block' : 'none';
+    const monitorBtn = document.getElementById('infoMonitorBtn');
+    const liveSession = getSessionForSchedule(s);
+    if (monitorBtn) {
+      if (liveSession && liveSession.sess_id) {
+        monitorBtn.href = '/teacher/session/' + liveSession.sess_id;
+        monitorBtn.style.display = 'inline-flex';
+      } else {
+        monitorBtn.href = '#';
+        monitorBtn.style.display = 'none';
+      }
+    }
 
     // Next class
     let nextTxt = '—';
@@ -1325,11 +1342,9 @@
       document.getElementById('editTeacherInput').value = s.teacher_name;
       document.getElementById('editTeacherHidden').value = s.teacher_username;
       const sk = (s.section_key || '').split('|');
-      document.getElementById('editProgramInput').value = sk[0] || '';
-      document.getElementById('editProgramHidden').value = sk[0] || '';
+      document.getElementById('editProgram').value = sk[0] || '';
       document.getElementById('editYear').value = sk[1] || '1st Year';
-      document.getElementById('editSectionInput').value = sk[2] || '';
-      document.getElementById('editSectionHidden').value = sk[2] || '';
+      document.getElementById('editSection').value = sk[2] || '';
       document.getElementById('editDay').value = s.day_of_week;
       document.getElementById('editStartTime').value = to24h(s.start_time);
       document.getElementById('editEndTime').value = to24h(s.end_time);
@@ -1364,27 +1379,7 @@
     document.getElementById(prefix + 'EndTime').value = et;
   }
 
-  /* ── SIMPLE AUTOCOMPLETE (single column) ── */
-  function makeSimpleAC(inputId, hiddenId, bodyId, dropId, dataFn) {
-    const inp = document.getElementById(inputId), hid = document.getElementById(hiddenId);
-    const tbody = document.getElementById(bodyId), drop = document.getElementById(dropId);
-    if (!inp || !tbody) return;
-    inp.onfocus = inp.oninput = function () { renderSimpleAC(inp.value, tbody, drop, hid, inp, dataFn); };
-    document.addEventListener('click', e => { if (!e.target.closest('.ac-wrap')) drop.classList.remove('open'); });
-  }
-  function renderSimpleAC(q, tbody, drop, hid, inp, dataFn) {
-    const items = dataFn(q.toLowerCase()); tbody.innerHTML = '';
-    if (!items.length) { tbody.innerHTML = '<tr><td class="ac-td ac-empty">No matches.</td></tr>'; drop.classList.add('open'); return; }
-    items.forEach(it => {
-      const tr = document.createElement('tr'); tr.className = 'ac-tr';
-      tr.innerHTML = '<td class="ac-td">' + esc(it.label) + '</td>';
-      tr.onclick = () => { hid.value = it.id; inp.value = it.label; drop.classList.remove('open'); };
-      tbody.appendChild(tr);
-    });
-    drop.classList.add('open');
-  }
-
-  /* ── AUTOCOMPLETE (two columns) ── */
+  /* ── AUTOCOMPLETE ── */
   function makeAC(inputId, hiddenId, bodyId, dropId, dataFn, colA, colB) {
     const inp = document.getElementById(inputId), hid = document.getElementById(hiddenId);
     const tbody = document.getElementById(bodyId), drop = document.getElementById(dropId);
@@ -1405,28 +1400,11 @@
   }
   function subjDataFn(q) { return Object.entries(ALL_SUBJECTS).filter(e => !q || (e[1].name || '').toLowerCase().includes(q) || (e[1].course_code || '').toLowerCase().includes(q)).slice(0, 10).map(e => ({ id: e[0], label: e[1].name, code: e[1].course_code || '—' })); }
   function teacherDataFn(q) { return Object.entries(ALL_TEACHERS).filter(e => !q || (e[1].full_name || '').toLowerCase().includes(q) || e[0].toLowerCase().includes(q)).slice(0, 10).map(e => ({ id: e[0], label: e[1].full_name, role: e[1].role })); }
-  function programDataFn(q) {
-    const programs = new Set([
-      'BS Computer Science', 'BS Information Technology',
-      'BS Computer Engineering', 'BS Information Systems',
-      'BS Electrical Engineering', 'BS Electronics Engineering',
-      'BS Accountancy', 'BS Business Administration',
-      'BS Education', 'BS Nursing', 'BS Civil Engineering', 'BS Mechanical Engineering'
-    ]);
-    return Array.from(programs).filter(p => !q || p.toLowerCase().includes(q)).sort().slice(0, 10).map(p => ({ id: p, label: p }));
-  }
-  function sectionDataFn(q) {
-    const sections = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
-    return Array.from(sections).filter(s => !q || s.toLowerCase().includes(q)).slice(0, 10).map(s => ({ id: s, label: s }));
-  }
 
   function validateSchedForm(prefix) {
     const hid = document.getElementById(prefix + 'SubjHidden');
     const thid = document.getElementById(prefix + 'TeacherHidden');
-    const progHid = document.getElementById(prefix + 'ProgramHidden');
-    const sectHid = document.getElementById(prefix + 'SectionHidden');
     if (!hid || !thid || !hid.value || !thid.value) { alert('Please select subject and teacher from dropdown.'); return false; }
-    if (!progHid || !sectHid || !progHid.value || !sectHid.value) { alert('Please select program and section from dropdown.'); return false; }
     return true;
   }
 
@@ -1467,22 +1445,20 @@
   // and visually marks the block — actual session start/end is handled server-side
   // via the /api/check_recurring_sessions endpoint if implemented.
   function checkRecurringSessions() {
-    buildCalendar(ALL_SCHEDULES);
-    checkPresessions();
+    refreshActiveSessions().finally(() => {
+      buildCalendar(ALL_SCHEDULES);
+      checkPresessions();
+    });
   }
 
   /* ── INIT ── */
   document.addEventListener('DOMContentLoaded', () => {
-    buildCalendar(ALL_SCHEDULES);
+    refreshActiveSessions().finally(() => buildCalendar(ALL_SCHEDULES));
     if (IS_SUPER) {
       makeAC('addSubjInput', 'addSubjHidden', 'addSubjBody', 'addSubjDrop', subjDataFn, 'code', 'label');
       makeAC('addTeacherInput', 'addTeacherHidden', 'addTeacherBody', 'addTeacherDrop', teacherDataFn, 'label', 'role');
-      makeSimpleAC('addProgramInput', 'addProgramHidden', 'addProgramBody', 'addProgramDrop', programDataFn);
-      makeSimpleAC('addSectionInput', 'addSectionHidden', 'addSectionBody', 'addSectionDrop', sectionDataFn);
       makeAC('editSubjInput', 'editSubjHidden', 'editSubjBody', 'editSubjDrop', subjDataFn, 'code', 'label');
       makeAC('editTeacherInput', 'editTeacherHidden', 'editTeacherBody', 'editTeacherDrop', teacherDataFn, 'label', 'role');
-      makeSimpleAC('editProgramInput', 'editProgramHidden', 'editProgramBody', 'editProgramDrop', programDataFn);
-      makeSimpleAC('editSectionInput', 'editSectionHidden', 'editSectionBody', 'editSectionDrop', sectionDataFn);
     }
     checkPresessions();
     setInterval(checkRecurringSessions, 60000);

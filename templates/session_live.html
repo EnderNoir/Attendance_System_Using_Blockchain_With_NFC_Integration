@@ -917,6 +917,7 @@
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <a href="{{ url_for('teacher_dashboard') }}" class="btn-outline-sm"><i class="bi bi-arrow-left"></i> Back</a>
+      <a href="{{ url_for('live_session', sess_id=sess_id) }}" class="btn-outline-sm" target="_blank"><i class="bi bi-broadcast"></i> Monitor Live</a>
       {% if is_active and session.get('role') != 'admin' %}
       <button type="button" class="btn-end" onclick="openEndModal()">
         <i class="bi bi-stop-fill"></i> End Class Session
@@ -1342,6 +1343,12 @@
           showModal('invalid', 'No Session', '', 'No active session for this section.', uid);
           showToast('No Session', `UID: ${uid} — no active session.`, 't-red', '✕');
         }
+      } else if (status === 'excused') {
+        updateNFCStrip(uid, 'warning', 'Excused student tap blocked', '⚠');
+        if (consumePopupGate()) {
+          showModal('warning', 'Excused', '', data.message || 'Student is marked Excused and cannot tap in.', uid);
+          showToast('Excused Student', data.message || 'Tap ignored for excused student.', 't-yellow', '⚠');
+        }
       } else {
         updateNFCStrip(uid, 'error', 'Not registered', '✕');
         if (consumePopupGate()) {
@@ -1492,7 +1499,6 @@
     const submitBtn = document.querySelector('#excuseOverlay .btn-excuse-submit');
     if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Submitting…'; }
 
-    // Optimistic UI update — immediately show excused without waiting for server
     const studentName = document.getElementById('excuseName').textContent;
     const reasonLabels = {
       sickness: 'Sickness / Illness', lbm: 'LBM', emergency: 'Family Emergency',
@@ -1501,10 +1507,6 @@
       others: reason_detail || 'Others'
     };
     const reasonDisplay = reasonLabels[reason_type] || reason_type;
-    updateStudentStatus(nfc_id, 'excused', reasonDisplay);
-    updateCounts();
-    closeExcuse();
-    showToast(studentName || nfc_id, '🔵 Marked Excused — ' + reasonDisplay, 't-blue', '🔵');
 
     // Build FormData — file is optional
     const formData = new FormData();
@@ -1518,19 +1520,25 @@
     }
 
     try {
-      const r = await fetch(`/excuse/submit/${sessId}/${nfc_id}`, {
+      const r = await fetch(`/teacher/session/${sessId}/excuse`, {
         method: 'POST',
         body: formData
       });
       const d = await r.json();
       if (!d.status || d.status !== 'ok') {
-        // Revert if server-side fails
-        console.warn('Excuse server error:', d.error);
-        showToast('Server Warning', d.error || 'Excuse saved locally but server sync failed', 't-yellow', '⚠');
+        console.warn('Excuse server error:', d.error || d.message);
+        showToast('Server Warning', d.error || d.message || 'Failed to mark student as excused.', 't-red', '✕');
+        return;
       }
+
+      // Apply UI update only after server confirms success
+      updateStudentStatus(nfc_id, 'excused', d.reason || reasonDisplay);
+      updateCounts();
+      closeExcuse();
+      showToast(studentName || nfc_id, '🔵 Marked Excused — ' + (d.reason || reasonDisplay), 't-blue', '🔵');
     } catch (e) {
       console.warn('Excuse network error:', e);
-      showToast('Network Warning', 'Excuse recorded locally; server sync pending', 't-yellow', '⚠');
+      showToast('Network Warning', 'Could not save excuse. Please try again.', 't-red', '✕');
     } finally {
       if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = 'Submit'; }
     }

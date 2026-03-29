@@ -546,6 +546,7 @@
       <tbody id="excTbody">
         {% for e in excuses %}
         {% set has_doc = e.attachment_file %}
+        {% set has_excuse_id = (e.id is defined and e.id is not none and e.id != '') %}
         <tr class="exc-row" id="exc_row_{{ e.id }}" data-name="{{ e.student_name|lower }}"
           data-subject="{{ (e.session_subject or '')|lower }}" data-reason="{{ e.reason_type }}"
           data-hasdoc="{{ 'yes' if has_doc else 'no' }}" style="cursor:pointer;" onclick="openExcModal({{ {
@@ -561,7 +562,7 @@
               'reviewed_by': e.reviewed_by or '',
               'reviewed_at': e.reviewed_at or '',
               'has_doc': has_doc,
-              'doc_url': url_for('admin_excuse_attachment', excuse_id=e.id) if has_doc else ''
+              'doc_url': url_for('admin_excuse_attachment', excuse_id=e.id) if (has_doc and has_excuse_id) else ''
             }|tojson|e }})">
           <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">{{ loop.index }}</td>
           <td>
@@ -585,13 +586,15 @@
             {% endif %}
           </td>
           <td onclick="event.stopPropagation();">
-            {% if has_doc %}
+            {% if has_doc and has_excuse_id %}
             {% set ext = (e.attachment_file|lower).rsplit('.', 1)|last %}
             <a href="{{ url_for('admin_excuse_attachment', excuse_id=e.id) }}" target="_blank"
               class="doc-link {% if ext == 'pdf' %}pdf{% endif %}">
               <i class="bi bi-{% if ext == 'pdf' %}file-earmark-pdf{% else %}file-earmark-image{% endif %}"></i>
               View {{ ext|upper }}
             </a>
+            {% elif has_doc %}
+            <span class="no-doc">Document unavailable</span>
             {% else %}
             <span class="no-doc">No document</span>
             {% endif %}
@@ -608,7 +611,7 @@
           </td>
           {% if tab == 'pending' %}
           <td onclick="event.stopPropagation();">
-            {% if e.status == 'pending' %}
+            {% if e.status == 'pending' and has_excuse_id %}
             <div style="display:flex;gap:6px;flex-wrap:nowrap;">
               <form method="POST" action="{{ url_for('admin_excuse_approve', excuse_id=e.id) }}" style="margin:0;">
                 <button type="submit" class="btn-approve"><i class="bi bi-check-lg"></i> Approve</button>
@@ -619,6 +622,8 @@
                 </button>
               </form>
             </div>
+            {% elif e.status == 'pending' %}
+            <span class="no-doc">Unavailable</span>
             {% endif %}
           </td>
           {% endif %}

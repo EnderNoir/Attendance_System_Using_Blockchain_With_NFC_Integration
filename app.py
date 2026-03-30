@@ -3,15 +3,10 @@ from web3 import Web3
 from datetime import datetime
 from functools import wraps
 from threading import Thread, Lock
-import json, os, secrets, time, csv, io, hashlib, uuid, re, sqlite3, calendar as _cal
+import json, os, secrets, time, hashlib, uuid, re, sqlite3
 from collections import deque
 from werkzeug.utils import secure_filename
-import re
-import io
-import uuid
-import json
 import secrets as _sec
-from datetime import datetime
 # pdfminer is imported inside parse_registration_pdf() so a startup
 # import glitch can never permanently disable PDF parsing for the session.
 
@@ -22,502 +17,117 @@ app.secret_key = 'davs-super-secret-2024'
 import json as _json_mod
 app.jinja_env.filters['from_json'] = lambda s: _json_mod.loads(s) if s else []
 
-def _parse_cvsu_pdf_text(raw_bytes: bytes) -> str:
-    """Extract plain text from a CvSU PDF. Tries pypdf, falls back to pdfminer."""
-    full = ''
-    try:
-        import pypdf
-        reader = pypdf.PdfReader(io.BytesIO(raw_bytes))
-        full = '\n'.join(page.extract_text() or '' for page in reader.pages)
-    except Exception as _e:
-        print(f'[PDF] pypdf failed: {_e}')
-    if not full.strip():
-        try:
-            from pdfminer.high_level import extract_text as _pm
-            full = _pm(io.BytesIO(raw_bytes))
-        except Exception as _e:
-            print(f'[PDF] pdfminer failed: {_e}')
-    return full
- 
- 
-def _generate_cvsu_email(name: str) -> str:
-    """sc.firstname.lastname@cvsu.edu.ph from a full name string."""
-    clean = re.sub(r'\b[A-Za-z]\.\s*', '', name).strip()
-    clean = re.sub(r'\b(JR|SR|II|III|IV)\.?\b', '', clean, flags=re.IGNORECASE).strip()
-    clean = re.sub(r'\s+', ' ', clean)
-    words = clean.split()
-    if len(words) >= 2:
-        first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
-        last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
-        if first_slug and last_slug:
-            return f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
-    return ''
- 
- 
-def _surname_sort_key(student: dict) -> tuple:
-    """
-    (surname_lower, firstnames_lower) for alphabetical-by-surname sorting.
-    Handles "First Mid Last" and "Last, First Mid" formats.
-    """
-    name = (student.get('name') or '').strip()
-    if not name:
-        return ('', '')
-    if ',' in name:
-        parts   = name.split(',', 1)
-        surname = parts[0].strip()
-        firsts  = parts[1].strip()
-    else:
-        parts   = name.split()
-        surname = parts[-1] if len(parts) > 1 else parts[0]
-        firsts  = ' '.join(parts[:-1])
-    clean = lambda s: re.sub(r'[^a-z ]', '', s.lower()).strip()
-    return (clean(surname), clean(firsts))
-# ── Course name alias map (abbreviation ↔ full name) ──────────────────
-_COURSE_ALIASES: dict[str, list[str]] = {
-    'BS Information Technology':  ['BSIT', 'B.S. Information Technology', 'BS InfoTech'],
-    'BS Computer Science':        ['BSCS', 'B.S. Computer Science', 'BS CompSci'],
-    'BS Computer Engineering':    ['BSCpE', 'BSCOE', 'B.S. Computer Engineering'],
-    'BS Information Systems':     ['BSIS', 'B.S. Information Systems'],
-    'BS Electrical Engineering':  ['BSEE', 'B.S. Electrical Engineering'],
-    'BS Electronics Engineering': ['BSEcE', 'BSECE', 'B.S. Electronics Engineering'],
-    'BS Accountancy':             ['BSA', 'B.S. Accountancy'],
-    'BS Business Administration': ['BSBA', 'B.S. Business Administration'],
-    'BS Education':               ['BSEd', 'B.S. Education'],
-    'BS Nursing':                 ['BSN', 'B.S. Nursing'],
-    'BS Civil Engineering':       ['BSCE', 'B.S. Civil Engineering'],
-    'BS Mechanical Engineering':  ['BSME', 'B.S. Mechanical Engineering'],
-}
+from services.cvsu_parsing import (
+    _extract_cvsu_fields,
+    _generate_cvsu_email,
+    _parse_cvsu_pdf_text,
+    _surname_sort_key,
+    normalize_course_name,
+)
+from services.attendance_email_templates import (
+    send_student_attendance_receipt as _send_student_attendance_receipt_template,
+    send_teacher_session_summary as _send_teacher_session_summary_template,
+)
+from services.attendance_view_routes_service import (
+    attendance_report_impl as _attendance_report_impl,
+    view_attendance_impl as _view_attendance_impl,
+)
+from services.admin_user_update_service import (
+    update_faculty_impl as _update_faculty_impl,
+    update_student_impl as _update_student_impl,
+)
+from services.admin_schedule_routes_service import (
+    admin_schedule_create_impl as _admin_schedule_create_impl,
+    admin_schedule_delete_impl as _admin_schedule_delete_impl,
+    admin_schedule_edit_impl as _admin_schedule_edit_impl,
+    admin_schedules_page_impl as _admin_schedules_page_impl,
+    api_active_sessions_info_impl as _api_active_sessions_info_impl,
+    api_schedules_search_impl as _api_schedules_search_impl,
+    api_schedules_today_impl as _api_schedules_today_impl,
+)
+from services.attendance_stats_service import attendance_stats_impl as _attendance_stats_impl
+from services.email_service import (
+    get_email_config as _get_email_config_service,
+    save_email_config as _save_email_config_service,
+    send_email_async as _send_email_async_service,
+)
+from services.excuse_email_templates import (
+    send_excuse_received_email as _send_excuse_received_email_template,
+    send_excuse_resolved_email as _send_excuse_resolved_email_template,
+)
+from services.excel_helpers import xl_helpers as _xl_helpers
+from services.export_attendance_routes import (
+    export_session_attendance_impl as _export_session_attendance_impl,
+    export_student_sessions_impl as _export_student_sessions_impl,
+)
+from services.export_basic_csv_routes import (
+    export_csv_all_impl as _export_csv_all_impl,
+    export_csv_single_impl as _export_csv_single_impl,
+    teacher_export_section_csv_impl as _teacher_export_section_csv_impl,
+)
+from services.export_stats_csv_service import export_stats_csv_impl as _export_stats_csv_impl
+from services.export_stats_data import build_stats_export_dataset as _build_stats_export_dataset
+from services.export_stats_xlsx_service import export_stats_xlsx_impl as _export_stats_xlsx_impl
+from services.dashboard_page_service import dashboard_page_impl as _dashboard_page_impl
+from services.profile_api_service import api_my_profile_impl as _api_my_profile_impl
+from services.profile_routes_service import (
+    delete_photo_impl as _delete_photo_impl,
+    get_my_photo_impl as _get_my_photo_impl,
+    update_profile_impl as _update_profile_impl,
+    upload_photo_impl as _upload_photo_impl,
+)
+from services.student_sessions_api_service import student_sessions_api_impl as _student_sessions_api_impl
+from services.teacher_schedule_api_service import api_schedules_upcoming_impl as _api_schedules_upcoming_impl
+from services.teacher_schedule_page_service import teacher_schedule_page_impl as _teacher_schedule_page_impl
+from services.teacher_portal_routes_service import (
+    admin_sessions_page_impl as _admin_sessions_page_impl,
+    teacher_create_session_page_impl as _teacher_create_session_page_impl,
+    teacher_dashboard_page_impl as _teacher_dashboard_page_impl,
+    teacher_records_page_impl as _teacher_records_page_impl,
+    teacher_sessions_students_page_impl as _teacher_sessions_students_page_impl,
+)
 
 AUTO_THREAD = None
 AUTO_THREAD_LOCK = Lock()
-_ALIAS_TO_CANONICAL: dict[str, str] = {}
-for _canon, _aliases in _COURSE_ALIASES.items():
-    _ALIAS_TO_CANONICAL[_canon.lower()] = _canon
-    for _a in _aliases:
-        _ALIAS_TO_CANONICAL[_a.lower()] = _canon
-
-def normalize_course_name(course: str) -> str:
-    """Return canonical course name if recognized, else return unchanged."""
-    return _ALIAS_TO_CANONICAL.get((course or '').strip().lower(), (course or '').strip())
-
-def _extract_cvsu_fields(full: str) -> dict:
-    """
-    Parse all CvSU registration fields from extracted PDF text.
- 
-    CvSU pypdf layout:  LABEL LINE\\nVALUE LINE
-    The value is always on the line immediately after its label.
- 
-    Returns dict with keys:
-        student_id, name, email, contact, adviser,
-        semester, school_year, course, year_level, section,
-        major, date_registered, subjects
-    """
-    ABBR_COURSE = {
-        'BSCS': 'BS Computer Science', 'BSIT': 'BS Information Technology',
-        'BSIS': 'BS Information Systems', 'BSCOE': 'BS Computer Engineering',
-        'BSECE': 'BS Electronics Engineering', 'BSEE': 'BS Electrical Engineering',
-        'BSCE': 'BS Civil Engineering', 'BSME': 'BS Mechanical Engineering',
-        'BSED': 'BS Education', 'BSN': 'BS Nursing',
-        'BSA': 'BS Accountancy', 'BSBA': 'BS Business Administration',
-    }
-    PREFIX_COURSE = {
-        'CS': 'BS Computer Science', 'IT': 'BS Information Technology',
-        'IS': 'BS Information Systems', 'COE': 'BS Computer Engineering',
-        'ECE': 'BS Electronics Engineering', 'EE': 'BS Electrical Engineering',
-        'CE': 'BS Civil Engineering', 'ME': 'BS Mechanical Engineering',
-        'ED': 'BS Education', 'N': 'BS Nursing',
-        'A': 'BS Accountancy', 'BA': 'BS Business Administration',
-    }
-    YEAR_MAP = {
-        '1': '1st Year', '2': '2nd Year', '3': '3rd Year',
-        '4': '4th Year', '5': '5th Year',
-        '1st': '1st Year', '2nd': '2nd Year', '3rd': '3rd Year',
-        '4th': '4th Year', '5th': '5th Year',
-    }
-    SEM_MAP = {
-        'FIRST': 'First', 'SECOND': 'Second', 'SUMMER': 'Summer',
-        '1ST': 'First', '2ND': 'Second',
-    }
- 
-    result = {
-        'student_id': '', 'name': '', 'email': '', 'contact': '',
-        'adviser': '', 'semester': '', 'school_year': '',
-        'course': '', 'year_level': '', 'section': '',
-        'major': '', 'date_registered': '', 'subjects': [],
-    }
- 
-    def next_line(label_re):
-        """Value on the line immediately after a label pattern."""
-        m = re.search(label_re + r'[^\n]*\n([^\n]+)', full, re.IGNORECASE)
-        if not m:
-            return ''
-        v = (m.group(1) or '').replace('\t', ' ').strip()
-        return v
- 
-    # Student ID
-    result['student_id'] = next_line(r'Student\s*(?:No\.?|Number|ID)')
-    if not result['student_id']:
-        m = re.search(r'\b(\d{4}-\d{4,6})\b', full)
-        if m:
-            result['student_id'] = m.group(1)
-    if not result['student_id']:
-        m = re.search(r'\b(\d{7,10})\b', full)
-        if m:
-            result['student_id'] = m.group(1)
- 
-    # Semester
-    raw_sem  = next_line(r'Semester').upper()
-    first_w  = raw_sem.split()[0] if raw_sem else ''
-    result['semester'] = SEM_MAP.get(first_w, raw_sem.title()) if raw_sem else ''
- 
-    # School Year
-    result['school_year'] = next_line(r'School\s*Year')
- 
-    # Student Name → also derive email
-    _norm_full = full.replace('\t', ' ')
-    _name_m = re.search(
-        r'Student\s+Name\s*:\s*((?:[A-Z][A-Z\s.,\'\-]+?)'
-        r'(?=\s*(?:Date|Course|Year|Encoder|Major|Section|Address)\s*:|$))',
-        _norm_full, re.IGNORECASE | re.DOTALL
-    )
-    raw_name = ''
-    if _name_m:
-        raw_name = re.sub(r'\s+', ' ', _name_m.group(1)).strip()
-        # Guard: reject if it looks like a label value rather than a name
-        if re.match(r'(Date|Course|Year|Encoder)\s*:', raw_name, re.IGNORECASE):
-            raw_name = ''
-    if not raw_name:
-        # Last-resort: grab the next non-empty line after the label
-        _fb = re.search(r'Student\s*Name[^\n]*\n([^\n:]+)', _norm_full, re.IGNORECASE)
-        if _fb:
-            raw_name = _fb.group(1).replace('\t', ' ').strip()
-    if raw_name:
-        result['name']  = raw_name.title()
-        result['email'] = _generate_cvsu_email(raw_name)
- 
-    # Adviser
-    result['adviser'] = next_line(r'Adviser|Advisor')
- 
-    # Contact
-    result['contact'] = next_line(r'Contact\s*(?:No\.?|Number)')
- 
-    # Date Registered (skip VALIDATION DATE lines)
-    raw_date = ''
-    for _m in re.finditer(r'Date[^\n]*\n([^\n]+)', full, re.IGNORECASE):
-        ctx = full[max(0, _m.start() - 30):_m.start()].upper()
-        if any(kw in ctx for kw in ('VALIDAT', 'PAYMENT', 'CONFIR')):
-            continue
-        raw_date = _m.group(1).replace('\t', ' ').strip()
-        break
-    if raw_date:
-        dm = re.search(r'(\d{1,2})[-\s/]+([A-Za-z]+)[-\s/]+(\d{4})', raw_date)
-        if dm:
-            try:
-                d = datetime.strptime(f"{dm.group(2)} {dm.group(3)}", "%b %Y")
-                result['date_registered'] = d.strftime('%Y-%m')
-            except Exception:
-                pass
-        if not result['date_registered']:
-            dm2 = re.search(r'([A-Za-z]+)\s+(\d{4})', raw_date)
-            if dm2:
-                try:
-                    d = datetime.strptime(f"{dm2.group(1)} {dm2.group(2)}", "%b %Y")
-                    result['date_registered'] = d.strftime('%Y-%m')
-                except Exception:
-                    pass
- 
-    # Course
-    raw_course = next_line(r'Course').strip().upper()
-    result['course'] = ABBR_COURSE.get(raw_course, '')
-    if not result['course']:
-        for abbr, cname in ABBR_COURSE.items():
-            if re.search(r'\b' + abbr + r'\b', full, re.IGNORECASE):
-                result['course'] = cname
-                break
- 
-    # Section code (e.g. IT4A → year=4th, sec=A, possibly course)
-    raw_section = next_line(r'Section').strip()
-    sec_m = re.match(r'^([A-Za-z]+)(\d)([A-Za-z])$', raw_section)
-    if sec_m:
-        prefix               = sec_m.group(1).upper()
-        yr_digit             = sec_m.group(2)
-        result['section']    = sec_m.group(3).upper()
-        result['year_level'] = YEAR_MAP.get(yr_digit, yr_digit + 'th Year')
-        if not result['course']:
-            result['course'] = PREFIX_COURSE.get(prefix, '')
-    else:
-        result['section'] = raw_section[:1].upper() if raw_section else ''
-        raw_year  = next_line(r'Year\s*(?:Level)?').strip()
-        yr_w      = raw_year.split()[0].lower() if raw_year else ''
-        result['year_level'] = (YEAR_MAP.get(yr_w) or
-                                YEAR_MAP.get(yr_w.rstrip('thsrnd')) or '')
- 
-    # Major
-    raw_major = next_line(r'Major')
-    result['major'] = ('' if raw_major.upper().strip() in ('N/A', 'NA', 'NONE', '', '\u2014')
-                       else raw_major.title())
- 
-    # Subjects — 8-line blocks after Schedule Code header, before Fees section
-    subjects = []
-    hdr_m  = re.search(
-        r'Schedule\s*Code.*?(?:Course\s*)?Description.*?Hour[s]?\s*\n',
-        full, re.DOTALL | re.IGNORECASE
-    )
-    fees_m = re.search(r'Laboratory\s*Fees|Total\s*Units', full, re.IGNORECASE)
-    if hdr_m and fees_m and fees_m.start() > hdr_m.end():
-        block = full[hdr_m.end():fees_m.start()]
-        lines = [l.replace('\t', ' ').strip() for l in block.split('\n') if l.strip()]
-        i = 0
-        while i < len(lines):
-            if re.match(r'^\d{7,12}$', lines[i]) and i + 7 < len(lines):
-                code_clean  = re.sub(r'\s+', ' ', lines[i + 2]).strip()
-                desc_clean  = lines[i + 3].title()
-                try:
-                    units_int = str(round(float(lines[i + 4])))
-                except Exception:
-                    units_int = '3'
-                if units_int == '0':
-                    units_int = '3'
-                if code_clean and desc_clean:
-                    subjects.append({
-                        'course_code': code_clean,
-                        'name':        desc_clean,
-                        'units':       units_int,
-                    })
-                i += 8
-            else:
-                i += 1
-    result['subjects'] = subjects
-    return result
 
 # ── Email config helpers ──────────────────────────────────────────────────
 def get_email_config():
     """Load SMTP config from DB. Returns dict with all keys."""
-    defaults = {
-        'smtp_host':     'smtp.gmail.com',
-        'smtp_port':     '587',
-        'smtp_user':     '',
-        'smtp_password': '',
-        'smtp_from':     '',
-        'enabled':       '0',
-    }
-    try:
-        with get_db() as conn:
-            rows = conn.execute('SELECT key, value FROM email_config').fetchall()
-            cfg  = dict(defaults)
-            for row in rows:
-                cfg[row['key']] = row['value']
-            return cfg
-    except Exception:
-        return defaults
+    return _get_email_config_service(get_db)
  
 def save_email_config(cfg: dict):
     """Upsert email config into DB."""
-    with get_db() as conn:
-        for key, value in cfg.items():
-            conn.execute(
-                'INSERT INTO email_config (key, value) VALUES (?, ?) '
-                'ON CONFLICT(key) DO UPDATE SET value=excluded.value',
-                (key, str(value))
-            )
+    _save_email_config_service(cfg, get_db)
  
 def _send_email(to_addrs: list, subject: str, html_body: str):
     """
     Send an HTML email via Gmail SMTP in a background thread.
     Silently logs errors — never crashes the main request.
     """
-    import threading as _th
-    def _worker():
-        try:
-            import smtplib, ssl
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text      import MIMEText
-            cfg = get_email_config()
-            if cfg.get('enabled') != '1':
-                return
-            if not cfg.get('smtp_user') or not cfg.get('smtp_password'):
-                print('[EMAIL] SMTP credentials not configured — skipping.')
-                return
-            recipients = [a for a in to_addrs if a and '@' in a]
-            if not recipients:
-                return
-            msg                    = MIMEMultipart('alternative')
-            msg['Subject']         = subject
-            msg['From']            = cfg.get('smtp_from') or cfg['smtp_user']
-            msg['To']              = ', '.join(recipients)
-            msg.attach(MIMEText(html_body, 'html'))
-            ctx  = ssl.create_default_context()
-            port = int(cfg.get('smtp_port', 587))
-            with smtplib.SMTP(cfg['smtp_host'], port, timeout=10) as srv:
-                srv.ehlo()
-                srv.starttls(context=ctx)
-                srv.login(cfg['smtp_user'], cfg['smtp_password'])
-                srv.sendmail(msg['From'], recipients, msg.as_string())
-            print(f'[EMAIL] Sent "{subject}" → {recipients}')
-        except Exception as _e:
-            print(f'[EMAIL] Failed to send "{subject}": {_e}')
-    _th.Thread(target=_worker, daemon=True).start()
+    _send_email_async_service(to_addrs, subject, html_body, get_email_config)
  
 def send_student_attendance_receipt(
         student_name, student_email, student_id,
         subject_name, section_key, teacher_name,
         tap_time, status, tx_hash, block_num,
         sess_id=None, nfc_id=None):
-    """Send attendance receipt email to student."""
-    if not student_email or '@' not in student_email:
-        return
-    status_colors = {
-        'present': ('#2D6A27', '#E8F5E9', '✓ Present'),
-        'late':    ('#D4A017', '#FFF8E1', '⏱ Late'),
-        'absent':  ('#C0392B', '#FFEBEE', '✕ Absent'),
-        'excused': ('#2980B9', '#E3F2FD', '◎ Excused'),
-    }
-    clr, bg, label = status_colors.get(status, ('#333333', '#F5F5F5', status.capitalize()))
-    section_display = section_key.replace('|', ' · ') if section_key else '—'
-    tx_row = ''
-    excuse_section = ''
-    
-    if status == 'absent' and sess_id and nfc_id:
-        try:
-            excuse_link = url_for('excuse_submit', sess_id=sess_id, nfc_id=nfc_id, _external=True)
-            excuse_section = f'''
-            <tr>
-              <td colspan="2" style="padding:16px 32px;text-align:center;border-top:1px solid #eee;">
-                <div style="font-size:13px;color:#666;margin-bottom:10px;">If this absence is valid, please submit an excuse request below:</div>
-                <a href="{excuse_link}" style="display:inline-block;background:#3b82f6;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:bold;font-size:14px;">Submit Excuse Form</a>
-              </td>
-            </tr>
-            '''
-        except Exception as e:
-            excuse_section = ''
-
-    if tx_hash:
-        tx_row = f'''
-        <tr>
-          <td style="padding:8px 12px;font-size:12px;color:#666;border-bottom:1px solid #eee;">
-            Blockchain TX
-          </td>
-          <td style="padding:8px 12px;font-size:11px;font-family:monospace;
-                     color:#2D6A27;border-bottom:1px solid #eee;word-break:break-all;">
-            {tx_hash}
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 12px;font-size:12px;color:#666;">Block #</td>
-          <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#333;">
-            {block_num}
-          </td>
-        </tr>'''
-    html = f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Calibri,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0">
-  <tr><td align="center" style="padding:32px 16px;">
-    <table width="560" cellpadding="0" cellspacing="0"
-           style="background:#fff;border-radius:12px;overflow:hidden;
-                  box-shadow:0 2px 12px rgba(0,0,0,.1);">
-      <!-- Header -->
-      <tr>
-        <td style="background:#1E4A1A;padding:24px 32px;">
-          <div style="font-size:20px;font-weight:700;color:#F5C518;
-                      letter-spacing:1px;">DAVS</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
-            Decentralized Attendance Verification System
-          </div>
-          <div style="font-size:11px;color:#94a3b8;">
-            Cavite State University — Silang Campus
-          </div>
-        </td>
-      </tr>
-      <!-- Status banner -->
-      <tr>
-        <td style="background:{bg};padding:20px 32px;
-                   border-left:4px solid {clr};">
-          <div style="font-size:28px;font-weight:700;color:{clr};">
-            {label}
-          </div>
-          <div style="font-size:13px;color:#555;margin-top:4px;">
-            Your attendance has been recorded for today's class.
-          </div>
-        </td>
-      </tr>
-      <!-- Details table -->
-      <tr>
-        <td style="padding:24px 32px 8px;">
-          <div style="font-size:13px;font-weight:700;color:#1E4A1A;
-                      text-transform:uppercase;letter-spacing:1px;
-                      margin-bottom:12px;">Attendance Details</div>
-          <table width="100%" cellpadding="0" cellspacing="0"
-                 style="border:1px solid #eee;border-radius:8px;overflow:hidden;">
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;width:140px;">Student</td>
-              <td style="padding:8px 12px;font-size:12px;font-weight:600;
-                         color:#333;border-bottom:1px solid #eee;">
-                {student_name}
-                {f'<span style="color:#999;font-size:11px;"> · ID: {student_id}</span>'
-                 if student_id else ''}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Subject</td>
-              <td style="padding:8px 12px;font-size:12px;font-weight:600;
-                         color:#333;border-bottom:1px solid #eee;">
-                {subject_name}
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Section</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{section_display}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Instructor</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{teacher_name}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Date & Time</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{tap_time}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Status</td>
-              <td style="padding:8px 12px;">
-                <span style="background:{bg};color:{clr};font-weight:700;
-                             font-size:12px;padding:3px 10px;border-radius:20px;
-                             border:1px solid {clr};">{label}</span>
-              </td>
-            </tr>
-            {tx_row}
-          </table>
-        </td>
-      </tr>
-      {excuse_section}
-      <!-- Footer -->
-      <tr>
-        <td style="padding:20px 32px 28px;">
-          <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
-            This is an automated attendance receipt from the DAVS system.<br>
-            {"The TX hash above is your tamper-proof blockchain proof of attendance.<br>" if tx_hash else ""}
-            Please do not reply to this email.
-          </div>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>'''
-    _send_email(
-        [student_email],
-        f'[DAVS] Attendance Receipt — {subject_name} ({label})',
-        html
-    )
+        """Send attendance receipt email to student."""
+        _send_student_attendance_receipt_template(
+                student_name=student_name,
+                student_email=student_email,
+                student_id=student_id,
+                subject_name=subject_name,
+                section_key=section_key,
+                teacher_name=teacher_name,
+                tap_time=tap_time,
+                status=status,
+                tx_hash=tx_hash,
+                block_num=block_num,
+                sess_id=sess_id,
+                nfc_id=nfc_id,
+                send_email_fn=_send_email,
+                url_for_fn=url_for,
+        )
  
 def send_teacher_session_summary(
         teacher_email, teacher_name,
@@ -525,181 +135,22 @@ def send_teacher_session_summary(
         started_at, ended_at,
         present_count, late_count, absent_count, excused_count,
         student_rows):
-    """
-    Send session summary email to teacher when session ends.
-    student_rows: list of dicts with keys:
-        name, student_id, status, tap_time, tx_hash, block_num
-    """
-    if not teacher_email or '@' not in teacher_email:
-        return
-    total        = present_count + late_count + absent_count + excused_count
-    rate         = round((present_count + late_count) / total * 100, 1) if total else 0
-    section_disp = section_key.replace('|', ' · ') if section_key else '—'
-    status_colors = {
-        'present': ('#2D6A27', '#E8F5E9', '✓ Present'),
-        'late':    ('#D4A017', '#FFF8E1', '⏱ Late'),
-        'absent':  ('#C0392B', '#FFEBEE', '✕ Absent'),
-        'excused': ('#2980B9', '#E3F2FD', '◎ Excused'),
-    }
-    rows_html = ''
-    for i, st in enumerate(student_rows):
-        clr, bg, lbl = status_colors.get(st.get('status','absent'),
-                                          ('#333','#f5f5f5', st.get('status','—').capitalize()))
-        tx = st.get('tx_hash','')
-        tx_cell = (f'<span style="font-family:monospace;font-size:10px;color:#2D6A27;">'
-                   f'{tx[:20]}…</span>') if tx else '—'
-        bg_row = '#F9FBF9' if i % 2 == 0 else '#FFFFFF'
-        rows_html += f'''<tr style="background:{bg_row};">
-          <td style="padding:7px 10px;font-size:12px;border-bottom:1px solid #eee;">
-            {st.get("name","—")}
-            <div style="font-size:10px;color:#999;">{st.get("student_id","")}</div>
-          </td>
-          <td style="padding:7px 10px;font-size:11px;color:#666;
-                     border-bottom:1px solid #eee;white-space:nowrap;">
-            {st.get("tap_time","—")}
-          </td>
-          <td style="padding:7px 10px;border-bottom:1px solid #eee;">
-            <span style="background:{bg};color:{clr};font-weight:700;
-                         font-size:11px;padding:2px 8px;border-radius:20px;
-                         border:1px solid {clr};">{lbl}</span>
-          </td>
-          <td style="padding:7px 10px;font-size:11px;border-bottom:1px solid #eee;">
-            {tx_cell}
-          </td>
-        </tr>'''
-    html = f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Calibri,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0">
-  <tr><td align="center" style="padding:32px 16px;">
-    <table width="640" cellpadding="0" cellspacing="0"
-           style="background:#fff;border-radius:12px;overflow:hidden;
-                  box-shadow:0 2px 12px rgba(0,0,0,.1);">
-      <!-- Header -->
-      <tr>
-        <td style="background:#1E4A1A;padding:24px 32px;">
-          <div style="font-size:20px;font-weight:700;color:#F5C518;">DAVS</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
-            Session Summary Report — {subject_name}
-          </div>
-        </td>
-      </tr>
-      <!-- Summary stats -->
-      <tr>
-        <td style="padding:20px 32px 8px;">
-          <div style="font-size:13px;font-weight:700;color:#1E4A1A;
-                      text-transform:uppercase;letter-spacing:1px;
-                      margin-bottom:12px;">Session Overview</div>
-          <table width="100%" cellpadding="0" cellspacing="0"
-                 style="border:1px solid #eee;border-radius:8px;
-                        overflow:hidden;margin-bottom:16px;">
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;width:140px;">Subject</td>
-              <td style="padding:8px 12px;font-size:12px;font-weight:600;
-                         color:#333;border-bottom:1px solid #eee;">{subject_name}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Section</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{section_disp}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Time Slot</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{time_slot or "—"}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Started</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{started_at}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;">Ended</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;">{ended_at}</td>
-            </tr>
-          </table>
-          <!-- Stat boxes -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
-            <tr>
-              <td width="25%" style="padding:4px;">
-                <div style="background:#E8F5E9;border:1px solid #2D6A27;border-radius:8px;
-                            padding:12px;text-align:center;">
-                  <div style="font-size:28px;font-weight:700;color:#2D6A27;">{present_count}</div>
-                  <div style="font-size:11px;color:#2D6A27;font-weight:600;">Present</div>
-                </div>
-              </td>
-              <td width="25%" style="padding:4px;">
-                <div style="background:#FFF8E1;border:1px solid #D4A017;border-radius:8px;
-                            padding:12px;text-align:center;">
-                  <div style="font-size:28px;font-weight:700;color:#D4A017;">{late_count}</div>
-                  <div style="font-size:11px;color:#D4A017;font-weight:600;">Late</div>
-                </div>
-              </td>
-              <td width="25%" style="padding:4px;">
-                <div style="background:#FFEBEE;border:1px solid #C0392B;border-radius:8px;
-                            padding:12px;text-align:center;">
-                  <div style="font-size:28px;font-weight:700;color:#C0392B;">{absent_count}</div>
-                  <div style="font-size:11px;color:#C0392B;font-weight:600;">Absent</div>
-                </div>
-              </td>
-              <td width="25%" style="padding:4px;">
-                <div style="background:#E3F2FD;border:1px solid #2980B9;border-radius:8px;
-                            padding:12px;text-align:center;">
-                  <div style="font-size:28px;font-weight:700;color:#2980B9;">{excused_count}</div>
-                  <div style="font-size:11px;color:#2980B9;font-weight:600;">Excused</div>
-                </div>
-              </td>
-            </tr>
-          </table>
-          <div style="font-size:12px;color:#555;margin-bottom:20px;">
-            Attendance rate: <strong style="color:#1E4A1A;">{rate}%</strong>
-            &nbsp;·&nbsp; {total} students enrolled
-          </div>
-          <!-- Student list -->
-          <div style="font-size:13px;font-weight:700;color:#1E4A1A;
-                      text-transform:uppercase;letter-spacing:1px;
-                      margin-bottom:10px;">Student Attendance List</div>
-          <table width="100%" cellpadding="0" cellspacing="0"
-                 style="border:1px solid #eee;border-radius:8px;overflow:hidden;">
-            <thead>
-              <tr style="background:#1E4A1A;">
-                <th style="padding:9px 10px;font-size:11px;color:#fff;
-                           text-align:left;font-weight:600;">Student</th>
-                <th style="padding:9px 10px;font-size:11px;color:#fff;
-                           text-align:left;font-weight:600;">Tap Time</th>
-                <th style="padding:9px 10px;font-size:11px;color:#fff;
-                           text-align:left;font-weight:600;">Status</th>
-                <th style="padding:9px 10px;font-size:11px;color:#fff;
-                           text-align:left;font-weight:600;">TX Hash</th>
-              </tr>
-            </thead>
-            <tbody>{rows_html}</tbody>
-          </table>
-        </td>
-      </tr>
-      <!-- Footer -->
-      <tr>
-        <td style="padding:16px 32px 28px;">
-          <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
-            This is an automated session summary from the DAVS system.<br>
-            All TX hashes are immutable blockchain records verifiable on the Hardhat network.<br>
-            Please do not reply to this email.
-          </div>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>'''
-    _send_email(
-        [teacher_email],
-        f'[DAVS] Session Summary — {subject_name} · {section_disp}',
-        html
-    )
+        """Send session summary email to teacher when session ends."""
+        _send_teacher_session_summary_template(
+                teacher_email=teacher_email,
+                teacher_name=teacher_name,
+                subject_name=subject_name,
+                section_key=section_key,
+                time_slot=time_slot,
+                started_at=started_at,
+                ended_at=ended_at,
+                present_count=present_count,
+                late_count=late_count,
+                absent_count=absent_count,
+                excused_count=excused_count,
+                student_rows=student_rows,
+                send_email_fn=_send_email,
+        )
 
 @app.context_processor
 def inject_globals():
@@ -757,6 +208,17 @@ EXCUSE_REASONS = [
 def hash_password(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
 
+
+def _canonical_role(role_value):
+    role_norm = (role_value or '').strip().lower().replace(' ', '_')
+    if role_norm in ('superadmin', 'super_admin'):
+        return 'super_admin'
+    if role_norm in ('admin', 'administrator'):
+        return 'admin'
+    if role_norm in ('teacher', 'instructor', 'faculty'):
+        return 'teacher'
+    return role_norm or 'teacher'
+
 def normalize_section_key(key):
     if not key:
         return key
@@ -777,12 +239,13 @@ def normalize_section_key(key):
     return key
 
 def build_student_section_key(student):
-    course     = (student.get('course') or '').strip()
+    course = (student.get('course') or '').strip()
     year_level = (student.get('year_level') or '').strip()
-    section    = (student.get('section') or '').strip().upper()
+    section = (student.get('section') or '').strip().upper()
     if not course or not year_level or not section:
         return None
     return normalize_section_key(f"{course}|{year_level}|{section}")
+
 
 def generate_cvsu_email(name, provided_email=''):
     """
@@ -794,24 +257,25 @@ def generate_cvsu_email(name, provided_email=''):
     if provided_email:
         return provided_email
 
-    # Generate CVSU pattern email: sc.firstname.lastname@cvsu.edu.ph
     clean = re.sub(r'\b[A-Za-z]\.\s*', '', name).strip()
     clean = re.sub(r'\b(JR|SR|II|III|IV)\.?\b', '', clean, flags=re.IGNORECASE).strip()
     clean = re.sub(r'\s+', ' ', clean)
     words = clean.split()
     if len(words) >= 2:
         first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
-        last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
+        last_slug = re.sub(r'[^a-z]', '', words[-1].lower())
         if first_slug and last_slug:
             return f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
     return ''
 
+
 def get_db():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA foreign_keys=ON')
     return conn
+
 
 def init_db():
     sql = """
@@ -985,53 +449,52 @@ def init_db():
     _migrate_add_missing_columns()
     _migrate_users_to_accounts()
     _migrate_nfc_registration()
-    print("[DB] Schema ready ->", DB_FILE)
+    print('[DB] Schema ready ->', DB_FILE)
+
 
 def _migrate_add_missing_columns():
     migrations = [
-        ("students", "program",         "TEXT NOT NULL DEFAULT ''"),
-        ("students", "full_name",       "TEXT NOT NULL DEFAULT ''"),
-        ("students", "reg_tx_hash",     "TEXT NOT NULL DEFAULT ''"),
-        ("students", "reg_block",       "INTEGER NOT NULL DEFAULT 0"),
-        ("students", "photo_file",      "TEXT NOT NULL DEFAULT ''"),
-        ("students", "updated_at",      "TEXT NOT NULL DEFAULT ''"),
-        ("sessions", "teacher_username","TEXT NOT NULL DEFAULT ''"),
-        ("sessions", "total_enrolled",  "INTEGER NOT NULL DEFAULT 0"),
-        ("sessions", "total_present",   "INTEGER NOT NULL DEFAULT 0"),
-        ("sessions", "total_late",      "INTEGER NOT NULL DEFAULT 0"),
-        ("sessions", "total_absent",    "INTEGER NOT NULL DEFAULT 0"),
-        ("sessions", "total_excused",   "INTEGER NOT NULL DEFAULT 0"),
-        ("sessions", "warn_log_json",   "TEXT NOT NULL DEFAULT '[]'"),
-        ("sessions", "invalid_log_json","TEXT NOT NULL DEFAULT '[]'"),
-        ("sessions", "grace_period",    "INTEGER NOT NULL DEFAULT 15"),
-        ("sessions", "auto_end_at",     "TEXT"),
-        ("sessions", "schedule_id",     "TEXT DEFAULT NULL"),
-        ("accounts", "updated_at",      "TEXT NOT NULL DEFAULT ''"),
-        ("photos",   "uploaded_at",     "TEXT NOT NULL DEFAULT ''"),
-        ("attendance_logs", "excuse_request_id", "INTEGER DEFAULT NULL"),
-        ("schedules", "section_key",      "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "subject_id",       "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "subject_name",     "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "course_code",      "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "teacher_username", "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "teacher_name",     "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "day_of_week",      "INTEGER NOT NULL DEFAULT 1"),
-        ("schedules", "start_time",       "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "end_time",         "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "grace_minutes",    "INTEGER NOT NULL DEFAULT 15"),
-        ("schedules", "is_active",        "INTEGER NOT NULL DEFAULT 1"),
-        ("schedules", "created_by",       "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "created_at",       "TEXT NOT NULL DEFAULT ''"),
-        ("schedules", "updated_at",       "TEXT NOT NULL DEFAULT ''"),
+        ('students', 'program', "TEXT NOT NULL DEFAULT ''"),
+        ('students', 'full_name', "TEXT NOT NULL DEFAULT ''"),
+        ('students', 'reg_tx_hash', "TEXT NOT NULL DEFAULT ''"),
+        ('students', 'reg_block', 'INTEGER NOT NULL DEFAULT 0'),
+        ('students', 'photo_file', "TEXT NOT NULL DEFAULT ''"),
+        ('students', 'updated_at', "TEXT NOT NULL DEFAULT ''"),
+        ('sessions', 'teacher_username', "TEXT NOT NULL DEFAULT ''"),
+        ('sessions', 'total_enrolled', 'INTEGER NOT NULL DEFAULT 0'),
+        ('sessions', 'total_present', 'INTEGER NOT NULL DEFAULT 0'),
+        ('sessions', 'total_late', 'INTEGER NOT NULL DEFAULT 0'),
+        ('sessions', 'total_absent', 'INTEGER NOT NULL DEFAULT 0'),
+        ('sessions', 'total_excused', 'INTEGER NOT NULL DEFAULT 0'),
+        ('sessions', 'warn_log_json', "TEXT NOT NULL DEFAULT '[]'"),
+        ('sessions', 'invalid_log_json', "TEXT NOT NULL DEFAULT '[]'"),
+        ('sessions', 'grace_period', 'INTEGER NOT NULL DEFAULT 15'),
+        ('sessions', 'auto_end_at', 'TEXT'),
+        ('sessions', 'schedule_id', 'TEXT DEFAULT NULL'),
+        ('accounts', 'updated_at', "TEXT NOT NULL DEFAULT ''"),
+        ('photos', 'uploaded_at', "TEXT NOT NULL DEFAULT ''"),
+        ('attendance_logs', 'excuse_request_id', 'INTEGER DEFAULT NULL'),
+        ('schedules', 'section_key', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'subject_id', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'subject_name', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'course_code', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'teacher_username', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'teacher_name', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'day_of_week', 'INTEGER NOT NULL DEFAULT 1'),
+        ('schedules', 'start_time', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'end_time', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'grace_minutes', 'INTEGER NOT NULL DEFAULT 15'),
+        ('schedules', 'is_active', 'INTEGER NOT NULL DEFAULT 1'),
+        ('schedules', 'created_by', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'created_at', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'updated_at', "TEXT NOT NULL DEFAULT ''"),
     ]
     with get_db() as conn:
-        # ── Ensure schedules table exists (created after initial DB may exist) ──
-        existing_tables = [r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()]
+        existing_tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
 
         if 'schedules' not in existing_tables:
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS schedules (
                     schedule_id      TEXT PRIMARY KEY,
                     section_key      TEXT NOT NULL DEFAULT '',
@@ -1049,13 +512,15 @@ def _migrate_add_missing_columns():
                     created_at       TEXT NOT NULL DEFAULT '',
                     updated_at       TEXT NOT NULL DEFAULT ''
                 )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_sched_teacher ON schedules(teacher_username)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_sched_day     ON schedules(day_of_week)")
-            print("[MIGRATION] Created missing table: schedules")
+                """
+            )
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_sched_teacher ON schedules(teacher_username)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_sched_day     ON schedules(day_of_week)')
+            print('[MIGRATION] Created missing table: schedules')
 
         if 'excuse_requests' not in existing_tables:
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS excuse_requests (
                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
                     sess_id         TEXT NOT NULL DEFAULT '',
@@ -1071,87 +536,107 @@ def _migrate_add_missing_columns():
                     reviewed_at     TEXT NOT NULL DEFAULT '',
                     created_at      TEXT NOT NULL DEFAULT ''
                 )
-            """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_excuse_sess   ON excuse_requests(sess_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_excuse_status ON excuse_requests(status)")
-            print("[MIGRATION] Created missing table: excuse_requests")
+                """
+            )
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_excuse_sess   ON excuse_requests(sess_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_excuse_status ON excuse_requests(status)')
+            print('[MIGRATION] Created missing table: excuse_requests')
 
         for table, col, col_def in migrations:
             try:
-                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
-                print(f"[MIGRATION] Added {table}.{col}")
+                conn.execute(f'ALTER TABLE {table} ADD COLUMN {col} {col_def}')
+                print(f'[MIGRATION] Added {table}.{col}')
             except Exception:
                 pass
         try:
-            existing = [r[1] for r in conn.execute("PRAGMA table_info(students)").fetchall()]
+            existing = [r[1] for r in conn.execute('PRAGMA table_info(students)').fetchall()]
             if 'course' in existing and 'program' in existing:
                 conn.execute("UPDATE students SET program = course WHERE program = '' AND course != ''")
         except Exception as e:
-            print(f"[MIGRATION] course->program copy: {e}")
+            print(f'[MIGRATION] course->program copy: {e}')
         try:
-            existing = [r[1] for r in conn.execute("PRAGMA table_info(students)").fetchall()]
+            existing = [r[1] for r in conn.execute('PRAGMA table_info(students)').fetchall()]
             if 'name' in existing and 'full_name' in existing:
                 conn.execute("UPDATE students SET full_name = name WHERE full_name = '' AND name != ''")
         except Exception as e:
-            print(f"[MIGRATION] name->full_name copy: {e}")
+            print(f'[MIGRATION] name->full_name copy: {e}')
         try:
-            existing = [r[1] for r in conn.execute("PRAGMA table_info(students)").fetchall()]
+            existing = [r[1] for r in conn.execute('PRAGMA table_info(students)').fetchall()]
             if 'tx_hash' in existing and 'reg_tx_hash' in existing:
                 conn.execute("UPDATE students SET reg_tx_hash = tx_hash WHERE reg_tx_hash = '' AND tx_hash != ''")
         except Exception as e:
-            print(f"[MIGRATION] tx_hash->reg_tx_hash copy: {e}")
+            print(f'[MIGRATION] tx_hash->reg_tx_hash copy: {e}')
         try:
-            existing = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+            existing = [r[1] for r in conn.execute('PRAGMA table_info(sessions)').fetchall()]
             if 'teacher' in existing and 'teacher_username' in existing:
                 conn.execute("UPDATE sessions SET teacher_username = teacher WHERE teacher_username = '' AND teacher != ''")
         except Exception as e:
-            print(f"[MIGRATION] teacher->teacher_username copy: {e}")
+            print(f'[MIGRATION] teacher->teacher_username copy: {e}')
         try:
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_stu_program ON students(program)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_stu_section ON students(year_level, section)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_sess_teacher ON sessions(teacher_username)")
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_stu_program ON students(program)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_stu_section ON students(year_level, section)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_sess_teacher ON sessions(teacher_username)')
         except Exception as e:
-            print(f"[MIGRATION] Index creation: {e}")
+            print(f'[MIGRATION] Index creation: {e}')
+
 
 def _migrate_users_to_accounts():
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM users").fetchall()
+        rows = conn.execute('SELECT * FROM users').fetchall()
         for r in rows:
             d = dict(r)
             conn.execute(
-                "INSERT OR IGNORE INTO accounts "
-                "(username,password_hash,role,full_name,email,status,"
-                " sections_json,my_subjects_json,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (d['username'], d['password'], d.get('role','teacher'),
-                 d.get('full_name',''), d.get('email',''), d.get('status','pending'),
-                 d.get('sections_json','[]'), d.get('my_subjects_json','[]'),
-                 d.get('created_at',''), d.get('created_at',''))
+                'INSERT OR IGNORE INTO accounts '
+                '(username,password_hash,role,full_name,email,status,'
+                ' sections_json,my_subjects_json,created_at,updated_at) '
+                'VALUES (?,?,?,?,?,?,?,?,?,?)',
+                (
+                    d['username'],
+                    d['password'],
+                    d.get('role', 'teacher'),
+                    d.get('full_name', ''),
+                    d.get('email', ''),
+                    d.get('status', 'pending'),
+                    d.get('sections_json', '[]'),
+                    d.get('my_subjects_json', '[]'),
+                    d.get('created_at', ''),
+                    d.get('created_at', ''),
+                ),
             )
+
 
 def _migrate_nfc_registration():
     with get_db() as conn:
-        row = conn.execute("SELECT * FROM nfc_registration WHERE id=1").fetchone()
+        row = conn.execute('SELECT * FROM nfc_registration WHERE id=1').fetchone()
         if row:
             conn.execute(
-                "INSERT OR REPLACE INTO nfc_scanner "
-                "(id,waiting,scanned_uid,requested_by,requested_at) VALUES (?,?,?,?,?)",
-                (1, row['waiting'], row['scanned_uid'],
-                 row['requested_by'], row['requested_at'])
+                'INSERT OR REPLACE INTO nfc_scanner '
+                '(id,waiting,scanned_uid,requested_by,requested_at) VALUES (?,?,?,?,?)',
+                (1, row['waiting'], row['scanned_uid'], row['requested_by'], row['requested_at']),
             )
 
+
 def _row_to_dict(row):
-    if row is None: return None
+    if row is None:
+        return None
     d = dict(row)
-    for col in ('present_json','late_json','excused_json','warned_json','absent_json',
-                'tap_log_json','warn_log_json','invalid_log_json'):
-        key = col.replace('_json','')
+    for col in (
+        'present_json',
+        'late_json',
+        'excused_json',
+        'warned_json',
+        'absent_json',
+        'tap_log_json',
+        'warn_log_json',
+        'invalid_log_json',
+    ):
+        key = col.replace('_json', '')
         if col in d:
             d[key] = json.loads(d.pop(col) or '[]')
         elif key not in d:
             d[key] = []
-    d['excuse_notes'] = json.loads(d.pop('excuse_notes_json','{}') or '{}') if 'excuse_notes_json' in d else {}
-    d['tx_hashes']    = json.loads(d.pop('tx_hashes_json',   '{}') or '{}') if 'tx_hashes_json'    in d else {}
+    d['excuse_notes'] = json.loads(d.pop('excuse_notes_json', '{}') or '{}') if 'excuse_notes_json' in d else {}
+    d['tx_hashes'] = json.loads(d.pop('tx_hashes_json', '{}') or '{}') if 'tx_hashes_json' in d else {}
     if 'teacher_username' in d and 'teacher' not in d:
         d['teacher'] = d.pop('teacher_username')
     elif 'teacher_username' in d:
@@ -1160,9 +645,10 @@ def _row_to_dict(row):
         d['section_key'] = normalize_section_key(d['section_key'])
     return d
 
+
 def load_sessions():
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM sessions").fetchall()
+        rows = conn.execute('SELECT * FROM sessions').fetchall()
         result = {}
         for r in rows:
             s = _session_row_with_logs(conn, r)
@@ -1303,12 +789,21 @@ def migrate_json_to_sqlite():
             'created_at':datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
         print('[DB] Default superadmin account created (change password immediately!)')
+    else:
+        # Keep the bootstrap superadmin account privileged to avoid lockout.
+        su = db_get_user('superadmin')
+        if su and (su.get('role') != 'super_admin' or su.get('status') != 'approved'):
+            su['role'] = 'super_admin'
+            su['status'] = 'approved'
+            db_save_user('superadmin', su)
+            print('[DB] Corrected superadmin role/status to super_admin/approved')
 
 def _account_row(row):
     if row is None: return None
     d = dict(row)
     if 'password_hash' in d:
         d['password'] = d.pop('password_hash')
+    d['role'] = _canonical_role(d.get('role', 'teacher'))
     raw_sections     = json.loads(d.pop('sections_json',   '[]') or '[]')
     d['my_subjects'] = json.loads(d.pop('my_subjects_json','[]') or '[]')
     d['sections']    = [normalize_section_key(s) for s in raw_sections]
@@ -1331,6 +826,7 @@ def db_save_user(username, u):
     sections = [normalize_section_key(s) for s in u.get('sections', [])]
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     pw  = u.get('password', u.get('password_hash', ''))
+    role = _canonical_role(u.get('role', 'teacher'))
     with get_db() as conn:
         conn.execute(
             "INSERT INTO accounts "
@@ -1342,7 +838,7 @@ def db_save_user(username, u):
             "full_name=excluded.full_name, email=excluded.email, "
             "status=excluded.status, sections_json=excluded.sections_json, "
             "my_subjects_json=excluded.my_subjects_json, updated_at=excluded.updated_at",
-            (username, pw, u.get('role','teacher'),
+              (username, pw, role,
              u.get('full_name',''), u.get('email',''), u.get('status','pending'),
              json.dumps(sections), json.dumps(u.get('my_subjects',[])),
              u.get('created_at', now), now)
@@ -1357,7 +853,7 @@ def db_save_user(username, u):
             "full_name=excluded.full_name, email=excluded.email, "
             "status=excluded.status, sections_json=excluded.sections_json, "
             "my_subjects_json=excluded.my_subjects_json",
-            (username, pw, u.get('role','teacher'),
+              (username, pw, role,
              u.get('full_name',''), u.get('email',''), u.get('status','pending'),
              json.dumps(sections), json.dumps(u.get('my_subjects',[])),
              u.get('created_at', now))
@@ -2233,6 +1729,24 @@ def staff_required(f):
         return f(*a,**kw)
     return dec
 
+
+@app.before_request
+def _sync_session_identity():
+    """Keep session role/full_name aligned with DB to avoid stale-role sidebars/routes."""
+    username = session.get('username')
+    if not username:
+        return
+    user = db_get_user(username)
+    if not user:
+        session.clear()
+        return
+    canonical_role = _canonical_role(user.get('role', 'teacher'))
+    if session.get('role') != canonical_role:
+        session['role'] = canonical_role
+    full_name = user.get('full_name', '')
+    if session.get('full_name') != full_name:
+        session['full_name'] = full_name
+
 def get_current_user(): return db_get_user(session.get('username',''))
 
 def parse_student(raw):
@@ -2650,7 +2164,7 @@ def get_active_session_for_nfc(nfc_id):
 @app.route('/login', methods=['GET','POST'])
 def login():
     if 'username' in session:
-        return redirect(url_for('index') if session.get('role')=='admin' else url_for('teacher_dashboard'))
+        return redirect(url_for('index') if session.get('role') in ADMIN_ROLES else url_for('teacher_dashboard'))
     if request.method == 'POST':
         u    = request.form['username'].strip().lower()
         p    = request.form['password']
@@ -2662,7 +2176,7 @@ def login():
         if user['status'] == 'rejected':
             flash('Your account was rejected.'); return redirect(url_for('login'))
         session.update({'username':u,'role':user['role'],'full_name':user['full_name']})
-        return redirect(url_for('index') if user['role']=='admin' else url_for('teacher_dashboard'))
+        return redirect(url_for('index') if user['role'] in ADMIN_ROLES else url_for('teacher_dashboard'))
     return render_template('login.html')
 
 @app.route('/logout')
@@ -3188,289 +2702,135 @@ def mark():
 @app.route('/dashboard')
 @admin_required
 def dashboard():
-    students  = get_all_students()
-    all_users = db_get_all_users()
-    teachers  = {u:d for u,d in all_users.items() if d.get('role') in ('admin','teacher')}
-    with get_db() as _conn:
-        _photo_rows = _conn.execute("SELECT person_id, filename FROM photos").fetchall()
-    photos_db = {r['person_id']: r['filename'] for r in _photo_rows}
-    return render_template('dashboard.html',
-        students=students, teachers=teachers,
-        photos_db=photos_db, fmt_time=fmt_time)
+    return _dashboard_page_impl(
+        get_all_students=get_all_students,
+        db_get_all_users=db_get_all_users,
+        get_db=get_db,
+        render_template=render_template,
+        fmt_time=fmt_time,
+    )
 
 @app.route('/upload_photo', methods=['POST'])
 @login_required
 def upload_photo():
-    person_id = request.form.get('person_id','').strip()
-    if not person_id or 'photo' not in request.files:
-        return jsonify({'error':'Missing data'}), 400
-    f = request.files['photo']
-    if not f or f.filename == '':
-        return jsonify({'error':'No file selected'}), 400
-    ext = os.path.splitext(f.filename)[1].lower()
-    if ext not in ('.jpg','.jpeg','.png','.gif','.webp'):
-        return jsonify({'error':'Only image files allowed'}), 400
-    filename = f"photo_{person_id.replace(' ','_')}{ext}"
-    f.save(os.path.join(UPLOAD_FOLDER, filename))
-    db_save_photo(person_id, filename)
-    return jsonify({'ok':True,'filename':filename,'url':f'/static/uploads/{filename}'})
+    return _upload_photo_impl(
+        request=request,
+        jsonify=jsonify,
+        os_module=os,
+        upload_folder=UPLOAD_FOLDER,
+        db_save_photo=db_save_photo,
+    )
 
 @app.route('/get_my_photo')
 @login_required
 def get_my_photo():
-    photo = db_get_photo(session.get('username',''))
-    if photo: return jsonify({'url':f'/static/uploads/{photo}'})
-    return jsonify({'url':None})
+    return _get_my_photo_impl(
+        username=session.get('username', ''),
+        db_get_photo=db_get_photo,
+        jsonify=jsonify,
+    )
 
 @app.route('/api/my_profile')
 @login_required
 def api_my_profile():
-    user = db_get_user(session.get('username',''))
-    if not user: return jsonify({'error':'Not found'}), 404
-    return jsonify({
-        'username':  user.get('username',''),
-        'full_name': user.get('full_name',''),
-        'email':     user.get('email',''),
-        'role':      user.get('role',''),
-        'status':    user.get('status',''),
-        'created':   user.get('created_at',''),
-        'sections':  user.get('sections',[]),
-        'photo':     db_get_photo(session.get('username','')) or '',
-    })
+    return _api_my_profile_impl(
+        username=session.get('username', ''),
+        db_get_user=db_get_user,
+        db_get_photo=db_get_photo,
+        jsonify=jsonify,
+    )
 
 @app.route('/update_profile', methods=['POST'])
 @login_required
 def update_profile():
-    username = session.get('username')
-    user = db_get_user(username)
-    if not user: return jsonify({'error':'Not logged in'}), 401
-    data = request.get_json()
-    if data.get('full_name'):
-        user['full_name'] = data['full_name'].strip()
-        session['full_name'] = user['full_name']
-    if data.get('email'):
-        user['email'] = data['email'].strip()
-    if data.get('password') and len(data['password']) >= 6:
-        user['password'] = hash_password(data['password'])
-    new_username = (data.get('new_username') or '').strip().lower()
-    if new_username and new_username != username:
-        if db_get_user(new_username):
-            return jsonify({'error': 'Username already taken'}), 409
-        db_save_user(new_username, user)
-        db_delete_user(username)
-        try:
-            photo = db_get_photo(username)
-            if photo:
-                db_save_photo(new_username, photo)
-                db_delete_photo(username)
-        except Exception:
-            pass
-        session['username'] = new_username
-        username = new_username
-    else:
-        db_save_user(username, user)
-    return jsonify({'ok': True, 'full_name': user['full_name'], 'username': session.get('username', username)})
+    return _update_profile_impl(
+        username=session.get('username'),
+        request=request,
+        session_obj=session,
+        db_get_user=db_get_user,
+        db_save_user=db_save_user,
+        db_delete_user=db_delete_user,
+        db_get_photo=db_get_photo,
+        db_save_photo=db_save_photo,
+        db_delete_photo=db_delete_photo,
+        hash_password=hash_password,
+        jsonify=jsonify,
+    )
 
 @app.route('/delete_photo', methods=['POST'])
 @login_required
 def delete_photo():
-    person_id = request.form.get('person_id','').strip()
-    existing  = db_get_photo(person_id)
-    if existing:
-        old_file = os.path.join(UPLOAD_FOLDER, existing)
-        if os.path.exists(old_file):
-            try: os.remove(old_file)
-            except: pass
-        db_delete_photo(person_id)
-    return jsonify({'ok':True})
+    return _delete_photo_impl(
+        person_id=request.form.get('person_id', '').strip(),
+        db_get_photo=db_get_photo,
+        upload_folder=UPLOAD_FOLDER,
+        db_delete_photo=db_delete_photo,
+        os_module=os,
+        jsonify=jsonify,
+    )
 
 @app.route('/reports')
 @admin_required
 def attendance_report():
-    return redirect(url_for('admin_sessions'))
+    return _attendance_report_impl(redirect=redirect, url_for=url_for)
 
 @app.route('/view/<nfc_id>')
 @login_required
 def view_attendance(nfc_id):
-    if session.get('role') == 'teacher':
-        user = get_current_user()
-        if not any(s['nfcId']==nfc_id for s in teacher_students(user)):
-            flash('Access denied.'); return redirect(url_for('teacher_dashboard'))
-    records      = get_attendance_records(nfc_id)
-    student_info = next((s for s in get_all_students() if s['nfcId']==nfc_id), {})
-    return render_template('attendance.html', nfc_id=nfc_id, records=records,
-                           student=student_info, fmt_time=fmt_time)
+    return _view_attendance_impl(
+        nfc_id=nfc_id,
+        role=session.get('role'),
+        get_current_user=get_current_user,
+        teacher_students=teacher_students,
+        flash=flash,
+        redirect=redirect,
+        url_for=url_for,
+        get_attendance_records=get_attendance_records,
+        get_all_students=get_all_students,
+        render_template=render_template,
+        fmt_time=fmt_time,
+    )
 
 @app.route('/api/student_sessions/<nfc_id>')
 @login_required
 def student_sessions_api(nfc_id):
-    with get_db() as conn:
-        log_rows = conn.execute(
-            "SELECT al.nfc_id, al.status, al.tx_hash, al.block_number, "
-            "al.tap_time, al.excuse_note, al.excuse_request_id, "
-            "s.sess_id, s.subject_name, s.course_code, s.section_key, "
-            "s.teacher_name, s.time_slot, s.started_at "
-            "FROM attendance_logs al "
-            "JOIN sessions s ON al.sess_id = s.sess_id "
-            "WHERE al.nfc_id = ? "
-            "ORDER BY s.started_at DESC",
-            (nfc_id,)
-        ).fetchall()
-    result = []
-    seen_sessions = set()
-    for row in log_rows:
-        seen_sessions.add(row['sess_id'])
-        attachment_url = ''
-        if (row['status'] or '').lower() == 'excused':
-            resolved_excuse_id = row['excuse_request_id'] if 'excuse_request_id' in row.keys() else None
-            if not resolved_excuse_id:
-                try:
-                    with get_db() as _conn:
-                        pk_col = _excuse_pk_column(_conn)
-                        pk_expr = pk_col if pk_col != 'rowid' else 'rowid'
-                        ex_row = _conn.execute(
-                            f"SELECT {pk_expr} AS id, rowid AS rid "
-                            "FROM excuse_requests "
-                            "WHERE sess_id=? AND nfc_id=? AND status='approved' "
-                            "ORDER BY COALESCE(created_at, submitted_at, '') DESC LIMIT 1",
-                            (row['sess_id'], row['nfc_id'])
-                        ).fetchone()
-                    if ex_row:
-                        resolved_excuse_id = ex_row['id'] if ex_row['id'] not in (None, '') else ex_row['rid']
-                except Exception:
-                    resolved_excuse_id = None
-            if resolved_excuse_id:
-                attachment_url = url_for('admin_excuse_attachment', excuse_id=resolved_excuse_id)
-        result.append({
-            'subject_name': row['subject_name'] or '',
-            'course_code':  row['course_code']  or '',
-            'teacher_name': row['teacher_name'] or '',
-            'section_key':  row['section_key']  or '',
-            'time_slot':    row['time_slot']     or '',
-            'date':         (row['started_at'] or '')[:10],
-            'started_at':   row['started_at']   or '',
-            'status':       (row['status'] or 'absent').lower(),
-            'tap_time':     row['tap_time']      or '',
-            'tx_hash':      row['tx_hash']       or '',
-            'block':        str(row['block_number']) if row['block_number'] else '',
-            'excuse_note':  row['excuse_note']   or '',
-            'attachment_url': attachment_url,
-        })
-    if not result:
-        all_students    = get_all_students()
-        student         = next((x for x in all_students if x['nfcId']==nfc_id), None)
-        student_section = build_student_section_key(student) if student else ''
-        with get_db() as conn:
-            sess_rows = conn.execute(
-                "SELECT * FROM sessions WHERE ended_at IS NOT NULL ORDER BY started_at DESC"
-            ).fetchall()
-        for row in sess_rows:
-            s   = _row_to_dict(row)
-            sec = normalize_section_key(s.get('section_key',''))
-            if student_section and sec != student_section: continue
-            if s.get('sess_id') in seen_sessions: continue
-            if   nfc_id in s.get('excused',[]): status = 'excused'
-            elif nfc_id in s.get('late',   []): status = 'late'
-            elif nfc_id in s.get('present',[]): status = 'present'
-            elif student_section == sec:        status = 'absent'
-            else: continue
-            tx_info = s.get('tx_hashes',{}).get(nfc_id,{})
-            result.append({
-                'subject_name': s.get('subject_name',''),
-                'course_code':  s.get('course_code',''),
-                'teacher_name': s.get('teacher_name',''),
-                'section_key':  s.get('section_key',''),
-                'time_slot':    s.get('time_slot',''),
-                'date':         (s.get('started_at','') or '')[:10],
-                'started_at':   s.get('started_at',''),
-                'status':       status,
-                'tap_time':     '',
-                'tx_hash':      tx_info.get('tx_hash',''),
-                'block':        str(tx_info.get('block','')),
-                'excuse_note':  '',
-                'attachment_url': '',
-            })
-    result.sort(key=lambda x: x['date'], reverse=True)
-    return jsonify(result)
+    return _student_sessions_api_impl(
+        nfc_id=nfc_id,
+        get_db=get_db,
+        excuse_pk_column=_excuse_pk_column,
+        url_for=url_for,
+        get_all_students=get_all_students,
+        build_student_section_key=build_student_section_key,
+        row_to_dict=_row_to_dict,
+        normalize_section_key=normalize_section_key,
+        jsonify=jsonify,
+    )
 
 @app.route('/update_student', methods=['POST'])
 @admin_required
 def update_student():
-    data   = request.get_json()
-    nfc_id = data.get('nfc_id','').strip()
-    if not nfc_id: return jsonify({'error':'Missing nfc_id'}), 400
-    fields = ['full_name','student_id','email','contact','adviser','major',
-              'semester','school_year','date_registered','course','year_level','section']
-    update_data = {f: (data.get(f) or '').strip() for f in fields}
-    if update_data.get('section'):
-        update_data['section'] = update_data['section'].strip().upper()
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    set_parts = []
-    params    = []
-    db_col_map = {
-        'full_name':'full_name','student_id':'student_id','email':'email',
-        'contact':'contact','adviser':'adviser','major':'major',
-        'semester':'semester','school_year':'school_year',
-        'date_registered':'date_registered','course':'program',
-        'year_level':'year_level','section':'section',
-    }
-    for field, db_col in db_col_map.items():
-        val = update_data.get(field,'')
-        if val:
-            set_parts.append(f"{db_col}=?")
-            params.append(val)
-    if set_parts:
-        set_parts.append("updated_at=?")
-        params.append(now)
-        params.append(nfc_id)
-        with get_db() as conn:
-            conn.execute(
-                f"UPDATE students SET {', '.join(set_parts)} WHERE nfc_id=?",
-                params
-            )
-    override_data = {f: update_data[f] for f in fields if update_data.get(f)}
-    if override_data:
-        db_save_override(nfc_id, override_data)
-    return jsonify({'ok': True})
+    return _update_student_impl(
+        request=request,
+        datetime_now=datetime.now,
+        get_db=get_db,
+        db_save_override=db_save_override,
+        jsonify=jsonify,
+    )
 
 @app.route('/update_faculty', methods=['POST'])
 @admin_required
 def update_faculty():
-    data     = request.get_json()
-    username = data.get('username','').strip()
-    user     = db_get_user(username)
-    if not user: return jsonify({'error':'User not found'}), 404
-    requester_role = session.get('role', '')
-    if requester_role != 'super_admin':
-        return jsonify({'error': 'Only Super Admin can edit user accounts.'}), 403
-    if data.get('full_name'):  user['full_name'] = data['full_name'].strip()
-    if data.get('email') is not None: user['email'] = data['email'].strip()
-    # Role update: super_admin can set any supported role
-    new_role = data.get('role', '')
-    if new_role:
-        if new_role in ('teacher', 'admin', 'super_admin'):
-            user['role'] = new_role
-        elif new_role not in ('teacher', 'admin', 'super_admin'):
-            return jsonify({'error': 'Invalid role.'}), 400
-    if data.get('status') in ('approved','pending','rejected'): user['status'] = data['status']
-    if 'sections' in data and isinstance(data['sections'], list):
-        user['sections'] = [normalize_section_key(s) for s in data['sections']]
-    new_pw = (data.get('new_password') or '').strip()
-    if new_pw:
-        if len(new_pw) < 6:
-            return jsonify({'error':'Password must be at least 6 characters'}), 400
-        user['password'] = hash_password(new_pw)
-    new_username = (data.get('new_username') or '').strip().lower()
-    if new_username and new_username != username:
-        if db_get_user(new_username):
-            return jsonify({'error':f'Username "{new_username}" is already taken'}), 409
-        user['username'] = new_username
-        db_save_user(new_username, user)
-        db_delete_user(username)
-        db_rename_photo_key(username, new_username)
-    else:
-        db_save_user(username, user)
-    return jsonify({'ok':True})
+    return _update_faculty_impl(
+        request=request,
+        session_obj=session,
+        db_get_user=db_get_user,
+        db_save_user=db_save_user,
+        db_delete_user=db_delete_user,
+        db_rename_photo_key=db_rename_photo_key,
+        normalize_section_key=normalize_section_key,
+        hash_password=hash_password,
+        jsonify=jsonify,
+    )
 
 @app.route('/export')
 @login_required
@@ -3483,26 +2843,19 @@ def export_page():
 @app.route('/export/all.csv')
 @admin_required
 def export_csv_all():
-    out = io.StringIO(); w = csv.writer(out)
-    w.writerow(['Name','NFC ID','Student ID','Course','Year','Section','Adviser','Email','Contact','Date & Time','Status'])
-    for s in get_all_students():
-        for ts,p in (get_attendance_records(s['nfcId']) or [('No records','')]):
-            w.writerow([s['name'],s['nfcId'],s['student_id'],s['course'],s['year_level'],s['section'],
-                        s['adviser'],s['email'],s['contact'],ts,'Present' if p is True else ('Absent' if p is False else '')])
-    out.seek(0)
-    return Response(out.getvalue(), mimetype='text/csv',
-        headers={'Content-Disposition':f'attachment; filename=attendance_all_{datetime.now().strftime("%Y%m%d")}.csv'})
+    return _export_csv_all_impl(
+        get_all_students_fn=get_all_students,
+        get_attendance_records_fn=get_attendance_records,
+    )
 
 @app.route('/export/<nfc_id>.csv')
 @login_required
 def export_csv_single(nfc_id):
-    name = student_name_map.get(nfc_id,'Unknown'); out = io.StringIO(); w = csv.writer(out)
-    w.writerow(['Student Name','NFC ID','Date & Time','Status'])
-    for ts,p in get_attendance_records(nfc_id):
-        w.writerow([name,nfc_id,ts,'Present' if p else 'Absent'])
-    out.seek(0)
-    return Response(out.getvalue(), mimetype='text/csv',
-        headers={'Content-Disposition':f'attachment; filename=attendance_{nfc_id}.csv'})
+    return _export_csv_single_impl(
+        nfc_id=nfc_id,
+        student_name_map_obj=student_name_map,
+        get_attendance_records_fn=get_attendance_records,
+    )
 
 @app.route('/admin/users')
 @admin_required
@@ -3613,13 +2966,13 @@ def delete_subject(sid):
 @app.route('/admin/sessions')
 @admin_required
 def admin_sessions():
-    with get_db() as _conn:
-        _active_rows = _conn.execute("SELECT * FROM sessions WHERE ended_at IS NULL").fetchall()
-        _ended_rows  = _conn.execute("SELECT * FROM sessions WHERE ended_at IS NOT NULL ORDER BY ended_at DESC").fetchall()
-        active = {r['sess_id']: _session_row_with_logs(_conn, r) for r in _active_rows}
-        ended  = {r['sess_id']: _session_row_with_logs(_conn, r) for r in _ended_rows}
-    return render_template('admin_sessions.html', active=active, ended=ended,
-                           subjects_db=db_get_all_subjects(), fmt_time=fmt_time)
+    return _admin_sessions_page_impl(
+        get_db=get_db,
+        session_row_with_logs=_session_row_with_logs,
+        render_template=render_template,
+        db_get_all_subjects=db_get_all_subjects,
+        fmt_time=fmt_time,
+    )
 
 def _build_teacher_context(user):
     if not user: return {}, [], []
@@ -3676,96 +3029,66 @@ def _build_teacher_context(user):
 @app.route('/teacher')
 @login_required
 def teacher_dashboard():
-    if session.get('role') == 'admin':
-        return redirect(url_for('index'))
-    user = get_current_user()
-    if not user:
-        session.clear()
-        return redirect(url_for('login'))
-    sections, my_subjects, _ = _build_teacher_context(user)
-    live_sessions = {sid: s for sid, s in get_active_sessions().items()
-                     if s.get('teacher') == session['username']
-                     or s.get('teacher_name') == session.get('full_name')}
-    with get_db() as conn:
-        total_sessions = conn.execute(
-            "SELECT COUNT(*) FROM sessions "
-            "WHERE (teacher_username=? OR teacher_name=?) AND ended_at IS NOT NULL",
-            (session['username'], session.get('full_name', ''))
-        ).fetchone()[0]
-    all_teacher_students = teacher_students(user)
-    total_students = len(all_teacher_students)
-    return render_template('teacher_dashboard.html',
-        user=user, sections=sections, my_subjects=my_subjects,
-        live_sessions=live_sessions, total_sessions=total_sessions,
-        total_students=total_students, fmt_time=fmt_time, fmt_time_short=fmt_time_short)
+    return _teacher_dashboard_page_impl(
+        session_obj=session,
+        redirect=redirect,
+        url_for=url_for,
+        get_current_user=get_current_user,
+        clear_session=session.clear,
+        build_teacher_context=_build_teacher_context,
+        get_active_sessions=get_active_sessions,
+        get_db=get_db,
+        teacher_students=teacher_students,
+        render_template=render_template,
+        fmt_time=fmt_time,
+        fmt_time_short=fmt_time_short,
+    )
 
 @app.route('/teacher/sessions-students')
 @login_required
 def teacher_sessions_students():
-    if session.get('role') == 'admin':
-        return redirect(url_for('index'))
-    user = get_current_user()
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM sessions "
-            "WHERE teacher_username=? OR teacher_name=? "
-            "ORDER BY started_at DESC",
-            (session['username'], session.get('full_name', ''))
-        ).fetchall()
-        sessions_data = {r['sess_id']: _session_row_with_logs(conn, r) for r in rows}
-    subjects = sorted(set(
-        s.get('subject_name', '') for s in sessions_data.values()
-        if s.get('subject_name')
-    ))
-    report = []
-    for s in teacher_students(user):
-        stats = get_student_attendance_stats(s['nfcId'])
-        report.append({**s, **stats})
-    students = sorted(report, key=lambda x: -x['rate'])
-    return render_template('teacher_sessions_students.html',
-        user=user, sessions_data=sessions_data,
-        sessions_json={sid: {
-            'subject_name': s.get('subject_name', ''),
-            'course_code':  s.get('course_code', ''),
-            'section_key':  s.get('section_key', ''),
-            'teacher_name': s.get('teacher_name', ''),
-            'started_at':   s.get('started_at', ''),
-            'ended_at':     s.get('ended_at', ''),
-            'time_slot':    s.get('time_slot', ''),
-            'present':      s.get('present', []),
-            'late':         s.get('late', []),
-            'excused':      s.get('excused', []),
-            'tx_hashes':    s.get('tx_hashes', {}),
-        } for sid, s in sessions_data.items()},
-        subjects=subjects, students=students,
-        now=str(datetime.now().year), fmt_time=fmt_time, fmt_time_short=fmt_time_short)
+    return _teacher_sessions_students_page_impl(
+        session_obj=session,
+        redirect=redirect,
+        url_for=url_for,
+        get_current_user=get_current_user,
+        get_db=get_db,
+        session_row_with_logs=_session_row_with_logs,
+        teacher_students=teacher_students,
+        get_student_attendance_stats=get_student_attendance_stats,
+        render_template=render_template,
+        datetime_cls=datetime,
+        fmt_time=fmt_time,
+        fmt_time_short=fmt_time_short,
+    )
 
 @app.route('/teacher/create-session')
 @login_required
 def teacher_create_session():
-    if session.get('role') == 'admin': return redirect(url_for('index'))
-    user = get_current_user()
-    if not user: session.clear(); return redirect(url_for('login'))
-    sections, my_subjects, all_subj = _build_teacher_context(user)
-    return render_template('teacher_create_session.html', user=user, sections=sections,
-                           my_subjects=my_subjects, subjects_db=all_subj)
+    return _teacher_create_session_page_impl(
+        session_obj=session,
+        redirect=redirect,
+        url_for=url_for,
+        get_current_user=get_current_user,
+        clear_session=session.clear,
+        build_teacher_context=_build_teacher_context,
+        render_template=render_template,
+    )
 
 @app.route('/teacher/records')
 @login_required
 def teacher_records():
-    if session.get('role') == 'admin': return redirect(url_for('admin_sessions'))
-    user = get_current_user()
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM sessions WHERE teacher_username=? AND ended_at IS NOT NULL ORDER BY started_at DESC",
-            (session['username'],)
-        ).fetchall()
-        teacher_sessions_data = {r['sess_id']: _session_row_with_logs(conn, r) for r in rows}
-    subjects = sorted(set(s.get('subject_name','') for s in teacher_sessions_data.values() if s.get('subject_name')))
-    all_students = get_all_students()
-    return render_template('teacher_records.html', user=user,
-                           sessions_data=teacher_sessions_data, subjects=subjects,
-                           all_students=all_students, fmt_time=fmt_time)
+    return _teacher_records_page_impl(
+        session_obj=session,
+        redirect=redirect,
+        url_for=url_for,
+        get_current_user=get_current_user,
+        get_db=get_db,
+        session_row_with_logs=_session_row_with_logs,
+        get_all_students=get_all_students,
+        render_template=render_template,
+        fmt_time=fmt_time,
+    )
 
 @app.route('/api/session_attendance/<sess_id>')
 @login_required
@@ -4266,21 +3589,14 @@ def teacher_reports():
 @app.route('/teacher/export/section.csv')
 @login_required
 def teacher_export():
-    user     = get_current_user()
-    sec_key  = request.args.get('section','')
-    students = teacher_students(user)
-    if sec_key:
-        norm_key = normalize_section_key(sec_key)
-        students = [s for s in students if build_student_section_key(s) == norm_key]
-    out = io.StringIO(); w = csv.writer(out)
-    w.writerow(['Name','NFC ID','Student ID','Course','Year','Section','Date & Time','Status'])
-    for s in students:
-        for ts,p in (get_attendance_records(s['nfcId']) or [('No records','')]):
-            w.writerow([s['name'],s['nfcId'],s['student_id'],s['course'],s['year_level'],s['section'],
-                        ts,'Present' if p is True else ('Absent' if p is False else '')])
-    out.seek(0)
-    return Response(out.getvalue(), mimetype='text/csv',
-        headers={'Content-Disposition':f'attachment; filename=section_{datetime.now().strftime("%Y%m%d")}.csv'})
+    return _teacher_export_section_csv_impl(
+        user_obj=get_current_user(),
+        sec_key=request.args.get('section', ''),
+        teacher_students_fn=teacher_students,
+        normalize_section_key_fn=normalize_section_key,
+        build_student_section_key_fn=build_student_section_key,
+        get_attendance_records_fn=get_attendance_records,
+    )
 
 @app.route('/api/attendance/recent')
 @login_required
@@ -4380,120 +3696,13 @@ def poll_session(sess_id):
 @app.route('/api/attendance/stats')
 @login_required
 def attendance_stats():
-    period     = request.args.get('period',      'today')
-    f_month    = request.args.get('month',       '').strip()
-    f_year_num = request.args.get('year_num',    '').strip()
-    f_subject  = request.args.get('subject',     '').strip()
-    f_section  = request.args.get('section_key', request.args.get('section', '')).strip()
-    f_year_lvl = request.args.get('year_level',  '').strip()
-    f_program  = request.args.get('program',     '').strip()
-    f_sec_ltr  = request.args.get('section_letter','').strip()
-    f_instr    = request.args.get('instructor',  '').strip()
-    f_tod      = request.args.get('time_of_day', '').strip()
-    role       = session.get('role')
-    username   = session.get('username')
-    now        = datetime.now()
-    if not f_year_num:
-        # Backward compatibility for older clients still using `year`.
-        f_year_num = request.args.get('year', '').strip() if period in ('month', 'year') else ''
-    if period == 'today':
-        start_dt = now.replace(hour=0,minute=0,second=0,microsecond=0); end_dt = None
-    elif period == 'month':
-        yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
-        mo = int(f_month)    if f_month    and f_month.isdigit()    else now.month
-        start_dt = datetime(yr,mo,1)
-        end_dt   = datetime(yr,mo,_cal.monthrange(yr,mo)[1],23,59,59)
-    elif period == 'year':
-        yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
-        start_dt = datetime(yr,1,1); end_dt = datetime(yr,12,31,23,59,59)
-    else:
-        start_dt = datetime(2000,1,1); end_dt = None
-    where  = ["s.started_at >= ?"]
-    params = [start_dt.strftime('%Y-%m-%d %H:%M:%S')]
-    if end_dt:
-        where.append("s.started_at <= ?"); params.append(end_dt.strftime('%Y-%m-%d %H:%M:%S'))
-    if role == 'teacher':
-        where.append("s.teacher_username = ?"); params.append(username)
-    if f_section:
-        where.append("s.section_key = ?"); params.append(normalize_section_key(f_section))
-    if f_program:
-        where.append("s.section_key LIKE ?"); params.append(f_program + '%')
-    if f_year_lvl:
-        where.append("s.section_key LIKE ?"); params.append('%|' + f_year_lvl + '|%')
-    if f_sec_ltr:
-        where.append("s.section_key LIKE ?"); params.append('%|' + f_sec_ltr)
-    if f_subject:
-        where.append("s.subject_name = ?"); params.append(f_subject)
-    if f_instr:
-        where.append("s.teacher_name = ?"); params.append(f_instr)
-    if f_tod == 'morning':
-        where.append("CAST(strftime('%H',s.started_at) AS INTEGER) < 12")
-    elif f_tod == 'afternoon':
-        where.append("CAST(strftime('%H',s.started_at) AS INTEGER) >= 12")
-    elif f_tod and ':' in f_tod:
-        where.append("s.time_slot = ?"); params.append(f_tod)
-    wsql = " AND ".join(where)
-    if period == 'today':   tkey_expr = "strftime('%H:00',s.started_at)"
-    elif period == 'month': tkey_expr = "strftime('%m/%d',s.started_at)"
-    elif period == 'year':  tkey_expr = "strftime('%m',s.started_at)"
-    else:                   tkey_expr = "strftime('%Y',s.started_at)"
-    with get_db() as conn:
-        donut_rows = conn.execute(
-            "SELECT al.status, COUNT(*) as cnt "
-            "FROM attendance_logs al "
-            "JOIN sessions s ON al.sess_id = s.sess_id "
-            "WHERE " + wsql + " GROUP BY al.status", params
-        ).fetchall()
-        trend_rows = conn.execute(
-            "SELECT " + tkey_expr + " as tkey, al.status, COUNT(*) as cnt "
-            "FROM attendance_logs al "
-            "JOIN sessions s ON al.sess_id = s.sess_id "
-            "WHERE " + wsql + " GROUP BY tkey, al.status ORDER BY tkey", params
-        ).fetchall()
-        subj_rows = conn.execute(
-            "SELECT s.subject_name, s.course_code, al.status, COUNT(*) as cnt "
-            "FROM attendance_logs al "
-            "JOIN sessions s ON al.sess_id = s.sess_id "
-            "WHERE " + wsql + " GROUP BY s.subject_name, s.course_code, al.status", params
-        ).fetchall()
-        sess_count = conn.execute(
-            "SELECT COUNT(DISTINCT s.sess_id) as cnt FROM sessions s WHERE " + wsql, params
-        ).fetchone()['cnt']
-        subj_labels_rows = conn.execute(
-            "SELECT DISTINCT s.subject_name, s.course_code FROM sessions s "
-            "WHERE " + wsql + " ORDER BY s.subject_name", params
-        ).fetchall()
-    donut = {'present':0,'late':0,'absent':0,'excused':0}
-    for r in donut_rows:
-        if r['status'] in donut: donut[r['status']] = r['cnt']
-    trend_buckets = {}
-    for r in trend_rows:
-        k = r['tkey']
-        if k not in trend_buckets:
-            trend_buckets[k] = {'present':0,'late':0,'absent':0,'excused':0}
-        if r['status'] in trend_buckets[k]:
-            trend_buckets[k][r['status']] = r['cnt']
-    subjects_breakdown = {}
-    for r in subj_rows:
-        code  = r['course_code']
-        label = f"[{code}] {r['subject_name']}" if code else r['subject_name']
-        if label not in subjects_breakdown:
-            subjects_breakdown[label] = {'present':0,'late':0,'absent':0,'excused':0,'sessions':0}
-        if r['status'] in subjects_breakdown[label]:
-            subjects_breakdown[label][r['status']] = r['cnt']
-    subj_labels_out = [
-        (f"[{r['course_code']}] {r['subject_name']}" if r['course_code'] else r['subject_name'])
-        for r in subj_labels_rows
-    ]
-    resp = jsonify({
-        'role': role, 'period': period, 'donut': donut,
-        'trend': trend_buckets, 'subjects': subjects_breakdown,
-        'all_subjects': subj_labels_out, 'session_count': sess_count,
-    })
-    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate'
-    resp.headers['Pragma']        = 'no-cache'
-    resp.headers['Expires']       = '0'
-    return resp
+    return _attendance_stats_impl(
+        request_obj=request,
+        session_obj=session,
+        get_db_fn=get_db,
+        normalize_section_key_fn=normalize_section_key,
+        jsonify_fn=jsonify,
+    )
 
 @app.route('/api/block_number')
 def api_block_number():
@@ -4915,1064 +4124,64 @@ def debug_tap(nfc_id):
     resp=current_app.response_class(json.dumps(result,indent=2),mimetype='application/json')
     return resp
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EXCEL EXPORT HELPERS — shared colour palette + formatters
-# ══════════════════════════════════════════════════════════════════════════════
-def _xl_helpers():
-    """Return a dict of reusable Excel style helpers."""
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    C = {
-        'bg':      '1E4A1A', 'header':  '1E4A1A', 'accent':  '2D6A27',
-        'gold':    'F5C518', 'surface': 'FFFFFF',  'border':  'D4DDD4',
-        'present': '2D6A27', 'late':    'D4A017',  'absent':  'C0392B', 'excused': '2980B9',
-        'present_bg': 'E8F5E9', 'late_bg': 'FFF8E1', 'absent_bg': 'FFEBEE', 'excused_bg': 'E3F2FD',
-        'white':   'FFFFFF', 'row_alt': 'F0F2F0', 'row_def': 'FFFFFF',
-        'muted':   '5A6B5A', 'sub_hdr': '2D6A27',
-    }
-    def fill(h):  return PatternFill('solid', fgColor=h)
-    def thin_border():
-        s = Side(style='thin', color='CBD5E1')
-        return Border(left=s, right=s, top=s, bottom=s)
-    def ctr(wrap=True):  return Alignment(horizontal='center', vertical='center', wrap_text=wrap)
-    def lft():  return Alignment(horizontal='left', vertical='center', wrap_text=True)
-    def rgt():  return Alignment(horizontal='right', vertical='center', wrap_text=True)
-    def header_font(size=10):
-        return Font(name='Calibri', bold=True, color='FFFFFF', size=size)
-    def normal_font(size=10, color='111111', bold=False):
-        return Font(name='Calibri', size=size, color=color, bold=bold)
-    def title_font(size=16, color=None):
-        return Font(name='Calibri', bold=True, size=size, color=color or C['accent'])
-    def make_header_row(ws, row_num, headers, widths, bg=None):
-        bg = bg or C['header']
-        for ci, (h, w) in enumerate(zip(headers, widths), 1):
-            from openpyxl.utils import get_column_letter
-            ws.column_dimensions[get_column_letter(ci)].width = w
-            c = ws.cell(row=row_num, column=ci, value=h)
-            c.font = header_font(); c.fill = fill(bg)
-            c.alignment = ctr(); c.border = thin_border()
-        ws.row_dimensions[row_num].height = 22
-    def data_row(ws, row_num, values, alt=False, col_formats=None):
-        rf = fill(C['row_alt'] if alt else C['row_def'])
-        for ci, val in enumerate(values, 1):
-            c = ws.cell(row=row_num, column=ci, value=val)
-            c.border = thin_border()
-            cf = (col_formats or {}).get(ci)
-            if cf and cf[0] == 'status':
-                status = val
-                status_colors = {'Present': C['present'], 'Late': C['late'], 'Absent': C['absent'], 'Excused': C['excused']}
-                fg = status_colors.get(status, '111111')
-                c.font = Font(name='Calibri', size=10, bold=True, color=fg)
-                c.fill = rf; c.alignment = ctr()
-            elif cf and cf[0] == 'tx':
-                c.font = Font(name='Courier New', size=8, color=C['muted'])
-                c.fill = rf; c.alignment = lft()
-            elif cf and cf[0] == 'num':
-                c.font = normal_font(); c.fill = rf; c.alignment = ctr()
-            else:
-                c.font = normal_font()
-                c.fill = rf
-                c.alignment = lft() if ci <= 3 else ctr()
-        ws.row_dimensions[row_num].height = 17
-    def title_block(ws, title, subtitle_lines, n_cols):
-        ws.sheet_view.showGridLines = False
-        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=n_cols)
-        c = ws.cell(row=1, column=1, value=title)
-        c.font = title_font(16, C['gold'])
-        c.fill = fill(C['bg']); c.alignment = ctr()
-        ws.row_dimensions[1].height = 36
-        for col in range(2, n_cols+1): ws.cell(row=1, column=col).fill = fill(C['bg'])
-        for i, sub in enumerate(subtitle_lines, 2):
-            ws.merge_cells(start_row=i, start_column=1, end_row=i, end_column=n_cols)
-            c = ws.cell(row=i, column=1, value=sub)
-            c.font = Font(name='Calibri', size=9, color='94A3B8', italic=True)
-            c.fill = fill(C['bg']); c.alignment = ctr()
-            ws.row_dimensions[i].height = 16
-            for col in range(2, n_cols+1): ws.cell(row=i, column=col).fill = fill(C['bg'])
-        next_row = len(subtitle_lines) + 2
-        for col in range(1, n_cols+1):
-            ws.cell(row=next_row, column=col).fill = fill('F8FAFC')
-        ws.row_dimensions[next_row].height = 7
-        return next_row + 1
-    def stat_block(ws, start_row, donut_data, n_cols=8):
-        total = sum(donut_data.values())
-        boxes = [
-            ('✓  PRESENT',  donut_data.get('present',  donut_data.get('Present',  0)), C['present'],  C['present_bg']),
-            ('⏱  LATE',     donut_data.get('late',     donut_data.get('Late',     0)), C['late'],     C['late_bg']),
-            ('✕  ABSENT',   donut_data.get('absent',   donut_data.get('Absent',   0)), C['absent'],   C['absent_bg']),
-            ('◎  EXCUSED',  donut_data.get('excused',  donut_data.get('Excused',  0)), C['excused'],  C['excused_bg']),
-        ]
-        cols_per = max(1, n_cols // 4)
-        for bi, (label, val, fg, bg2) in enumerate(boxes):
-            sc = bi * cols_per + 1; ec = sc + cols_per - 1
-            pct = f"{round(val/total*100,1)}%" if total else "0%"
-            for row_offset, (text, sz, bold, height) in enumerate([
-                (label, 9, True, 18), (val, 26, True, 40), (pct, 9, False, 18),
-            ]):
-                r = start_row + row_offset
-                ws.merge_cells(start_row=r, start_column=sc, end_row=r, end_column=ec)
-                c = ws.cell(row=r, column=sc, value=text)
-                c.font = Font(name='Calibri', size=sz, bold=bold, color=fg)
-                c.fill = fill(bg2); c.alignment = ctr(); ws.row_dimensions[r].height = height
-                for col in range(sc+1, ec+1): ws.cell(row=r, column=col).fill = fill(bg2)
-        spacer_row = start_row + 3
-        for col in range(1, n_cols+1):
-            ws.cell(row=spacer_row, column=col).fill = fill('F8FAFC')
-        ws.row_dimensions[spacer_row].height = 8
-        return spacer_row + 1
-    def totals_row(ws, row_num, values, n_cols):
-        for ci, val in enumerate(values, 1):
-            c = ws.cell(row=row_num, column=ci, value=val)
-            c.font = Font(name='Calibri', size=10, bold=True, color='FFFFFF')
-            c.fill = fill(C['sub_hdr']); c.border = thin_border()
-            c.alignment = lft() if ci == 1 else ctr()
-        ws.row_dimensions[row_num].height = 20
-    def add_bar_chart(wb, ws_name, data_ws_name, title,
-                      first_data_row, last_data_row, n_series,
-                      cat_col, series_cols_start,
-                      series_titles, series_colors,
-                      chart_anchor, width=18, height=12):
-        from openpyxl.chart import BarChart, Reference
-        from openpyxl.chart.series import SeriesLabel
-        chart_ws = wb[ws_name]; data_ws = wb[data_ws_name]
-        chart = BarChart()
-        chart.type = 'col'; chart.grouping = 'stacked'; chart.overlap = 100
-        chart.title = title; chart.style = 10
-        chart.y_axis.title = 'Count'; chart.x_axis.title = ''
-        chart.width = width; chart.height = height; chart.legend.position = 'b'
-        cats = Reference(data_ws, min_col=cat_col, min_row=first_data_row, max_row=last_data_row)
-        for i in range(n_series):
-            col = series_cols_start + i
-            data_ref = Reference(data_ws, min_col=col, min_row=first_data_row-1, max_row=last_data_row)
-            chart.series.append(data_ref)
-        chart.set_categories(cats)
-        for i, (title_s, color) in enumerate(zip(series_titles, series_colors)):
-            if i < len(chart.series):
-                chart.series[i].title = SeriesLabel(v=title_s)
-                chart.series[i].graphicalProperties.solidFill = color
-                chart.series[i].graphicalProperties.line.solidFill = color
-        chart_ws.add_chart(chart, chart_anchor)
-    def add_pie_chart(wb, ws_name, data_ws_name, title,
-                      first_data_row, last_data_row,
-                      label_col, val_col,
-                      series_colors, chart_anchor, width=12, height=10):
-        from openpyxl.chart import PieChart, Reference
-        chart_ws = wb[ws_name]; data_ws = wb[data_ws_name]
-        chart = PieChart()
-        chart.title = title; chart.style = 10; chart.width = width; chart.height = height
-        labels = Reference(data_ws, min_col=label_col, min_row=first_data_row, max_row=last_data_row)
-        data   = Reference(data_ws, min_col=val_col,   min_row=first_data_row, max_row=last_data_row)
-        chart.add_data(data); chart.set_categories(labels)
-        chart_ws.add_chart(chart, chart_anchor)
-    return dict(
-        C=C, fill=fill, thin_border=thin_border, ctr=ctr, lft=lft, rgt=rgt,
-        header_font=header_font, normal_font=normal_font, title_font=title_font,
-        make_header_row=make_header_row, data_row=data_row,
-        title_block=title_block, stat_block=stat_block, totals_row=totals_row,
-        add_bar_chart=add_bar_chart, add_pie_chart=add_pie_chart,
-    )
-
 # ── EXPORT ROUTES ─────────────────────────────────────────────────────────────
 
 @app.route('/export/student_sessions/<nfc_id>')
 @login_required
 def export_student_sessions(nfc_id):
-    """Export one student's full attendance history with blockchain proof."""
-    try:
-        from openpyxl import Workbook
-        from openpyxl.utils import get_column_letter
-        from openpyxl.chart import BarChart, PieChart, Reference
-        from openpyxl.chart.series import SeriesLabel
-
-        f_status  = request.args.get('status','').strip()
-        f_subject = request.args.get('subject','').strip()
-        stud_name = request.args.get('name','Student').strip()
-        now       = datetime.now()
-
-        all_students = get_all_students()
-        student      = next((x for x in all_students if x['nfcId']==nfc_id), None)
-
-        with get_db() as conn:
-            log_rows = conn.execute(
-                "SELECT al.*, s.subject_name, s.course_code, s.section_key, "
-                "s.teacher_name, s.time_slot, s.started_at, s.ended_at "
-                "FROM attendance_logs al "
-                "JOIN sessions s ON al.sess_id = s.sess_id "
-                "WHERE al.nfc_id=? ORDER BY s.started_at DESC",
-                (nfc_id,)
-            ).fetchall()
-
-        rows = []
-        status_counts = {'Present':0,'Late':0,'Absent':0,'Excused':0}
-        for lg in log_rows:
-            status = lg['status'].capitalize()
-            if f_status and status.lower() != f_status.lower(): continue
-            if f_subject and lg['subject_name'] != f_subject: continue
-            status_counts[status] = status_counts.get(status, 0) + 1
-            rows.append({
-                'subject':   lg['subject_name'],
-                'code':      lg['course_code'] or '',
-                'section':   (lg['section_key'] or '').replace('|',' · '),
-                'teacher':   lg['teacher_name'] or '',
-                'date':      (lg['started_at'] or '')[:10],
-                'time_slot': lg['time_slot'] or '',
-                'status':    status,
-                'tap_time':  lg['tap_time'] or '—',
-                'tx_hash':   lg['tx_hash']  or '—',
-                'block':     str(lg['block_number']) if lg['block_number'] else '—',
-                'excuse':    lg['excuse_note'] or '',
-            })
-
-        H = _xl_helpers(); C = H['C']
-        wb = Workbook()
-        ws = wb.active; ws.title = 'Attendance Log'
-        prog  = student.get('course','') if student else ''
-        yr    = student.get('year_level','') if student else ''
-        sec   = student.get('section','') if student else ''
-        sid_  = student.get('student_id','') if student else ''
-        headers = ['#','Subject','Course Code','Section','Instructor',
-                   'Date','Time Slot','Status','Tap Time','TX Hash','Block #','Excuse Note']
-        widths  = [4, 32, 12, 24, 22, 14, 16, 10, 12, 52, 10, 22]
-        subtitles = [
-            'Cavite State University — DAVS Attendance Record',
-            f'Student: {stud_name}  |  ID: {sid_}  |  NFC: {nfc_id}',
-            f'Program: {prog}  |  Year: {yr}  |  Section: {sec}',
-            f'Exported: {now.strftime("%B %d, %Y %I:%M %p")}',
-        ]
-        first_data = H['title_block'](ws, f'Student Attendance Report — {stud_name}', subtitles, len(headers))
-        first_data = H['stat_block'](ws, first_data, status_counts, len(headers))
-        H['make_header_row'](ws, first_data, headers, widths)
-        first_data += 1
-        col_fmt = {8: ('status',), 10: ('tx',), 11: ('num',)}
-        for ri, row in enumerate(rows, first_data):
-            H['data_row'](ws, ri, [
-                ri - first_data + 1,
-                row['subject'], row['code'], row['section'], row['teacher'],
-                row['date'], row['time_slot'], row['status'],
-                row['tap_time'], row['tx_hash'], row['block'], row['excuse'],
-            ], alt=(ri % 2 == 0), col_formats=col_fmt)
-        last_data = first_data + len(rows) - 1
-        total_vals = ['TOTAL', '', '', '', '', '', '',
-                      f"{status_counts['Present']}P / {status_counts['Late']}L / {status_counts['Absent']}A / {status_counts['Excused']}E",
-                      '', '', '', '']
-        H['totals_row'](ws, last_data + 1, total_vals, len(headers))
-        ws.cell(row=last_data+3, column=1,
-                value=f'Generated by DAVS on {now.strftime("%B %d, %Y %I:%M %p")}').font \
-            = __import__('openpyxl').styles.Font(name='Calibri', size=9, italic=True, color='94A3B8')
-
-        wc = wb.create_sheet('Charts')
-        wc.sheet_view.showGridLines = False
-        from openpyxl.styles import Font as XFont, PatternFill as XFill, Alignment as XAlign
-        wc.merge_cells('A1:N1')
-        wc['A1'] = f'Attendance Summary — {stud_name}'
-        wc['A1'].font = XFont(name='Calibri', bold=True, size=14, color=C['gold'])
-        wc['A1'].fill = XFill('solid', fgColor=C['bg'])
-        wc['A1'].alignment = XAlign(horizontal='center', vertical='center')
-        wc.row_dimensions[1].height = 32
-        for col in range(2, 15): wc.cell(row=1, column=col).fill = XFill('solid', fgColor=C['bg'])
-        wc.cell(row=3, column=1, value='Status').font = XFont(bold=True, size=9)
-        wc.cell(row=3, column=2, value='Count').font  = XFont(bold=True, size=9)
-        status_order = ['Present','Late','Absent','Excused']
-        for ri, st in enumerate(status_order, 4):
-            wc.cell(row=ri, column=1, value=st)
-            wc.cell(row=ri, column=2, value=status_counts.get(st, 0))
-        pie = PieChart()
-        pie.title = 'Attendance Status Breakdown'
-        pie.style = 10; pie.width = 14; pie.height = 10
-        pie.add_data(Reference(wc, min_col=2, min_row=4, max_row=7))
-        pie.set_categories(Reference(wc, min_col=1, min_row=4, max_row=7))
-        wc.add_chart(pie, 'D3')
-        subj_counts = {}
-        for r in rows: subj_counts[r['subject']] = subj_counts.get(r['subject'], 0) + 1
-        wc.cell(row=3, column=9,  value='Subject').font  = XFont(bold=True, size=9)
-        wc.cell(row=3, column=10, value='Count').font    = XFont(bold=True, size=9)
-        for ri2, (sn, cnt) in enumerate(sorted(subj_counts.items()), 4):
-            wc.cell(row=ri2, column=9,  value=sn[:30])
-            wc.cell(row=ri2, column=10, value=cnt)
-        if subj_counts:
-            bar = BarChart()
-            bar.type = 'bar'; bar.grouping = 'clustered'
-            bar.title = 'Sessions by Subject'; bar.style = 10; bar.width = 18; bar.height = 10
-            bar.y_axis.title = 'Count'
-            cats2 = Reference(wc, min_col=9,  min_row=4, max_row=3+len(subj_counts))
-            data2 = Reference(wc, min_col=10, min_row=3, max_row=3+len(subj_counts))
-            bar.add_data(data2, titles_from_data=True); bar.set_categories(cats2)
-            if bar.series: bar.series[0].graphicalProperties.solidFill = C['accent']
-            wc.add_chart(bar, 'D21')
-
-        name_slug = stud_name.replace(' ','_')
-        fname = (request.args.get('filename') or
-                 f"{name_slug}_Attendance_Record_{now.strftime('%Y-%m-%d')}.xlsx")
-        output = io.BytesIO()
-        wb.save(output); output.seek(0)
-        return Response(output.getvalue(),
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            headers={'Content-Disposition': f'attachment;filename="{fname}"'})
-    except Exception:
-        import traceback
-        return Response(f'Export error: {traceback.format_exc()}', status=500, mimetype='text/plain')
+    return _export_student_sessions_impl(
+        nfc_id,
+        get_all_students_fn=get_all_students,
+        get_db_fn=get_db,
+        xl_helpers_fn=_xl_helpers,
+    )
 
 
 @app.route('/export/session/<sess_id>')
 @login_required
 def export_session_attendance(sess_id):
-    """Export one classroom session — attendance list with blockchain proof + charts."""
-    try:
-        from openpyxl import Workbook
-        from openpyxl.utils import get_column_letter
-        from openpyxl.chart import BarChart, PieChart, Reference
-        from openpyxl.chart.series import SeriesLabel
-        from openpyxl.styles import Font as XFont, PatternFill as XFill, Alignment as XAlign
-        import io as _io
-
-        sess = load_session(sess_id)
-        if not sess:
-            flash('Session not found.'); return redirect(url_for('admin_sessions'))
-        if not _is_my_session(sess):
-            flash('Access denied.'); return redirect(url_for('teacher_sessions'))
-
-        now          = datetime.now()
-        section_key  = normalize_section_key(sess.get('section_key',''))
-        all_students = get_all_students()
-        enrolled     = sorted([s for s in all_students if build_student_section_key(s)==section_key],
-                               key=lambda x: x['name'])
-        present_ids  = set(sess.get('present', []))
-        late_ids     = set(sess.get('late',    []))
-        excused_ids  = set(sess.get('excused', []))
-        att_logs     = {lg['nfc_id']: lg for lg in db_get_session_attendance(sess_id)}
-
-        # Get excuse request details
-        excuse_details = {}
-        with get_db() as _conn:
-            excuses = _conn.execute(
-                "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
-                (sess_id,)
-            ).fetchall()
-            for exc in excuses:
-                excuse_details[exc['nfc_id']] = {
-                    'reason': exc['reason_type'],
-                    'reason_detail': exc['reason_detail'],
-                    'attachment_file': exc['attachment_file'],
-                }
-
-        counts = {'Present':0,'Late':0,'Absent':0,'Excused':0}
-        rows = []
-        REASON_LABELS = {
-            'sickness': 'Sickness / Illness', 'lbm': 'LBM', 'emergency': 'Family Emergency',
-            'bereavement': 'Bereavement', 'medical': 'Medical Appointment', 'accident': 'Accident / Injury',
-            'official': 'Official School Business', 'weather': 'Extreme Weather / Calamity',
-            'transport': 'Transportation Problem', 'others': 'Others'
-        }
-        for st in enrolled:
-            nid = st['nfcId']
-            if   nid in excused_ids: status = 'Excused'
-            elif nid in late_ids:    status = 'Late'
-            elif nid in present_ids: status = 'Present'
-            else:                    status = 'Absent'
-            counts[status] += 1
-            lg = att_logs.get(nid, {})
-            excuse_info = excuse_details.get(nid, {})
-            excuse_reason = ''
-            if excuse_info.get('reason'):
-                excuse_reason = REASON_LABELS.get(excuse_info['reason'], excuse_info['reason'])
-                if excuse_info.get('reason_detail'):
-                    excuse_reason += f" ({excuse_info['reason_detail']})"
-            rows.append({
-                'name':       st['name'],
-                'student_id': st.get('student_id','—'),
-                'nfc_id':     nid,
-                'program':    st.get('course',''),
-                'year':       st.get('year_level',''),
-                'section':    st.get('section',''),
-                'status':     status,
-                'tap_time':   lg.get('tap_time','') or '—',
-                'tx_hash':    lg.get('tx_hash','')  or '—',
-                'block':      str(lg.get('block_number','')) if lg.get('block_number') else '—',
-                'excuse_reason': excuse_reason,
-                'excuse_document': excuse_info.get('attachment_file', '') or '',
-            })
-
-        H = _xl_helpers(); C = H['C']
-        wb = Workbook()
-        ws = wb.active; ws.title = 'Attendance'
-        subj  = sess.get('subject_name','')
-        code  = sess.get('course_code','')
-        sec   = section_key.replace('|',' · ')
-        instr = sess.get('teacher_name','')
-        slot  = sess.get('time_slot','—')
-        started = sess.get('started_at','—')
-        ended   = sess.get('ended_at','Still running')
-        n_cols  = 13
-        subtitles = [
-            'Cavite State University — DAVS Session Attendance Report',
-            f'Subject: {subj}  {"["+code+"]" if code else ""}',
-            f'Section: {sec}  |  Instructor: {instr}',
-            f'Time Slot: {slot}  |  Started: {started}  |  Ended: {ended}',
-            f'Exported: {now.strftime("%B %d, %Y %I:%M %p")}',
-        ]
-        first_data = H['title_block'](ws, 'Session Attendance Report', subtitles, n_cols)
-        first_data = H['stat_block'](ws, first_data, counts, n_cols)
-        headers = ['#','Student Name','Student ID','NFC Card UID',
-                   'Program','Year','Sec','Status','Tap Time','TX Hash','Block #','Excuse Reason','Document']
-        widths  = [4, 28, 14, 14, 28, 10, 6, 10, 12, 52, 10, 30, 20]
-        H['make_header_row'](ws, first_data, headers, widths)
-        first_data += 1
-        col_fmt = {8: ('status',), 10: ('tx',), 11: ('num',)}
-        for ri, row in enumerate(rows, first_data):
-            H['data_row'](ws, ri, [
-                ri-first_data+1, row['name'], row['student_id'], row['nfc_id'],
-                row['program'], row['year'], row['section'],
-                row['status'], row['tap_time'], row['tx_hash'], row['block'], row['excuse_reason'], row['excuse_document'],
-            ], alt=(ri%2==0), col_formats=col_fmt)
-        last_data = first_data + len(rows) - 1
-        total_row_vals = ['TOTAL',f'{len(enrolled)} enrolled','','',
-                          '','','',
-                          f"{counts['Present']}P/{counts['Late']}L/{counts['Absent']}A/{counts['Excused']}E",
-                          '','','','','']
-        H['totals_row'](ws, last_data+1, total_row_vals, len(headers))
-        ws.cell(row=last_data+3, column=1,
-                value=f'Generated by DAVS on {now.strftime("%B %d, %Y %I:%M %p")}') \
-            .font = XFont(name='Calibri', size=9, italic=True, color='94A3B8')
-
-        wc = wb.create_sheet('Charts')
-        wc.sheet_view.showGridLines = False
-        wc.merge_cells('A1:N1')
-        wc['A1'] = f'Attendance Charts — {subj} {"["+code+"]" if code else ""}'
-        wc['A1'].font = XFont(name='Calibri', bold=True, size=14, color=C['gold'])
-        wc['A1'].fill = XFill('solid', fgColor=C['bg'])
-        wc['A1'].alignment = XAlign(horizontal='center', vertical='center')
-        wc.row_dimensions[1].height = 32
-        for col in range(2,15): wc.cell(row=1,column=col).fill = XFill('solid', fgColor=C['bg'])
-        status_order = ['Present','Late','Absent','Excused']
-        wc.cell(row=3,column=1,value='Status').font = XFont(bold=True, size=9, color=C['muted'])
-        wc.cell(row=3,column=2,value='Count').font  = XFont(bold=True, size=9, color=C['muted'])
-        for ri,st in enumerate(status_order,4):
-            wc.cell(row=ri,column=1,value=st)
-            wc.cell(row=ri,column=2,value=counts[st])
-        pie = PieChart()
-        pie.title = 'Attendance Status Breakdown'
-        pie.style = 10; pie.width = 14; pie.height = 12
-        pie.add_data(Reference(wc,min_col=2,min_row=4,max_row=7))
-        pie.set_categories(Reference(wc,min_col=1,min_row=4,max_row=7))
-        wc.add_chart(pie, 'D3')
-        prog_counts = {}
-        for r in rows:
-            key = f"{r['year']}"; prog_counts[key] = prog_counts.get(key,{'Present':0,'Late':0,'Absent':0,'Excused':0})
-            prog_counts[key][r['status']] += 1
-        if len(prog_counts) > 1:
-            r3c = 9
-            wc.cell(row=3,column=r3c,  value='Year Level').font = XFont(bold=True,size=9,color=C['muted'])
-            wc.cell(row=3,column=r3c+1,value='Present').font    = XFont(bold=True,size=9,color=C['muted'])
-            wc.cell(row=3,column=r3c+2,value='Late').font       = XFont(bold=True,size=9,color=C['muted'])
-            wc.cell(row=3,column=r3c+3,value='Absent').font     = XFont(bold=True,size=9,color=C['muted'])
-            for ri3,(yr_k,yc) in enumerate(sorted(prog_counts.items()),4):
-                wc.cell(row=ri3,column=r3c,  value=yr_k)
-                wc.cell(row=ri3,column=r3c+1,value=yc['Present'])
-                wc.cell(row=ri3,column=r3c+2,value=yc['Late'])
-                wc.cell(row=ri3,column=r3c+3,value=yc['Absent'])
-            bar = BarChart(); bar.type='col'; bar.grouping='stacked'; bar.overlap=100
-            bar.title='Attendance by Year Level'; bar.style=10; bar.width=16; bar.height=12
-            n_yl = len(prog_counts)
-            bar.add_data(Reference(wc,min_col=r3c+1,min_row=3,max_row=3+n_yl),titles_from_data=True)
-            bar.set_categories(Reference(wc,min_col=r3c,min_row=4,max_row=3+n_yl))
-            for i,clr in enumerate([C['present'],C['late'],C['absent']]):
-                if i < len(bar.series): bar.series[i].graphicalProperties.solidFill = clr
-            wc.add_chart(bar,'D21')
-
-        sec_last = section_key.split('|')[-1] if section_key else 'Sec'
-        date_str = (started or '')[:10]
-        code_part = f'_{code}' if code else ''
-        fname = (request.args.get('filename') or
-                 f"Session_Attendance{code_part}_{sec_last}_{date_str}.xlsx")
-        output = _io.BytesIO()
-        wb.save(output); output.seek(0)
-        return Response(output.getvalue(),
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            headers={'Content-Disposition': f'attachment;filename="{fname}"'})
-    except Exception:
-        import traceback
-        return Response(f'Export error: {traceback.format_exc()}', status=500, mimetype='text/plain')
+    return _export_session_attendance_impl(
+        sess_id,
+        load_session_fn=load_session,
+        is_my_session_fn=_is_my_session,
+        get_all_students_fn=get_all_students,
+        normalize_section_key_fn=normalize_section_key,
+        build_student_section_key_fn=build_student_section_key,
+        db_get_session_attendance_fn=db_get_session_attendance,
+        get_db_fn=get_db,
+        xl_helpers_fn=_xl_helpers,
+    )
 
 
 @app.route('/export/stats.xlsx')
 @app.route('/export/stats/xlsx', methods=['POST'])
 @login_required
 def export_stats_xlsx():
-    """Unified analytics export — GET or POST. Produces rich multi-sheet workbook."""
-    try:
-        from openpyxl import Workbook
-        from openpyxl.utils import get_column_letter
-        from openpyxl.chart import BarChart, PieChart, Reference
-        from openpyxl.chart.series import SeriesLabel
-        from openpyxl.styles import Font as XFont, PatternFill as XFill, Alignment as XAlign
-        import io as _io
-
-        if request.method == 'POST':
-            import base64
-            from urllib.parse import parse_qs
-            body       = request.get_json() or {}
-            qs         = parse_qs(body.get('params',''))
-            def qp(k): return qs.get(k,[''])[0]
-            period     = qp('period') or 'all'
-            f_section  = qp('section_key') or qp('section')
-            f_year_lvl = qp('year_level')
-            f_subject  = qp('subject')
-            f_instr    = qp('instructor')
-            f_month    = qp('month')
-            f_year_num = qp('year_num')
-            f_program  = qp('program')
-            f_sec_ltr  = qp('section_letter')
-            f_tod      = qp('time_of_day')
-        else:
-            period     = request.args.get('period',     'all')
-            f_section  = request.args.get('section_key', request.args.get('section','')).strip()
-            f_year_lvl = request.args.get('year_level', '').strip()
-            f_subject  = request.args.get('subject',    '').strip()
-            f_instr    = request.args.get('instructor', '').strip()
-            f_month    = request.args.get('month',      '').strip()
-            f_year_num = request.args.get('year_num',   '').strip()
-            f_program  = request.args.get('program',    '').strip()
-            f_sec_ltr  = request.args.get('section_letter','').strip()
-            f_tod      = request.args.get('time_of_day','').strip()
-
-        role     = session.get('role')
-        username = session.get('username')
-        now      = datetime.now()
-        if not f_year_num:
-            f_year_num = (qp('year') if request.method == 'POST' else request.args.get('year', '').strip()) if period in ('month', 'year') else ''
-
-        if period == 'today':
-            start_dt = now.replace(hour=0,minute=0,second=0,microsecond=0); end_dt = None
-            period_label = now.strftime('Today — %B %d, %Y')
-        elif period == 'month':
-            yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
-            mo = int(f_month)    if f_month    and f_month.isdigit()    else now.month
-            start_dt = datetime(yr,mo,1)
-            end_dt   = datetime(yr,mo,_cal.monthrange(yr,mo)[1],23,59,59)
-            period_label = start_dt.strftime('%B %Y')
-        elif period == 'year':
-            yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
-            start_dt = datetime(yr,1,1); end_dt = datetime(yr,12,31,23,59,59)
-            period_label = str(yr)
-        else:
-            start_dt = datetime(2000,1,1); end_dt = None; period_label = 'All Time'
-
-        all_sess = load_sessions()
-        # Always use SQLite cache for export — get_all_students() may return
-        # empty if blockchain restarted and events are gone. SQLite is the
-        # reliable source of truth for enrolled students.
-        all_stud = db_get_all_students()
-        for _st in all_stud:
-            _ov = db_get_override(_st['nfcId'])
-            if _ov.get('course'):      _st['course']      = _ov['course']
-            if _ov.get('year_level'):  _st['year_level']  = _ov['year_level']
-            if _ov.get('section'):     _st['section']     = _ov['section'].upper()
-            if _ov.get('full_name'):   _st['name']        = _ov['full_name']
-            if _ov.get('student_id'):  _st['student_id']  = _ov['student_id']
-            _st['section'] = (_st.get('section') or '').strip().upper()
-        filtered = {}
-        f_section_norm = normalize_section_key(f_section) if f_section else ''
-        for sid, s in all_sess.items():
-            if not s.get('started_at'): continue
-            try:    sess_dt = datetime.strptime(s['started_at'],'%Y-%m-%d %H:%M:%S')
-            except: continue
-            if sess_dt < start_dt: continue
-            if end_dt and sess_dt > end_dt: continue
-            if role == 'teacher' and s.get('teacher') != username: continue
-            sk = s.get('section_key',''); sk_parts = sk.split('|')
-            if f_section_norm and normalize_section_key(sk) != f_section_norm: continue
-            if f_program and (len(sk_parts)<1 or sk_parts[0] != f_program): continue
-            if f_year_lvl and (len(sk_parts)<2 or sk_parts[1] != f_year_lvl): continue
-            if f_sec_ltr and (len(sk_parts)<3 or sk_parts[2] != f_sec_ltr): continue
-            if f_subject and s.get('subject_name','') != f_subject: continue
-            if f_instr   and s.get('teacher_name','') != f_instr:   continue
-            if f_tod:
-                if ':' in f_tod:
-                    if s.get('time_slot','') != f_tod: continue
-                else:
-                    try:
-                        h = sess_dt.hour
-                        if f_tod == 'morning'   and h >= 12: continue
-                        if f_tod == 'afternoon' and h <  12: continue
-                    except: pass
-            filtered[sid] = s
-
-        af = []
-        if f_program:  af.append('Program: '+f_program)
-        if f_year_lvl: af.append('Year: '+f_year_lvl)
-        if f_sec_ltr:  af.append('Section: '+f_sec_ltr)
-        if f_section:  af.append('Section: '+f_section.replace('|',' · '))
-        if f_subject:  af.append('Subject: '+f_subject)
-        if f_instr:    af.append('Instructor: '+f_instr)
-        if f_tod:      af.append('Time: '+f_tod)
-        filter_label = ' | '.join(af) if af else 'All data'
-
-        donut  = {'Present':0,'Late':0,'Absent':0,'Excused':0}
-        trend  = {}; subj_d = {}; sess_rows = []; detail_rows = []; by_section = {}
-        REASON_LABELS = {
-            'sickness': 'Sickness / Illness', 'lbm': 'LBM', 'emergency': 'Family Emergency',
-            'bereavement': 'Bereavement', 'medical': 'Medical Appointment', 'accident': 'Accident / Injury',
-            'official': 'Official School Business', 'weather': 'Extreme Weather / Calamity',
-            'transport': 'Transportation Problem', 'others': 'Others'
-        }
-
-        for sid, s in sorted(filtered.items(), key=lambda x: x[1].get('started_at','')):
-            sk       = normalize_section_key(s.get('section_key',''))
-            enrolled = [st for st in all_stud if build_student_section_key(st)==sk]
-            en_ids   = {st['nfcId'] for st in enrolled}
-            pre      = set(s.get('present',[])); late = set(s.get('late',[]))
-            exc      = set(s.get('excused',[])); abs_ = en_ids - pre - late - exc
-            cnt      = {'enrolled':len(en_ids),
-                        'present': len(pre-late), 'late': len(late),
-                        'absent':  len(abs_),      'excused': len(exc)}
-            for k in ('present','late','absent','excused'): donut[k.capitalize()] += cnt[k]
-            code      = s.get('course_code','')
-            subj_lbl  = f"[{code}] {s.get('subject_name','')}" if code else s.get('subject_name','')
-            rate      = round((cnt['present']+cnt['late'])/cnt['enrolled']*100,1) if cnt['enrolled'] else 0
-            date_key  = s['started_at'][:10]
-            if date_key not in trend: trend[date_key] = {'present':0,'late':0,'absent':0,'excused':0}
-            for k in ('present','late','absent','excused'): trend[date_key][k] += cnt[k]
-            sn = s.get('subject_name','Unknown')
-            if sn not in subj_d: subj_d[sn] = {'code':code,'present':0,'late':0,'absent':0,'excused':0}
-            for k in ('present','late','absent','excused'): subj_d[sn][k] += cnt[k]
-            if sk not in by_section: by_section[sk] = {'present':0,'late':0,'absent':0,'excused':0,'enrolled':0}
-            for k in ('present','late','absent','excused','enrolled'): by_section[sk][k] += cnt[k]
-            sess_rows.append([subj_lbl, fmt_time(s['started_at']),
-                              sk.replace('|',' · '), s.get('teacher_name',''),
-                              s.get('time_slot',''),
-                              cnt['enrolled'], cnt['present'], cnt['late'],
-                              cnt['absent'],   cnt['excused'], rate])
-            att_logs = {lg['nfc_id']: lg for lg in db_get_session_attendance(sid)}
-            # Get excuse request details for this session
-            excuse_details = {}
-            with get_db() as _conn:
-                excuses = _conn.execute(
-                    "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
-                    (sid,)
-                ).fetchall()
-                for exc_row in excuses:
-                    excuse_details[exc_row['nfc_id']] = {
-                        'reason': exc_row['reason_type'],
-                        'reason_detail': exc_row['reason_detail'],
-                        'attachment_file': exc_row['attachment_file'],
-                    }
-            for st in enrolled:
-                nid = st['nfcId']
-                if   nid in exc:  status = 'Excused'
-                elif nid in late: status = 'Late'
-                elif nid in pre:  status = 'Present'
-                else:             status = 'Absent'
-                lg = att_logs.get(nid,{})
-                excuse_info = excuse_details.get(nid, {})
-                excuse_reason = ''
-                if excuse_info.get('reason'):
-                    excuse_reason = REASON_LABELS.get(excuse_info['reason'], excuse_info['reason'])
-                    if excuse_info.get('reason_detail'):
-                        excuse_reason += f" ({excuse_info['reason_detail']})"
-                detail_rows.append([
-                    st['name'], st.get('student_id',''), nid,
-                    st.get('course',''), st.get('year_level',''), st.get('section',''),
-                    subj_lbl, fmt_time(s['started_at']), s.get('time_slot',''),
-                    s.get('teacher_name',''), status,
-                    lg.get('tx_hash','') or s.get('tx_hashes',{}).get(nid,{}).get('tx_hash',''),
-                    str(lg.get('block_number','') or s.get('tx_hashes',{}).get(nid,{}).get('block','')),
-                    excuse_reason,
-                    excuse_info.get('attachment_file', '') or '',
-                ])
-
-        total_all = sum(donut.values())
-        H = _xl_helpers(); C = H['C']
-        wb = Workbook()
-
-        # Sheet 1: Summary
-        ws1 = wb.active; ws1.title = 'Summary'
-        n_cols = 11
-        subtitles = [
-            'Cavite State University — Decentralized Attendance Verification System',
-            f'Period: {period_label}  |  Filters: {filter_label}',
-            f'Generated: {now.strftime("%B %d, %Y  %I:%M %p")}  |  Role: {role.upper()}',
-        ]
-        first_row = H['title_block'](ws1, 'DAVS — Attendance Analytics Report', subtitles, n_cols)
-        first_row = H['stat_block'](ws1, first_row, donut, n_cols)
-        hdrs = ['Subject','Session Date & Time','Section','Instructor','Time Slot',
-                'Enrolled','Present','Late','Absent','Excused','Rate %']
-        wids = [36,22,26,22,16,10,10,9,9,10,10]
-        H['make_header_row'](ws1, first_row, hdrs, wids)
-        first_row += 1
-        for ri, row in enumerate(sess_rows, first_row):
-            vals = list(row); vals[10] = f"{vals[10]}%"
-            col_fmt = {7:('num',),8:('num',),9:('num',),10:('num',)}
-            H['data_row'](ws1, ri, vals, alt=(ri%2==0), col_formats=col_fmt)
-        last_data = first_row + len(sess_rows) - 1
-        tr = last_data + 1
-        H['totals_row'](ws1, tr,
-            ['TOTAL','','','','',
-             f"=SUM(F{first_row}:F{last_data})",
-             f"=SUM(G{first_row}:G{last_data})",
-             f"=SUM(H{first_row}:H{last_data})",
-             f"=SUM(I{first_row}:I{last_data})",
-             f"=SUM(J{first_row}:J{last_data})",
-             f'=IFERROR(TEXT((G{tr}+H{tr})/F{tr},"0.0%"),"-")'],
-            n_cols)
-        ws1.cell(row=tr+2, column=1,
-                 value=f'Generated by DAVS on {now.strftime("%B %d, %Y %I:%M %p")}') \
-            .font = XFont(name='Calibri', size=9, italic=True, color='94A3B8')
-        ws1.freeze_panes = ws1.cell(row=first_row, column=1)
-
-        # Sheet 2: Student Detail
-        ws2 = wb.create_sheet('Student Detail'); n2 = 16
-        subtitles2 = [
-            'Cavite State University — DAVS',
-            f'Period: {period_label}  |  Filters: {filter_label}',
-            'Each row represents one student in one session including full blockchain proof.',
-        ]
-        dr = H['title_block'](ws2, 'Student Attendance Detail', subtitles2, n2)
-        det_hdrs = ['Student Name','Student ID','NFC Card UID','Program','Year','Sec',
-                    'Subject','Session Date','Time Slot','Instructor',
-                    'Status','TX Hash','Block #','Excuse Reason','Document']
-        det_wids = [28,14,14,28,10,6,32,20,16,22,10,52,10,26,20]
-        H['make_header_row'](ws2, dr, det_hdrs, det_wids)
-        dr += 1
-        for ri, row in enumerate(detail_rows, dr):
-            col_fmt = {11:('status',),12:('tx',),13:('num',)}
-            H['data_row'](ws2, ri, row, alt=(ri%2==0), col_formats=col_fmt)
-        ws2.freeze_panes = ws2.cell(row=dr, column=1)
-
-        # Sheet 3: By Date
-        ws3 = wb.create_sheet('By Date'); n3 = 5
-        subtitles3 = [f'Period: {period_label}  |  Attendance counts per session date']
-        tr3 = H['title_block'](ws3, 'Attendance Trend by Date', subtitles3, n3)
-        H['make_header_row'](ws3, tr3, ['Date','Present','Late','Absent','Excused'], [18,12,12,12,12])
-        tr3 += 1
-        for ri, (date, td) in enumerate(sorted(trend.items()), tr3):
-            col_fmt = {2:('num',),3:('num',),4:('num',),5:('num',)}
-            H['data_row'](ws3, ri, [date,td['present'],td['late'],td['absent'],td['excused']],
-                          alt=(ri%2==0), col_formats=col_fmt)
-        last_tr3 = tr3 + len(trend) - 1
-        if trend:
-            bar3 = BarChart(); bar3.type='col'; bar3.grouping='stacked'; bar3.overlap=100
-            bar3.title='Daily Attendance Trend'; bar3.style=10; bar3.width=22; bar3.height=14
-            bar3.y_axis.title='Count'; bar3.legend.position='b'
-            cats3 = Reference(ws3, min_col=1, min_row=tr3, max_row=last_tr3)
-            data3 = Reference(ws3, min_col=2, min_row=tr3-1, max_row=last_tr3, max_col=5)
-            bar3.add_data(data3, titles_from_data=True); bar3.set_categories(cats3)
-            colors3 = [C['present'],C['late'],C['absent'],C['excused']]
-            for i,clr in enumerate(colors3):
-                if i < len(bar3.series):
-                    bar3.series[i].graphicalProperties.solidFill = clr
-                    bar3.series[i].graphicalProperties.line.solidFill = clr
-            ws3.add_chart(bar3, f'G{tr3}')
-
-        # Sheet 4: By Subject
-        ws4 = wb.create_sheet('By Subject'); n4 = 7
-        subtitles4 = [f'Period: {period_label}  |  Aggregate attendance per subject']
-        ts4 = H['title_block'](ws4, 'Attendance by Subject', subtitles4, n4)
-        H['make_header_row'](ws4, ts4,
-                             ['Subject','Code','Present','Late','Absent','Excused','Rate %'],
-                             [36,12,12,12,12,12,12])
-        ts4 += 1
-        for ri, (sn, sd) in enumerate(sorted(subj_d.items()), ts4):
-            total2 = sd['present']+sd['late']+sd['absent']+sd['excused']
-            rate2  = f"{round((sd['present']+sd['late'])/total2*100,1)}%" if total2 else '—'
-            col_fmt4 = {3:('num',),4:('num',),5:('num',),6:('num',)}
-            H['data_row'](ws4, ri, [sn, sd['code'], sd['present'],sd['late'],sd['absent'],sd['excused'],rate2],
-                          alt=(ri%2==0), col_formats=col_fmt4)
-        last_ts4 = ts4 + len(subj_d) - 1
-        if subj_d:
-            bar4 = BarChart(); bar4.type='bar'; bar4.grouping='stacked'; bar4.overlap=100
-            bar4.title='Attendance by Subject'; bar4.style=10; bar4.width=22; bar4.height=14
-            bar4.x_axis.title='Count'; bar4.legend.position='b'
-            cats4 = Reference(ws4, min_col=1, min_row=ts4, max_row=last_ts4)
-            data4 = Reference(ws4, min_col=3, min_row=ts4-1, max_row=last_ts4, max_col=6)
-            bar4.add_data(data4, titles_from_data=True); bar4.set_categories(cats4)
-            colors4 = [C['present'],C['late'],C['absent'],C['excused']]
-            for i,clr in enumerate(colors4):
-                if i < len(bar4.series): bar4.series[i].graphicalProperties.solidFill = clr
-            ws4.add_chart(bar4, f'I{ts4}')
-
-# Sheet 5: By Section
-        ws5 = wb.create_sheet('By Section'); n5 = 7
-        subtitles5 = [f'Period: {period_label}  |  Aggregate attendance per section']
-        ts5 = H['title_block'](ws5, 'Attendance by Section', subtitles5, n5)
-        H['make_header_row'](ws5, ts5,
-                             ['Section','Enrolled','Present','Late','Absent','Excused','Rate %'],
-                             [32,10,12,12,12,12,12])
-        ts5 += 1
-        for ri, (sec_k, sc) in enumerate(sorted(by_section.items()), ts5):
-            total5 = sc['present']+sc['late']+sc['absent']+sc['excused']
-            rate5  = f"{round((sc['present']+sc['late'])/sc['enrolled']*100,1)}%" if sc['enrolled'] else '-'
-            col_fmt5 = {2:('num',),3:('num',),4:('num',),5:('num',),6:('num',)}
-            H['data_row'](ws5, ri, [sec_k.replace('|',' · '), sc['enrolled'],
-                                    sc['present'],sc['late'],sc['absent'],sc['excused'],rate5],
-                          alt=(ri%2==0), col_formats=col_fmt5)
-        last_ts5 = ts5 + len(by_section) - 1
-        # Add bar chart for By Section sheet
-        if by_section:
-            from openpyxl.chart import BarChart, Reference
-            bar5 = BarChart(); bar5.type='bar'; bar5.grouping='stacked'; bar5.overlap=100
-            bar5.title='Attendance by Section'; bar5.style=10; bar5.width=22; bar5.height=14
-            bar5.x_axis.title='Count'; bar5.legend.position='b'
-            cats5 = Reference(ws5, min_col=1, min_row=ts5, max_row=last_ts5)
-            data5 = Reference(ws5, min_col=3, min_row=ts5-1, max_row=last_ts5, max_col=6)
-            bar5.add_data(data5, titles_from_data=True); bar5.set_categories(cats5)
-            colors5 = [C['present'],C['late'],C['absent'],C['excused']]
-            for i,clr in enumerate(colors5):
-                if i < len(bar5.series):
-                    bar5.series[i].graphicalProperties.solidFill = clr
-                    bar5.series[i].graphicalProperties.line.solidFill = clr
-            ws5.add_chart(bar5, f'I{ts5}')
- 
-        # Sheet 6: Charts Dashboard
-        # ── Layout strategy ────────────────────────────────────────────────
-        # Row 1-2:  Title + subtitle (dark header)
-        # Row 3:    Spacer
-        # Row 4-7:  PIE chart data (cols A-B), Pie chart anchored at C4
-        # Row 10+:  Subject bar data (cols A-E), Subject bar anchored at G10
-        # Row 25+:  Section bar data (cols A-E), Section bar anchored at G25
-        # All data columns are hidden so only charts show.
-        # ──────────────────────────────────────────────────────────────────
-        from openpyxl.chart import BarChart, PieChart, Reference
-        from openpyxl.styles import Font as XFont, PatternFill as XFill, Alignment as XAlign
- 
-        wc = wb.create_sheet('Charts')
-        wc.sheet_view.showGridLines = False
- 
-        # Title rows
-        n_chart_cols = 20
-        wc.merge_cells(f'A1:{chr(64+n_chart_cols)}1')
-        wc['A1'] = 'DAVS — Attendance Analytics Charts'
-        wc['A1'].font      = XFont(name='Calibri', bold=True, size=16, color=C['gold'])
-        wc['A1'].fill      = XFill('solid', fgColor=C['bg'])
-        wc['A1'].alignment = XAlign(horizontal='center', vertical='center')
-        wc.row_dimensions[1].height = 36
-        for col in range(2, n_chart_cols+1):
-            wc.cell(row=1, column=col).fill = XFill('solid', fgColor=C['bg'])
- 
-        wc.merge_cells(f'A2:{chr(64+n_chart_cols)}2')
-        wc['A2'] = f'Period: {period_label}  |  Filters: {filter_label}  |  Generated: {now.strftime("%B %d, %Y")}'
-        wc['A2'].font      = XFont(name='Calibri', size=9, italic=True, color='94A3B8')
-        wc['A2'].fill      = XFill('solid', fgColor=C['bg'])
-        wc['A2'].alignment = XAlign(horizontal='center', vertical='center')
-        for col in range(2, n_chart_cols+1):
-            wc.cell(row=2, column=col).fill = XFill('solid', fgColor=C['bg'])
- 
-        # ── 1. Overall Status Pie chart ───────────────────────────────────
-        # Data in cols A-B, rows 4-7 (hidden)
-        pie_labels = ['Present','Late','Absent','Excused']
-        pie_vals   = [donut[k] for k in pie_labels]
-        for ri_p, (lbl, val) in enumerate(zip(pie_labels, pie_vals), 4):
-            wc.cell(row=ri_p, column=30, value=lbl)
-            wc.cell(row=ri_p, column=31, value=val)
- 
-        pie_c = PieChart()
-        pie_c.title  = f'Overall Attendance Status — {period_label}'
-        pie_c.style  = 10; pie_c.width = 16; pie_c.height = 14
-        pie_c.add_data(Reference(wc, min_col=31, min_row=4, max_row=7))
-        pie_c.set_categories(Reference(wc, min_col=30, min_row=4, max_row=7))
-        pie_colors = [C['present'], C['late'], C['absent'], C['excused']]
-        for i, clr in enumerate(pie_colors):
-            if i < len(pie_c.series) and pie_c.series[i].dPt:
-                pass  # openpyxl PieChart slice colors require DataPoint — skip per-slice color
-        wc.add_chart(pie_c, 'B4')
- 
-        # ── 2. Attendance by Subject bar chart ────────────────────────────
-        # Data in cols A-E, rows 10+ (cols A-B already hidden, C-F hidden below)
-        SUBJ_DATA_ROW = 10
-        if subj_d:
-            wc.cell(row=SUBJ_DATA_ROW-1, column=33, value='Subject')
-            wc.cell(row=SUBJ_DATA_ROW-1, column=34, value='Present')
-            wc.cell(row=SUBJ_DATA_ROW-1, column=35, value='Late')
-            wc.cell(row=SUBJ_DATA_ROW-1, column=36, value='Absent')
-            wc.cell(row=SUBJ_DATA_ROW-1, column=37, value='Excused')
-            for ri_s, (sn, sd) in enumerate(sorted(subj_d.items()), SUBJ_DATA_ROW):
-                wc.cell(row=ri_s, column=33, value=sn[:30])
-                wc.cell(row=ri_s, column=34, value=sd['present'])
-                wc.cell(row=ri_s, column=35, value=sd['late'])
-                wc.cell(row=ri_s, column=36, value=sd['absent'])
-                wc.cell(row=ri_s, column=37, value=sd['excused'])
-            n_subj      = len(subj_d)
-            subj_last   = SUBJ_DATA_ROW + n_subj - 1
-            bar_s = BarChart(); bar_s.type='bar'; bar_s.grouping='stacked'; bar_s.overlap=100
-            bar_s.title  = 'Attendance by Subject'
-            bar_s.style  = 10; bar_s.width = 20; bar_s.height = max(10, n_subj * 1.2)
-            bar_s.legend.position = 'b'
-            bar_s.add_data(
-                Reference(wc, min_col=34, min_row=SUBJ_DATA_ROW-1,
-                            max_row=subj_last, max_col=37),
-                titles_from_data=True)
-            bar_s.set_categories(
-                Reference(wc, min_col=33, min_row=SUBJ_DATA_ROW, max_row=subj_last))
-            for i, clr in enumerate([C['present'],C['late'],C['absent'],C['excused']]):
-                if i < len(bar_s.series):
-                    bar_s.series[i].graphicalProperties.solidFill = clr
-                    bar_s.series[i].graphicalProperties.line.solidFill = clr
-            # Anchor subject chart below the pie chart — row 4 + ~20 rows down
-            wc.add_chart(bar_s, 'B36')
-
-        # ── 3. Attendance by Section bar chart ───────────────────────────
-        # Data in cols H-L, rows 10+
-        SEC_DATA_ROW = 10
-        if by_section:
-            wc.cell(row=SEC_DATA_ROW-1, column=38, value='Section')
-            wc.cell(row=SEC_DATA_ROW-1, column=39, value='Present')
-            wc.cell(row=SEC_DATA_ROW-1, column=40, value='Late')
-            wc.cell(row=SEC_DATA_ROW-1, column=41, value='Absent')
-            wc.cell(row=SEC_DATA_ROW-1, column=42, value='Excused')
-            for ri_sc, (sec_k, sc) in enumerate(sorted(by_section.items()), SEC_DATA_ROW):
-                wc.cell(row=ri_sc, column=38, value=sec_k.replace('|',' · ')[:30])
-                wc.cell(row=ri_sc, column=39, value=sc['present'])
-                wc.cell(row=ri_sc, column=40, value=sc['late'])
-                wc.cell(row=ri_sc, column=41, value=sc['absent'])
-                wc.cell(row=ri_sc, column=42, value=sc['excused'])
-            n_sec     = len(by_section)
-            sec_last  = SEC_DATA_ROW + n_sec - 1
-            bar_sc = BarChart(); bar_sc.type='bar'; bar_sc.grouping='stacked'; bar_sc.overlap=100
-            bar_sc.title  = 'Attendance by Section'
-            bar_sc.style  = 10; bar_sc.width = 20; bar_sc.height = max(10, n_sec * 1.4)
-            bar_sc.legend.position = 'b'
-            bar_sc.add_data(
-                Reference(wc, min_col=39, min_row=SEC_DATA_ROW-1,
-                            max_row=sec_last, max_col=42),
-                titles_from_data=True)
-            bar_sc.set_categories(
-                Reference(wc, min_col=38, min_row=SEC_DATA_ROW, max_row=sec_last))
-            for i, clr in enumerate([C['present'],C['late'],C['absent'],C['excused']]):
-                if i < len(bar_sc.series):
-                    bar_sc.series[i].graphicalProperties.solidFill = clr
-                    bar_sc.series[i].graphicalProperties.line.solidFill = clr
-            # Anchor section chart to the right of the pie chart
-            wc.add_chart(bar_sc, 'N4')
-
-        parts = ['DAVS_Attendance_Report', period_label.replace(' ','_').replace(',','')]
-        if f_program:  parts.append(f_program.replace('BS ','BS').replace(' ','_'))
-        if f_year_lvl: parts.append(f_year_lvl.replace(' ','_'))
-        if f_sec_ltr:  parts.append(f'Section_{f_sec_ltr}')
-        if f_subject:  parts.append(re.sub(r'[^A-Za-z0-9]','_',f_subject)[:20])
-        if f_instr:    parts.append(f_instr.split()[0])
-        fname = request.args.get('filename') or ('_'.join(parts)+f'_{now.strftime("%Y-%m-%d")}.xlsx')
-        fname = re.sub(r'_+','_', fname)
-        # Strip characters outside latin-1 range — the em dash (—) in
-        # period_label e.g. "Today — March 21, 2026" causes UnicodeEncodeError
-        # when Werkzeug encodes the Content-Disposition HTTP header.
-        fname = fname.replace('\u2014','-').replace('\u2013','-')  # em/en dash
-        fname = fname.encode('ascii','ignore').decode('ascii')      # drop rest
-        fname = re.sub(r'[^\w\-.]','_', fname)
-        fname = re.sub(r'_+','_', fname).strip('_')
-        if not fname.endswith('.xlsx'):
-            fname += '.xlsx'
-        output = _io.BytesIO()
-        wb.save(output); output.seek(0)
-        return Response(output.getvalue(),
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            headers={'Content-Disposition': f'attachment; filename="{fname}"'})
-    except Exception:
-        import traceback
-        return Response(f'Export error: {traceback.format_exc()}', status=500, mimetype='text/plain')
+    return _export_stats_xlsx_impl(
+        request_obj=request,
+        session_obj=session,
+        build_stats_export_dataset_fn=_build_stats_export_dataset,
+        load_sessions_fn=load_sessions,
+        db_get_all_students_fn=db_get_all_students,
+        db_get_override_fn=db_get_override,
+        normalize_section_key_fn=normalize_section_key,
+        build_student_section_key_fn=build_student_section_key,
+        fmt_time_fn=fmt_time,
+        db_get_session_attendance_fn=db_get_session_attendance,
+        get_db_fn=get_db,
+        xl_helpers_fn=_xl_helpers,
+    )
 
 
 @app.route('/export/stats.csv')
 @login_required
 def export_stats_csv():
-    period     = request.args.get('period', 'all')
-    f_month    = request.args.get('month', '').strip()
-    f_year_num = request.args.get('year_num', '').strip()
-    f_subject  = request.args.get('subject', '').strip()
-    f_section  = request.args.get('section_key', request.args.get('section', '')).strip()
-    f_year_lvl = request.args.get('year_level', '').strip()
-    f_program  = request.args.get('program', '').strip()
-    f_sec_ltr  = request.args.get('section_letter', '').strip()
-    f_instr    = request.args.get('instructor', '').strip()
-    f_tod      = request.args.get('time_of_day', '').strip()
-    role       = session.get('role')
-    username   = session.get('username')
-    now        = datetime.now()
-
-    if not f_year_num:
-        f_year_num = request.args.get('year', '').strip() if period in ('month', 'year') else ''
-
-    if period == 'today':
-        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0); end_dt = None
-    elif period == 'month':
-        yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
-        mo = int(f_month) if f_month and f_month.isdigit() else now.month
-        start_dt = datetime(yr, mo, 1); end_dt = datetime(yr, mo, _cal.monthrange(yr, mo)[1], 23, 59, 59)
-    elif period == 'year':
-        yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
-        start_dt = datetime(yr, 1, 1); end_dt = datetime(yr, 12, 31, 23, 59, 59)
-    else:
-        start_dt = datetime(2000, 1, 1); end_dt = None
-
-    where = ["s.started_at >= ?"]
-    params = [start_dt.strftime('%Y-%m-%d %H:%M:%S')]
-    if end_dt:
-        where.append("s.started_at <= ?")
-        params.append(end_dt.strftime('%Y-%m-%d %H:%M:%S'))
-    if role == 'teacher':
-        where.append("s.teacher_username = ?")
-        params.append(username)
-    if f_section:
-        where.append("s.section_key = ?")
-        params.append(normalize_section_key(f_section))
-    if f_program:
-        where.append("s.section_key LIKE ?")
-        params.append(f_program + '%')
-    if f_year_lvl:
-        where.append("s.section_key LIKE ?")
-        params.append('%|' + f_year_lvl + '|%')
-    if f_sec_ltr:
-        where.append("s.section_key LIKE ?")
-        params.append('%|' + f_sec_ltr)
-    if f_subject:
-        where.append("s.subject_name = ?")
-        params.append(f_subject)
-    if f_instr:
-        where.append("s.teacher_name = ?")
-        params.append(f_instr)
-    if f_tod == 'morning':
-        where.append("CAST(strftime('%H',s.started_at) AS INTEGER) < 12")
-    elif f_tod == 'afternoon':
-        where.append("CAST(strftime('%H',s.started_at) AS INTEGER) >= 12")
-    elif f_tod and ':' in f_tod:
-        where.append("s.time_slot = ?")
-        params.append(f_tod)
-    wsql = " AND ".join(where)
-
-    out = io.StringIO()
-    w = csv.writer(out)
-    w.writerow(['Session ID', 'Subject', 'Section', 'Instructor', 'Date', 'Time Slot', 'Total Records', 'Present', 'Late', 'Absent', 'Excused', 'Rate%'])
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT s.sess_id, s.subject_name, s.section_key, s.teacher_name, s.started_at, s.time_slot, "
-            "SUM(CASE WHEN al.status='present' THEN 1 ELSE 0 END) AS present_count, "
-            "SUM(CASE WHEN al.status='late' THEN 1 ELSE 0 END) AS late_count, "
-            "SUM(CASE WHEN al.status='absent' THEN 1 ELSE 0 END) AS absent_count, "
-            "SUM(CASE WHEN al.status='excused' THEN 1 ELSE 0 END) AS excused_count, "
-            "COUNT(*) AS total_count "
-            "FROM attendance_logs al "
-            "JOIN sessions s ON al.sess_id = s.sess_id "
-            "WHERE " + wsql + " "
-            "GROUP BY s.sess_id, s.subject_name, s.section_key, s.teacher_name, s.started_at, s.time_slot "
-            "ORDER BY s.started_at",
-            params
-        ).fetchall()
-    for r in rows:
-        total = int(r['total_count'] or 0)
-        present = int(r['present_count'] or 0)
-        late = int(r['late_count'] or 0)
-        absent = int(r['absent_count'] or 0)
-        excused = int(r['excused_count'] or 0)
-        rate = round((present + late) / total * 100, 1) if total else 0
-        w.writerow([
-            (r['sess_id'] or '')[:8],
-            r['subject_name'] or '',
-            normalize_section_key(r['section_key'] or '').replace('|', ' · '),
-            r['teacher_name'] or '',
-            (r['started_at'] or '')[:10],
-            r['time_slot'] or '',
-            total, present, late, absent, excused, rate
-        ])
-    out.seek(0)
-    fname = f"attendance_{period}_{now.strftime('%Y%m%d')}.csv"
-    return Response(out.getvalue(), mimetype='text/csv', headers={'Content-Disposition': f'attachment;filename={fname}'})
+    return _export_stats_csv_impl(
+        request_obj=request,
+        session_obj=session,
+        get_db_fn=get_db,
+        normalize_section_key_fn=normalize_section_key,
+    )
 
 @app.route('/request_registration_scan', methods=['POST'])
 @admin_required
@@ -6094,6 +4303,9 @@ def superadmin_promote(username):
 @app.route('/admin/create-instructor', methods=['GET', 'POST'])
 @admin_required
 def admin_create_instructor():
+    if session.get('role') != 'admin':
+        flash('Normal admin access required.', 'danger')
+        return redirect(url_for('index'))
     if request.method == 'POST':
         username = request.form.get('username', '').strip().lower()
         fullname = request.form.get('full_name', '').strip()
@@ -6125,197 +4337,94 @@ def admin_create_instructor():
 @app.route('/admin/schedules')
 @admin_required
 def admin_schedules():
-    all_schedules = db_get_all_schedules()
-    subjects   = db_get_all_subjects()
-    users      = db_get_all_users()
-    # Only show teacher-role accounts in the instructor dropdown
-    teachers   = {u: v for u, v in users.items() if v.get('role') == 'teacher' and v.get('status') == 'approved'}
-    sections   = _get_all_section_keys()
-    # Admin and Super Admin can both see all schedules.
-    current_role = session.get('role', '')
-    schedules = all_schedules
-    return render_template('admin_schedules.html',
-                           schedules=schedules,
-                           subjects=subjects,
-                           teachers=teachers,
-                           sections=sections,
-                           dow_names=DOW_NAMES,
-                           is_super_admin=(current_role == 'super_admin'),
-                           can_manage_schedules=(current_role in ADMIN_ROLES))
+    return _admin_schedules_page_impl(
+        db_get_all_schedules=db_get_all_schedules,
+        db_get_all_subjects=db_get_all_subjects,
+        db_get_all_users=db_get_all_users,
+        get_all_section_keys=_get_all_section_keys,
+        session_obj=session,
+        render_template=render_template,
+        dow_names=DOW_NAMES,
+        admin_roles=ADMIN_ROLES,
+    )
 
 @app.route('/admin/schedules/create', methods=['POST'])
 @admin_required
 def admin_schedule_create():
-    try:
-        subject_id  = request.form.get('subject_id', '')
-        subj        = db_get_subject(subject_id)
-        if not subj:
-            flash('Subject not found.', 'danger')
-            return redirect(url_for('admin_schedules'))
-        teacher_u = request.form.get('teacher_username', '')
-        teacher   = db_get_user(teacher_u)
-        if not teacher:
-            flash('Instructor not found.', 'danger')
-            return redirect(url_for('admin_schedules'))
-        program      = request.form.get('program', '').strip()
-        year_level   = request.form.get('year_level', '').strip()
-        # Support both 'section' (new form) and 'section_letter' (old form)
-        sec_letter   = (request.form.get('section', '') or request.form.get('section_letter', '')).strip()
-        if program and year_level and sec_letter:
-            section_key = normalize_section_key(f"{program}|{year_level}|{sec_letter}")
-        else:
-            section_key  = normalize_section_key(request.form.get('section_key', ''))
-            
-        day_of_week  = int(request.form.get('day_of_week', 0))
-        start_time   = request.form.get('start_time', '')
-        end_time     = request.form.get('end_time', '')
-        grace_min    = int(request.form.get('grace_minutes', 15))
-        if not section_key or not start_time or not end_time:
-            flash('Section, start time, and end time are required.', 'danger')
-            return redirect(url_for('admin_schedules'))
-        start_mins = _time_mins(start_time)
-        end_mins = _time_mins(end_time)
-        if start_mins is None or end_mins is None or end_mins <= start_mins:
-            flash('End time must be later than start time.', 'danger')
-            return redirect(url_for('admin_schedules'))
-        db_save_schedule({
-            'section_key': section_key,
-            'subject_id':  subject_id,
-            'subject_name': subj['name'],
-            'course_code': subj.get('course_code', ''),
-            'teacher_username': teacher_u,
-            'teacher_name': teacher.get('full_name', teacher_u),
-            'day_of_week': day_of_week,
-            'start_time':  start_time,
-            'end_time':    end_time,
-            'grace_minutes': grace_min,
-            'created_by':  session.get('username', ''),
-        })
-        flash('Schedule created successfully.', 'success')
-    except Exception as e:
-        flash(f'Error creating schedule: {e}', 'danger')
-    return redirect(url_for('admin_schedules'))
+    return _admin_schedule_create_impl(
+        request=request,
+        flash=flash,
+        redirect=redirect,
+        url_for=url_for,
+        db_get_subject=db_get_subject,
+        db_get_user=db_get_user,
+        normalize_section_key=normalize_section_key,
+        time_mins=_time_mins,
+        db_save_schedule=db_save_schedule,
+        session_obj=session,
+    )
 
 @app.route('/admin/schedules/<schedule_id>/edit', methods=['POST'])
 @admin_required
 def admin_schedule_edit(schedule_id):
-    try:
-        sched = db_get_schedule(schedule_id)
-        if not sched:
-            flash('Schedule not found.', 'danger')
-            return redirect(url_for('admin_schedules'))
-        
-        # ✅ FIX: Check if schedule is within 5 minutes of start time
-        today_dow = datetime.now().weekday()
-        if int(sched['day_of_week']) == today_dow:
-            current_time = datetime.now().strftime('%H:%M')
-            start_time = sched['start_time']
-            try:
-                now_dt = datetime.strptime(current_time, '%H:%M')
-                start_dt = datetime.strptime(start_time, '%H:%M')
-                time_diff = (start_dt - now_dt).total_seconds() / 60
-                if 0 <= time_diff <= 5:
-                    flash('Cannot edit schedule within 5 minutes before start time. Delete and recreate if changes are needed.', 'warning')
-                    return redirect(url_for('admin_schedules'))
-            except:
-                pass
-        
-        subject_id  = request.form.get('subject_id', sched['subject_id'])
-        subj        = db_get_subject(subject_id)
-        teacher_u   = request.form.get('teacher_username', sched['teacher_username'])
-        teacher     = db_get_user(teacher_u)
-        program      = request.form.get('program', '').strip()
-        year_level   = request.form.get('year_level', '').strip()
-        sec_letter   = (request.form.get('section', '') or request.form.get('section_letter', '')).strip()
-        if program and year_level and sec_letter:
-            new_section = normalize_section_key(f"{program}|{year_level}|{sec_letter}")
-        else:
-            new_section = normalize_section_key(request.form.get('section_key', sched['section_key']))
-        new_start_time = request.form.get('start_time', sched['start_time'])
-        new_end_time = request.form.get('end_time', sched['end_time'])
-        start_mins = _time_mins(new_start_time)
-        end_mins = _time_mins(new_end_time)
-        if start_mins is None or end_mins is None or end_mins <= start_mins:
-            flash('End time must be later than start time.', 'danger')
-            return redirect(url_for('admin_schedules'))
-            
-        db_save_schedule({
-            'schedule_id': schedule_id,
-            'section_key': new_section,
-            'subject_id':  subject_id,
-            'subject_name': subj['name'] if subj else sched['subject_name'],
-            'course_code': subj.get('course_code','') if subj else sched['course_code'],
-            'teacher_username': teacher_u,
-            'teacher_name': teacher.get('full_name', teacher_u) if teacher else sched['teacher_name'],
-            'day_of_week': int(request.form.get('day_of_week', sched['day_of_week'])),
-            'start_time':  new_start_time,
-            'end_time':    new_end_time,
-            'grace_minutes': int(request.form.get('grace_minutes', sched['grace_minutes'])),
-            'created_by':  sched['created_by'],
-        })
-        flash('Schedule updated.', 'success')
-    except Exception as e:
-        flash(f'Error updating schedule: {e}', 'danger')
-    return redirect(url_for('admin_schedules'))
+    return _admin_schedule_edit_impl(
+        schedule_id=schedule_id,
+        request=request,
+        flash=flash,
+        redirect=redirect,
+        url_for=url_for,
+        db_get_schedule=db_get_schedule,
+        datetime_cls=datetime,
+        db_get_subject=db_get_subject,
+        db_get_user=db_get_user,
+        normalize_section_key=normalize_section_key,
+        time_mins=_time_mins,
+        db_save_schedule=db_save_schedule,
+    )
 
 @app.route('/admin/schedules/<schedule_id>/delete', methods=['POST'])
 @admin_required
 def admin_schedule_delete(schedule_id):
-    db_delete_schedule(schedule_id)
-    flash('Schedule removed.', 'success')
-    return redirect(url_for('admin_schedules'))
+    return _admin_schedule_delete_impl(
+        schedule_id=schedule_id,
+        db_delete_schedule=db_delete_schedule,
+        flash=flash,
+        redirect=redirect,
+        url_for=url_for,
+    )
 
 @app.route('/api/schedules/today')
 @login_required
 def api_schedules_today():
-    """Returns today's schedules for the current teacher (JSON)."""
-    username  = session.get('username', '')
-    schedules = get_todays_schedules(username)
-    return jsonify({'schedules': schedules, 'dow_names': DOW_NAMES})
+    return _api_schedules_today_impl(
+        session_obj=session,
+        get_todays_schedules=get_todays_schedules,
+        jsonify=jsonify,
+        dow_names=DOW_NAMES,
+    )
 
 
 @app.route('/api/schedules/search')
 @admin_required
 def api_schedules_search():
-    """Autocomplete search for teachers and subjects for schedule grid."""
-    q = request.args.get('q', '').strip().lower()
-    users = db_get_all_users()
-    results = []
-    for uname, u in users.items():
-        if u.get('role') not in ('teacher', 'admin', 'super_admin'):
-            continue
-        name = u.get('full_name', uname)
-        if not q or q in name.lower() or q in uname.lower():
-            results.append({'value': uname, 'label': name, 'type': u.get('role', 'teacher')})
-    subjects = db_get_all_subjects()
-    subj_results = []
-    for sid, s in subjects.items():
-        label = s.get('name', '')
-        code  = s.get('course_code', '')
-        if not q or q in label.lower() or q in code.lower():
-            subj_results.append({'value': sid, 'code': code, 'label': label})
-    return jsonify({'teachers': results[:20], 'subjects': subj_results[:20]})
+    return _api_schedules_search_impl(
+        request=request,
+        db_get_all_users=db_get_all_users,
+        db_get_all_subjects=db_get_all_subjects,
+        jsonify=jsonify,
+    )
 
 @app.route('/api/active_sessions_info')
 @login_required
 def api_active_sessions_info():
-    """Return active sessions keyed by session id for schedule live indicators."""
-    active = get_active_sessions()
-    current_role = session.get('role', '')
-    out = {}
-    for sid, s in active.items():
-        if current_role not in ADMIN_ROLES and not _is_my_session(s):
-            continue
-        out[sid] = {
-            'sess_id': sid,
-            'schedule_id': s.get('schedule_id') or '',
-            'subject_id': s.get('subject_id', ''),
-            'section_key': normalize_section_key(s.get('section_key', '')),
-            'teacher_username': s.get('teacher_username', s.get('teacher', '')),
-            'teacher_name': s.get('teacher_name', ''),
-            'is_active': not bool(s.get('ended_at')),
-        }
-    return jsonify(out)
+    return _api_active_sessions_info_impl(
+        get_active_sessions=get_active_sessions,
+        session_obj=session,
+        admin_roles=ADMIN_ROLES,
+        is_my_session=_is_my_session,
+        normalize_section_key=normalize_section_key,
+        jsonify=jsonify,
+    )
 
 
 @app.route('/excuse/submit/<sess_id>/<nfc_id>', methods=['GET', 'POST'])
@@ -6418,82 +4527,25 @@ def admin_excuse_attachment(excuse_id):
 # ── Excuse email helpers ───────────────────────────────────────────────────
 
 def _send_excuse_received_email(email, student_name, subject_name, reason_type, excuse_id):
-    if not email or '@' not in email: return
-    reason_label = dict(EXCUSE_REASONS).get(reason_type, reason_type.title())
-    html = f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Calibri,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0">
-  <tr><td align="center" style="padding:32px 16px;">
-    <table width="520" cellpadding="0" cellspacing="0"
-           style="background:#fff;border-radius:12px;overflow:hidden;
-                  box-shadow:0 2px 12px rgba(0,0,0,.1);">
-      <tr><td style="background:#1E4A1A;padding:20px 28px;">
-        <div style="font-size:18px;font-weight:700;color:#F5C518;">DAVS</div>
-        <div style="font-size:11px;color:#94a3b8;">Decentralized Attendance Verification System</div>
-      </td></tr>
-      <tr><td style="padding:24px 28px;">
-        <p style="font-size:15px;color:#1E4A1A;font-weight:700;">Excuse Request Received</p>
-        <p style="font-size:13px;color:#444;">Dear <strong>{student_name}</strong>,</p>
-        <p style="font-size:13px;color:#444;">
-          Your excuse request for <strong>{subject_name}</strong> has been received and is
-          <strong>pending review</strong> by the administrator.
-        </p>
-        <table style="border:1px solid #eee;border-radius:8px;width:100%;">
-          <tr><td style="padding:8px 12px;font-size:12px;color:#666;width:130px;">Reason</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;">{reason_label}</td></tr>
-          <tr><td style="padding:8px 12px;font-size:12px;color:#666;">Request #</td>
-              <td style="padding:8px 12px;font-size:12px;font-family:monospace;color:#333;">#{excuse_id}</td></tr>
-        </table>
-        <p style="font-size:11px;color:#94a3b8;margin-top:20px;">
-          You will receive another email when your request is reviewed.<br>Please do not reply to this email.
-        </p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>'''
-    _send_email([email], f'[DAVS] Excuse Request Received — {subject_name}', html)
+        _send_excuse_received_email_template(
+                email=email,
+                student_name=student_name,
+                subject_name=subject_name,
+                reason_type=reason_type,
+                excuse_id=excuse_id,
+                reason_labels=dict(EXCUSE_REASONS),
+                send_email_fn=_send_email,
+        )
 
 def _send_excuse_resolved_email(email, student_name, reason_type, resolution):
-    if not email or '@' not in email: return
-    reason_label = dict(EXCUSE_REASONS).get(reason_type, reason_type.title())
-    color   = '#2D6A27' if resolution == 'approved' else '#C0392B'
-    badge   = 'APPROVED ✓' if resolution == 'approved' else 'REJECTED ✕'
-    message = ('Your excuse has been <strong>approved</strong> and your attendance has been '
-               'updated to <strong>Excused</strong>.' if resolution == 'approved'
-               else 'Your excuse request has been <strong>rejected</strong>. '
-                    'Please contact your instructor or administrator for more details.')
-    html = f'''<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Calibri,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0">
-  <tr><td align="center" style="padding:32px 16px;">
-    <table width="520" cellpadding="0" cellspacing="0"
-           style="background:#fff;border-radius:12px;overflow:hidden;
-                  box-shadow:0 2px 12px rgba(0,0,0,.1);">
-      <tr><td style="background:#1E4A1A;padding:20px 28px;">
-        <div style="font-size:18px;font-weight:700;color:#F5C518;">DAVS</div>
-        <div style="font-size:11px;color:#94a3b8;">Decentralized Attendance Verification System</div>
-      </td></tr>
-      <tr><td style="padding:24px 28px;">
-        <div style="font-size:22px;font-weight:700;color:{color};margin-bottom:12px;">{badge}</div>
-        <p style="font-size:13px;color:#444;">Dear <strong>{student_name}</strong>,</p>
-        <p style="font-size:13px;color:#444;">{message}</p>
-        <table style="border:1px solid #eee;border-radius:8px;width:100%;">
-          <tr><td style="padding:8px 12px;font-size:12px;color:#666;width:130px;">Reason Filed</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;">{reason_label}</td></tr>
-          <tr><td style="padding:8px 12px;font-size:12px;color:#666;">Decision</td>
-              <td style="padding:8px 12px;font-size:12px;font-weight:700;color:{color};"
-              >{resolution.title()}</td></tr>
-        </table>
-        <p style="font-size:11px;color:#94a3b8;margin-top:20px;">Please do not reply to this email.</p>
-      </td></tr>
-    </table>
-  </td></tr>
-</table>
-</body></html>'''
-    _send_email([email], f'[DAVS] Excuse Request {resolution.title()} — {reason_label}', html)
+        _send_excuse_resolved_email_template(
+                email=email,
+                student_name=student_name,
+                reason_type=reason_type,
+                resolution=resolution,
+                reason_labels=dict(EXCUSE_REASONS),
+                send_email_fn=_send_email,
+        )
 
 # ── helper: collect all existing section keys ────────────────────────────────
 def _get_all_section_keys():
@@ -6530,28 +4582,29 @@ def _save_excuse_attachment(uploaded):
 @app.route('/teacher/schedule')
 @staff_required
 def teacher_schedule():
-    username = session.get('username')
-    # Filter only for the current teacher
-    schedules = db_get_schedules_for_teacher(username)
-    subjects = db_get_all_subjects()
-    return render_template('teacher_schedule.html',
-                           schedules=schedules,
-                           subjects=subjects)
+    if session.get('role') != 'teacher':
+        return redirect(url_for('admin_schedules'))
+    return _teacher_schedule_page_impl(
+        username=session.get('username'),
+        db_get_schedules_for_teacher=db_get_schedules_for_teacher,
+        db_get_all_subjects=db_get_all_subjects,
+        render_template=render_template,
+        dow_names=DOW_NAMES,
+    )
 
 @app.route('/api/schedules/upcoming')
 @login_required
 def api_schedules_upcoming():
     """Upcoming schedules for notification (5-min lead time)."""
-    username = session.get('username')
-    now = datetime.now()
-    today_dow = now.weekday()
-    # 5 minutes from now
-    target_time = (now + timedelta(minutes=5)).strftime('%H:%M')
-    
-    schedules = db_get_schedules_for_teacher(username)
-    upcoming = [s for s in schedules if s['day_of_week'] == today_dow and s['start_time'] == target_time]
-    
-    return jsonify({'upcoming': upcoming})
+    if session.get('role') != 'teacher':
+        return jsonify({'upcoming': []})
+    return _api_schedules_upcoming_impl(
+        username=session.get('username'),
+        now_dt=datetime.now(),
+        db_get_schedules_for_teacher=db_get_schedules_for_teacher,
+        jsonify=jsonify,
+        timedelta=timedelta,
+    )
 
 def _row_to_dict(row):
     return dict(row) if row else {}

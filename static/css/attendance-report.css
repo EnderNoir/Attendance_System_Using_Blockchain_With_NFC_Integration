@@ -1,0 +1,32 @@
+/* Attendance report page styles: extracted from template for maintainability. */
+
+.student-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;transition:border-color .2s;flex-wrap:wrap;}
+.student-card:hover{border-color:var(--accent);}
+.student-card.good{border-left:3px solid var(--success);}
+.student-card.at-risk{border-left:3px solid var(--warning);}
+.student-card.critical{border-left:3px solid var(--danger);}
+.hidden-card{display:none!important;}
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+.filter-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;}
+.filter-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;}
+.filter-select{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 11px;font-size:13px;font-family:'DM Sans',sans-serif;appearance:none;transition:border-color .2s;}
+.filter-select:focus{outline:none;border-color:var(--accent);}
+.btn-reset{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 13px;font-size:12px;cursor:pointer;align-self:flex-end;transition:all .2s;}
+.btn-reset:hover{border-color:var(--danger);color:var(--danger);}
+.filter-count{font-size:11px;color:var(--muted);align-self:flex-end;white-space:nowrap;}
+
+@media(max-width:768px){
+  .filter-bar{padding:10px;gap:8px;}
+  .filter-group{min-width:100%;}
+  .btn-reset{width:100%;}
+  #reportList{grid-template-columns:repeat(2,1fr) !important;gap:10px !important;}
+  .student-card{padding:12px;}
+  .student-card a.btn-success-custom{width:100%;justify-content:center;}
+}
+
+@media(max-width:480px){
+  #reportList{grid-template-columns:1fr !important;}
+  .student-card>div>div:nth-child(2){gap:8px !important;justify-content:space-between;}
+  .student-card>div>div:nth-child(2)>div{flex:1;}
+  .filter-count{width:100%;text-align:left;}
+}

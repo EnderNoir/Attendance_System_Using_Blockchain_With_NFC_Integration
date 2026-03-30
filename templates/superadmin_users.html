@@ -1,35 +1,14 @@
 {% extends 'base.html' %}
 {% block title %}User Management — DAVS{% endblock %}
 {% block page_title %}SUPER ADMIN / USERS{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/superadmin-users.css') }}">
+{% endblock %}
 {% block content %}
-<style>
-.role-badge-sa{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(109,40,217,.1);color:#5B21B6;border:1.5px solid rgba(109,40,217,.25);}
-.role-badge-a{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(192,57,43,.1);color:#8B1A0A;border:1.5px solid rgba(192,57,43,.25);}
-.role-badge-t{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:rgba(45,106,39,.1);color:#1A5A17;border:1.5px solid rgba(45,106,39,.25);}
-.user-table-wrap{overflow-x:auto;}
-.promote-form{display:inline-flex;align-items:center;gap:6px;}
-
-@media(max-width:768px){
-  .user-table-wrap{overflow:visible;}
-  .user-table-wrap table,.user-table-wrap tbody,.user-table-wrap tr,.user-table-wrap td{display:block;width:100%;}
-  .user-table-wrap thead{display:none;}
-  .user-table-wrap tr{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;}
-  .user-table-wrap td{border:none !important;padding:4px 0 !important;}
-  .user-table-wrap td:nth-child(1)::before{content:'User';display:block;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;}
-  .user-table-wrap td:nth-child(2)::before{content:'Username';display:block;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;}
-  .user-table-wrap td:nth-child(3)::before{content:'Email';display:block;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;}
-  .user-table-wrap td:nth-child(4)::before{content:'Role';display:block;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;}
-  .user-table-wrap td:nth-child(5)::before{content:'Status';display:block;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;}
-  .user-table-wrap td:nth-child(6)::before{content:'Change Role';display:block;font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;}
-  .promote-form{display:flex;flex-wrap:wrap;width:100%;}
-  .promote-form .form-select,.promote-form .btn-primary{width:100% !important;}
-}
-</style>
-
-<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+<div class="sa-users-head-row">
   <div>
-    <h2 style="font-size:18px;font-weight:700;margin:0;">User Management</h2>
-    <p style="color:var(--muted);font-size:12px;margin:4px 0 0;">Only Super Admins can create or change Admin/Super Admin accounts.</p>
+    <h2 class="sa-users-title">User Management</h2>
+    <p class="sa-users-subtitle">Only Super Admins can create or change Admin/Super Admin accounts.</p>
   </div>
   <a href="{{ url_for('superadmin_create_user') }}" class="btn-primary"><i class="bi bi-person-plus"></i> Create Account</a>
 </div>
@@ -51,7 +30,7 @@
       <tr>
         <td><strong>{{ u.full_name or '—' }}</strong></td>
         <td><code>{{ uname }}</code></td>
-        <td style="font-size:12px;">{{ u.email or '—' }}</td>
+        <td class="sa-users-email">{{ u.email or '—' }}</td>
         <td>
           {% if u.role == 'super_admin' %}<span class="role-badge-sa"><i class="bi bi-shield-lock"></i> Super Admin</span>
           {% elif u.role == 'admin' %}<span class="role-badge-a"><i class="bi bi-shield-check"></i> Admin</span>
@@ -65,7 +44,7 @@
         <td>
           {% if uname != session.get('username') %}
           <form method="POST" action="{{ url_for('superadmin_promote', username=uname) }}" class="promote-form">
-            <select name="role" class="form-select form-select-sm" style="width:auto;padding:4px 8px;font-size:12px;">
+            <select name="role" class="form-select form-select-sm sa-users-role-select">
               <option value="teacher" {% if u.role=='teacher' %}selected{% endif %}>Instructor</option>
               <option value="admin" {% if u.role=='admin' %}selected{% endif %}>Admin</option>
               {# Only allow promoting to Super Admin if none exists yet, or this user IS already Super Admin #}
@@ -75,10 +54,10 @@
               <option value="super_admin" disabled title="A Super Admin already exists">Super Admin (taken)</option>
               {% endif %}
             </select>
-            <button type="submit" class="btn-primary" style="padding:5px 12px;font-size:12px;">Apply</button>
+            <button type="submit" class="btn-primary sa-users-apply-btn">Apply</button>
           </form>
           {% else %}
-          <span style="font-size:11px;color:var(--muted);">— (you)</span>
+          <span class="sa-users-self">— (you)</span>
           {% endif %}
         </td>
       </tr>

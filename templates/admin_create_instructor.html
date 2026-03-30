@@ -1,35 +1,24 @@
 {% extends 'base.html' %}
 {% block title %}Create Instructor — DAVS{% endblock %}
 {% block page_title %}ADMIN / CREATE INSTRUCTOR{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-create-instructor.css') }}">
+{% endblock %}
 {% block content %}
-<style>
-  @media(max-width:768px){
-    .aci-wrap{max-width:100% !important;}
-    .aci-form{padding:14px !important;border-radius:12px;}
-    .aci-actions{flex-wrap:wrap;}
-    .aci-actions .btn-outline,
-    .aci-actions .btn-primary{width:100%;justify-content:center;}
-  }
-
-  @media(max-width:480px){
-    .aci-wrap h2{font-size:16px !important;}
-    .aci-wrap p{line-height:1.5;}
-  }
-</style>
-<div class="aci-wrap" style="max-width:480px;margin:0 auto;">
-  <a href="{{ url_for('manage_users') }}" class="btn-outline" style="margin-bottom:14px;display:inline-flex;"><i class="bi bi-arrow-left"></i> Back to Faculty Accounts</a>
-  <h2 style="font-size:18px;font-weight:700;margin-bottom:4px;">Create Instructor Account</h2>
-  <p style="color:var(--muted);font-size:12px;margin-bottom:18px;">
+<div class="aci-wrap">
+  <a href="{{ url_for('manage_users') }}" class="btn-outline aci-back-link"><i class="bi bi-arrow-left"></i> Back to Faculty Accounts</a>
+  <h2 class="aci-title">Create Instructor Account</h2>
+  <p class="aci-subtitle">
     Creates an approved Instructor account. Only Super Admin can create Admin accounts.
   </p>
 
-  <form method="POST" class="card aci-form" style="padding:22px;">
+  <form method="POST" class="card aci-form">
     <div class="mb-3">
       <label class="form-label">Full Name *</label>
       <input type="text" name="full_name" class="form-control" placeholder="e.g. Juan dela Cruz" required>
     </div>
     <div class="mb-3">
-      <label class="form-label">Username * <span style="font-size:11px;color:var(--muted);font-weight:500;">(lowercase, no spaces)</span></label>
+      <label class="form-label">Username * <span class="aci-label-help">(lowercase, no spaces)</span></label>
       <input type="text" name="username" class="form-control" placeholder="e.g. jdelacruz"
              oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'')" required>
     </div>
@@ -38,14 +27,14 @@
       <input type="email" name="email" class="form-control" placeholder="instructor@cvsu.edu.ph">
     </div>
     <div class="mb-3">
-      <label class="form-label">Password * <span style="font-size:11px;color:var(--muted);font-weight:500;">(min. 8 characters)</span></label>
+      <label class="form-label">Password * <span class="aci-label-help">(min. 8 characters)</span></label>
       <input type="password" name="password" class="form-control" minlength="8" placeholder="Set a strong temporary password" required>
     </div>
-    <div style="background:rgba(45,106,39,.06);border:1.5px solid rgba(45,106,39,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--muted);">
-      <i class="bi bi-info-circle" style="color:var(--accent);"></i>
+    <div class="aci-info-box">
+      <i class="bi bi-info-circle aci-info-icon"></i>
       The instructor will be able to change their password after first login from their profile page.
     </div>
-    <div class="aci-actions" style="display:flex;gap:10px;justify-content:flex-end;padding-top:10px;border-top:1.5px solid var(--border);">
+    <div class="aci-actions">
       <a href="{{ url_for('manage_users') }}" class="btn-outline">Cancel</a>
       <button type="submit" class="btn-primary"><i class="bi bi-person-check"></i> Create Instructor</button>
     </div>

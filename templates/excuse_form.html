@@ -1,72 +1,62 @@
 {% extends "base.html" %}
 {% block title %}Submit Excuse Request — DAVS{% endblock %}
 {% block page_title %}SUBMIT EXCUSE REQUEST{% endblock %}
+{% block extra_head %}
+<link href="{{ url_for('static', filename='css/excuse-form.css') }}" rel="stylesheet"/>
+{% endblock %}
 {% block content %}
-<style>
-    @media(max-width:768px){
-        .excuse-wrap{padding:12px !important;}
-        .excuse-card{padding:18px !important;border-radius:14px !important;}
-        .excuse-head h2{font-size:20px !important;}
-    }
-
-    @media(max-width:480px){
-        .excuse-wrap{padding:8px !important;}
-        .excuse-card{padding:14px !important;}
-        .excuse-meta{font-size:12px !important;line-height:1.5;word-break:break-word;}
-    }
-</style>
-<div class="excuse-wrap" style="max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div class="card excuse-card" style="padding: 30px; border-radius: 20px; border: 1px solid var(--border);">
-        <div class="excuse-head" style="text-align: center; margin-bottom: 24px;">
-            <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(59, 130, 246, 0.1); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px; color: #3b82f6;">
+<div class="excuse-wrap">
+    <div class="card excuse-card">
+        <div class="excuse-head">
+            <div class="excuse-icon-wrap">
                 <i class="bi bi-journal-check"></i>
             </div>
-            <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 8px;">Excuse Submission</h2>
-            <p style="font-size: 14px; color: var(--muted);">Please provide the details and supporting documents for your absence.</p>
+            <h2 class="excuse-title">Excuse Submission</h2>
+            <p class="excuse-subtitle">Please provide the details and supporting documents for your absence.</p>
         </div>
 
         <form method="POST" enctype="multipart/form-data" action="{{ url_for('excuse_submit', sess_id=sess_id, nfc_id=nfc_id) }}">
-            <div style="margin-bottom: 20px;">
-                <label style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Student Information</label>
-                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); padding: 12px 16px; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
-                    <div style="font-size: 16px; font-weight: 700;">{{ student.name }}</div>
-                    <div class="excuse-meta" style="font-size: 13px; color: var(--muted); font-family: 'Space Mono', monospace;">ID: {{ student.student_id or '—' }} | NFC: {{ student.nfcId }}</div>
+            <div class="excuse-block">
+                <label class="excuse-label">Student Information</label>
+                <div class="excuse-info-box">
+                    <div class="excuse-student-name">{{ student.name }}</div>
+                    <div class="excuse-meta">ID: {{ student.student_id or '—' }} | NFC: {{ student.nfcId }}</div>
                 </div>
             </div>
 
-            <div style="margin-bottom: 20px;">
-                <label style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Class Information</label>
-                <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); padding: 12px 16px; border-radius: 12px; display: flex; flex-direction: column; gap: 4px;">
-                    <div style="font-size: 15px; font-weight: 600;">{{ sess.subject_name }}</div>
-                    <div style="font-size: 12px; color: var(--muted);">{{ sess.course_code }} · {{ sess.section_key|replace('|', ' · ') }}</div>
-                    <div style="font-size: 12px; color: var(--muted); margin-top: 4px;"><i class="bi bi-clock"></i> Session Date: {{ sess.started_at[:10] }}</div>
+            <div class="excuse-block">
+                <label class="excuse-label">Class Information</label>
+                <div class="excuse-info-box">
+                    <div class="excuse-subject-name">{{ sess.subject_name }}</div>
+                    <div class="excuse-class-meta">{{ sess.course_code }} · {{ sess.section_key|replace('|', ' · ') }}</div>
+                    <div class="excuse-session-date"><i class="bi bi-clock"></i> Session Date: {{ sess.started_at[:10] }}</div>
                 </div>
             </div>
 
-            <div style="margin-bottom: 20px;">
-                <label for="reason_type" style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Reason Type</label>
+            <div class="excuse-block">
+                <label for="reason_type" class="excuse-label">Reason Type</label>
                 <select name="reason_type" id="reason_type" required
-                        style="width: 100%; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 12px 16px; font-size: 14px; appearance: none; cursor: pointer;">
+                        class="excuse-input excuse-select">
                     {% for val, label in excuse_reasons %}
                     <option value="{{ val }}">{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
 
-            <div style="margin-bottom: 20px;">
-                <label for="reason_detail" style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Specific Details</label>
+            <div class="excuse-block">
+                <label for="reason_detail" class="excuse-label">Specific Details</label>
                 <textarea name="reason_detail" id="reason_detail" rows="3" placeholder="Provide more context about your reason..."
-                          style="width: 100%; background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 12px 16px; font-size: 14px; font-family: inherit; resize: vertical;"></textarea>
+                          class="excuse-input excuse-textarea"></textarea>
             </div>
 
-            <div style="margin-bottom: 28px;">
-                <label for="attachment" style="display: block; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Supporting Document (Image/PDF)</label>
+            <div class="excuse-block excuse-attach-block">
+                <label for="attachment" class="excuse-label">Supporting Document (Image/PDF)</label>
                 <input type="file" name="attachment" id="attachment" accept=".jpg,.jpeg,.png,.pdf"
-                       style="width: 100%; font-size: 13px; color: var(--muted);">
-                <div style="font-size: 11px; color: var(--muted); margin-top: 6px;">Allowed formats: JPG, PNG, PDF. Max size 2MB.</div>
+                       class="excuse-file-input">
+                <div class="excuse-file-hint">Allowed formats: JPG, PNG, PDF. Max size 2MB.</div>
             </div>
 
-            <button type="submit" style="width: 100%; background: #3b82f6; color: #fff; font-weight: 700; border: none; border-radius: 12px; padding: 14px; font-size: 15px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <button type="submit" class="excuse-submit-btn">
                 <i class="bi bi-send-fill"></i> Submit Excuse Request
             </button>
         </form>

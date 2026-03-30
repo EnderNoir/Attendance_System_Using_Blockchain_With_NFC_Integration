@@ -1,109 +1,10 @@
 {% extends "base.html" %} {% block title %}Attendance Record — DAVS{% endblock
 %} {% block page_title %}STUDENT ATTENDANCE RECORD{% endblock %} {% block
+extra_head %}
+<link href="{{ url_for('static', filename='css/attendance-record.css') }}" rel="stylesheet"/>
+{% endblock %} {% block
 content %}
-<style>
-  .back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--muted);
-    text-decoration: none;
-    font-size: 12px;
-    margin-bottom: 18px;
-    transition: color 0.2s;
-  }
-  .back-link:hover {
-    color: var(--accent);
-  }
-  .summary-pill {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 18px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-    min-width: 120px;
-  }
-  .summary-pill .val {
-    font-family: "Space Mono", monospace;
-    font-size: 20px;
-    font-weight: 700;
-  }
-  .summary-pill .lbl {
-    font-size: 10px;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-
-  /* Session record card */
-  .sess-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    transition: border-color 0.2s;
-  }
-  .sess-card:hover {
-    border-color: var(--border);
-  }
-  .sess-card.present {
-    border-left: 3px solid var(--success);
-  }
-  .sess-card.late {
-    border-left: 3px solid var(--warning);
-  }
-  .sess-card.excused {
-    border-left: 3px solid #60a5fa;
-  }
-  .sess-card.absent {
-    border-left: 3px solid var(--danger);
-  }
-
-  @media (max-width: 768px) {
-    .summary-pill {
-      min-width: calc(50% - 5px);
-      padding: 10px 12px;
-    }
-
-    .sess-card {
-      padding: 12px;
-      gap: 8px;
-    }
-
-    #sessionDetailList,
-    .scroll-container {
-      padding-left: 12px !important;
-      padding-right: 12px !important;
-    }
-
-    .timeline-item {
-      align-items: flex-start !important;
-      flex-wrap: wrap;
-      gap: 8px !important;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .summary-pill {
-      min-width: 100%;
-    }
-
-    .summary-pill .val {
-      font-size: 18px;
-    }
-
-    .back-link {
-      margin-bottom: 12px;
-    }
-  }
-</style>
+<div id="attendanceMeta" data-nfc-id="{{ nfc_id }}" style="display:none;"></div>
 
 <a href="{{ url_for('dashboard') }}" class="back-link"
   ><i class="bi bi-arrow-left"></i> Back to Directory</a
@@ -348,68 +249,7 @@ if total > 0 else 0 %}
 </div>
 {% endif %}
 
-<script>
-  // Load detailed session records
-  fetch("/api/student_sessions/{{ nfc_id }}", { credentials: "same-origin" })
-    .then((r) => r.json())
-    .then((sessions) => {
-      const list = document.getElementById("sessionDetailList");
-      document.getElementById("sessCount").textContent = `${
-        sessions.length
-      } session${sessions.length !== 1 ? "s" : ""}`;
-      if (!sessions.length) {
-        list.innerHTML =
-          '<div style="text-align:center;color:var(--muted);padding:32px;font-size:12px;"><i class="bi bi-calendar-x" style="font-size:28px;display:block;opacity:.2;margin-bottom:8px;"></i>No detailed session records found.</div>';
-        return;
-      }
-      list.innerHTML = sessions
-        .map(
-          (s, i) => `
-    <div class="sess-card ${s.status}" style="${i > 0 ? "margin-top:8px" : ""}">
-      <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:13px;">${s.subject_name}${
-            s.course_code
-              ? ' <span style="font-family:monospace;font-size:10px;color:var(--accent);">[' +
-                s.course_code +
-                "]</span>"
-              : ""
-          }</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:12px;">
-          <span><i class="bi bi-person-badge"></i> ${s.teacher_name}</span>
-          <span><i class="bi bi-grid"></i> ${s.section_key.replace(
-            /\|/g,
-            " · ",
-          )}</span>
-          <span><i class="bi bi-clock"></i> ${s.time_slot}</span>
-          <span><i class="bi bi-calendar3"></i> ${s.date}</span>
-          ${
-            s.units
-              ? `<span><i class="bi bi-layers"></i> ${s.units} units</span>`
-              : ""
-          }
-        </div>
-        ${s.excuse_note ? `<div style="font-size:11px;color:var(--warning);margin-top:6px;"><i class="bi bi-info-circle"></i> Reason: <strong>${s.excuse_note}</strong></div>` : ''}
-      </div>
-      <span style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0;
-        ${
-          s.status === "present"
-            ? "background:rgba(16,185,129,.12);color:var(--success);border:1px solid rgba(16,185,129,.25);"
-            : s.status === "late"
-            ? "background:rgba(245,158,11,.1);color:var(--warning);border:1px solid rgba(245,158,11,.25);"
-            : s.status === "excused"
-            ? "background:rgba(96,165,250,.1);color:#60a5fa;border:1px solid rgba(96,165,250,.25);"
-            : "background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2);"
-        }">
-        ${s.status.charAt(0).toUpperCase() + s.status.slice(1)}
-      </span>
-    </div>
-  `,
-        )
-        .join("");
-    })
-    .catch(() => {
-      document.getElementById("sessionDetailList").innerHTML =
-        '<div style="color:var(--danger);text-align:center;padding:24px;font-size:12px;">Failed to load session records.</div>';
-    });
-</script>
+{% endblock %}
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/attendance-record.js') }}"></script>
 {% endblock %}

@@ -6,97 +6,7 @@
   <title>Login — DAVS</title>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet"/>
-  <style>
-    /* ── CvSU Light Mode ── */
-    :root {
-      --bg:#F0F2F0; --surface:#FFFFFF; --border:#D4DDD4;
-      --accent:#2D6A27; --accent2:#F5C518; --accent3:#3A7D32;
-      --success:#2D6A27; --danger:#C0392B; --warning:#D4A017;
-      --text:#1A1A1A; --muted:#5A6B5A;
-    }
-    /* ── CvSU Dark Mode ── */
-    [data-theme="dark"] {
-      --bg:#0F1A0F; --surface:#162016; --border:#243524;
-      --accent:#F5C518; --accent2:#4CAF50; --accent3:#3A7D32;
-      --success:#4CAF50; --danger:#EF5350; --warning:#FFC107;
-      --text:#E8F5E9; --muted:#81A881;
-    }
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;transition:background .2s,color .2s;}
-
-    /* Theme toggle */
-    .theme-toggle{position:fixed;top:16px;right:16px;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;z-index:100;}
-    [data-theme="dark"] .theme-toggle{background:var(--accent);color:#000;}
-    .theme-toggle:hover{opacity:.85;}
-
-    .auth-wrap{width:100%;max-width:420px;}
-
-    /* Logo */
-    .auth-logo{text-align:center;margin-bottom:28px;}
-    .logo-box{width:64px;height:64px;background:linear-gradient(135deg,#2D6A27,#F5C518);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;box-shadow:0 4px 20px rgba(45,106,39,.2);}
-    .app-name{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);letter-spacing:2px;}
-    .app-sub{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;max-width:300px;margin-inline:auto;}
-    .school-name{font-size:12px;font-weight:600;color:var(--accent3);margin-top:6px;}
-
-    /* Card */
-    .auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px;box-shadow:0 2px 16px rgba(0,0,0,.06);}
-    [data-theme="dark"] .auth-card{box-shadow:0 2px 16px rgba(0,0,0,.3);}
-
-    /* Header bar */
-    .card-header{background:var(--accent);border-radius:10px;padding:12px 18px;margin-bottom:24px;display:flex;align-items:center;gap:10px;}
-    [data-theme="dark"] .card-header{background:#243524;}
-    .card-header h2{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#fff;margin:0;}
-    [data-theme="dark"] .card-header h2{color:var(--accent);}
-    .card-header i{font-size:16px;color:#fff;}
-    [data-theme="dark"] .card-header i{color:var(--accent);}
-
-    /* Form */
-    .form-group{margin-bottom:16px;}
-    .form-label{display:block;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px;}
-    .form-control{width:100%;background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:11px 14px;font-size:14px;font-family:'DM Sans',sans-serif;transition:all .2s;}
-    .form-control:focus{outline:none;border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(45,106,39,.12);}
-    [data-theme="dark"] .form-control:focus{box-shadow:0 0 0 3px rgba(245,197,24,.1);}
-    .form-control::placeholder{color:var(--muted);}
-    .form-control.invalid{border-color:var(--danger);}
-    .err-msg{font-size:11px;color:var(--danger);margin-top:4px;display:none;}
-    .err-msg.show{display:block;}
-
-    /* Button */
-    .btn-submit{width:100%;background:var(--accent);border:none;color:#fff;font-weight:700;border-radius:8px;padding:13px;font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;}
-    [data-theme="dark"] .btn-submit{color:#000;}
-    .btn-submit:hover{opacity:.9;transform:translateY(-1px);}
-    .btn-public{width:100%;background:transparent;border:1.5px solid var(--border);color:var(--text);font-weight:700;border-radius:8px;padding:11px;font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;text-decoration:none;}
-    .btn-public:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px);}
-
-    .auth-footer{text-align:center;margin-top:18px;font-size:13px;color:var(--muted);}
-    .auth-footer a{color:var(--accent);text-decoration:none;font-weight:600;}
-    .auth-footer a:hover{text-decoration:underline;}
-
-    /* Flash */
-    .flash-item{border-radius:8px;padding:11px 14px;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:16px;}
-    .flash-item.error{background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);color:var(--danger);}
-    .flash-item.success{background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);color:var(--success);}
-    .flash-item.info{background:rgba(245,197,24,.08);border:1px solid rgba(245,197,24,.25);color:var(--warning);}
-
-    @media(max-width:768px){
-      body{padding:14px;align-items:flex-start;}
-      .theme-toggle{top:10px;right:10px;padding:6px 10px;font-size:11px;}
-      .auth-logo{margin-top:46px;margin-bottom:18px;}
-      .auth-card{padding:18px;border-radius:12px;}
-      .card-header{padding:10px 12px;margin-bottom:16px;}
-      .card-header h2{font-size:12px;}
-      .form-control{min-height:40px;font-size:13px;padding:10px 12px;}
-      .btn-submit{min-height:40px;font-size:13px;padding:11px;}
-    }
-
-    @media(max-width:480px){
-      .logo-box{width:56px;height:56px;font-size:24px;}
-      .app-name{font-size:16px;}
-      .auth-footer{font-size:12px;}
-      .form-control{min-height:38px;font-size:12px;}
-      .btn-submit{min-height:38px;padding:10px;font-size:12px;}
-    }
-  </style>
+  <link href="{{ url_for('static', filename='css/login.css') }}" rel="stylesheet"/>
 </head>
 <body>
 
@@ -159,45 +69,6 @@
   </div>
 </div>
 
-<script>
-function validateLogin(){
-  let ok=true;
-  const u=document.getElementById('login_user');
-  const p=document.getElementById('login_pass');
-  if(!u.value.trim()){
-    u.classList.add('invalid');
-    document.getElementById('login_user_err').classList.add('show');
-    ok=false;
-  }
-  if(!p.value){
-    p.classList.add('invalid');
-    document.getElementById('login_pass_err').classList.add('show');
-    ok=false;
-  }
-  return ok;
-}
-function clearErr(el,errId){
-  el.classList.remove('invalid');
-  document.getElementById(errId)?.classList.remove('show');
-}
-function toggleTheme(){
-  const html=document.documentElement;
-  const isDark=html.getAttribute('data-theme')==='dark';
-  const next=isDark?'light':'dark';
-  html.setAttribute('data-theme',next);
-  localStorage.setItem('davs_theme',next);
-  updateIcon();
-}
-function updateIcon(){
-  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-  document.getElementById('themeIcon').className=isDark?'bi bi-sun-fill':'bi bi-moon-fill';
-  document.getElementById('themeLabel').textContent=isDark?'Light Mode':'Dark Mode';
-}
-(function(){
-  const saved=localStorage.getItem('davs_theme')||'light';
-  document.documentElement.setAttribute('data-theme',saved);
-  updateIcon();
-})();
-</script>
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
 </body>
 </html>

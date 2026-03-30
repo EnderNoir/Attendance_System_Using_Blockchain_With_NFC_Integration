@@ -15,6 +15,97 @@
     } catch (e) { return dtStr; }
   }
 
+  function parseTapDateTime(dtStr) {
+    if (!dtStr) return { date: '—', time: '—' };
+    try {
+      const d = new Date(String(dtStr).replace(' ', 'T'));
+      if (Number.isNaN(d.getTime())) return { date: '—', time: '—' };
+      return {
+        date: d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).replace(',', ''),
+        time: d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+      };
+    } catch (e) {
+      return { date: '—', time: '—' };
+    }
+  }
+
+  function formatHistoryDate(input) {
+    if (!input) return '—';
+    try {
+      const d = new Date(String(input).replace(' ', 'T'));
+      if (Number.isNaN(d.getTime())) return '—';
+      const month = d.toLocaleString('en-US', { month: 'long' });
+      const day = String(d.getDate()).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${month}:${day}:${year}`;
+    } catch (e) {
+      return '—';
+    }
+  }
+
+  function normalizeTimeToAmPm(input) {
+    if (!input) return '—';
+    const raw = String(input).trim();
+    if (/\b(am|pm)\b/i.test(raw)) return raw.toUpperCase();
+    const m = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return raw;
+    const h = Number(m[1]);
+    const min = m[2];
+    const sec = m[3] ? `:${m[3]}` : '';
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hh = h % 12 === 0 ? 12 : h % 12;
+    return `${hh}:${min}${sec} ${period}`;
+  }
+
+  function normalizeTimeSlot(slot) {
+    if (!slot) return '—';
+    const raw = String(slot).trim();
+    if (/\b(am|pm)\b/i.test(raw)) return raw.toUpperCase();
+    const parts = raw.split(/\s*[\-–]\s*/);
+    if (parts.length === 2) return `${normalizeTimeToAmPm(parts[0])} - ${normalizeTimeToAmPm(parts[1])}`;
+    return normalizeTimeToAmPm(raw);
+  }
+
+  function copyText(text) {
+    if (!text) return Promise.resolve(false);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(() => true).catch(() => false);
+    }
+    const tmp = document.createElement('textarea');
+    tmp.value = text;
+    tmp.setAttribute('readonly', '');
+    tmp.style.position = 'fixed';
+    tmp.style.opacity = '0';
+    document.body.appendChild(tmp);
+    tmp.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch (e) {
+      ok = false;
+    }
+    document.body.removeChild(tmp);
+    return Promise.resolve(ok);
+  }
+
+  function bindTxCopyHandlers(scopeEl) {
+    if (!scopeEl) return;
+    scopeEl.querySelectorAll('.att-tx-copy').forEach((btn) => {
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        copyText(btn.dataset.tx || '').then((ok) => {
+          btn.title = ok ? 'Copied' : 'Copy failed';
+          btn.classList.add(ok ? 'copied' : 'copy-failed');
+          setTimeout(() => {
+            btn.title = 'Copy to clipboard';
+            btn.classList.remove('copied', 'copy-failed');
+          }, 1100);
+        });
+      });
+    });
+  }
+
   // ── Main tabs ──
   function switchTab(id, btn) {
     document.querySelectorAll('.main-pane').forEach(p => p.classList.remove('active'));
@@ -89,7 +180,7 @@
 
     // Attendance Records tab — table format
     const stCls = { present: 'st-present', late: 'st-late', absent: 'st-absent', excused: 'st-excused' };
-    const stLbl = { present: '✓ Present', late: '⏱ Late', absent: '✕ Absent', excused: '◎ Excused' };
+    const stLbl = { present: 'Present', late: 'Late', absent: 'Absent', excused: 'Excused' };
     if (!sts.length) {
       document.getElementById('sm_att_list').innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);font-size:12px;"><i class="bi bi-people" style="font-size:28px;display:block;opacity:.2;margin-bottom:8px;"></i>No enrolled students found.</div>';
       return;
@@ -107,10 +198,12 @@
         <th>Student Name</th>
         <th>Student ID</th>
         <th>Status</th>
-        <th>Tap Time</th>
+        <th>Date</th>
+        <th>Time</th>
         <th>Excused Reason</th>
         <th>Document</th>
-        <th>TX Hash</th>
+        <th>Transaction Number (TX)</th>
+        <th>Block Number</th>
       </tr></thead>
       <tbody>
         ${sts.map((st, i) => {
@@ -124,19 +217,23 @@
       const reasonHtml = isExcused && reasonLabel
         ? `<span style="color:#60a5fa;font-weight:600;font-size:11px;">${reasonLabel}</span>${reasonDetail}`
         : '<span style="color:var(--muted);font-size:11px;">—</span>';
+      const tap = parseTapDateTime(st.time || st.tap_time || '');
       return `<tr>
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '—'}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '—'}</td>
-            <td><span class="att-status ${stCls[st.status] || 'st-absent'}">${stLbl[st.status] || '—'}</span></td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.time || '—'}</td>
+            <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || '—'}</span></td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.date}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
             <td style="font-size:11px;">${reasonHtml}</td>
             <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-            <td>${st.tx_hash ? `<span class="att-tx">${st.tx_hash.substring(0, 18)}…</span>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+            <td>${st.tx_hash ? `<button type="button" class="att-tx-copy" title="Copy to clipboard" data-tx="${st.tx_hash}">${st.tx_hash}</button>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.block || '—'}</td>
           </tr>`;
     }).join('')}
       </tbody>
     </table>`;
+    bindTxCopyHandlers(document.getElementById('sm_att_list'));
   }
 
   function closeSessModal() {
@@ -194,12 +291,14 @@
     <table class="hist-table">
       <thead><tr>
         <th>#</th>
-        <th>Subject</th>
+        <th>Course Code</th>
+        <th>Subject Name</th>
         <th>Date</th>
         <th>Time Slot</th>
-        <th>Status</th>
         <th>Excused Reason</th>
         <th>Document</th>
+        <th>Transaction Number (TX)</th>
+        <th>Block Number</th>
       </tr></thead>
       <tbody>
         ${sessions.map((s, i) => {
@@ -211,19 +310,19 @@
         : '<span style="color:var(--muted);font-size:11px;">—</span>';
       return `<tr>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${i + 1}</td>
-            <td>
-              ${s.course_code ? `<span class="hist-code">${s.course_code}</span> ` : ''}
-              <span style="font-weight:600;">${s.subject_name}</span>
-            </td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.date}</td>
-            <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${s.time_slot || '—'}</td>
-            <td><span class="att-status ${stCls[s.status] || 'st-absent'}">${stLbl[s.status] || '—'}</span></td>
+            <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+            <td><span style="font-weight:600;">${s.subject_name || '—'}</span></td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${formatHistoryDate(s.started_at || s.date)}</td>
+            <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || '')}</td>
             <td style="font-size:11px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>
             <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+            <td>${s.tx_hash ? `<button type="button" class="att-tx-copy" title="Copy to clipboard" data-tx="${s.tx_hash}">${s.tx_hash}</button>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '—'}</td>
           </tr>`;
     }).join('')}
       </tbody>
     </table>`;
+    bindTxCopyHandlers(document.getElementById('stud_hist'));
 }
 
 function closeStudModal() {

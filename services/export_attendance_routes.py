@@ -5,12 +5,93 @@ import traceback
 from flask import Response, flash, redirect, request, url_for
 
 
+def _parse_dt(value):
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M'):
+        try:
+            return datetime.strptime(raw, fmt)
+        except Exception:
+            continue
+    return None
+
+
+def _fmt_date_dash(value):
+    dt = _parse_dt(value)
+    if not dt:
+        return '—'
+    return dt.strftime('%B-%d-%Y')
+
+
+def _fmt_date_colon(value):
+    dt = _parse_dt(value)
+    if not dt:
+        return '—'
+    return dt.strftime('%B:%d:%Y')
+
+
+def _fmt_time_hms_ampm(value):
+    dt = _parse_dt(value)
+    if not dt:
+        return '—'
+    return dt.strftime('%I:%M:%S %p')
+
+
+def _normalize_time_token(value, with_seconds=False):
+    if value is None:
+        return '—'
+    raw = str(value).strip()
+    if not raw:
+        return '—'
+    if 'AM' in raw.upper() or 'PM' in raw.upper():
+        return raw.upper()
+    m = None
+    try:
+        import re
+        m = re.match(r'^(\d{1,2}):(\d{2})(?::(\d{2}))?$', raw)
+    except Exception:
+        m = None
+    if not m:
+        return raw
+    h = int(m.group(1))
+    mm = m.group(2)
+    ss = m.group(3)
+    period = 'PM' if h >= 12 else 'AM'
+    hh = 12 if h % 12 == 0 else (h % 12)
+    if with_seconds:
+        return f"{hh:02d}:{mm}:{(ss or '00')} {period}"
+    return f"{hh:02d}:{mm} {period}"
+
+
+def _normalize_time_slot(value):
+    if not value:
+        return '—'
+    raw = str(value).strip()
+    if not raw:
+        return '—'
+    if 'AM' in raw.upper() or 'PM' in raw.upper():
+        return raw.upper()
+    if '–' in raw:
+        parts = [p.strip() for p in raw.split('–', 1)]
+    elif '-' in raw:
+        parts = [p.strip() for p in raw.split('-', 1)]
+    else:
+        parts = [raw]
+    if len(parts) == 2:
+        return f"{_normalize_time_token(parts[0])} - {_normalize_time_token(parts[1])}"
+    return _normalize_time_token(parts[0])
+
+
 def export_student_sessions_impl(
     nfc_id,
     *,
     get_all_students_fn,
     get_db_fn,
     xl_helpers_fn,
+    viewer_role,
 ):
     """Export one student's full attendance history with blockchain proof."""
     try:
@@ -42,6 +123,33 @@ def export_student_sessions_impl(
                 "WHERE al.nfc_id=? ORDER BY s.started_at DESC",
                 (nfc_id,),
             ).fetchall()
+            exc_rows = conn.execute(
+                "SELECT sess_id, reason_type, reason_detail, attachment_file "
+                "FROM excuse_requests "
+                "WHERE nfc_id=? AND status='approved'",
+                (nfc_id,),
+            ).fetchall()
+
+        exc_map = {}
+        for ex in exc_rows:
+            exc_map[ex['sess_id']] = {
+                'reason_type': ex['reason_type'] or '',
+                'reason_detail': ex['reason_detail'] or '',
+                'attachment_file': ex['attachment_file'] or '',
+            }
+
+        reason_labels = {
+            'sickness': 'Sickness / Illness',
+            'lbm': 'LBM',
+            'emergency': 'Family Emergency',
+            'bereavement': 'Bereavement',
+            'medical': 'Medical Appointment',
+            'accident': 'Accident / Injury',
+            'official': 'Official School Business',
+            'weather': 'Extreme Weather / Calamity',
+            'transport': 'Transportation Problem',
+            'others': 'Others',
+        }
 
         rows = []
         status_counts = {'Present': 0, 'Late': 0, 'Absent': 0, 'Excused': 0}
@@ -52,19 +160,28 @@ def export_student_sessions_impl(
             if f_subject and lg['subject_name'] != f_subject:
                 continue
             status_counts[status] = status_counts.get(status, 0) + 1
+            ex = exc_map.get(lg['sess_id'], {})
+            reason = ''
+            if ex.get('reason_type'):
+                reason = reason_labels.get(ex['reason_type'], ex['reason_type'])
+                if ex.get('reason_detail'):
+                    reason += f" ({ex['reason_detail']})"
+            elif lg['excuse_note']:
+                reason = lg['excuse_note']
+
             rows.append(
                 {
                     'subject': lg['subject_name'],
                     'code': lg['course_code'] or '',
-                    'section': (lg['section_key'] or '').replace('|', ' · '),
                     'teacher': lg['teacher_name'] or '',
-                    'date': (lg['started_at'] or '')[:10],
-                    'time_slot': lg['time_slot'] or '',
+                    'date_dash': _fmt_date_dash(lg['started_at'] or ''),
+                    'date_colon': _fmt_date_colon(lg['started_at'] or ''),
+                    'time_slot': _normalize_time_slot(lg['time_slot'] or ''),
                     'status': status,
-                    'tap_time': lg['tap_time'] or '—',
                     'tx_hash': lg['tx_hash'] or '—',
                     'block': str(lg['block_number']) if lg['block_number'] else '—',
-                    'excuse': lg['excuse_note'] or '',
+                    'excuse': reason or '—',
+                    'document': ex.get('attachment_file') or '—',
                 }
             )
 
@@ -77,21 +194,35 @@ def export_student_sessions_impl(
         yr = student.get('year_level', '') if student else ''
         sec = student.get('section', '') if student else ''
         sid_ = student.get('student_id', '') if student else ''
-        headers = [
-            '#',
-            'Subject',
-            'Course Code',
-            'Section',
-            'Instructor',
-            'Date',
-            'Time Slot',
-            'Status',
-            'Tap Time',
-            'TX Hash',
-            'Block #',
-            'Excuse Note',
-        ]
-        widths = [4, 32, 12, 24, 22, 14, 16, 10, 12, 52, 10, 22]
+        is_admin_view = viewer_role in ('admin', 'super_admin')
+        if is_admin_view:
+            headers = [
+                '#',
+                'Course Code',
+                'Subject Name',
+                'Instructor Name',
+                'Date',
+                'Time Slot',
+                'Transaction Number (TX)',
+                'Block Number',
+                'Status',
+                'Excused Reason',
+                'Document',
+            ]
+            widths = [4, 12, 30, 24, 16, 20, 56, 12, 12, 28, 22]
+        else:
+            headers = [
+                '#',
+                'Course Code',
+                'Subject Name',
+                'Date',
+                'Time Slot',
+                'Excused Reason',
+                'Document',
+                'Transaction Number (TX)',
+                'Block Number',
+            ]
+            widths = [4, 12, 34, 16, 20, 30, 22, 56, 12]
         subtitles = [
             'Cavite State University — DAVS Attendance Record',
             f'Student: {stud_name}  |  ID: {sid_}  |  NFC: {nfc_id}',
@@ -102,43 +233,73 @@ def export_student_sessions_impl(
         first_data = H['stat_block'](ws, first_data, status_counts, len(headers))
         H['make_header_row'](ws, first_data, headers, widths)
         first_data += 1
-        col_fmt = {8: ('status',), 10: ('tx',), 11: ('num',)}
+        col_fmt = {}
+        if is_admin_view:
+            col_fmt = {7: ('tx',), 8: ('num',), 9: ('status',)}
+        else:
+            col_fmt = {8: ('tx',), 9: ('num',)}
         for ri, row in enumerate(rows, first_data):
+            if is_admin_view:
+                vals = [
+                    ri - first_data + 1,
+                    row['code'],
+                    row['subject'],
+                    row['teacher'],
+                    row['date_dash'],
+                    row['time_slot'],
+                    row['tx_hash'],
+                    row['block'],
+                    row['status'],
+                    row['excuse'],
+                    row['document'],
+                ]
+            else:
+                vals = [
+                    ri - first_data + 1,
+                    row['code'],
+                    row['subject'],
+                    row['date_colon'],
+                    row['time_slot'],
+                    row['excuse'],
+                    row['document'],
+                    row['tx_hash'],
+                    row['block'],
+                ]
             H['data_row'](
                 ws,
                 ri,
-                [
-                    ri - first_data + 1,
-                    row['subject'],
-                    row['code'],
-                    row['section'],
-                    row['teacher'],
-                    row['date'],
-                    row['time_slot'],
-                    row['status'],
-                    row['tap_time'],
-                    row['tx_hash'],
-                    row['block'],
-                    row['excuse'],
-                ],
+                vals,
                 alt=(ri % 2 == 0),
                 col_formats=col_fmt,
             )
         last_data = first_data + len(rows) - 1
-        total_vals = [
-            'TOTAL',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            f"{status_counts['Present']}P / {status_counts['Late']}L / {status_counts['Absent']}A / {status_counts['Excused']}E",
-            '',
-            '',
-            '',
-            '',
-        ]
+        if is_admin_view:
+            total_vals = [
+                'TOTAL',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                f"{status_counts['Present']}P / {status_counts['Late']}L / {status_counts['Absent']}A / {status_counts['Excused']}E",
+                '',
+                '',
+                '',
+            ]
+        else:
+            total_vals = [
+                'TOTAL',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+            ]
         H['totals_row'](ws, last_data + 1, total_vals, len(headers))
         ws.cell(
             row=last_data + 3,
@@ -304,16 +465,14 @@ def export_session_attendance_impl(
                 {
                     'name': st['name'],
                     'student_id': st.get('student_id', '—'),
-                    'nfc_id': nid,
-                    'program': st.get('course', ''),
                     'year': st.get('year_level', ''),
-                    'section': st.get('section', ''),
                     'status': status,
-                    'tap_time': lg.get('tap_time', '') or '—',
+                    'tap_date': _fmt_date_dash(lg.get('tap_time', '') or ''),
+                    'tap_time': _fmt_time_hms_ampm(lg.get('tap_time', '') or ''),
                     'tx_hash': lg.get('tx_hash', '') or '—',
                     'block': str(lg.get('block_number', '')) if lg.get('block_number') else '—',
-                    'excuse_reason': excuse_reason,
-                    'excuse_document': excuse_info.get('attachment_file', '') or '',
+                    'excuse_reason': excuse_reason or '—',
+                    'excuse_document': excuse_info.get('attachment_file', '') or '—',
                 }
             )
 
@@ -329,7 +488,7 @@ def export_session_attendance_impl(
         slot = sess.get('time_slot', '—')
         started = sess.get('started_at', '—')
         ended = sess.get('ended_at', 'Still running')
-        n_cols = 13
+        n_cols = 10
         subtitles = [
             'Cavite State University — DAVS Session Attendance Report',
             f'Subject: {subj}  {"["+code+"]" if code else ""}',
@@ -343,21 +502,18 @@ def export_session_attendance_impl(
             '#',
             'Student Name',
             'Student ID',
-            'NFC Card UID',
-            'Program',
-            'Year',
-            'Sec',
             'Status',
-            'Tap Time',
-            'TX Hash',
-            'Block #',
+            'Date',
+            'Time',
+            'Transaction Number (TX)',
+            'Block Number',
             'Excuse Reason',
             'Document',
         ]
-        widths = [4, 28, 14, 14, 28, 10, 6, 10, 12, 52, 10, 30, 20]
+        widths = [4, 30, 14, 12, 16, 14, 56, 12, 30, 24]
         H['make_header_row'](ws, first_data, headers, widths)
         first_data += 1
-        col_fmt = {8: ('status',), 10: ('tx',), 11: ('num',)}
+        col_fmt = {4: ('status',), 7: ('tx',), 8: ('num',)}
         for ri, row in enumerate(rows, first_data):
             H['data_row'](
                 ws,
@@ -366,11 +522,8 @@ def export_session_attendance_impl(
                     ri - first_data + 1,
                     row['name'],
                     row['student_id'],
-                    row['nfc_id'],
-                    row['program'],
-                    row['year'],
-                    row['section'],
                     row['status'],
+                    row['tap_date'],
                     row['tap_time'],
                     row['tx_hash'],
                     row['block'],
@@ -385,11 +538,8 @@ def export_session_attendance_impl(
             'TOTAL',
             f'{len(enrolled)} enrolled',
             '',
-            '',
-            '',
-            '',
-            '',
             f"{counts['Present']}P/{counts['Late']}L/{counts['Absent']}A/{counts['Excused']}E",
+            '',
             '',
             '',
             '',

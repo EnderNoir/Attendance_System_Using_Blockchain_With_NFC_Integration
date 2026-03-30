@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}User Management — DAVS{% endblock %}
-{% block page_title %}SUPER ADMIN / USERS{% endblock %}
+{% block page_title %}{% if is_super_admin %}SUPER ADMIN / USERS{% else %}ADMIN / USERS{% endif %}{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/superadmin-users.css') }}">
 {% endblock %}
@@ -8,9 +8,15 @@
 <div class="sa-users-head-row">
   <div>
     <h2 class="sa-users-title">User Management</h2>
-    <p class="sa-users-subtitle">Only Super Admins can create or change Admin/Super Admin accounts.</p>
+    <p class="sa-users-subtitle">
+      {% if is_super_admin %}
+      Only Super Admins can create or change Admin/Super Admin accounts.
+      {% else %}
+      Admins can create teacher accounts and view admin/teacher users.
+      {% endif %}
+    </p>
   </div>
-  <a href="{{ url_for('superadmin_create_user') }}" class="btn-primary"><i class="bi bi-person-plus"></i> Create Account</a>
+  <a href="{{ create_user_url }}" class="btn-primary"><i class="bi bi-person-plus"></i> {{ create_button_label }}</a>
 </div>
 
 <div class="card user-table-wrap">
@@ -22,7 +28,7 @@
         <th>Email</th>
         <th>Role</th>
         <th>Status</th>
-        <th>Change Role</th>
+        <th>{% if can_change_role %}Change Role{% else %}Access{% endif %}</th>
       </tr>
     </thead>
     <tbody>
@@ -42,7 +48,7 @@
           {% else %}<span class="pill-rej">{{ u.status }}</span>{% endif %}
         </td>
         <td>
-          {% if uname != session.get('username') %}
+          {% if can_change_role and uname != session.get('username') %}
           <form method="POST" action="{{ url_for('superadmin_promote', username=uname) }}" class="promote-form">
             <select name="role" class="form-select form-select-sm sa-users-role-select">
               <option value="teacher" {% if u.role=='teacher' %}selected{% endif %}>Instructor</option>
@@ -56,8 +62,10 @@
             </select>
             <button type="submit" class="btn-primary sa-users-apply-btn">Apply</button>
           </form>
-          {% else %}
+          {% elif can_change_role %}
           <span class="sa-users-self">— (you)</span>
+          {% else %}
+          <span class="sa-users-self">View only</span>
           {% endif %}
         </td>
       </tr>

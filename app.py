@@ -1876,6 +1876,74 @@ def get_attendance_records(nfc_id):
     except:
         return []
 
+
+def get_student_session_rows_for_export(nfc_id):
+    reason_labels = {
+        'sickness': 'Sickness / Illness',
+        'lbm': 'LBM',
+        'emergency': 'Family Emergency',
+        'bereavement': 'Bereavement',
+        'medical': 'Medical Appointment',
+        'accident': 'Accident / Injury',
+        'official': 'Official School Business',
+        'weather': 'Extreme Weather / Calamity',
+        'transport': 'Transportation Problem',
+        'others': 'Others',
+    }
+
+    with get_db() as conn:
+        log_rows = conn.execute(
+            "SELECT al.status, al.tx_hash, al.block_number, al.tap_time, al.excuse_note, "
+            "al.sess_id, s.subject_name, s.course_code, s.teacher_name, s.time_slot, s.started_at "
+            "FROM attendance_logs al "
+            "JOIN sessions s ON al.sess_id = s.sess_id "
+            "WHERE al.nfc_id=? "
+            "ORDER BY s.started_at DESC",
+            (nfc_id,),
+        ).fetchall()
+        exc_rows = conn.execute(
+            "SELECT sess_id, reason_type, reason_detail, attachment_file "
+            "FROM excuse_requests "
+            "WHERE nfc_id=? AND status='approved'",
+            (nfc_id,),
+        ).fetchall()
+
+    exc_map = {}
+    for ex in exc_rows:
+        exc_map[ex['sess_id']] = {
+            'reason_type': ex['reason_type'] or '',
+            'reason_detail': ex['reason_detail'] or '',
+            'attachment_file': ex['attachment_file'] or '',
+        }
+
+    rows = []
+    for lg in log_rows:
+        ex = exc_map.get(lg['sess_id'], {})
+        excuse_reason = ''
+        if ex.get('reason_type'):
+            excuse_reason = reason_labels.get(ex['reason_type'], ex['reason_type'])
+            if ex.get('reason_detail'):
+                excuse_reason += f" ({ex['reason_detail']})"
+        elif lg['excuse_note']:
+            excuse_reason = lg['excuse_note']
+
+        rows.append(
+            {
+                'code': lg['course_code'] or '',
+                'subject': lg['subject_name'] or '',
+                'teacher': lg['teacher_name'] or '',
+                'date': lg['started_at'] or '',
+                'time_slot': lg['time_slot'] or '',
+                'tx_hash': lg['tx_hash'] or '—',
+                'block': str(lg['block_number']) if lg['block_number'] else '—',
+                'status': (lg['status'] or '').capitalize(),
+                'excuse': excuse_reason or '—',
+                'document': ex.get('attachment_file') or '—',
+            }
+        )
+
+    return rows
+
 def chain_status_code(status: str) -> int:
     return {
         'present': 0,
@@ -2185,34 +2253,8 @@ def logout():
 
 @app.route('/signup', methods=['GET','POST'])
 def signup():
-    if request.method == 'POST':
-        username = request.form['username'].strip().lower()
-        password = request.form['password']
-        confirm  = request.form['confirm_password']
-        fullname = request.form['full_name'].strip()
-        email    = request.form['email'].strip()
-        # Role is always 'teacher' for self-registration.
-        # Admins/Super Admins are created only by Super Admin via /superadmin/create-user.
-        role     = 'teacher'
-        raw_sections = request.form.getlist('sections')
-        sections = [normalize_section_key(s) for s in raw_sections]
-        if db_get_user(username):    flash('Username already taken.'); return redirect(url_for('signup'))
-        if password != confirm:      flash('Passwords do not match.'); return redirect(url_for('signup'))
-        if len(password) < 6:        flash('Password must be at least 6 characters.'); return redirect(url_for('signup'))
-        db_save_user(username, {
-            'username':username,'password':hash_password(password),'role':role,
-            'full_name':fullname,'email':email,'status':'pending','sections':sections,
-            'my_subjects':[],'created_at':datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        })
-        photo_file = request.files.get('profile_photo')
-        if photo_file and photo_file.filename:
-            ext = os.path.splitext(photo_file.filename)[1].lower()
-            if ext in ('.jpg','.jpeg','.png','.gif','.webp'):
-                fname = f"photo_{username}{ext}"
-                photo_file.save(os.path.join(UPLOAD_FOLDER, fname))
-                db_save_photo(username, fname)
-        flash('Account created! Waiting for admin approval.'); return redirect(url_for('login'))
-    return render_template('signup.html', departments=DEPARTMENTS, year_levels=YEAR_LEVELS, sections=SECTIONS)
+    flash('Self-signup is disabled. Please contact your administrator for account creation.')
+    return redirect(url_for('login'))
 
 # ── ADMIN MAIN ────────────────────────────────────────────────────────────────
 
@@ -2846,6 +2888,7 @@ def export_csv_all():
     return _export_csv_all_impl(
         get_all_students_fn=get_all_students,
         get_attendance_records_fn=get_attendance_records,
+        get_student_session_rows_fn=get_student_session_rows_for_export,
     )
 
 @app.route('/export/<nfc_id>.csv')
@@ -2855,19 +2898,25 @@ def export_csv_single(nfc_id):
         nfc_id=nfc_id,
         student_name_map_obj=student_name_map,
         get_attendance_records_fn=get_attendance_records,
+        get_student_session_rows_fn=get_student_session_rows_for_export,
     )
 
 @app.route('/admin/users')
 @admin_required
 def manage_users():
-    all_u    = db_get_all_users()
-    pending  = {u:d for u,d in all_u.items() if d['status']=='pending'}
-    approved = {u:d for u,d in all_u.items() if d['status']=='approved' and u!='admin'}
-    rejected = {u:d for u,d in all_u.items() if d['status']=='rejected'}
-    photos_db = db_get_all_photos()
-    return render_template('admin_users.html', pending=pending, approved=approved,
-                           rejected=rejected, fmt_time=fmt_time, photos_db=photos_db,
-                           can_edit_roles=(session.get('role') == 'super_admin'))
+    all_u = db_get_all_users()
+    users = {u: d for u, d in all_u.items() if d.get('role') in ('admin', 'teacher')}
+    super_admin_count = sum(1 for d in all_u.values() if d.get('role') == 'super_admin')
+    return render_template(
+        'superadmin_users.html',
+        users=users,
+        ADMIN_ROLES=ADMIN_ROLES,
+        super_admin_count=super_admin_count,
+        is_super_admin=False,
+        can_change_role=False,
+        create_user_url=url_for('admin_create_instructor'),
+        create_button_label='Create Teacher Account',
+    )
 
 
 @app.route('/admin/approve/<username>', methods=['POST'])
@@ -3596,6 +3645,7 @@ def teacher_export():
         normalize_section_key_fn=normalize_section_key,
         build_student_section_key_fn=build_student_section_key,
         get_attendance_records_fn=get_attendance_records,
+        get_student_session_rows_fn=get_student_session_rows_for_export,
     )
 
 @app.route('/api/attendance/recent')
@@ -4134,6 +4184,7 @@ def export_student_sessions(nfc_id):
         get_all_students_fn=get_all_students,
         get_db_fn=get_db,
         xl_helpers_fn=_xl_helpers,
+        viewer_role=session.get('role', ''),
     )
 
 
@@ -4225,7 +4276,11 @@ def superadmin_users():
     return render_template('superadmin_users.html',
                            users=users,
                            ADMIN_ROLES=ADMIN_ROLES,
-                           super_admin_count=super_admin_count)
+                           super_admin_count=super_admin_count,
+                           is_super_admin=True,
+                           can_change_role=True,
+                           create_user_url=url_for('superadmin_create_user'),
+                           create_button_label='Create Account')
 
 @app.route('/superadmin/create-user', methods=['GET', 'POST'])
 @super_admin_required

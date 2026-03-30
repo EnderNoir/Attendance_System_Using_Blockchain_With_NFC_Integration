@@ -1,4 +1,5 @@
 ﻿const sessId = "{{ sess_id }}";
+  const gracePeriodMinutes = Number("{{ sess.grace_period or 15 }}") || 15;
   const totalStudents = {{ section_students| length }};
   let lastTimestamp = 0;
   let pollInitialized = false;
@@ -73,7 +74,7 @@
     });
     const cfg = {
       'present': { cls: 'green', icon: '✔', label: 'PRESENT', msg: 'Attendance recorded successfully.' },
-      'late': { cls: 'orange', icon: '⏱', label: 'LATE', msg: 'Arrived after the 30-minute grace period — marked Late.' },
+      'late': { cls: 'orange', icon: '⏱', label: 'LATE', msg: `Arrived after the ${gracePeriodMinutes}-minute grace period - marked Late.` },
       'warning': { cls: 'yellow', icon: '⚠', label: 'DUPLICATE TAP', msg: 'Already marked — this tap was not counted again.' },
       'invalid': { cls: 'red', icon: '✕', label: 'INVALID CARD', msg: message || 'This NFC card is not registered in the system.' },
     };

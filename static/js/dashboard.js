@@ -167,7 +167,7 @@ function openStudentRecord(idx){
         <div style="font-size:10px;color:rgba(45,106,39,.5);margin-top:5px;"><i class="bi bi-pencil-square"></i> Go to Update tab to change photo</div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;">
+    <div class="info-card-grid">
       ${infoRow('Semester', s.semester)}
       ${infoRow('School Year', s.sy)}
       ${infoRow('Date of Admission', s.datereg)}
@@ -278,10 +278,84 @@ function openStudentRecord(idx){
 
 function infoRow(label, val, full=false){
   const v = val||'-';
-  return `<div class="upd-field"${full?' style="grid-column:1/-1"':''}>
-    <span class="upd-label">${label}</span>
-    <span style="font-size:13px;color:var(--text);padding:4px 0;">${v}</span>
+  return `<div class="info-card-field${full?' full':''}">
+    <span class="info-card-label">${label}</span>
+    <span class="info-card-value">${v}</span>
   </div>`;
+}
+
+function formatDateMonthDayYear(input) {
+  if (!input) return '-';
+  try {
+    const d = new Date(String(input).replace(' ', 'T'));
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).replace(',', '');
+  } catch (e) {
+    return '-';
+  }
+}
+
+function toAmPm(input) {
+  if (!input) return '-';
+  const raw = String(input).trim();
+  if (/\b(am|pm)\b/i.test(raw)) return raw.toUpperCase();
+  const m = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return raw;
+  const h = Number(m[1]);
+  const min = m[2];
+  const sec = m[3] ? `:${m[3]}` : '';
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hh = h % 12 === 0 ? 12 : h % 12;
+  return `${hh}:${min}${sec} ${period}`;
+}
+
+function formatTimeSlot(slot) {
+  if (!slot) return '-';
+  const raw = String(slot).trim();
+  if (/\b(am|pm)\b/i.test(raw)) return raw.toUpperCase();
+  const parts = raw.split(/\s*[\-–]\s*/);
+  if (parts.length === 2) return `${toAmPm(parts[0])} - ${toAmPm(parts[1])}`;
+  return toAmPm(raw);
+}
+
+function copyText(text) {
+  if (!text) return Promise.resolve(false);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true).catch(() => false);
+  }
+  const tmp = document.createElement('textarea');
+  tmp.value = text;
+  tmp.setAttribute('readonly', '');
+  tmp.style.position = 'fixed';
+  tmp.style.opacity = '0';
+  document.body.appendChild(tmp);
+  tmp.select();
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch (e) {
+    ok = false;
+  }
+  document.body.removeChild(tmp);
+  return Promise.resolve(ok);
+}
+
+function bindTxCopyButtons(scopeEl) {
+  if (!scopeEl) return;
+  scopeEl.querySelectorAll('.att-tx-copy').forEach((btn) => {
+    btn.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      copyText(btn.dataset.tx || '').then((ok) => {
+        btn.title = ok ? 'Copied' : 'Copy failed';
+        btn.classList.add(ok ? 'copied' : 'copy-failed');
+        setTimeout(() => {
+          btn.title = 'Copy to clipboard';
+          btn.classList.remove('copied', 'copy-failed');
+        }, 1100);
+      });
+    });
+  });
 }
 
 function renderSessions(sessions){
@@ -292,23 +366,51 @@ function renderSessions(sessions){
     wrap.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;"><i class="bi bi-calendar-x" style="font-size:24px;display:block;opacity:.2;margin-bottom:6px;"></i>No sessions found.</div>';
     return;
   }
-  wrap.innerHTML = sessions.map(s=>{
-    const sbClass = `sb-${s.status}`;
-    const statusLabel = s.status.charAt(0).toUpperCase()+s.status.slice(1);
-    return `<div class="sess-item">
-      <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:12px;">${s.subject_name}${s.course_code?' <code style="font-size:10px;">['+s.course_code+']</code>':''}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px;">
-          <i class="bi bi-person-badge"></i> ${s.teacher_name}
-          &nbsp;|&nbsp;<i class="bi bi-calendar3"></i> ${s.date}
-          &nbsp;|&nbsp;<i class="bi bi-clock"></i> ${s.time_slot||'-'}
-        </div>
-        ${s.excuse_note ? `<div style="font-size:11px;color:var(--warning);margin-top:3px;"><i class="bi bi-info-circle"></i> Reason: <strong>${s.excuse_note}</strong></div>` : ''}
-        ${s.tx_hash?`<div class="tx-chip"><i class="bi bi-link-45deg"></i> TX: ${s.tx_hash.substring(0,20)}... Block #${s.block}</div>`:''}
-      </div>
-      <span class="status-badge ${sbClass}">${statusLabel}</span>
-    </div>`;
-  }).join('');
+  wrap.innerHTML = `
+    <table class="sess-table">
+      <thead>
+        <tr>
+          <th>Course Code</th>
+          <th>Subject Name</th>
+          <th>Instructor Name</th>
+          <th>Date</th>
+          <th>Time Slot</th>
+          <th>Transaction Number (TX)</th>
+          <th>Block Number</th>
+          <th>Status</th>
+          <th>Excused Reason</th>
+          <th>Document</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sessions.map((s) => {
+          const sbClass = `sb-${s.status}`;
+          const statusLabel = s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : '-';
+          const doc = s.attachment_url
+            ? `<a href="${s.attachment_url}" target="_blank" class="sess-doc-link"><i class="bi bi-paperclip"></i> View</a>`
+            : '<span class="muted-dash">-</span>';
+          const reason = s.status === 'excused' && s.excuse_note
+            ? `<span style="color:#60a5fa;font-weight:600;">${s.excuse_note}</span>`
+            : '<span class="muted-dash">-</span>';
+          const tx = s.tx_hash
+            ? `<button type="button" class="att-tx-copy" title="Copy to clipboard" data-tx="${s.tx_hash}">${s.tx_hash}</button>`
+            : '<span class="muted-dash">-</span>';
+          return `<tr>
+            <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span class="muted-dash">-</span>'}</td>
+            <td style="font-weight:600;">${s.subject_name || '-'}</td>
+            <td>${s.teacher_name || '-'}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;">${formatDateMonthDayYear(s.started_at || s.date)}</td>
+            <td style="font-size:11px;color:var(--muted);">${formatTimeSlot(s.time_slot || '')}</td>
+            <td>${tx}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '-'}</td>
+            <td><span class="status-badge ${sbClass}">${statusLabel}</span></td>
+            <td>${reason}</td>
+            <td>${doc}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+  bindTxCopyButtons(wrap);
 }
 
 function filterSessions(){
@@ -421,7 +523,7 @@ function openTeacherRecord(username){
         <div style="font-size:10px;color:rgba(45,106,39,.5);margin-top:5px;"><i class="bi bi-pencil-square"></i> Go to Update tab to change photo or sections</div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;">
+    <div class="info-card-grid">
       ${infoRow('Full Name', u.name)}
       ${infoRow('Username', '@'+u.username)}
       ${infoRow('Email Address', u.email||'-', true)}

@@ -242,9 +242,6 @@
       <a href="{{ url_for('superadmin_users') }}"
         class="nav-link {% if request.endpoint in ('superadmin_users','superadmin_create_user') %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-shield-lock"></i> User Management</a>
-      <a href="{{ url_for('superadmin_create_user') }}"
-        class="nav-link {% if request.endpoint == 'superadmin_create_user' %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-person-plus"></i> Create Account</a>
       <a href="{{ url_for('admin_schedules') }}"
         class="nav-link {% if request.endpoint in ('admin_schedules','admin_schedule_create') %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-calendar3-week"></i> Schedules</a>
@@ -279,15 +276,9 @@
         onclick="closeSidebar()"><i class="bi bi-person-plus"></i> Enroll Student</a>
       <div class="nav-section-label" style="margin-top:6px;">Administration</div>
       <a href="{{ url_for('manage_users') }}"
-        class="nav-link {% if request.endpoint == 'manage_users' %}active{% endif %}" onclick="closeSidebar()">
+        class="nav-link {% if request.endpoint in ('manage_users','admin_create_instructor') %}active{% endif %}" onclick="closeSidebar()">
         <i class="bi bi-shield-check"></i> User Management
-        {% if pending_count is defined and pending_count %}<span
-          style="margin-left:auto;background:var(--warning);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;">{{
-          pending_count }}</span>{% endif %}
       </a>
-      <a href="{{ url_for('admin_create_instructor') }}"
-        class="nav-link {% if request.endpoint == 'admin_create_instructor' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-person-plus"></i> Create Teacher Account</a>
       <a href="{{ url_for('manage_subjects') }}"
         class="nav-link {% if request.endpoint == 'manage_subjects' %}active{% endif %}" onclick="closeSidebar()"><i
           class="bi bi-book"></i> Subject Catalogue</a>

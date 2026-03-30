@@ -103,20 +103,54 @@
     function stageAdminPhoto(input) { if (!input.files || !input.files[0]) return; pmStagedFile = input.files[0]; var reader = new FileReader(); reader.onload = function (e) { setAvatarImg('pmEditAvatarWrap', e.target.result); }; reader.readAsDataURL(pmStagedFile); }
     function clearPmErr(el, errId) { el.style.borderColor = ''; var e = document.getElementById(errId); if (e) e.style.display = 'none'; }
     function checkPmPwMatch() { var pw = document.getElementById('pmPass') ? document.getElementById('pmPass').value : ''; var pw2 = document.getElementById('pmPass2') ? document.getElementById('pmPass2').value : ''; var err = document.getElementById('pmPass2Err'); if (err) err.style.display = (pw && pw2 && pw !== pw2) ? 'block' : 'none'; }
+    async function requestProfilePasswordOtp(kind) {
+      var isTeacher = kind === 'teacher';
+      var prefix = isTeacher ? 'tpm' : 'pm';
+      var passEl = document.getElementById(prefix + 'Pass');
+      var pass = passEl ? passEl.value : '';
+      var msg = document.getElementById(prefix + 'Msg');
+      var hint = document.getElementById(prefix + 'OtpHint');
+      var btn = document.getElementById(prefix + 'OtpBtn');
+      if (!pass || pass.length < 6) {
+        if (passEl) passEl.style.borderColor = 'var(--danger)';
+        var perr = document.getElementById(prefix + 'PassErr');
+        if (perr) perr.style.display = 'block';
+        if (hint) { hint.style.color = 'var(--danger)'; hint.textContent = 'Enter your new password first before requesting OTP.'; }
+        return;
+      }
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+      try {
+        var r = await fetch('/request_password_change_otp', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        var d = await r.json();
+        if (d.ok) {
+          if (hint) { hint.style.color = 'var(--success)'; hint.textContent = 'OTP sent to ' + (d.sent_to || 'your email') + '.'; }
+          if (msg) { msg.style.display = 'block'; msg.style.color = 'var(--success)'; msg.textContent = 'OTP sent. Enter the 6-digit code to continue.'; }
+        } else {
+          if (hint) { hint.style.color = 'var(--danger)'; hint.textContent = d.error || 'Unable to send OTP.'; }
+          if (msg) { msg.style.display = 'block'; msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Unable to send OTP.'; }
+        }
+      } catch (e) {
+        if (hint) { hint.style.color = 'var(--danger)'; hint.textContent = 'Network error while sending OTP.'; }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Send OTP'; }
+      }
+    }
     async function saveProfileModal() {
       var name = document.getElementById('pmName') ? document.getElementById('pmName').value.trim() : '';
       var email = document.getElementById('pmEmail') ? document.getElementById('pmEmail').value.trim() : '';
       var pass = document.getElementById('pmPass') ? document.getElementById('pmPass').value : '';
       var pass2 = document.getElementById('pmPass2') ? document.getElementById('pmPass2').value : '';
+      var otp = document.getElementById('pmOtp') ? document.getElementById('pmOtp').value.trim() : '';
       var msg = document.getElementById('pmMsg'); var ok = true;
       if (!name) { var el = document.getElementById('pmName'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmNameErr'); if (er) er.style.display = 'block'; ok = false; }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { var el = document.getElementById('pmEmail'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmEmailErr'); if (er) er.style.display = 'block'; ok = false; }
       if (pass && pass.length < 6) { var el = document.getElementById('pmPass'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmPassErr'); if (er) er.style.display = 'block'; ok = false; }
       if (pass && pass2 && pass !== pass2) { var er = document.getElementById('pmPass2Err'); if (er) er.style.display = 'block'; ok = false; }
+      if (pass && (!otp || otp.length !== 6)) { var el = document.getElementById('pmOtp'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmOtpErr'); if (er) er.style.display = 'block'; ok = false; }
       if (!ok) return;
       if (pmStagedFile) { var fd = new FormData(); fd.append('photo', pmStagedFile); fd.append('person_id', '{{ session.get("username","") }}'); try { var pr = await fetch('/upload_photo', { method: 'POST', credentials: 'same-origin', body: fd }); var pd = await pr.json(); if (pd.ok) { setSidebarPhoto(pd.url); setAvatarImg('pmInfoAvatarWrap', pd.url + '?t=' + Date.now()); } } catch (e) { console.warn(e); } pmStagedFile = null; }
       try {
-        var r = await fetch('/update_profile', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: name, email: email, password: pass || undefined }) });
+        var r = await fetch('/update_profile', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: name, email: email, password: pass || undefined, password_otp: pass ? otp : undefined }) });
         var d = await r.json(); if (msg) msg.style.display = 'block';
         if (d.ok) {
           if (msg) { msg.style.color = 'var(--success)'; msg.textContent = '✓ Profile saved!'; }
@@ -161,16 +195,18 @@
       var email = document.getElementById('tpmEmail') ? document.getElementById('tpmEmail').value.trim() : '';
       var pass = document.getElementById('tpmPass') ? document.getElementById('tpmPass').value : '';
       var pass2 = document.getElementById('tpmPass2') ? document.getElementById('tpmPass2').value : '';
+      var otp = document.getElementById('tpmOtp') ? document.getElementById('tpmOtp').value.trim() : '';
       var msg = document.getElementById('tpmMsg'); var ok = true;
       if (!name) { var el = document.getElementById('tpmName'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmNameErr'); if (er) er.style.display = 'block'; ok = false; }
       if (!uname) { var el = document.getElementById('tpmUsername'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmUsernameErr'); if (er) er.style.display = 'block'; ok = false; }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { var el = document.getElementById('tpmEmail'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmEmailErr'); if (er) er.style.display = 'block'; ok = false; }
       if (pass && pass.length < 6) { var el = document.getElementById('tpmPass'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmPassErr'); if (er) er.style.display = 'block'; ok = false; }
       if (pass && pass2 && pass !== pass2) { var er = document.getElementById('tpmPass2Err'); if (er) er.style.display = 'block'; ok = false; }
+      if (pass && (!otp || otp.length !== 6)) { var el = document.getElementById('tpmOtp'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmOtpErr'); if (er) er.style.display = 'block'; ok = false; }
       if (!ok) return;
       if (tpmStagedFile) { var fd = new FormData(); fd.append('photo', tpmStagedFile); fd.append('person_id', '{{ session.get("username","") }}'); try { var pr = await fetch('/upload_photo', { method: 'POST', credentials: 'same-origin', body: fd }); var pd = await pr.json(); if (pd.ok) { setSidebarPhoto(pd.url); setAvatarImg('tpmInfoAvatarWrap', pd.url + '?t=' + Date.now()); } } catch (e) { console.warn(e); } tpmStagedFile = null; }
       try {
-        var r = await fetch('/update_profile', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: name, new_username: uname, email: email, password: pass || undefined }) });
+        var r = await fetch('/update_profile', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: name, new_username: uname, email: email, password: pass || undefined, password_otp: pass ? otp : undefined }) });
         var d = await r.json(); if (msg) msg.style.display = 'block';
         if (d.ok) {
           if (msg) { msg.style.color = 'var(--success)'; msg.textContent = '✓ Profile saved!'; }

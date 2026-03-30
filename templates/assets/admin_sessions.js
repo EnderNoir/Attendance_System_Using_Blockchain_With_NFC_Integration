@@ -41,10 +41,36 @@ function fmtReadable(dtStr) {
   }
 }
 
-function parseTapDateTime(dtStr) {
+function parseTapDateTime(dtStr, fallbackDateStr = '') {
   if (!dtStr) return { date: '-', time: '-' };
+  const raw = String(dtStr).trim();
+  if (!raw) return { date: '-', time: '-' };
+  const timeOnly = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (timeOnly) {
+    const base = parseTapDateTime(fallbackDateStr || '');
+    const hh = Number(timeOnly[1]);
+    const mm = timeOnly[2];
+    const ss = timeOnly[3] || '00';
+    const period = hh >= 12 ? 'PM' : 'AM';
+    const hh12 = hh % 12 === 0 ? 12 : hh % 12;
+    return {
+      date: base.date !== '-' ? base.date : '-',
+      time: `${String(hh12).padStart(2, '0')}:${mm}:${ss} ${period}`,
+    };
+  }
   try {
-    const d = new Date(String(dtStr).replace(' ', 'T'));
+    const normalized = raw
+      .replace(' ', 'T')
+      .replace(/\.(\d{3})\d+/, '.$1');
+    let d = new Date(normalized);
+    if (Number.isNaN(d.getTime())) {
+      d = new Date(raw);
+    }
+    if (Number.isNaN(d.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const dateOnly = raw.slice(0, 10);
+      const [y, m, day] = dateOnly.split('-').map(Number);
+      d = new Date(y, (m || 1) - 1, day || 1);
+    }
     if (Number.isNaN(d.getTime())) return { date: '-', time: '-' };
     return {
       date: d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).replace(',', ''),
@@ -282,7 +308,7 @@ function renderSessModal(sessId, data) {
           const docLink = st.attachment_url
             ? `<a href="${st.attachment_url}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);border-radius:5px;padding:2px 7px;white-space:nowrap;"><i class="bi bi-paperclip"></i> View</a>`
             : '<span style="color:var(--muted);font-size:11px;">-</span>';
-          const tap = parseTapDateTime(st.time || st.tap_time || '');
+          const tap = parseTapDateTime(st.time || st.tap_time || s.started_at || '', s.started_at || '');
           return `<tr>
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '-'}</td>

@@ -55,6 +55,11 @@ from services.excuse_email_templates import (
     send_excuse_received_email as _send_excuse_received_email_template,
     send_excuse_resolved_email as _send_excuse_resolved_email_template,
 )
+from services.welcome_email_templates import (
+    send_password_changed_success_email as _send_password_changed_success_email_template,
+    send_staff_welcome_email as _send_staff_welcome_email_template,
+    send_student_welcome_email as _send_student_welcome_email_template,
+)
 from services.excel_helpers import xl_helpers as _xl_helpers
 from services.export_attendance_routes import (
     export_session_attendance_impl as _export_session_attendance_impl,
@@ -89,6 +94,10 @@ from services.teacher_portal_routes_service import (
 
 AUTO_THREAD = None
 AUTO_THREAD_LOCK = Lock()
+
+PASSWORD_OTP_TTL_SECONDS = 600
+PASSWORD_OTP_COOLDOWN_SECONDS = 60
+PASSWORD_OTP_MAX_ATTEMPTS = 5
 
 # ── Email config helpers ──────────────────────────────────────────────────
 def get_email_config():
@@ -151,6 +160,179 @@ def send_teacher_session_summary(
                 student_rows=student_rows,
                 send_email_fn=_send_email,
         )
+
+
+def send_student_welcome_email(
+    *,
+    student_name,
+    student_email,
+    nfc_id,
+    student_id='',
+    course='',
+    year_level='',
+    section=''):
+    """Send account-created welcome email to student."""
+    _send_student_welcome_email_template(
+        student_name=student_name,
+        student_email=student_email,
+        nfc_id=nfc_id,
+        student_id=student_id,
+        course=course,
+        year_level=year_level,
+        section=section,
+        send_email_fn=_send_email,
+    )
+
+
+def send_staff_welcome_email(
+    *,
+    full_name,
+    email,
+    username,
+    role,
+    initial_password=''):
+    """Send account-created welcome email to teacher/admin/staff."""
+    _send_staff_welcome_email_template(
+        full_name=full_name,
+        email=email,
+        username=username,
+        role=role,
+        initial_password=initial_password,
+        login_url=request.url_root.rstrip('/') + url_for('login'),
+        send_email_fn=_send_email,
+    )
+
+
+def send_password_changed_success_email(
+    *,
+    full_name,
+    email,
+    username,
+    role):
+    """Send confirmation email after successful password update."""
+    _send_password_changed_success_email_template(
+        full_name=full_name,
+        email=email,
+        username=username,
+        role=role,
+        send_email_fn=_send_email,
+    )
+
+
+def _mask_email(email: str) -> str:
+    email = (email or '').strip()
+    if '@' not in email:
+        return email
+    local, domain = email.split('@', 1)
+    if len(local) <= 2:
+        local_masked = local[0] + '*' if local else '*'
+    else:
+        local_masked = local[0] + ('*' * (len(local) - 2)) + local[-1]
+    return f"{local_masked}@{domain}"
+
+
+def _password_otp_hash(code: str) -> str:
+    return hashlib.sha256(f"{code}|{app.secret_key}".encode('utf-8')).hexdigest()
+
+
+def _send_password_change_otp_email(*, full_name: str, email: str, otp_code: str):
+    if not email or '@' not in email:
+        return False, 'No valid email is registered on your profile.'
+
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:22px;border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;">
+      <h2 style="margin:0 0 10px;color:#1e4a1a;">Password Change OTP</h2>
+      <p style="margin:0 0 12px;color:#334155;">Hello {full_name or 'User'},</p>
+      <p style="margin:0 0 14px;color:#334155;">Use this one-time code to continue your DAVS password change request:</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;">
+        <p style="margin:0;font-size:28px;letter-spacing:6px;font-weight:700;color:#0f172a;">{otp_code}</p>
+      </div>
+      <p style="margin:12px 0 0;color:#b45309;font-size:13px;font-weight:700;">This code expires in 10 minutes and can only be used once.</p>
+      <p style="margin:8px 0 0;color:#b91c1c;font-size:13px;font-weight:700;">If you did not request this, secure your account immediately and report it to your DAVS administrator.</p>
+      <div style="margin-top:14px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+        <p style="margin:0;color:#475569;font-size:12px;line-height:1.5;">
+          Privacy and lawful use notice: DAVS account and attendance data are collected and processed only for legitimate academic attendance monitoring,
+          verification, and school administrative purposes. Any unauthorized or illegal use of this information is strictly prohibited.
+        </p>
+      </div>
+      <p style="margin:14px 0 0;color:#94a3b8;font-size:11px;">Cavite State University - DAVS System (Automated Message)</p>
+    </div>
+    """
+
+    _send_email([email], '[DAVS] Password Change OTP Code', html)
+    return True, ''
+
+
+def request_password_change_otp_for_current_user():
+    username = session.get('username', '')
+    user = db_get_user(username)
+    if not user:
+        return False, 'Not logged in', 401
+
+    email = (user.get('email') or '').strip()
+    if '@' not in email:
+        return False, 'Add a valid email in your profile before requesting OTP.', 400
+
+    now = int(time.time())
+    state = session.get('password_change_otp') or {}
+    cooldown_until = int(state.get('cooldown_until') or 0)
+    if cooldown_until > now:
+        wait_seconds = cooldown_until - now
+        return False, f'Please wait {wait_seconds}s before requesting a new OTP.', 429
+
+    otp_code = f"{_sec.randbelow(1000000):06d}"
+    session['password_change_otp'] = {
+        'username': username,
+        'code_hash': _password_otp_hash(otp_code),
+        'expires_at': now + PASSWORD_OTP_TTL_SECONDS,
+        'tries_left': PASSWORD_OTP_MAX_ATTEMPTS,
+        'cooldown_until': now + PASSWORD_OTP_COOLDOWN_SECONDS,
+    }
+    session.modified = True
+
+    sent, err = _send_password_change_otp_email(
+        full_name=user.get('full_name', username),
+        email=email,
+        otp_code=otp_code,
+    )
+    if not sent:
+        return False, err or 'Unable to send OTP email.', 500
+
+    return True, _mask_email(email), 200
+
+
+def validate_password_change_otp_for_current_user(otp_code: str):
+    username = session.get('username', '')
+    state = session.get('password_change_otp') or {}
+    if not state or state.get('username') != username:
+        return False, 'Request an OTP first.'
+
+    now = int(time.time())
+    expires_at = int(state.get('expires_at') or 0)
+    if now > expires_at:
+        session.pop('password_change_otp', None)
+        session.modified = True
+        return False, 'OTP expired. Please request a new code.'
+
+    otp_code = (otp_code or '').strip()
+    if not otp_code:
+        return False, 'OTP is required to change password.'
+
+    expected_hash = state.get('code_hash') or ''
+    if not expected_hash or not _sec.compare_digest(_password_otp_hash(otp_code), expected_hash):
+        tries_left = int(state.get('tries_left') or 0) - 1
+        if tries_left <= 0:
+            session.pop('password_change_otp', None)
+            session.modified = True
+            return False, 'OTP attempts exceeded. Request a new code.'
+        state['tries_left'] = tries_left
+        session['password_change_otp'] = state
+        session.modified = True
+        return False, f'Invalid OTP. {tries_left} attempt(s) left.'
+
+    session.pop('password_change_otp', None)
+    session.modified = True
+    return True, ''
 
 @app.context_processor
 def inject_globals():
@@ -2415,6 +2597,15 @@ def register():
         student_name_map[nfc_id] = name
         db_save_student({**p, 'nfcId': nfc_id, 'raw_name': on_chain,
                          'address': addr, 'tx_hash': ''})
+        send_student_welcome_email(
+            student_name=name,
+            student_email=email_val,
+            nfc_id=nfc_id,
+            student_id=request.form.get('student_id', '').strip(),
+            course=request.form.get('course', '').strip(),
+            year_level=request.form.get('year_level', '').strip(),
+            section=section_val,
+        )
         photo_file = request.files.get('student_photo')
         if photo_file and photo_file.filename:
             ext = os.path.splitext(photo_file.filename)[1].lower()
@@ -2600,6 +2791,15 @@ def batch_register():
                 'tx_hash':    '',
                 'photo_file': student.get('photo_file', ''),
             })
+            send_student_welcome_email(
+                student_name=name,
+                student_email=email_val,
+                nfc_id=nfc_id,
+                student_id=(student.get('student_id') or '').strip(),
+                course=(student.get('course') or '').strip(),
+                year_level=(student.get('year_level') or '').strip(),
+                section=section_val,
+            )
             success_count += 1
  
             # Register on blockchain (non-fatal if offline)
@@ -2782,6 +2982,15 @@ def api_my_profile():
         jsonify=jsonify,
     )
 
+
+@app.route('/request_password_change_otp', methods=['POST'])
+@login_required
+def request_password_change_otp():
+    ok, payload, status = request_password_change_otp_for_current_user()
+    if not ok:
+        return jsonify({'ok': False, 'error': payload}), status
+    return jsonify({'ok': True, 'sent_to': payload})
+
 @app.route('/update_profile', methods=['POST'])
 @login_required
 def update_profile():
@@ -2796,6 +3005,8 @@ def update_profile():
         db_save_photo=db_save_photo,
         db_delete_photo=db_delete_photo,
         hash_password=hash_password,
+        validate_password_otp_fn=validate_password_change_otp_for_current_user,
+        send_password_changed_email_fn=send_password_changed_success_email,
         jsonify=jsonify,
     )
 
@@ -4080,6 +4291,7 @@ def mark_pico():
             except Exception as e:
                 print(f"[WARNING] Blockchain mark failed: {e} — attendance saved to SQLite only.")
 
+    tap_time_db   = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     tap_time      = datetime.now().strftime('%H:%M:%S')
     tap_timestamp = time.time()
     status_label  = 'late' if is_late else 'present'
@@ -4088,7 +4300,7 @@ def mark_pico():
     db_save_attendance_log(
         sess_id=sess_id, nfc_id=nfc_id,
         student_name=name, student_id=student_id,
-        status=status_label, tap_time=tap_time,
+        status=status_label, tap_time=tap_time_db,
         tx_hash=tx_hash or '', block_number=block_num or 0
     )
 
@@ -4290,9 +4502,9 @@ def superadmin_create_user():
         fullname  = request.form.get('full_name', '').strip()
         email     = request.form.get('email', '').strip()
         role      = request.form.get('role', 'teacher')
-        password  = request.form.get('password', '').strip()
-        if not username or not fullname or not password:
-            flash('Username, full name, and password are required.', 'danger')
+        password  = request.form.get('password', '').strip() or 'test12345'
+        if not username or not fullname:
+            flash('Username and full name are required.', 'danger')
             return redirect(url_for('superadmin_create_user'))
         if role not in {'teacher', 'admin', 'super_admin'}:
             flash('Invalid role.', 'danger')
@@ -4318,6 +4530,13 @@ def superadmin_create_user():
             'status': 'approved', 'sections': [], 'my_subjects': [],
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
+        send_staff_welcome_email(
+            full_name=fullname,
+            email=email,
+            username=username,
+            role=role,
+            initial_password=password,
+        )
         flash(f'Account "{username}" ({role}) created successfully.', 'success')
         return redirect(url_for('superadmin_users'))
     # Check if Super Admin exists for frontend
@@ -4365,9 +4584,9 @@ def admin_create_instructor():
         username = request.form.get('username', '').strip().lower()
         fullname = request.form.get('full_name', '').strip()
         email    = request.form.get('email', '').strip()
-        password = request.form.get('password', '').strip()
-        if not username or not fullname or not password:
-            flash('Username, full name, and password are required.', 'danger')
+        password = request.form.get('password', '').strip() or 'test12345'
+        if not username or not fullname:
+            flash('Username and full name are required.', 'danger')
             return redirect(url_for('admin_create_instructor'))
         if db_get_user(username):
             flash(f'Username "{username}" is already taken.', 'danger')
@@ -4381,6 +4600,13 @@ def admin_create_instructor():
             'status': 'approved', 'sections': [], 'my_subjects': [],
             'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
+        send_staff_welcome_email(
+            full_name=fullname,
+            email=email,
+            username=username,
+            role='teacher',
+            initial_password=password,
+        )
         flash(f'Instructor account "{username}" created successfully.', 'success')
         return redirect(url_for('manage_users'))
     return render_template('admin_create_instructor.html')

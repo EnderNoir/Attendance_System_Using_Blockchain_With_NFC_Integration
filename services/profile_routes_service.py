@@ -36,6 +36,8 @@ def update_profile_impl(
     db_save_photo,
     db_delete_photo,
     hash_password,
+    validate_password_otp_fn,
+    send_password_changed_email_fn,
     jsonify,
 ):
     user = db_get_user(username)
@@ -48,8 +50,19 @@ def update_profile_impl(
         session_obj['full_name'] = user['full_name']
     if data.get('email'):
         user['email'] = data['email'].strip()
-    if data.get('password') and len(data['password']) >= 6:
-        user['password'] = hash_password(data['password'])
+    password_updated = False
+    password_val = (data.get('password') or '')
+    if password_val:
+        if len(password_val) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters.'}), 400
+        otp_code = (data.get('password_otp') or '').strip()
+        if not callable(validate_password_otp_fn):
+            return jsonify({'error': 'Password OTP validation is unavailable.'}), 500
+        otp_ok, otp_err = validate_password_otp_fn(otp_code)
+        if not otp_ok:
+            return jsonify({'error': otp_err or 'Invalid OTP code.'}), 403
+        user['password'] = hash_password(password_val)
+        password_updated = True
 
     new_username = (data.get('new_username') or '').strip().lower()
     if new_username and new_username != username:
@@ -70,6 +83,17 @@ def update_profile_impl(
         username = new_username
     else:
         db_save_user(username, user)
+
+    if password_updated and callable(send_password_changed_email_fn):
+        try:
+            send_password_changed_email_fn(
+                full_name=user.get('full_name', username),
+                email=user.get('email', ''),
+                username=username,
+                role=user.get('role', ''),
+            )
+        except Exception:
+            pass
 
     return jsonify({'ok': True, 'full_name': user['full_name'], 'username': session_obj.get('username', username)})
 

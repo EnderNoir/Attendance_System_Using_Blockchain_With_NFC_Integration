@@ -35,8 +35,9 @@
       </select>
     </div>
     <div class="mb-3">
-      <label class="form-label">Password * <span class="sacu-label-help">(min. 8 characters)</span></label>
-      <input type="password" name="password" class="form-control" minlength="8" placeholder="Set a strong password" required>
+      <label class="form-label">Initial Password * <span class="sacu-label-help">(default: test12345, editable)</span></label>
+      <input type="text" name="password" class="form-control" minlength="8" value="test12345" placeholder="test12345">
+      <small class="text-muted">Share this temporary password securely and require immediate change after first login.</small>
     </div>
     <div class="sacu-actions">
       <a href="{{ url_for('superadmin_users') }}" class="btn-outline">Cancel</a>

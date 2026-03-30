@@ -15,10 +15,36 @@
     } catch (e) { return dtStr; }
   }
 
-  function parseTapDateTime(dtStr) {
+  function parseTapDateTime(dtStr, fallbackDateStr = '') {
     if (!dtStr) return { date: '—', time: '—' };
+    const raw = String(dtStr).trim();
+    if (!raw) return { date: '—', time: '—' };
+    const timeOnly = raw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (timeOnly) {
+      const base = parseTapDateTime(fallbackDateStr || '');
+      const hh = Number(timeOnly[1]);
+      const mm = timeOnly[2];
+      const ss = timeOnly[3] || '00';
+      const period = hh >= 12 ? 'PM' : 'AM';
+      const hh12 = hh % 12 === 0 ? 12 : hh % 12;
+      return {
+        date: base.date !== '—' ? base.date : '—',
+        time: `${String(hh12).padStart(2, '0')}:${mm}:${ss} ${period}`,
+      };
+    }
     try {
-      const d = new Date(String(dtStr).replace(' ', 'T'));
+      const normalized = raw
+        .replace(' ', 'T')
+        .replace(/\.(\d{3})\d+/, '.$1');
+      let d = new Date(normalized);
+      if (Number.isNaN(d.getTime())) {
+        d = new Date(raw);
+      }
+      if (Number.isNaN(d.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+        const dateOnly = raw.slice(0, 10);
+        const [y, m, day] = dateOnly.split('-').map(Number);
+        d = new Date(y, (m || 1) - 1, day || 1);
+      }
       if (Number.isNaN(d.getTime())) return { date: '—', time: '—' };
       return {
         date: d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).replace(',', ''),
@@ -31,8 +57,21 @@
 
   function formatHistoryDate(input) {
     if (!input) return '—';
+    const raw = String(input).trim();
+    if (!raw) return '—';
     try {
-      const d = new Date(String(input).replace(' ', 'T'));
+      const normalized = raw
+        .replace(' ', 'T')
+        .replace(/\.(\d{3})\d+/, '.$1');
+      let d = new Date(normalized);
+      if (Number.isNaN(d.getTime())) {
+        d = new Date(raw);
+      }
+      if (Number.isNaN(d.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+        const dateOnly = raw.slice(0, 10);
+        const [y, m, day] = dateOnly.split('-').map(Number);
+        d = new Date(y, (m || 1) - 1, day || 1);
+      }
       if (Number.isNaN(d.getTime())) return '—';
       const month = d.toLocaleString('en-US', { month: 'long' });
       const day = String(d.getDate()).padStart(2, '0');
@@ -60,10 +99,28 @@
   function normalizeTimeSlot(slot) {
     if (!slot) return '—';
     const raw = String(slot).trim();
+    if (!raw) return '—';
+    if (/[A-Za-z]+-\d{2}-\d{4}/.test(raw)) return '—';
     if (/\b(am|pm)\b/i.test(raw)) return raw.toUpperCase();
+    if (/^\d{4}-\d{2}-\d{2}[ T]/.test(raw)) {
+      const d = new Date(raw.replace(' ', 'T').replace(/\.(\d{3})\d+/, '.$1'));
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      }
+    }
     const parts = raw.split(/\s*[\-–]\s*/);
     if (parts.length === 2) return `${normalizeTimeToAmPm(parts[0])} - ${normalizeTimeToAmPm(parts[1])}`;
     return normalizeTimeToAmPm(raw);
+  }
+
+  function pickHistoryDate(sessionObj) {
+    if (!sessionObj) return '—';
+    const candidates = [sessionObj.started_at, sessionObj.date, sessionObj.tap_time];
+    for (const c of candidates) {
+      const out = formatHistoryDate(c || '');
+      if (out !== '—') return out;
+    }
+    return '—';
   }
 
   function copyText(text) {
@@ -217,7 +274,7 @@
       const reasonHtml = isExcused && reasonLabel
         ? `<span style="color:#60a5fa;font-weight:600;font-size:11px;">${reasonLabel}</span>${reasonDetail}`
         : '<span style="color:var(--muted);font-size:11px;">—</span>';
-      const tap = parseTapDateTime(st.time || st.tap_time || '');
+      const tap = parseTapDateTime(st.time || st.tap_time || s.started_at || '', s.started_at || '');
       return `<tr>
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '—'}</td>
@@ -312,8 +369,8 @@
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${i + 1}</td>
             <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
             <td><span style="font-weight:600;">${s.subject_name || '—'}</span></td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${formatHistoryDate(s.started_at || s.date)}</td>
-            <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || '')}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${pickHistoryDate(s)}</td>
+            <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || s.tap_time || '')}</td>
             <td style="font-size:11px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>
             <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
             <td>${s.tx_hash ? `<button type="button" class="att-tx-copy" title="Copy to clipboard" data-tx="${s.tx_hash}">${s.tx_hash}</button>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>

@@ -286,13 +286,36 @@ function infoRow(label, val, full=false){
 
 function formatDateMonthDayYear(input) {
   if (!input) return '-';
+  const raw = String(input).trim();
+  if (!raw) return '-';
   try {
-    const d = new Date(String(input).replace(' ', 'T'));
+    const normalized = raw
+      .replace(' ', 'T')
+      .replace(/\.(\d{3})\d+/, '.$1');
+    let d = new Date(normalized);
+    if (Number.isNaN(d.getTime())) {
+      d = new Date(raw);
+    }
+    if (Number.isNaN(d.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const dateOnly = raw.slice(0, 10);
+      const [y, m, day] = dateOnly.split('-').map(Number);
+      d = new Date(y, (m || 1) - 1, day || 1);
+    }
     if (Number.isNaN(d.getTime())) return '-';
     return d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).replace(',', '');
   } catch (e) {
     return '-';
   }
+}
+
+function pickSessionDate(sessionObj) {
+  if (!sessionObj) return '-';
+  const candidates = [sessionObj.started_at, sessionObj.date, sessionObj.tap_time];
+  for (const c of candidates) {
+    const out = formatDateMonthDayYear(c || '');
+    if (out !== '-') return out;
+  }
+  return '-';
 }
 
 function toAmPm(input) {
@@ -312,7 +335,15 @@ function toAmPm(input) {
 function formatTimeSlot(slot) {
   if (!slot) return '-';
   const raw = String(slot).trim();
+  if (!raw) return '-';
+  if (/[A-Za-z]+-\d{2}-\d{4}/.test(raw)) return '-';
   if (/\b(am|pm)\b/i.test(raw)) return raw.toUpperCase();
+  if (/^\d{4}-\d{2}-\d{2}[ T]/.test(raw)) {
+    const d = new Date(raw.replace(' ', 'T').replace(/\.(\d{3})\d+/, '.$1'));
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    }
+  }
   const parts = raw.split(/\s*[\-–]\s*/);
   if (parts.length === 2) return `${toAmPm(parts[0])} - ${toAmPm(parts[1])}`;
   return toAmPm(raw);
@@ -399,8 +430,8 @@ function renderSessions(sessions){
             <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span class="muted-dash">-</span>'}</td>
             <td style="font-weight:600;">${s.subject_name || '-'}</td>
             <td>${s.teacher_name || '-'}</td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;">${formatDateMonthDayYear(s.started_at || s.date)}</td>
-            <td style="font-size:11px;color:var(--muted);">${formatTimeSlot(s.time_slot || '')}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;">${pickSessionDate(s)}</td>
+            <td style="font-size:11px;color:var(--muted);">${formatTimeSlot(s.time_slot || s.tap_time || '')}</td>
             <td>${tx}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '-'}</td>
             <td><span class="status-badge ${sbClass}">${statusLabel}</span></td>

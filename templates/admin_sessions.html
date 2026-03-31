@@ -95,6 +95,15 @@
       <input type="text" class="fs" id="lf_search" placeholder="Subject or instructor..." oninput="filterLive()"
         style="appearance:none;" />
     </div>
+    <div class="fg">
+      <span class="fl">Class Type</span>
+      <select class="fs" id="lf_class_type" onchange="filterLive()">
+        <option value="">All Types</option>
+        <option value="lecture">Lecture</option>
+        <option value="laboratory">Laboratory</option>
+        <option value="school_event">School Event</option>
+      </select>
+    </div>
     <button class="btn-rst" onclick="resetLive()"><i class="bi bi-x-circle"></i> Reset</button>
     <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="lf_count">{{ active|length }} shown</span>
   </div>
@@ -103,6 +112,7 @@
     {% for sid, s in active.items() %}
     <div class="sess-row live-row" id="lrow_{{ sid }}" data-subject="{{ s.subject_name|lower }}"
       data-teacher="{{ s.teacher_name|lower }}" data-section="{{ s.section_key|lower }}"
+      data-classtype="{{ s.get('class_type', 'lecture')|lower }}"
       data-program="{{ (s.section_key.split('|')[0] if '|' in s.section_key else '')|lower }}"
       data-year="{{ (s.section_key.split('|')[1] if s.section_key.count('|') >= 1 else '')|lower }}"
       data-secletter="{{ (s.section_key.split('|')[2] if s.section_key.count('|') >= 2 else '')|lower }}"
@@ -111,7 +121,7 @@
       <div style="flex:1;min-width:0;">
         <div class="sr-name">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif
           %}{{ s.subject_name }}</div>
-        <div class="sr-sub">{{ s.section_key.replace('|',' | ') }} | {{ s.teacher_name }}</div>
+        <div class="sr-sub">{{ s.section_key.replace('|',' | ') }} | {{ s.teacher_name }} | {{ s.get('class_type','lecture')|title }}</div>
       </div>
       <span class="badge-live">LIVE</span>
       <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-vr" style="text-decoration:none;"
@@ -184,6 +194,15 @@
         {% set _=seen_subj.append(s.subject_name) %}{% endif %}{% endfor %}
       </select>
     </div>
+    <div class="fg">
+      <span class="fl">Class Type</span>
+      <select class="fs" id="ef_class_type" onchange="filterEnded()">
+        <option value="">All Types</option>
+        <option value="lecture">Lecture</option>
+        <option value="laboratory">Laboratory</option>
+        <option value="school_event">School Event</option>
+      </select>
+    </div>
     <button class="btn-rst" onclick="resetEnded()"><i class="bi bi-x-circle"></i> Reset</button>
     <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="ef_count">{{ ended|length }} shown</span>
   </div>
@@ -193,13 +212,14 @@
     {% set sparts = s.section_key.split('|') %}
     <div class="sess-row" id="erow_{{ sid }}" data-subject="{{ s.subject_name|lower }}"
       data-teacher="{{ s.teacher_name|lower }}" data-section="{{ s.section_key|lower }}"
+      data-classtype="{{ s.get('class_type', 'lecture')|lower }}"
       data-program="{{ (sparts[0] if sparts|length > 0 else '')|lower }}"
       data-year="{{ (sparts[1] if sparts|length > 1 else '')|lower }}"
       data-secletter="{{ (sparts[2] if sparts|length > 2 else '')|lower }}" onclick="openSessModal('{{ sid }}')">
       <div style="flex:1;min-width:0;">
         <div class="sr-name">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif
           %}{{ s.subject_name }}</div>
-        <div class="sr-sub">{{ s.section_key.replace('|',' | ') }} | {{ s.teacher_name }} | {{ fmt_time(s.ended_at) }}
+        <div class="sr-sub">{{ s.section_key.replace('|',' | ') }} | {{ s.teacher_name }} | {{ s.get('class_type','lecture')|title }} | {{ fmt_time(s.ended_at) }}
         </div>
       </div>
       <span class="badge-done"><i class="bi bi-check-circle"></i> Done</span>

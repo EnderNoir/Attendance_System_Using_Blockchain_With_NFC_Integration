@@ -31,9 +31,9 @@
 .pill-rej{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(192,57,43,.1);color:var(--danger);border:1px solid rgba(192,57,43,.2);}
 
 /* Modal overlay */
-.upd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s;}
+.upd-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:flex-start;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity .2s;overflow-y:auto;padding:16px 0;}
 .upd-overlay.show{opacity:1;pointer-events:all;}
-.upd-box{background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:1750px;width:min(98vw,1750px);max-height:98vh;overflow-y:visible;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);scrollbar-width:thin;}
+.upd-box{background:var(--surface);border:1px solid var(--border);border-radius:18px;max-width:1750px;width:min(98vw,1750px);max-height:calc(100vh - 32px);overflow-y:auto;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1.56,.64,1);scrollbar-width:thin;}
 .upd-overlay.show .upd-box{transform:scale(1);}
 .upd-box::-webkit-scrollbar{width:4px;}
 .upd-box::-webkit-scrollbar-thumb{background:rgba(45,106,39,.2);border-radius:99px;}

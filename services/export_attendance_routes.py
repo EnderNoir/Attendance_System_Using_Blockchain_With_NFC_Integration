@@ -1,6 +1,7 @@
 from datetime import datetime
 import io
 import traceback
+import json
 
 from flask import Response, flash, redirect, request, url_for
 
@@ -108,6 +109,7 @@ def export_student_sessions_impl(
 
         f_status = request.args.get('status', '').strip()
         f_subject = request.args.get('subject', '').strip()
+        f_class_type = request.args.get('class_type', '').strip().lower()
         stud_name = request.args.get('name', 'Student').strip()
         now = datetime.now()
 
@@ -117,7 +119,7 @@ def export_student_sessions_impl(
         with get_db_fn() as conn:
             log_rows = conn.execute(
                 "SELECT al.*, s.subject_name, s.course_code, s.section_key, "
-                "s.teacher_name, s.time_slot, s.started_at, s.ended_at "
+                "s.teacher_name, s.class_type, s.time_slot, s.started_at, s.ended_at "
                 "FROM attendance_logs al "
                 "JOIN sessions s ON al.sess_id = s.sess_id "
                 "WHERE al.nfc_id=? ORDER BY s.started_at DESC",
@@ -159,6 +161,9 @@ def export_student_sessions_impl(
                 continue
             if f_subject and lg['subject_name'] != f_subject:
                 continue
+            class_type = str(lg['class_type'] or 'lecture').strip().lower()
+            if f_class_type in ('lecture', 'laboratory') and class_type != f_class_type:
+                continue
             status_counts[status] = status_counts.get(status, 0) + 1
             ex = exc_map.get(lg['sess_id'], {})
             reason = ''
@@ -173,6 +178,7 @@ def export_student_sessions_impl(
                 {
                     'subject': lg['subject_name'],
                     'code': lg['course_code'] or '',
+                    'class_type': class_type.capitalize(),
                     'teacher': lg['teacher_name'] or '',
                     'date_dash': _fmt_date_dash(lg['started_at'] or ''),
                     'date_colon': _fmt_date_colon(lg['started_at'] or ''),
@@ -200,6 +206,7 @@ def export_student_sessions_impl(
                 '#',
                 'Course Code',
                 'Subject Name',
+                'Class Type',
                 'Instructor Name',
                 'Date',
                 'Time Slot',
@@ -209,12 +216,13 @@ def export_student_sessions_impl(
                 'Excused Reason',
                 'Document',
             ]
-            widths = [4, 12, 30, 24, 16, 20, 56, 12, 12, 28, 22]
+            widths = [4, 12, 28, 12, 24, 16, 20, 56, 12, 12, 28, 22]
         else:
             headers = [
                 '#',
                 'Course Code',
                 'Subject Name',
+                'Class Type',
                 'Date',
                 'Time Slot',
                 'Excused Reason',
@@ -222,7 +230,7 @@ def export_student_sessions_impl(
                 'Transaction Number (TX)',
                 'Block Number',
             ]
-            widths = [4, 12, 34, 16, 20, 30, 22, 56, 12]
+            widths = [4, 12, 30, 12, 16, 20, 30, 22, 56, 12]
         subtitles = [
             'Cavite State University — DAVS Attendance Record',
             f'Student: {stud_name}  |  ID: {sid_}  |  NFC: {nfc_id}',
@@ -235,15 +243,16 @@ def export_student_sessions_impl(
         first_data += 1
         col_fmt = {}
         if is_admin_view:
-            col_fmt = {7: ('tx',), 8: ('num',), 9: ('status',)}
+            col_fmt = {8: ('tx',), 9: ('num',), 10: ('status',)}
         else:
-            col_fmt = {8: ('tx',), 9: ('num',)}
+            col_fmt = {9: ('tx',), 10: ('num',)}
         for ri, row in enumerate(rows, first_data):
             if is_admin_view:
                 vals = [
                     ri - first_data + 1,
                     row['code'],
                     row['subject'],
+                    row['class_type'],
                     row['teacher'],
                     row['date_dash'],
                     row['time_slot'],
@@ -258,6 +267,7 @@ def export_student_sessions_impl(
                     ri - first_data + 1,
                     row['code'],
                     row['subject'],
+                    row['class_type'],
                     row['date_colon'],
                     row['time_slot'],
                     row['excuse'],
@@ -283,14 +293,15 @@ def export_student_sessions_impl(
                 '',
                 '',
                 '',
-                f"{status_counts['Present']}P / {status_counts['Late']}L / {status_counts['Absent']}A / {status_counts['Excused']}E",
                 '',
+                f"{status_counts['Present']}P / {status_counts['Late']}L / {status_counts['Absent']}A / {status_counts['Excused']}E",
                 '',
                 '',
             ]
         else:
             total_vals = [
                 'TOTAL',
+                '',
                 '',
                 '',
                 '',
@@ -406,22 +417,89 @@ def export_session_attendance_impl(
 
         now = datetime.now()
         section_key = normalize_section_key_fn(sess.get('section_key', ''))
+        class_type_norm = str(sess.get('class_type', 'lecture') or 'lecture').strip().lower()
+        is_school_event = class_type_norm == 'school_event'
+
+        related_ids = [sess_id]
+        section_keys = {section_key} if section_key else set()
+        teacher_names = [str(sess.get('teacher_name', '') or '').strip()]
+
+        if is_school_event:
+            sched_id = str(sess.get('schedule_id', '') or '').strip()
+            event_id = ''
+            if sched_id.startswith('event:'):
+                parts = sched_id.split(':', 3)
+                if len(parts) == 4:
+                    event_id = parts[1]
+            if event_id:
+                with get_db_fn() as _conn:
+                    rel_rows = _conn.execute(
+                        "SELECT sess_id, section_key, teacher_name FROM sessions "
+                        "WHERE class_type='school_event' AND schedule_id LIKE ?",
+                        (f"event:{event_id}:%",),
+                    ).fetchall()
+                if rel_rows:
+                    related_ids = [r['sess_id'] for r in rel_rows if r.get('sess_id')]
+                    if not related_ids:
+                        related_ids = [sess_id]
+                    for r in rel_rows:
+                        sk = normalize_section_key_fn(r.get('section_key', ''))
+                        if sk:
+                            section_keys.add(sk)
+                        tn = str(r.get('teacher_name', '') or '').strip()
+                        if tn:
+                            teacher_names.append(tn)
+                with get_db_fn() as _conn:
+                    ev_row = _conn.execute(
+                        "SELECT teacher_usernames_json, section_keys_json FROM event_schedules WHERE event_id=? LIMIT 1",
+                        (event_id,),
+                    ).fetchone()
+                if ev_row:
+                    try:
+                        for sk in json.loads(ev_row['section_keys_json'] or '[]'):
+                            skn = normalize_section_key_fn(sk)
+                            if skn:
+                                section_keys.add(skn)
+                    except Exception:
+                        pass
         all_students = get_all_students_fn()
-        enrolled = sorted(
-            [s for s in all_students if build_student_section_key_fn(s) == section_key],
-            key=lambda x: x['name'],
-        )
+        if is_school_event:
+            enrolled = sorted(
+                [s for s in all_students if build_student_section_key_fn(s) in section_keys],
+                key=lambda x: x['name'],
+            )
+        else:
+            enrolled = sorted(
+                [s for s in all_students if build_student_section_key_fn(s) == section_key],
+                key=lambda x: x['name'],
+            )
         present_ids = set(sess.get('present', []))
         late_ids = set(sess.get('late', []))
         excused_ids = set(sess.get('excused', []))
-        att_logs = {lg['nfc_id']: lg for lg in db_get_session_attendance_fn(sess_id)}
+        att_logs = {}
+        for rid in (related_ids if is_school_event else [sess_id]):
+            for lg in db_get_session_attendance_fn(rid):
+                att_logs[lg['nfc_id']] = lg
+
+        if is_school_event:
+            present_ids = {nid for nid, lg in att_logs.items() if str(lg.get('status', '')).strip().lower() in ('present', 'late')}
+            late_ids = set()
+            excused_ids = set()
 
         excuse_details = {}
         with get_db_fn() as _conn:
-            excuses = _conn.execute(
-                "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
-                (sess_id,),
-            ).fetchall()
+            if is_school_event and related_ids:
+                ph = ','.join(['?'] * len(related_ids))
+                excuses = _conn.execute(
+                    "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests "
+                    "WHERE sess_id IN (" + ph + ") AND status='approved'",
+                    tuple(related_ids),
+                ).fetchall()
+            else:
+                excuses = _conn.execute(
+                    "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
+                    (sess_id,),
+                ).fetchall()
             for exc in excuses:
                 excuse_details[exc['nfc_id']] = {
                     'reason': exc['reason_type'],
@@ -453,6 +531,8 @@ def export_session_attendance_impl(
                 status = 'Present'
             else:
                 status = 'Absent'
+            if is_school_event and status == 'Late':
+                status = 'Present'
             counts[status] += 1
             lg = att_logs.get(nid, {})
             excuse_info = excuse_details.get(nid, {})
@@ -465,6 +545,11 @@ def export_session_attendance_impl(
                 {
                     'name': st['name'],
                     'student_id': st.get('student_id', '—'),
+                    'section_origin': '-'.join([
+                        str(st.get('course', '') or '').strip(),
+                        str(st.get('year_level', '') or '').strip(),
+                        str(st.get('section', '') or '').strip(),
+                    ]).strip('-') or '—',
                     'year': st.get('year_level', ''),
                     'status': status,
                     'tap_date': _fmt_date_dash(lg.get('tap_time', '') or ''),
@@ -486,22 +571,34 @@ def export_session_attendance_impl(
         sec = section_key.replace('|', ' · ')
         instr = sess.get('teacher_name', '')
         slot = sess.get('time_slot', '—')
+        if class_type_norm == 'school_event':
+            class_type_label = 'School Event'
+        elif class_type_norm == 'laboratory':
+            class_type_label = 'Laboratory'
+        else:
+            class_type_label = 'Lecture'
         started = sess.get('started_at', '—')
         ended = sess.get('ended_at', 'Still running')
-        n_cols = 10
+        teacher_scope = ', '.join(sorted({t for t in teacher_names if t})) or instr or '—'
+        section_scope = ' · '.join(sorted(section_keys)).replace('|', ' / ') if section_keys else sec
+        n_cols = 12
         subtitles = [
             'Cavite State University — DAVS Session Attendance Report',
             f'Subject: {subj}  {"["+code+"]" if code else ""}',
-            f'Section: {sec}  |  Instructor: {instr}',
-            f'Time Slot: {slot}  |  Started: {started}  |  Ended: {ended}',
+            (f'Event Scope: {section_scope}' if is_school_event else f'Section: {sec}  |  Instructor: {instr}'),
+            (f'Teacher(s) Involved: {teacher_scope}' if is_school_event else ''),
+            f'Time Slot: {slot}  |  Class Type: {class_type_label}  |  Started: {started}  |  Ended: {ended}',
             f'Exported: {now.strftime("%B %d, %Y %I:%M %p")}',
         ]
+        subtitles = [s for s in subtitles if s]
         first_data = H['title_block'](ws, 'Session Attendance Report', subtitles, n_cols)
         first_data = H['stat_block'](ws, first_data, counts, n_cols)
         headers = [
             '#',
             'Student Name',
             'Student ID',
+            'Program-Year-Section',
+            'Class Type',
             'Status',
             'Date',
             'Time',
@@ -510,10 +607,10 @@ def export_session_attendance_impl(
             'Excuse Reason',
             'Document',
         ]
-        widths = [4, 30, 14, 12, 16, 14, 56, 12, 30, 24]
+        widths = [4, 24, 14, 24, 12, 12, 16, 14, 56, 12, 30, 24]
         H['make_header_row'](ws, first_data, headers, widths)
         first_data += 1
-        col_fmt = {4: ('status',), 7: ('tx',), 8: ('num',)}
+        col_fmt = {6: ('status',), 9: ('tx',), 10: ('num',)}
         for ri, row in enumerate(rows, first_data):
             H['data_row'](
                 ws,
@@ -522,6 +619,8 @@ def export_session_attendance_impl(
                     ri - first_data + 1,
                     row['name'],
                     row['student_id'],
+                    row['section_origin'],
+                    class_type_label,
                     row['status'],
                     row['tap_date'],
                     row['tap_time'],
@@ -539,6 +638,8 @@ def export_session_attendance_impl(
             f'{len(enrolled)} enrolled',
             '',
             f"{counts['Present']}P/{counts['Late']}L/{counts['Absent']}A/{counts['Excused']}E",
+            '',
+            '',
             '',
             '',
             '',

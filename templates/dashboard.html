@@ -24,6 +24,7 @@
       <button class="mtab active" onclick="switchMTab('info',this)"><i class="bi bi-person-lines-fill"></i> Info</button>
       <button class="mtab" onclick="switchMTab('edit',this)"><i class="bi bi-pencil-square"></i> Update</button>
       <button class="mtab" onclick="switchMTab('sessions',this)"><i class="bi bi-journal-text"></i> Sessions</button>
+      <button class="mtab" id="mtab_action" onclick="switchMTab('action',this)" style="display:none;"><i class="bi bi-trash"></i> Action</button>
     </div>
 
     <div class="mpane active" id="mpane-info">
@@ -61,6 +62,14 @@
             <option value="">All Subjects</option>
           </select>
         </div>
+        <div class="fg">
+          <span class="fl">Class Type</span>
+          <select class="upd-input" id="sessClassType" onchange="filterSessions()" style="appearance:none;">
+            <option value="">All Types</option>
+            <option value="lecture">Lecture</option>
+            <option value="laboratory">Laboratory</option>
+          </select>
+        </div>
         <div style="display:flex;gap:6px;align-self:flex-end;">
           <button class="btn-rst" onclick="resetSessFilters()" title="Reset"><i class="bi bi-x-circle"></i></button>
           <button class="btn-primary" id="sessExportBtn" onclick="exportStudentSessions()" style="padding:7px 12px;font-size:12px;" title="Export to Excel">
@@ -75,6 +84,10 @@
           Loading sessions...
         </div>
       </div>
+    </div>
+
+    <div class="mpane" id="mpane-action">
+      <div id="actionContent" style="padding:4px 0;"></div>
     </div>
   </div>
 </div>
@@ -122,6 +135,11 @@
         <option>A</option><option>B</option><option>C</option><option>D</option>
       </select>
     </div>
+    {% if session.get('role') in ('admin', 'super_admin') %}
+    <a class="btn-primary" href="{{ url_for('register') }}" style="align-self:flex-end;">
+      <i class="bi bi-person-plus"></i> Enroll Student
+    </a>
+    {% endif %}
     <button class="btn-rst" onclick="resetStudentFilters()"><i class="bi bi-x-circle"></i> Reset</button>
     <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="st_count">{{ students|length }} students</span>
   </div>
@@ -166,15 +184,11 @@
         <option value="teacher">Teacher</option>
       </select>
     </div>
-    <div class="fg">
-      <span class="fl">Status</span>
-      <select class="fs" id="tc_status" onchange="filterTeachers()">
-        <option value="">All</option>
-        <option value="approved">Active</option>
-        <option value="pending">Pending</option>
-        <option value="rejected">Rejected</option>
-      </select>
-    </div>
+    {% if session.get('role') in ('admin', 'super_admin') %}
+    <a class="btn-primary" href="{{ url_for('superadmin_create_user') if session.get('role') == 'super_admin' else url_for('admin_create_instructor') }}" style="align-self:flex-end;">
+      <i class="bi bi-person-plus"></i> Create Account
+    </a>
+    {% endif %}
     <button class="btn-rst" onclick="resetTeacherFilters()"><i class="bi bi-x-circle"></i> Reset</button>
     <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="tc_count">{{ teachers|length }} faculty</span>
   </div>
@@ -195,9 +209,16 @@
           <span class="{{ 'pill-ok' if st=='approved' else ('pill-pend' if st=='pending' else 'pill-rej') }}">{{ st|capitalize }}</span>
         </div>
       </div>
-      <button class="btn-vr" onclick="openTeacherRecord('{{ username }}')">
-        <i class="bi bi-eye"></i> View Record
-      </button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn-vr" onclick="openTeacherRecord('{{ username }}')">
+          <i class="bi bi-eye"></i> View Record
+        </button>
+        {% if session.get('role') in ('admin', 'super_admin') and username != session.get('username') %}
+        <button class="btn-rst" onclick="deleteFacultyAccount('{{ username }}','{{ u.full_name|e }}')">
+          <i class="bi bi-trash"></i> Delete
+        </button>
+        {% endif %}
+      </div>
     </div>
     {% else %}
     <div style="text-align:center;padding:48px 20px;color:var(--muted);">
@@ -215,7 +236,9 @@
   window.DASHBOARD_BOOTSTRAP = {
     students: {{ students | tojson }},
     teachers: {{ teachers | tojson }},
-    photos: {{ photos_db | tojson if photos_db else '{}' }}
+    photos: {{ photos_db | tojson if photos_db else '{}' }},
+    currentRole: {{ session.get('role','') | tojson }},
+    currentUsername: {{ session.get('username','') | tojson }}
   };
 </script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>

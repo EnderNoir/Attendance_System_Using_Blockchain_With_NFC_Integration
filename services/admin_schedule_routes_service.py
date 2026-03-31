@@ -3,6 +3,7 @@ def admin_schedules_page_impl(
     db_get_all_schedules,
     db_get_all_subjects,
     db_get_all_users,
+    db_get_all_no_class_days,
     get_all_section_keys,
     session_obj,
     render_template,
@@ -17,6 +18,7 @@ def admin_schedules_page_impl(
         for username, user in users.items()
         if user.get('role') == 'teacher' and user.get('status') == 'approved'
     }
+    no_class_days = db_get_all_no_class_days()
     sections = get_all_section_keys()
     current_role = session_obj.get('role', '')
     return render_template(
@@ -25,6 +27,7 @@ def admin_schedules_page_impl(
         subjects=subjects,
         teachers=teachers,
         sections=sections,
+        no_class_days=no_class_days,
         dow_names=dow_names,
         is_super_admin=(current_role == 'super_admin'),
         can_manage_schedules=(current_role in admin_roles),
@@ -45,6 +48,9 @@ def admin_schedule_create_impl(
     session_obj,
 ):
     try:
+        def _is_checked(value):
+            return str(value or '').strip().lower() in ('1', 'true', 'yes', 'on')
+
         subject_id = request.form.get('subject_id', '')
         subject = db_get_subject(subject_id)
         if not subject:
@@ -69,36 +75,84 @@ def admin_schedule_create_impl(
             section_key = normalize_section_key(request.form.get('section_key', ''))
 
         day_of_week = int(request.form.get('day_of_week', 0))
-        start_time = request.form.get('start_time', '')
-        end_time = request.form.get('end_time', '')
         grace_minutes = int(request.form.get('grace_minutes', 15))
 
-        if not section_key or not start_time or not end_time:
-            flash('Section, start time, and end time are required.', 'danger')
+        if not section_key:
+            flash('Section is required.', 'danger')
             return redirect(url_for('admin_schedules'))
 
-        start_mins = time_mins(start_time)
-        end_mins = time_mins(end_time)
-        if start_mins is None or end_mins is None or end_mins <= start_mins:
-            flash('End time must be later than start time.', 'danger')
+        lecture_enabled = _is_checked(request.form.get('lecture_enabled'))
+        lab_enabled = _is_checked(request.form.get('laboratory_enabled'))
+
+        # Backward compatibility for old form payload using start_time/end_time only.
+        legacy_start = request.form.get('start_time', '')
+        legacy_end = request.form.get('end_time', '')
+        lecture_start_time = request.form.get('lecture_start_time', '') or legacy_start
+        lecture_end_time = request.form.get('lecture_end_time', '') or legacy_end
+        laboratory_start_time = request.form.get('laboratory_start_time', '')
+        laboratory_end_time = request.form.get('laboratory_end_time', '')
+
+        if not lecture_enabled and not lab_enabled and lecture_start_time and lecture_end_time:
+            lecture_enabled = True
+
+        if not lecture_enabled and not lab_enabled:
+            flash('Please select at least one class type (Lecture or Laboratory).', 'danger')
             return redirect(url_for('admin_schedules'))
 
-        db_save_schedule(
-            {
-                'section_key': section_key,
-                'subject_id': subject_id,
-                'subject_name': subject['name'],
-                'course_code': subject.get('course_code', ''),
-                'teacher_username': teacher_username,
-                'teacher_name': teacher.get('full_name', teacher_username),
-                'day_of_week': day_of_week,
-                'start_time': start_time,
-                'end_time': end_time,
-                'grace_minutes': grace_minutes,
-                'created_by': session_obj.get('username', ''),
-            }
-        )
-        flash('Schedule created successfully.', 'success')
+        schedule_rows = []
+        if lecture_enabled:
+            schedule_rows.append(('lecture', lecture_start_time, lecture_end_time))
+        if lab_enabled:
+            schedule_rows.append(('laboratory', laboratory_start_time, laboratory_end_time))
+
+        for class_type, start_time, end_time in schedule_rows:
+            if not start_time or not end_time:
+                flash(f"{class_type.title()} start and end time are required.", 'danger')
+                return redirect(url_for('admin_schedules'))
+            start_mins = time_mins(start_time)
+            end_mins = time_mins(end_time)
+            if start_mins is None or end_mins is None or end_mins <= start_mins:
+                flash(f"{class_type.title()} end time must be later than start time.", 'danger')
+                return redirect(url_for('admin_schedules'))
+
+        # Allow back-to-back lecture/lab schedules (e.g. 07:00-09:00 and 09:00-11:00),
+        # but reject true time overlaps when both are selected.
+        lecture_item = next((row for row in schedule_rows if row[0] == 'lecture'), None)
+        lab_item = next((row for row in schedule_rows if row[0] == 'laboratory'), None)
+        if lecture_item and lab_item:
+            lec_start = time_mins(lecture_item[1])
+            lec_end = time_mins(lecture_item[2])
+            lab_start = time_mins(lab_item[1])
+            lab_end = time_mins(lab_item[2])
+            if lec_end > lab_start and lab_end > lec_start:
+                flash(
+                    'Lecture and Laboratory times overlap. Back-to-back schedules are allowed.',
+                    'danger',
+                )
+                return redirect(url_for('admin_schedules'))
+
+        for class_type, start_time, end_time in schedule_rows:
+            db_save_schedule(
+                {
+                    'section_key': section_key,
+                    'subject_id': subject_id,
+                    'subject_name': subject['name'],
+                    'course_code': subject.get('course_code', ''),
+                    'teacher_username': teacher_username,
+                    'teacher_name': teacher.get('full_name', teacher_username),
+                    'day_of_week': day_of_week,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'class_type': class_type,
+                    'grace_minutes': grace_minutes,
+                    'created_by': session_obj.get('username', ''),
+                }
+            )
+
+        if len(schedule_rows) == 2:
+            flash('Lecture and Laboratory schedules created successfully.', 'success')
+        else:
+            flash(f"{schedule_rows[0][0].title()} schedule created successfully.", 'success')
     except Exception as exc:
         flash(f'Error creating schedule: {exc}', 'danger')
 
@@ -134,9 +188,9 @@ def admin_schedule_edit_impl(
                 now_dt = datetime_cls.strptime(current_time, '%H:%M')
                 start_dt = datetime_cls.strptime(start_time, '%H:%M')
                 time_diff = (start_dt - now_dt).total_seconds() / 60
-                if 0 <= time_diff <= 5:
+                if time_diff <= 5:
                     flash(
-                        'Cannot edit schedule within 5 minutes before start time. Delete and recreate if changes are needed.',
+                        'Cannot edit schedule within 5 minutes before start time or after it has started. Delete and recreate if changes are needed.',
                         'warning',
                     )
                     return redirect(url_for('admin_schedules'))
@@ -163,6 +217,11 @@ def admin_schedule_edit_impl(
 
         new_start_time = request.form.get('start_time', schedule['start_time'])
         new_end_time = request.form.get('end_time', schedule['end_time'])
+        class_type = str(
+            request.form.get('class_type', schedule.get('class_type', 'lecture'))
+        ).strip().lower()
+        if class_type not in ('lecture', 'laboratory', 'school_event'):
+            class_type = 'lecture'
         start_mins = time_mins(new_start_time)
         end_mins = time_mins(new_end_time)
         if start_mins is None or end_mins is None or end_mins <= start_mins:
@@ -181,6 +240,7 @@ def admin_schedule_edit_impl(
                 'day_of_week': int(request.form.get('day_of_week', schedule['day_of_week'])),
                 'start_time': new_start_time,
                 'end_time': new_end_time,
+                'class_type': class_type,
                 'grace_minutes': int(request.form.get('grace_minutes', schedule['grace_minutes'])),
                 'created_by': schedule['created_by'],
             }

@@ -9,6 +9,7 @@ def build_stats_export_dataset(
     f_year_lvl,
     f_subject,
     f_instr,
+    f_class_type,
     f_month,
     f_year_num,
     f_program,
@@ -91,6 +92,9 @@ def build_stats_export_dataset(
             continue
         if f_instr and s.get('teacher_name', '') != f_instr:
             continue
+        class_type_norm = str(s.get('class_type', 'lecture')).strip().lower()
+        if f_class_type in ('lecture', 'laboratory', 'school_event') and class_type_norm != f_class_type:
+            continue
         if f_tod:
             if ':' in f_tod:
                 if s.get('time_slot', '') != f_tod:
@@ -119,6 +123,8 @@ def build_stats_export_dataset(
         af.append('Subject: ' + f_subject)
     if f_instr:
         af.append('Instructor: ' + f_instr)
+    if f_class_type in ('lecture', 'laboratory', 'school_event'):
+        af.append('Class Type: ' + ('School Event' if f_class_type == 'school_event' else f_class_type.capitalize()))
     if f_tod:
         af.append('Time: ' + f_tod)
     filter_label = ' | '.join(af) if af else 'All data'
@@ -143,6 +149,9 @@ def build_stats_export_dataset(
     }
 
     for sid, s in sorted(filtered.items(), key=lambda x: x[1].get('started_at', '')):
+        class_type_norm = str(s.get('class_type', 'lecture')).strip().lower()
+        if class_type_norm not in ('lecture', 'laboratory', 'school_event'):
+            class_type_norm = 'lecture'
         sk = normalize_section_key_fn(s.get('section_key', ''))
         enrolled = [st for st in all_stud if build_student_section_key_fn(st) == sk]
         en_ids = {st['nfcId'] for st in enrolled}
@@ -179,6 +188,7 @@ def build_stats_export_dataset(
         sess_rows.append(
             [
                 subj_lbl,
+                class_type_norm.capitalize(),
                 fmt_time_fn(s['started_at']),
                 sk.replace('|', ' · '),
                 s.get('teacher_name', ''),
@@ -230,6 +240,7 @@ def build_stats_export_dataset(
                     st.get('year_level', ''),
                     st.get('section', ''),
                     subj_lbl,
+                    class_type_norm.capitalize(),
                     fmt_time_fn(s['started_at']),
                     s.get('time_slot', ''),
                     s.get('teacher_name', ''),

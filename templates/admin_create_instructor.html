@@ -6,7 +6,7 @@
 {% endblock %}
 {% block content %}
 <div class="aci-wrap">
-  <a href="{{ url_for('manage_users') }}" class="btn-outline aci-back-link"><i class="bi bi-arrow-left"></i> Back to Faculty Accounts</a>
+  <a href="{{ url_for('dashboard', tab='faculty') }}" class="btn-outline aci-back-link"><i class="bi bi-arrow-left"></i> Back to Faculty Accounts</a>
   <h2 class="aci-title">Create Instructor Account</h2>
   <p class="aci-subtitle">
     Creates an approved Instructor account. Only Super Admin can create Admin accounts.
@@ -35,7 +35,7 @@
       The instructor should change this temporary password immediately after first login from their profile page.
     </div>
     <div class="aci-actions">
-      <a href="{{ url_for('manage_users') }}" class="btn-outline">Cancel</a>
+      <a href="{{ url_for('dashboard', tab='faculty') }}" class="btn-outline">Cancel</a>
       <button type="submit" class="btn-primary"><i class="bi bi-person-check"></i> Create Instructor</button>
     </div>
   </form>

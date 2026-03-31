@@ -77,6 +77,8 @@ def reset_sqlite():
         'accounts',
         'users',
         'schedules',
+        'event_schedules',
+        'no_class_days',
         'excuse_requests',
     ]
     for table in data_tables:
@@ -254,6 +256,9 @@ def verify_reset():
         ('sessions',         'SELECT COUNT(*) FROM sessions'),
         ('attendance_logs',  'SELECT COUNT(*) FROM attendance_logs'),
         ('subjects',         'SELECT COUNT(*) FROM subjects'),
+        ('schedules',        'SELECT COUNT(*) FROM schedules'),
+        ('event_schedules',  'SELECT COUNT(*) FROM event_schedules'),
+        ('no_class_days',    'SELECT COUNT(*) FROM no_class_days'),
         ('photos',           'SELECT COUNT(*) FROM photos'),
         ('accounts',         'SELECT COUNT(*) FROM accounts'),
     ]

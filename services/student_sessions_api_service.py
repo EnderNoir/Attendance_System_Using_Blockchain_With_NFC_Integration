@@ -15,7 +15,7 @@ def student_sessions_api_impl(
             "SELECT al.nfc_id, al.status, al.tx_hash, al.block_number, "
             "al.tap_time, al.excuse_note, al.excuse_request_id, "
             "s.sess_id, s.subject_name, s.course_code, s.section_key, "
-            "s.teacher_name, s.time_slot, s.started_at "
+            "s.teacher_name, s.class_type, s.time_slot, s.started_at "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "WHERE al.nfc_id = ? "
@@ -53,6 +53,7 @@ def student_sessions_api_impl(
             'subject_name': row['subject_name'] or '',
             'course_code': row['course_code'] or '',
             'teacher_name': row['teacher_name'] or '',
+            'class_type': (row['class_type'] or 'lecture').lower(),
             'section_key': row['section_key'] or '',
             'time_slot': row['time_slot'] or '',
             'date': (row['started_at'] or '')[:10],
@@ -99,6 +100,7 @@ def student_sessions_api_impl(
                 'subject_name': sess.get('subject_name', ''),
                 'course_code': sess.get('course_code', ''),
                 'teacher_name': sess.get('teacher_name', ''),
+                'class_type': str(sess.get('class_type', 'lecture')).strip().lower(),
                 'section_key': sess.get('section_key', ''),
                 'time_slot': sess.get('time_slot', ''),
                 'date': (sess.get('started_at', '') or '')[:10],

@@ -4,6 +4,13 @@ let curFilters = {};
 let rawData = null;
 const ssdValues = {};
 
+function fmtClassTypeLabel(v) {
+  const norm = String(v || '').trim().toLowerCase();
+  if (!norm) return '';
+  if (norm === 'school_event') return 'School Event';
+  return norm.charAt(0).toUpperCase() + norm.slice(1);
+}
+
 // Chart instances
 const donutChart = new Chart(document.getElementById('donutChart'), {
   type: 'doughnut',
@@ -117,6 +124,7 @@ async function loadStats() {
   const tod = ssdValues.gf_timeofday || '';
   const subj = ssdValues.gf_subject || '';
   const instr = ssdValues.gf_instructor || '';
+  const classType = ssdValues.gf_class_type || '';
 
   if (prog && yr && sec) {
     params.append('section_key', `${prog}|${yr}|${sec}`);
@@ -127,6 +135,7 @@ async function loadStats() {
   }
   if (subj) params.append('subject', subj);
   if (instr) params.append('instructor', instr);
+  if (classType) params.append('class_type', classType);
   if (tod) params.append('time_of_day', tod);
 
   const expLink = document.getElementById('exportBtn');
@@ -151,11 +160,13 @@ function buildExportFilename() {
   const sec = ssdValues.gf_section || '';
   const subj = ssdValues.gf_subject || '';
   const instr = ssdValues.gf_instructor || '';
+  const classType = ssdValues.gf_class_type || '';
   if (prog) parts.push(prog.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().substring(0, 10));
   if (yr) parts.push(yr.replace(' ', '').toLowerCase());
   if (sec) parts.push('sec' + sec.toLowerCase());
   if (subj) parts.push(subj.replace(/[^a-z0-9]/gi, '').toLowerCase().substring(0, 12));
   if (instr) parts.push(instr.split(' ')[0].toLowerCase());
+  if (classType) parts.push(classType);
   const now = new Date();
   parts.push(`exported_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`);
   return parts.join('_') + '.xlsx';
@@ -186,12 +197,14 @@ function renderAll(data) {
   const sec = ssdValues.gf_section || '';
   const subj = ssdValues.gf_subject || '';
   const instr = ssdValues.gf_instructor || '';
+  const classType = ssdValues.gf_class_type || '';
   const tod = ssdValues.gf_timeofday || '';
   if (prog) parts.push('Program: ' + prog);
   if (yr) parts.push(yr);
   if (sec) parts.push('Section ' + sec);
   if (subj) parts.push('Subject: ' + subj);
   if (instr) parts.push('Instructor: ' + instr);
+  if (classType) parts.push('Class Type: ' + fmtClassTypeLabel(classType));
   if (tod) parts.push(tod.charAt(0).toUpperCase() + tod.slice(1));
   document.getElementById('showingDetail').textContent = parts.length ? parts.join(' - ') : 'Showing all data across every subject, section, and instructor.';
 
@@ -270,13 +283,14 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  ['gf_program', 'gf_year', 'gf_section', 'gf_subject', 'gf_instructor', 'gf_timeofday'].forEach((id) => {
+  ['gf_program', 'gf_year', 'gf_section', 'gf_subject', 'gf_instructor', 'gf_class_type', 'gf_timeofday'].forEach((id) => {
     const defaults = {
       gf_program: 'All Programs',
       gf_year: 'All Years',
       gf_section: 'All Sections',
       gf_subject: 'All Subjects',
       gf_instructor: 'All Instructors',
+      gf_class_type: 'All Types',
       gf_timeofday: 'Any Time',
     };
     selectSSD(id, '', defaults[id]);

@@ -1,4 +1,5 @@
 ﻿const sessId = "{{ sess_id }}";
+  const IS_SCHOOL_EVENT = {{ 'true' if is_school_event else 'false' }};
   const gracePeriodMinutes = Number("{{ sess.grace_period or 15 }}") || 15;
   const totalStudents = {{ section_students| length }};
   let lastTimestamp = 0;
@@ -139,11 +140,15 @@
       else if (st === 'absent') absent++;
       else if (st === 'excused') excused++;
     });
-    document.getElementById('sc_present').textContent = present;
-    document.getElementById('sc_late').textContent = late;
-    document.getElementById('sc_absent').textContent = absent;
-    document.getElementById('sc_excused').textContent = excused;
-    const pCount = present + late;
+    const presentEl = document.getElementById('sc_present');
+    const lateEl = document.getElementById('sc_late');
+    const absentEl = document.getElementById('sc_absent');
+    const excusedEl = document.getElementById('sc_excused');
+    if (presentEl) presentEl.textContent = present;
+    if (lateEl) lateEl.textContent = late;
+    if (absentEl) absentEl.textContent = absent;
+    if (excusedEl) excusedEl.textContent = excused;
+    const pCount = IS_SCHOOL_EVENT ? present : (present + late);
     const rate = totalStudents > 0 ? ((pCount / totalStudents) * 100).toFixed(1) : 0;
     document.getElementById('presentLabel').textContent = pCount + ' students present';
     document.getElementById('progressFill').style.width = rate + '%';
@@ -183,14 +188,14 @@
       const resp = await fetch('/mark_pico', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nfc_id: uid })
+        body: JSON.stringify({ nfc_id: uid, sess_id: sessId })
       });
       const data = await resp.json();
       const status = data.status || '';
 
       // consumePopupGate() returns true once then false — ensures single popup
       if (status === 'ok') {
-        const isLate = data.is_late;
+        const isLate = !IS_SCHOOL_EVENT && data.is_late;
         const label = isLate ? 'LATE' : 'PRESENT';
         const color = isLate ? 'warning' : 'active';
         const icon = isLate ? '⏱' : '✔';
@@ -280,8 +285,8 @@
       if (!pollInitialized) {
         pollInitialized = true;
         const presentSet = new Set(data.present_ids || []);
-        const lateSet = new Set(data.late_ids || []);
-        const excusedSet = new Set(data.excused_ids || []);
+        const lateSet = new Set(IS_SCHOOL_EVENT ? [] : (data.late_ids || []));
+        const excusedSet = new Set(IS_SCHOOL_EVENT ? [] : (data.excused_ids || []));
         document.querySelectorAll('#statusList .student-row[data-nfc]').forEach(row => {
           const nid = row.dataset.nfc;
           if (excusedSet.has(nid)) updateStudentStatus(nid, 'excused');
@@ -302,7 +307,7 @@
           if (shownTaps.has(tapKey)) return;
           shownTaps.add(tapKey);
           gotNew = true;
-          const isLate = (data.late_ids || []).includes(tap.nfc_id);
+          const isLate = !IS_SCHOOL_EVENT && (data.late_ids || []).includes(tap.nfc_id);
           updateStudentStatus(tap.nfc_id, isLate ? 'late' : 'present');
           // No showModal / showToast here — HID handler already did it
           if (tap.timestamp && tap.timestamp > lastTimestamp)

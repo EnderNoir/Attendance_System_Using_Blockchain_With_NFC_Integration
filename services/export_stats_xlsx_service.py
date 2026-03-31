@@ -47,6 +47,7 @@ def export_stats_xlsx_impl(
             f_year_lvl = qp('year_level')
             f_subject = qp('subject')
             f_instr = qp('instructor')
+            f_class_type = qp('class_type').strip().lower()
             f_month = qp('month')
             f_year_num = qp('year_num')
             f_program = qp('program')
@@ -59,6 +60,7 @@ def export_stats_xlsx_impl(
             f_year_lvl = request_obj.args.get('year_level', '').strip()
             f_subject = request_obj.args.get('subject', '').strip()
             f_instr = request_obj.args.get('instructor', '').strip()
+            f_class_type = request_obj.args.get('class_type', '').strip().lower()
             f_month = request_obj.args.get('month', '').strip()
             f_year_num = request_obj.args.get('year_num', '').strip()
             f_program = request_obj.args.get('program', '').strip()
@@ -79,6 +81,7 @@ def export_stats_xlsx_impl(
             f_year_lvl=f_year_lvl,
             f_subject=f_subject,
             f_instr=f_instr,
+            f_class_type=f_class_type,
             f_month=f_month,
             f_year_num=f_year_num,
             f_program=f_program,
@@ -113,7 +116,7 @@ def export_stats_xlsx_impl(
         # Sheet 1: Summary
         ws1 = wb.active
         ws1.title = 'Summary'
-        n_cols = 11
+        n_cols = 12
         subtitles = [
             'Cavite State University - Decentralized Attendance Verification System',
             f'Period: {period_label}  |  Filters: {filter_label}',
@@ -123,6 +126,7 @@ def export_stats_xlsx_impl(
         first_row = H['stat_block'](ws1, first_row, donut, n_cols)
         hdrs = [
             'Subject',
+            'Class Type',
             'Session Date & Time',
             'Section',
             'Instructor',
@@ -134,13 +138,13 @@ def export_stats_xlsx_impl(
             'Excused',
             'Rate %',
         ]
-        wids = [36, 22, 26, 22, 16, 10, 10, 9, 9, 10, 10]
+        wids = [30, 12, 22, 24, 22, 16, 10, 10, 9, 9, 10, 10]
         H['make_header_row'](ws1, first_row, hdrs, wids)
         first_row += 1
         for ri, row in enumerate(sess_rows, first_row):
             vals = list(row)
-            vals[10] = f"{vals[10]}%"
-            col_fmt = {7: ('num',), 8: ('num',), 9: ('num',), 10: ('num',)}
+            vals[11] = f"{vals[11]}%"
+            col_fmt = {8: ('num',), 9: ('num',), 10: ('num',), 11: ('num',)}
             H['data_row'](ws1, ri, vals, alt=(ri % 2 == 0), col_formats=col_fmt)
         last_data = first_row + len(sess_rows) - 1
         tr = last_data + 1
@@ -184,6 +188,7 @@ def export_stats_xlsx_impl(
             'Year',
             'Sec',
             'Subject',
+            'Class Type',
             'Session Date',
             'Time Slot',
             'Instructor',
@@ -193,11 +198,11 @@ def export_stats_xlsx_impl(
             'Excuse Reason',
             'Document',
         ]
-        det_wids = [28, 14, 14, 28, 10, 6, 32, 20, 16, 22, 10, 52, 10, 26, 20]
+        det_wids = [24, 14, 14, 24, 10, 6, 28, 12, 20, 16, 22, 10, 52, 10, 26, 20]
         H['make_header_row'](ws2, dr, det_hdrs, det_wids)
         dr += 1
         for ri, row in enumerate(detail_rows, dr):
-            col_fmt = {11: ('status',), 12: ('tx',), 13: ('num',)}
+            col_fmt = {12: ('status',), 13: ('tx',), 14: ('num',)}
             H['data_row'](ws2, ri, row, alt=(ri % 2 == 0), col_formats=col_fmt)
         ws2.freeze_panes = ws2.cell(row=dr, column=1)
 
@@ -338,7 +343,62 @@ def export_stats_xlsx_impl(
                     bar5.series[i].graphicalProperties.line.solidFill = clr
             ws5.add_chart(bar5, f'I{ts5}')
 
-        # Sheet 6: Charts Dashboard
+        # Sheet 6: By Class Type
+        ws6 = wb.create_sheet('By Class Type')
+        n6 = 7
+        subtitles6 = [f'Period: {period_label}  |  Aggregate attendance per class type']
+        ts6 = H['title_block'](ws6, 'Attendance by Class Type', subtitles6, n6)
+        H['make_header_row'](
+            ws6,
+            ts6,
+            ['Class Type', 'Present', 'Late', 'Absent', 'Excused', 'Total', 'Rate %'],
+            [22, 12, 12, 12, 12, 12, 12],
+        )
+        ts6 += 1
+        by_class_type = {}
+        for dr in detail_rows:
+            ctype = str(dr[7] or 'Lecture').strip().title()
+            status = str(dr[11] or '').strip().lower()
+            if ctype not in by_class_type:
+                by_class_type[ctype] = {'present': 0, 'late': 0, 'absent': 0, 'excused': 0}
+            if status in by_class_type[ctype]:
+                by_class_type[ctype][status] += 1
+
+        for ri, (ctype, cnts) in enumerate(sorted(by_class_type.items()), ts6):
+            total6 = cnts['present'] + cnts['late'] + cnts['absent'] + cnts['excused']
+            rate6 = f"{round((cnts['present'] + cnts['late']) / total6 * 100, 1)}%" if total6 else '-'
+            col_fmt6 = {2: ('num',), 3: ('num',), 4: ('num',), 5: ('num',), 6: ('num',)}
+            H['data_row'](
+                ws6,
+                ri,
+                [ctype, cnts['present'], cnts['late'], cnts['absent'], cnts['excused'], total6, rate6],
+                alt=(ri % 2 == 0),
+                col_formats=col_fmt6,
+            )
+        last_ts6 = ts6 + len(by_class_type) - 1
+        if by_class_type:
+            bar6 = BarChart()
+            bar6.type = 'bar'
+            bar6.grouping = 'stacked'
+            bar6.overlap = 100
+            bar6.title = 'Attendance by Class Type'
+            bar6.style = 10
+            bar6.width = 18
+            bar6.height = max(9, len(by_class_type) * 1.8)
+            bar6.x_axis.title = 'Count'
+            bar6.legend.position = 'b'
+            cats6 = Reference(ws6, min_col=1, min_row=ts6, max_row=last_ts6)
+            data6 = Reference(ws6, min_col=2, min_row=ts6 - 1, max_row=last_ts6, max_col=5)
+            bar6.add_data(data6, titles_from_data=True)
+            bar6.set_categories(cats6)
+            colors6 = [C['present'], C['late'], C['absent'], C['excused']]
+            for i, clr in enumerate(colors6):
+                if i < len(bar6.series):
+                    bar6.series[i].graphicalProperties.solidFill = clr
+                    bar6.series[i].graphicalProperties.line.solidFill = clr
+            ws6.add_chart(bar6, f'I{ts6}')
+
+        # Sheet 7: Charts Dashboard
         wc = wb.create_sheet('Charts')
         wc.sheet_view.showGridLines = False
 
@@ -444,6 +504,41 @@ def export_stats_xlsx_impl(
                     bar_sc.series[i].graphicalProperties.solidFill = clr
                     bar_sc.series[i].graphicalProperties.line.solidFill = clr
             wc.add_chart(bar_sc, 'N4')
+
+        class_type_data_row = 10
+        if by_class_type:
+            wc.cell(row=class_type_data_row - 1, column=43, value='Class Type')
+            wc.cell(row=class_type_data_row - 1, column=44, value='Present')
+            wc.cell(row=class_type_data_row - 1, column=45, value='Late')
+            wc.cell(row=class_type_data_row - 1, column=46, value='Absent')
+            wc.cell(row=class_type_data_row - 1, column=47, value='Excused')
+            for ri_ct, (ctype, cnts) in enumerate(sorted(by_class_type.items()), class_type_data_row):
+                wc.cell(row=ri_ct, column=43, value=ctype)
+                wc.cell(row=ri_ct, column=44, value=cnts['present'])
+                wc.cell(row=ri_ct, column=45, value=cnts['late'])
+                wc.cell(row=ri_ct, column=46, value=cnts['absent'])
+                wc.cell(row=ri_ct, column=47, value=cnts['excused'])
+            n_ct = len(by_class_type)
+            ct_last = class_type_data_row + n_ct - 1
+            bar_ct = BarChart()
+            bar_ct.type = 'bar'
+            bar_ct.grouping = 'stacked'
+            bar_ct.overlap = 100
+            bar_ct.title = 'Attendance by Class Type'
+            bar_ct.style = 10
+            bar_ct.width = 20
+            bar_ct.height = max(9, n_ct * 2)
+            bar_ct.legend.position = 'b'
+            bar_ct.add_data(
+                Reference(wc, min_col=44, min_row=class_type_data_row - 1, max_row=ct_last, max_col=47),
+                titles_from_data=True,
+            )
+            bar_ct.set_categories(Reference(wc, min_col=43, min_row=class_type_data_row, max_row=ct_last))
+            for i, clr in enumerate([C['present'], C['late'], C['absent'], C['excused']]):
+                if i < len(bar_ct.series):
+                    bar_ct.series[i].graphicalProperties.solidFill = clr
+                    bar_ct.series[i].graphicalProperties.line.solidFill = clr
+            wc.add_chart(bar_ct, 'N36')
 
         parts = ['DAVS_Attendance_Report', period_label.replace(' ', '_').replace(',', '')]
         if f_program:

@@ -50,6 +50,48 @@
     /* ══ AVATAR UTIL ══ */
     function setAvatarImg(wrapId, src) { var w = document.getElementById(wrapId); if (!w) return; w.innerHTML = ''; w.style.overflow = 'hidden'; var img = document.createElement('img'); img.src = src; img.style = 'width:100%;height:100%;object-fit:cover;border-radius:50%;'; w.appendChild(img); }
 
+    /* ══ SHARED APP DIALOG ══ */
+    var _appDialogResolver = null;
+    function closeAppDialog(result) {
+      var dialog = document.getElementById('appDialog');
+      if (dialog) dialog.classList.remove('show');
+      if (_appDialogResolver) {
+        var resolver = _appDialogResolver;
+        _appDialogResolver = null;
+        resolver(!!result);
+      }
+    }
+    function showAppDialog(opts) {
+      var dialog = document.getElementById('appDialog');
+      var title = document.getElementById('appDialogTitle');
+      var message = document.getElementById('appDialogMessage');
+      var actions = document.getElementById('appDialogActions');
+      if (!dialog || !title || !message || !actions) {
+        var isConfirm = !!(opts && opts.confirm);
+        if (isConfirm) return Promise.resolve(window.confirm((opts && opts.message) || 'Are you sure?'));
+        window.alert((opts && opts.message) || 'Done.');
+        return Promise.resolve(true);
+      }
+      title.textContent = (opts && opts.title) || (opts && opts.confirm ? 'Confirmation' : 'Notice');
+      message.textContent = (opts && opts.message) || '';
+      var cancelLabel = (opts && opts.cancelText) || 'Cancel';
+      var okLabel = (opts && opts.okText) || 'OK';
+      if (opts && opts.confirm) {
+        actions.innerHTML = '<button type="button" class="btn-outline" onclick="closeAppDialog(false)">' + cancelLabel + '</button>' +
+          '<button type="button" class="btn-primary" onclick="closeAppDialog(true)">' + okLabel + '</button>';
+      } else {
+        actions.innerHTML = '<button type="button" class="btn-primary" onclick="closeAppDialog(true)">' + okLabel + '</button>';
+      }
+      dialog.classList.add('show');
+      return new Promise(function (resolve) { _appDialogResolver = resolve; });
+    }
+    function showAppAlert(message, title) {
+      return showAppDialog({ message: message, title: title || 'Notice', confirm: false, okText: 'OK' });
+    }
+    function showAppConfirm(message, title, okText, cancelText) {
+      return showAppDialog({ message: message, title: title || 'Confirmation', confirm: true, okText: okText || 'Confirm', cancelText: cancelText || 'Cancel' });
+    }
+
     /* ══ SECTION ACCORDION ══ */
     function buildSectionAccordion(sections) {
       if (!sections || !sections.length) return '<span style="font-size:13px;color:var(--muted);font-weight:500;">No sections assigned.</span>';

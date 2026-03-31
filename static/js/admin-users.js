@@ -34,13 +34,13 @@ function applyRole(username) {
     } else {
       btn.innerHTML = '<i class="bi bi-check-lg"></i> Apply';
       btn.disabled = false;
-      alert('Error: ' + (d.error || 'Could not update role. Try again.'));
+      showAppAlert('Error: ' + (d.error || 'Could not update role. Try again.'), 'Role Update Failed');
     }
   })
   .catch(() => {
     btn.innerHTML = '<i class="bi bi-check-lg"></i> Apply';
     btn.disabled = false;
-    alert('Network error. Please try again.');
+    showAppAlert('Network error. Please try again.', 'Network Error');
   });
 }
 
@@ -351,8 +351,9 @@ function doAction(url, successMsg) {
 
 function doApprove() { doAction('/admin/approve/' + encodeURIComponent(curFaUser.username), 'Account approved.'); }
 function doReject()  { doAction('/admin/reject/' + encodeURIComponent(curFaUser.username), 'Account rejected.'); }
-function doDelete()  {
-  if (!confirm('Permanently delete ' + curFaUser.name + '? This cannot be undone.')) return;
+async function doDelete()  {
+  const ok = await showAppConfirm('Permanently delete ' + curFaUser.name + '? This cannot be undone.', 'Delete Faculty Account', 'Delete', 'Cancel');
+  if (!ok) return;
   doAction('/admin/delete/' + encodeURIComponent(curFaUser.username), 'Account deleted.');
 }
 

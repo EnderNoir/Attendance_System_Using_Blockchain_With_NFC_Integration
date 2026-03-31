@@ -87,17 +87,17 @@ function filterPastTimeSlots() {
 function validateStartForm(form) {
   const sel = form.querySelector('.slot-select');
   if (!sel.value) {
-    alert('Please select a time slot.');
+    showAppAlert('Please select a time slot.', 'Missing Time Slot');
     return false;
   }
   const selected = Array.from(sel.options).find((o) => o.value === sel.value);
   if (selected && selected.disabled) {
-    alert('That time slot has already ended. Please select a current or future slot.');
+    showAppAlert('That time slot has already ended. Please select a current or future slot.', 'Invalid Time Slot');
     return false;
   }
   const grace = parseInt(form.querySelector('[name="grace_period"]').value, 10);
   if (isNaN(grace) || grace < 1 || grace > 120) {
-    alert('Grace period must be between 1 and 120 minutes.');
+    showAppAlert('Grace period must be between 1 and 120 minutes.', 'Invalid Grace Period');
     return false;
   }
   return true;

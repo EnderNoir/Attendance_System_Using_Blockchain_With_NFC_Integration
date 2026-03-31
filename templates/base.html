@@ -261,16 +261,9 @@
     <nav class="sidebar-nav">
       {% if session.get('role') == 'super_admin' %}
       <div class="nav-section-label">Super Admin</div>
-      <a href="{{ url_for('superadmin_users') }}"
-        class="nav-link {% if request.endpoint in ('superadmin_users','superadmin_create_user') %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-shield-lock"></i> User Management</a>
       <a href="{{ url_for('admin_schedules') }}"
         class="nav-link {% if request.endpoint in ('admin_schedules','admin_schedule_create') %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-calendar3-week"></i> Schedules</a>
-      <div class="nav-section-label" style="margin-top:6px;">Students</div>
-      <a href="{{ url_for('register') }}"
-        class="nav-link {% if request.endpoint in ('register', 'batch_register') %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-person-plus"></i> Enroll Student</a>
       <div class="nav-section-label" style="margin-top:6px;">Administration</div>
       <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-house"></i> Admin Dashboard</a>
@@ -278,10 +271,10 @@
         onclick="closeSidebar()"><i class="bi bi-people"></i> Students & Faculty</a>
       <a href="{{ url_for('manage_subjects') }}"
         class="nav-link {% if request.endpoint == 'manage_subjects' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-book"></i> Subjects</a>
+          class="bi bi-book"></i> Subject Catalogues</a>
       <a href="{{ url_for('admin_sessions') }}"
         class="nav-link {% if request.endpoint == 'admin_sessions' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-broadcast"></i> Sessions</a>
+          class="bi bi-broadcast"></i> Classroom Sessions</a>
       <a href="{{ url_for('admin_settings') }}"
         class="nav-link {% if request.endpoint in ('admin_settings','admin_settings_save','admin_settings_test') %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-gear-fill"></i> Settings</a>
@@ -293,17 +286,10 @@
         onclick="closeSidebar()"><i class="bi bi-house"></i> Admin Dashboard</a>
       <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-people"></i> Students & Faculty</a>
-      <a href="{{ url_for('register') }}"
-        class="nav-link {% if request.endpoint in ('register', 'batch_register') %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-person-plus"></i> Enroll Student</a>
       <div class="nav-section-label" style="margin-top:6px;">Administration</div>
-      <a href="{{ url_for('manage_users') }}"
-        class="nav-link {% if request.endpoint in ('manage_users','admin_create_instructor') %}active{% endif %}" onclick="closeSidebar()">
-        <i class="bi bi-shield-check"></i> User Management
-      </a>
       <a href="{{ url_for('manage_subjects') }}"
         class="nav-link {% if request.endpoint == 'manage_subjects' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-book"></i> Subject Catalogue</a>
+          class="bi bi-book"></i> Subject Catalogues</a>
       <a href="{{ url_for('admin_schedules') }}"
         class="nav-link {% if request.endpoint in ('admin_schedules','admin_schedule_create') %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-calendar3-week"></i> Schedules</a>
@@ -323,9 +309,6 @@
       <a href="{{ url_for('teacher_schedule') }}"
         class="nav-link {% if request.endpoint == 'teacher_schedule' %}active{% endif %}" onclick="closeSidebar()"><i
           class="bi bi-calendar3-week"></i> My Schedule</a>
-      <a href="{{ url_for('teacher_create_session') }}"
-        class="nav-link {% if request.endpoint == 'teacher_create_session' %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-play-circle"></i> Create Session</a>
       <a href="{{ url_for('teacher_sessions_students') }}"
         class="nav-link {% if request.endpoint == 'teacher_sessions_students' %}active{% endif %}"
         onclick="closeSidebar()"><i class="bi bi-journal-text"></i> Sessions &amp; Students</a>
@@ -384,6 +367,17 @@
     </div>
   </div>
   <div class="toast-stack" id="toastStack"></div>
+
+  <div class="app-dialog-backdrop" id="appDialog" onclick="if(event.target===this)closeAppDialog(false)">
+    <div class="app-dialog-box" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle">
+      <div class="app-dialog-head">
+        <div class="app-dialog-title" id="appDialogTitle">Confirmation</div>
+        <button type="button" class="app-dialog-close" onclick="closeAppDialog(false)"><i class="bi bi-x"></i></button>
+      </div>
+      <div class="app-dialog-body" id="appDialogMessage"></div>
+      <div class="app-dialog-actions" id="appDialogActions"></div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
   <script>{% include 'assets/base.js' %}</script>

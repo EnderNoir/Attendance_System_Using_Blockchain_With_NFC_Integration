@@ -4,6 +4,7 @@ const sessionsData = {
   "{{ sid }}": {
     subject_name: "{{ s.subject_name|e }}",
     course_code: "{{ s.get('course_code','')|e }}",
+    class_type: "{{ s.get('class_type','lecture')|e }}",
     section_key: "{{ s.section_key|e }}",
     teacher_name: "{{ s.teacher_name|e }}",
     time_slot: "{{ s.get('time_slot','')|e }}",
@@ -16,6 +17,7 @@ const sessionsData = {
   "{{ sid }}": {
     subject_name: "{{ s.subject_name|e }}",
     course_code: "{{ s.get('course_code','')|e }}",
+    class_type: "{{ s.get('class_type','lecture')|e }}",
     section_key: "{{ s.section_key|e }}",
     teacher_name: "{{ s.teacher_name|e }}",
     time_slot: "{{ s.get('time_slot','')|e }}",
@@ -194,6 +196,10 @@ function openSessModal(sessId) {
 function renderSessModal(sessId, data) {
   const s = sessionsData[sessId];
   const sts = data.students || [];
+  const classType = String(s.class_type || data.class_type || 'lecture').toLowerCase();
+  const classTypeLabel = classType === 'school_event' ? 'School Event' : (classType === 'laboratory' ? 'Laboratory' : 'Lecture');
+  const teachersInvolved = (data.teachers_involved || []).join(', ') || (s.teacher_name || '-');
+  const sectionsInvolved = (data.sections_involved || []).map((x) => String(x || '').replace(/\|/g, ' | ')).join(', ') || ((s.section_key || '').replace(/\|/g, ' | '));
 
   const cnt = { present: 0, late: 0, absent: 0, excused: 0 };
   sts.forEach((st) => {
@@ -214,9 +220,23 @@ function renderSessModal(sessId, data) {
       <div class="sm-info-lbl"><i class="bi bi-person-badge"></i> Instructor</div>
       <div class="sm-info-val">${s.teacher_name || '-'}</div>
     </div>
+    ${classType === 'school_event' ? `
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-people"></i> Teachers Involved</div>
+      <div class="sm-info-val">${teachersInvolved}</div>
+    </div>
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-diagram-3"></i> Sections Involved</div>
+      <div class="sm-info-val">${sectionsInvolved}</div>
+    </div>
+    ` : ''}
     <div class="sm-info-box">
       <div class="sm-info-lbl"><i class="bi bi-clock"></i> Time Slot</div>
       <div class="sm-info-val">${s.time_slot || '-'}</div>
+    </div>
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-tags"></i> Class Type</div>
+      <div class="sm-info-val">${classTypeLabel}</div>
     </div>
     <div class="sm-info-box">
       <div class="sm-info-lbl"><i class="bi bi-people"></i> Total Enrolled</div>
@@ -290,6 +310,7 @@ function renderSessModal(sessId, data) {
         <th style="width:36px;">#</th>
         <th>Student Name</th>
         <th>Student ID</th>
+        <th>${classType === 'school_event' ? 'Program-Year-Section' : 'Class Type'}</th>
         <th>Status</th>
         <th>Date</th>
         <th>Time</th>
@@ -313,6 +334,7 @@ function renderSessModal(sessId, data) {
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '-'}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '-'}</td>
+            <td style="font-size:11px;color:var(--muted);">${classType === 'school_event' ? (st.section_origin || '-') : classTypeLabel}</td>
             <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || status}</span></td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.date}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
@@ -355,9 +377,11 @@ function exportCurrentSession() {
 
 function filterLive() {
   const q = document.getElementById('lf_search').value.toLowerCase();
+  const classType = (document.getElementById('lf_class_type')?.value || '').toLowerCase();
   let shown = 0;
   document.querySelectorAll('#liveList .sess-row').forEach((r) => {
-    const m = !q || r.dataset.subject.includes(q) || r.dataset.teacher.includes(q);
+    const m = (!q || r.dataset.subject.includes(q) || r.dataset.teacher.includes(q))
+      && (!classType || (r.dataset.classtype || 'lecture') === classType);
     r.style.display = m ? '' : 'none';
     if (m) shown++;
   });
@@ -366,6 +390,8 @@ function filterLive() {
 
 function resetLive() {
   document.getElementById('lf_search').value = '';
+  const classTypeSel = document.getElementById('lf_class_type');
+  if (classTypeSel) classTypeSel.value = '';
   filterLive();
 }
 
@@ -376,6 +402,7 @@ function filterEnded() {
   const yr = document.getElementById('ef_year').value;
   const sec = document.getElementById('ef_secletter').value;
   const subj = document.getElementById('ef_subject').value;
+  const classType = (document.getElementById('ef_class_type')?.value || '').toLowerCase();
   let shown = 0;
   document.querySelectorAll('#endedList .sess-row').forEach((r) => {
     const m = (!q || r.dataset.subject.includes(q) || r.dataset.teacher.includes(q))
@@ -383,7 +410,8 @@ function filterEnded() {
       && (!prog || r.dataset.program === prog)
       && (!yr || r.dataset.year === yr)
       && (!sec || r.dataset.secletter === sec)
-      && (!subj || r.dataset.subject === subj);
+      && (!subj || r.dataset.subject === subj)
+      && (!classType || (r.dataset.classtype || 'lecture') === classType);
     r.style.display = m ? '' : 'none';
     if (m) shown++;
   });
@@ -393,7 +421,7 @@ function filterEnded() {
 }
 
 function resetEnded() {
-  ['ef_search', 'ef_teacher', 'ef_program', 'ef_year', 'ef_secletter', 'ef_subject'].forEach((id) => {
+  ['ef_search', 'ef_teacher', 'ef_program', 'ef_year', 'ef_secletter', 'ef_subject', 'ef_class_type'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });

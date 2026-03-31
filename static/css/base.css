@@ -1512,6 +1512,73 @@
       transform: scale(1);
     }
 
+    .app-dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 20, 25, .45);
+      z-index: 6000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .app-dialog-backdrop.show {
+      display: flex;
+    }
+
+    .app-dialog-box {
+      width: min(440px, 96vw);
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, .28);
+      overflow: hidden;
+    }
+
+    .app-dialog-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .app-dialog-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .app-dialog-close {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .app-dialog-body {
+      padding: 14px;
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+
+    .app-dialog-actions {
+      padding: 0 14px 14px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
     /* Green header stays green in both modes */
     .pm-modal-header {
       background: #2D6A27;

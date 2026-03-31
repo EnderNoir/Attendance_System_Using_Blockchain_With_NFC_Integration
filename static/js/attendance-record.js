@@ -39,6 +39,7 @@ function loadSessionRecords() {
         <div style="font-size:11px;color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:12px;">
           <span><i class="bi bi-person-badge"></i> ${s.teacher_name}</span>
           <span><i class="bi bi-grid"></i> ${s.section_key.replace(/\|/g, ' · ')}</span>
+          <span><i class="bi bi-tags"></i> ${(String(s.class_type || 'lecture').toLowerCase() === 'laboratory' ? 'Laboratory' : 'Lecture')}</span>
           <span><i class="bi bi-clock"></i> ${s.time_slot}</span>
           <span><i class="bi bi-calendar3"></i> ${s.date}</span>
           ${s.units ? `<span><i class="bi bi-layers"></i> ${s.units} units</span>` : ''}

@@ -509,6 +509,7 @@ def init_db():
             subject_id      TEXT NOT NULL DEFAULT '',
             subject_name    TEXT NOT NULL DEFAULT '',
             course_code     TEXT NOT NULL DEFAULT '',
+            class_type      TEXT NOT NULL DEFAULT 'lecture',
             units           INTEGER NOT NULL DEFAULT 3,
             time_slot       TEXT NOT NULL DEFAULT '',
             section_key     TEXT NOT NULL DEFAULT '',
@@ -537,6 +538,7 @@ def init_db():
         student_name TEXT NOT NULL DEFAULT '',
         student_id   TEXT NOT NULL DEFAULT '',
         status       TEXT NOT NULL DEFAULT 'absent',
+        class_type   TEXT NOT NULL DEFAULT 'lecture',
         tap_time     TEXT NOT NULL DEFAULT '',
         tx_hash      TEXT NOT NULL DEFAULT '',
         block_number INTEGER NOT NULL DEFAULT 0,
@@ -600,6 +602,7 @@ def init_db():
         day_of_week      INTEGER NOT NULL DEFAULT 1,
         start_time       TEXT NOT NULL DEFAULT '',
         end_time         TEXT NOT NULL DEFAULT '',
+        class_type       TEXT NOT NULL DEFAULT 'lecture',
         grace_minutes    INTEGER NOT NULL DEFAULT 15,
         is_active        INTEGER NOT NULL DEFAULT 1,
         created_by       TEXT NOT NULL DEFAULT '',
@@ -608,6 +611,36 @@ def init_db():
     );
     CREATE INDEX IF NOT EXISTS idx_sched_teacher ON schedules(teacher_username);
     CREATE INDEX IF NOT EXISTS idx_sched_day     ON schedules(day_of_week);
+    CREATE TABLE IF NOT EXISTS event_schedules (
+        event_id             TEXT PRIMARY KEY,
+        title                TEXT NOT NULL DEFAULT '',
+        description          TEXT NOT NULL DEFAULT '',
+        teacher_usernames_json TEXT NOT NULL DEFAULT '[]',
+        section_keys_json    TEXT NOT NULL DEFAULT '[]',
+        start_at             TEXT NOT NULL DEFAULT '',
+        end_at               TEXT NOT NULL DEFAULT '',
+        is_active            INTEGER NOT NULL DEFAULT 1,
+        created_by           TEXT NOT NULL DEFAULT '',
+        created_at           TEXT NOT NULL DEFAULT '',
+        updated_at           TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_event_sched_start ON event_schedules(start_at);
+    CREATE INDEX IF NOT EXISTS idx_event_sched_active ON event_schedules(is_active);
+    CREATE TABLE IF NOT EXISTS no_class_days (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        title               TEXT NOT NULL DEFAULT '',
+        description         TEXT NOT NULL DEFAULT '',
+        from_date           TEXT NOT NULL DEFAULT '',
+        to_date             TEXT NOT NULL DEFAULT '',
+        teacher_usernames_json TEXT NOT NULL DEFAULT '[]',
+        apply_all_teachers  INTEGER NOT NULL DEFAULT 0,
+        is_active           INTEGER NOT NULL DEFAULT 1,
+        created_by          TEXT NOT NULL DEFAULT '',
+        created_at          TEXT NOT NULL DEFAULT '',
+        updated_at          TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_no_class_days_range ON no_class_days(from_date, to_date);
+    CREATE INDEX IF NOT EXISTS idx_no_class_days_active ON no_class_days(is_active);
     CREATE TABLE IF NOT EXISTS excuse_requests (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
         sess_id         TEXT NOT NULL DEFAULT '',
@@ -643,6 +676,7 @@ def _migrate_add_missing_columns():
         ('students', 'photo_file', "TEXT NOT NULL DEFAULT ''"),
         ('students', 'updated_at', "TEXT NOT NULL DEFAULT ''"),
         ('sessions', 'teacher_username', "TEXT NOT NULL DEFAULT ''"),
+        ('sessions', 'class_type', "TEXT NOT NULL DEFAULT 'lecture'"),
         ('sessions', 'total_enrolled', 'INTEGER NOT NULL DEFAULT 0'),
         ('sessions', 'total_present', 'INTEGER NOT NULL DEFAULT 0'),
         ('sessions', 'total_late', 'INTEGER NOT NULL DEFAULT 0'),
@@ -656,6 +690,7 @@ def _migrate_add_missing_columns():
         ('accounts', 'updated_at', "TEXT NOT NULL DEFAULT ''"),
         ('photos', 'uploaded_at', "TEXT NOT NULL DEFAULT ''"),
         ('attendance_logs', 'excuse_request_id', 'INTEGER DEFAULT NULL'),
+        ('attendance_logs', 'class_type', "TEXT NOT NULL DEFAULT 'lecture'"),
         ('schedules', 'section_key', "TEXT NOT NULL DEFAULT ''"),
         ('schedules', 'subject_id', "TEXT NOT NULL DEFAULT ''"),
         ('schedules', 'subject_name', "TEXT NOT NULL DEFAULT ''"),
@@ -665,6 +700,7 @@ def _migrate_add_missing_columns():
         ('schedules', 'day_of_week', 'INTEGER NOT NULL DEFAULT 1'),
         ('schedules', 'start_time', "TEXT NOT NULL DEFAULT ''"),
         ('schedules', 'end_time', "TEXT NOT NULL DEFAULT ''"),
+        ('schedules', 'class_type', "TEXT NOT NULL DEFAULT 'lecture'"),
         ('schedules', 'grace_minutes', 'INTEGER NOT NULL DEFAULT 15'),
         ('schedules', 'is_active', 'INTEGER NOT NULL DEFAULT 1'),
         ('schedules', 'created_by', "TEXT NOT NULL DEFAULT ''"),
@@ -688,6 +724,7 @@ def _migrate_add_missing_columns():
                     day_of_week      INTEGER NOT NULL DEFAULT 1,
                     start_time       TEXT NOT NULL DEFAULT '',
                     end_time         TEXT NOT NULL DEFAULT '',
+                    class_type       TEXT NOT NULL DEFAULT 'lecture',
                     grace_minutes    INTEGER NOT NULL DEFAULT 15,
                     is_active        INTEGER NOT NULL DEFAULT 1,
                     created_by       TEXT NOT NULL DEFAULT '',
@@ -699,6 +736,50 @@ def _migrate_add_missing_columns():
             conn.execute('CREATE INDEX IF NOT EXISTS idx_sched_teacher ON schedules(teacher_username)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_sched_day     ON schedules(day_of_week)')
             print('[MIGRATION] Created missing table: schedules')
+
+        if 'event_schedules' not in existing_tables:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS event_schedules (
+                    event_id             TEXT PRIMARY KEY,
+                    title                TEXT NOT NULL DEFAULT '',
+                    description          TEXT NOT NULL DEFAULT '',
+                    teacher_usernames_json TEXT NOT NULL DEFAULT '[]',
+                    section_keys_json    TEXT NOT NULL DEFAULT '[]',
+                    start_at             TEXT NOT NULL DEFAULT '',
+                    end_at               TEXT NOT NULL DEFAULT '',
+                    is_active            INTEGER NOT NULL DEFAULT 1,
+                    created_by           TEXT NOT NULL DEFAULT '',
+                    created_at           TEXT NOT NULL DEFAULT '',
+                    updated_at           TEXT NOT NULL DEFAULT ''
+                )
+                """
+            )
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_event_sched_start ON event_schedules(start_at)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_event_sched_active ON event_schedules(is_active)')
+            print('[MIGRATION] Created missing table: event_schedules')
+
+        if 'no_class_days' not in existing_tables:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS no_class_days (
+                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title               TEXT NOT NULL DEFAULT '',
+                    description         TEXT NOT NULL DEFAULT '',
+                    from_date           TEXT NOT NULL DEFAULT '',
+                    to_date             TEXT NOT NULL DEFAULT '',
+                    teacher_usernames_json TEXT NOT NULL DEFAULT '[]',
+                    apply_all_teachers  INTEGER NOT NULL DEFAULT 0,
+                    is_active           INTEGER NOT NULL DEFAULT 1,
+                    created_by          TEXT NOT NULL DEFAULT '',
+                    created_at          TEXT NOT NULL DEFAULT '',
+                    updated_at          TEXT NOT NULL DEFAULT ''
+                )
+                """
+            )
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_no_class_days_range ON no_class_days(from_date, to_date)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_no_class_days_active ON no_class_days(is_active)')
+            print('[MIGRATION] Created missing table: no_class_days')
 
         if 'excuse_requests' not in existing_tables:
             conn.execute(
@@ -730,6 +811,16 @@ def _migrate_add_missing_columns():
                 print(f'[MIGRATION] Added {table}.{col}')
             except Exception:
                 pass
+        try:
+            conn.execute("ALTER TABLE no_class_days ADD COLUMN teacher_usernames_json TEXT NOT NULL DEFAULT '[]'")
+            print('[MIGRATION] Added no_class_days.teacher_usernames_json')
+        except Exception:
+            pass
+        try:
+            conn.execute('ALTER TABLE no_class_days ADD COLUMN apply_all_teachers INTEGER NOT NULL DEFAULT 0')
+            print('[MIGRATION] Added no_class_days.apply_all_teachers')
+        except Exception:
+            pass
         try:
             existing = [r[1] for r in conn.execute('PRAGMA table_info(students)').fetchall()]
             if 'course' in existing and 'program' in existing:
@@ -889,17 +980,21 @@ def save_session(sess_id, s):
     teacher_uname = s.get('teacher_username') or s.get('teacher') or ''
     teacher_name  = s.get('teacher_name', '')
     schedule_id   = s.get('schedule_id')
+    class_type = str(s.get('class_type', 'lecture')).strip().lower()
+    if class_type not in ('lecture', 'laboratory', 'school_event'):
+        class_type = 'lecture'
     with get_db() as conn:
         conn.execute(
             "INSERT INTO sessions "
-            "(sess_id,subject_id,subject_name,course_code,units,time_slot,"
+            "(sess_id,subject_id,subject_name,course_code,class_type,units,time_slot,"
             " section_key,teacher_username,teacher_name,started_at,late_cutoff,"
             " auto_end_at,ended_at,grace_period,schedule_id,"
             " warn_log_json,invalid_log_json) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(sess_id) DO UPDATE SET "
             "subject_id=excluded.subject_id, subject_name=excluded.subject_name, "
-            "course_code=excluded.course_code, units=excluded.units, "
+            "course_code=excluded.course_code, class_type=excluded.class_type, "
+            "units=excluded.units, "
             "time_slot=excluded.time_slot, section_key=excluded.section_key, "
             "teacher_username=excluded.teacher_username, "
             "teacher_name=excluded.teacher_name, "
@@ -911,7 +1006,7 @@ def save_session(sess_id, s):
             "warn_log_json=excluded.warn_log_json, "
             "invalid_log_json=excluded.invalid_log_json",
             (sess_id, s.get('subject_id', ''), s.get('subject_name', ''),
-             s.get('course_code', ''), s.get('units', 3), s.get('time_slot', ''),
+             s.get('course_code', ''), class_type, s.get('units', 3), s.get('time_slot', ''),
              sk, teacher_uname, teacher_name,
              s.get('started_at', ''), s.get('late_cutoff', ''),
              s.get('auto_end_at'), s.get('ended_at'),
@@ -1116,20 +1211,35 @@ def db_delete_student(nfc_id):
 
 def db_save_attendance_log(sess_id, nfc_id, student_name, student_id,
                             status, tap_time, tx_hash='', block_number=0,
-                            excuse_note=''):
+                            excuse_note='', class_type=''):
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    class_type_norm = str(class_type or '').strip().lower()
+    if class_type_norm not in ('lecture', 'laboratory', 'school_event'):
+        class_type_norm = ''
+    if not class_type_norm:
+        try:
+            with get_db() as _conn:
+                _row = _conn.execute(
+                    "SELECT class_type FROM sessions WHERE sess_id=?",
+                    (sess_id,),
+                ).fetchone()
+            class_type_norm = str((_row['class_type'] if _row else 'lecture') or 'lecture').strip().lower()
+        except Exception:
+            class_type_norm = 'lecture'
+    if class_type_norm not in ('lecture', 'laboratory', 'school_event'):
+        class_type_norm = 'lecture'
     with get_db() as conn:
         conn.execute(
             "INSERT INTO attendance_logs "
-            "(sess_id,nfc_id,student_name,student_id,status,tap_time,"
+            "(sess_id,nfc_id,student_name,student_id,status,class_type,tap_time,"
             " tx_hash,block_number,excuse_note,created_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(sess_id,nfc_id) DO UPDATE SET "
-            "status=excluded.status, tap_time=excluded.tap_time, "
+            "status=excluded.status, class_type=excluded.class_type, tap_time=excluded.tap_time, "
             "tx_hash=excluded.tx_hash, block_number=excluded.block_number, "
             "excuse_note=excluded.excuse_note",
             (sess_id, nfc_id, student_name, student_id,
-             status, tap_time, tx_hash, block_number, excuse_note, now)
+             status, class_type_norm, tap_time, tx_hash, block_number, excuse_note, now)
         )
 
 def db_get_session_attendance(sess_id):
@@ -1276,20 +1386,187 @@ def db_save_override(nfc_id, fields):
 
 # ── Schedule DB helpers ────────────────────────────────────────────────────
 
+def _event_schedule_to_rows(event_row):
+    """Expand one event_schedules row into calendar-like schedule rows (teacher x section)."""
+    title = str(event_row.get('title', 'School Event') or 'School Event').strip()
+    desc = str(event_row.get('description', '') or '').strip()
+    event_id = str(event_row.get('event_id', '') or '').strip()
+    start_at = str(event_row.get('start_at', '') or '').strip()
+    end_at = str(event_row.get('end_at', '') or '').strip()
+    teacher_usernames = list(event_row.get('teacher_usernames', []) or [])
+    section_keys = [normalize_section_key(s) for s in list(event_row.get('section_keys', []) or []) if str(s or '').strip()]
+    if not start_at or not end_at or not event_id or not section_keys:
+        return []
+
+    try:
+        start_dt = datetime.strptime(start_at, '%Y-%m-%d %H:%M:%S')
+        end_dt = datetime.strptime(end_at, '%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return []
+
+    if end_dt <= start_dt:
+        return []
+
+    if not teacher_usernames:
+        teacher_usernames = ['']
+
+    teachers_involved = []
+    for u in teacher_usernames:
+        tu = (db_get_user(u) if u else {}) or {}
+        teachers_involved.append(str(tu.get('full_name', u) or u).strip())
+    teachers_involved = sorted({t for t in teachers_involved if t})
+
+    programs_involved = sorted({str(sk).split('|')[0] for sk in section_keys if '|' in str(sk) and str(sk).split('|')[0]})
+    years_involved = sorted({str(sk).split('|')[1] for sk in section_keys if len(str(sk).split('|')) > 1 and str(sk).split('|')[1]})
+    sections_involved = sorted({str(sk).split('|')[2] for sk in section_keys if len(str(sk).split('|')) > 2 and str(sk).split('|')[2]})
+
+    rows = []
+    for teacher_username in teacher_usernames:
+        teacher = (db_get_user(teacher_username) if teacher_username else {}) or {}
+        teacher_name = teacher.get('full_name', teacher_username or 'Event Monitor')
+        for section_key in section_keys:
+            schedule_id = f"event:{event_id}:{teacher_username}:{normalize_section_key(section_key)}"
+            rows.append(
+                {
+                    'schedule_id': schedule_id,
+                    'section_key': normalize_section_key(section_key),
+                    'subject_id': f"event:{event_id}",
+                    'subject_name': title,
+                    'course_code': 'EVENT',
+                    'teacher_username': teacher_username,
+                    'teacher_name': teacher_name,
+                    'day_of_week': start_dt.weekday(),
+                    'start_time': start_dt.strftime('%H:%M'),
+                    'end_time': end_dt.strftime('%H:%M'),
+                    'class_type': 'school_event',
+                    'grace_minutes': 0,
+                    'is_active': 1,
+                    'is_event': 1,
+                    'event_id': event_id,
+                    'event_title': title,
+                    'event_description': desc,
+                    'event_date': start_dt.strftime('%Y-%m-%d'),
+                    'event_start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                    'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                    'teachers_involved': teachers_involved,
+                    'programs_involved': programs_involved,
+                    'years_involved': years_involved,
+                    'sections_involved': sections_involved,
+                    'section_keys_involved': section_keys,
+                }
+            )
+    return rows
+
+
+def _event_schedule_rows_for_all():
+    rows = []
+    for ev in db_get_all_event_schedules():
+        rows.extend(_event_schedule_to_rows(ev))
+    return rows
+
+
+def _event_schedule_rows_for_teacher(username):
+    username_norm = str(username or '').strip().lower()
+    rows = []
+    for ev in db_get_all_event_schedules():
+        teacher_usernames = [str(u or '').strip() for u in list(ev.get('teacher_usernames', []) or []) if str(u or '').strip()]
+        if username_norm not in {u.lower() for u in teacher_usernames}:
+            continue
+
+        section_keys = [normalize_section_key(s) for s in list(ev.get('section_keys', []) or []) if str(s or '').strip()]
+        if not section_keys:
+            continue
+
+        try:
+            start_dt = datetime.strptime(str(ev.get('start_at', '') or '').strip(), '%Y-%m-%d %H:%M:%S')
+            end_dt = datetime.strptime(str(ev.get('end_at', '') or '').strip(), '%Y-%m-%d %H:%M:%S')
+        except Exception:
+            continue
+
+        if end_dt <= start_dt:
+            continue
+
+        # Keep schedule_id compatible with runtime sessions by anchoring to one
+        # concrete section schedule key.
+        representative_section = section_keys[0]
+        schedule_id = f"event:{ev.get('event_id', '')}:{username_norm}:{representative_section}"
+
+        teacher = db_get_user(username_norm) or {}
+        teacher_name = teacher.get('full_name', username_norm)
+
+        teachers_involved = []
+        for u in teacher_usernames:
+            tu = db_get_user(u) or {}
+            teachers_involved.append(str(tu.get('full_name', u) or u).strip())
+        teachers_involved = sorted({t for t in teachers_involved if t})
+
+        programs = sorted({str(sk).split('|')[0] for sk in section_keys if '|' in str(sk) and str(sk).split('|')[0]})
+        years = sorted({str(sk).split('|')[1] for sk in section_keys if len(str(sk).split('|')) > 1 and str(sk).split('|')[1]})
+        sections = sorted({str(sk).split('|')[2] for sk in section_keys if len(str(sk).split('|')) > 2 and str(sk).split('|')[2]})
+
+        section_key_set = set(section_keys)
+        students_count = 0
+        for st in db_get_all_students():
+            if build_student_section_key(st) in section_key_set:
+                students_count += 1
+
+        rows.append(
+            {
+                'schedule_id': schedule_id,
+                'section_key': representative_section,
+                'subject_id': f"event:{ev.get('event_id', '')}",
+                'subject_name': str(ev.get('title', 'School Event') or 'School Event').strip(),
+                'course_code': 'EVENT',
+                'teacher_username': username_norm,
+                'teacher_name': teacher_name,
+                'day_of_week': start_dt.weekday(),
+                'start_time': start_dt.strftime('%H:%M'),
+                'end_time': end_dt.strftime('%H:%M'),
+                'class_type': 'school_event',
+                'grace_minutes': 0,
+                'is_active': 1,
+                'is_event': 1,
+                'event_id': str(ev.get('event_id', '') or '').strip(),
+                'event_title': str(ev.get('title', 'School Event') or 'School Event').strip(),
+                'event_description': str(ev.get('description', '') or '').strip(),
+                'event_date': start_dt.strftime('%Y-%m-%d'),
+                'event_start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'teachers_involved': teachers_involved,
+                'programs_involved': programs,
+                'years_involved': years,
+                'sections_involved': sections,
+                'section_keys_involved': section_keys,
+                'students_involved_count': students_count,
+            }
+        )
+    return rows
+
 def db_get_all_schedules():
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM schedules WHERE is_active=1 ORDER BY day_of_week, start_time"
         ).fetchall()
-    return [dict(r) for r in rows]
+    regular_rows = [dict(r) for r in rows]
+    event_rows = _event_schedule_rows_for_all()
+    merged = regular_rows + event_rows
+    merged.sort(key=lambda r: (int(r.get('day_of_week', 0)), str(r.get('start_time', ''))))
+    return merged
 
 def db_get_schedules_for_teacher(username):
+    username_norm = str(username or '').strip().lower()
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM schedules WHERE teacher_username=? AND is_active=1 ORDER BY day_of_week, start_time",
-            (username,)
+            "SELECT * FROM schedules "
+            "WHERE lower(trim(teacher_username))=? AND is_active=1 "
+            "ORDER BY day_of_week, start_time",
+            (username_norm,)
         ).fetchall()
-    return [dict(r) for r in rows]
+    regular_rows = [dict(r) for r in rows]
+    event_rows = _event_schedule_rows_for_teacher(username_norm)
+    merged = regular_rows + event_rows
+    merged.sort(key=lambda r: (int(r.get('day_of_week', 0)), str(r.get('start_time', ''))))
+    return merged
 
 def db_get_schedule(schedule_id):
     with get_db() as conn:
@@ -1299,26 +1576,34 @@ def db_get_schedule(schedule_id):
 def db_save_schedule(s: dict) -> str:
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     sid = s.get('schedule_id') or str(uuid.uuid4())
+    class_type = str(s.get('class_type', 'lecture')).strip().lower()
+    if class_type not in ('lecture', 'laboratory', 'school_event'):
+        class_type = 'lecture'
+    day_of_week = int(s.get('day_of_week', 0) or 0)
+    if day_of_week < 0 or day_of_week > 6:
+        day_of_week = 0
     with get_db() as conn:
         conn.execute(
             "INSERT INTO schedules "
             "(schedule_id,section_key,subject_id,subject_name,course_code,"
-            " teacher_username,teacher_name,day_of_week,start_time,end_time,"
+            " teacher_username,teacher_name,day_of_week,start_time,end_time,class_type,"
             " grace_minutes,is_active,created_by,created_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?,?,?) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?) "
             "ON CONFLICT(schedule_id) DO UPDATE SET "
             "section_key=excluded.section_key, subject_id=excluded.subject_id, "
             "subject_name=excluded.subject_name, course_code=excluded.course_code, "
             "teacher_username=excluded.teacher_username, teacher_name=excluded.teacher_name, "
             "day_of_week=excluded.day_of_week, start_time=excluded.start_time, "
-            "end_time=excluded.end_time, grace_minutes=excluded.grace_minutes, "
+            "end_time=excluded.end_time, class_type=excluded.class_type, "
+            "grace_minutes=excluded.grace_minutes, "
             "updated_at=excluded.updated_at",
             (sid,
              normalize_section_key(s.get('section_key', '')),
              s.get('subject_id', ''), s.get('subject_name', ''), s.get('course_code', ''),
              s.get('teacher_username', ''), s.get('teacher_name', ''),
-             int(s.get('day_of_week', 0)),
+             day_of_week,
              s.get('start_time', ''), s.get('end_time', ''),
+             class_type,
              int(s.get('grace_minutes', 15)),
              s.get('created_by', ''), now, now)
         )
@@ -1330,6 +1615,152 @@ def db_delete_schedule(schedule_id):
         conn.execute(
             "UPDATE schedules SET is_active=0, updated_at=? WHERE schedule_id=?",
             (now, schedule_id)
+        )
+
+
+def db_get_all_event_schedules():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM event_schedules WHERE is_active=1 ORDER BY start_at"
+        ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d['teacher_usernames'] = json.loads(d.get('teacher_usernames_json', '[]') or '[]')
+        except Exception:
+            d['teacher_usernames'] = []
+        try:
+            d['section_keys'] = json.loads(d.get('section_keys_json', '[]') or '[]')
+        except Exception:
+            d['section_keys'] = []
+        out.append(d)
+    return out
+
+
+def db_get_event_schedule_by_id(event_id):
+    event_id = str(event_id or '').strip()
+    if not event_id:
+        return None
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM event_schedules WHERE event_id=? LIMIT 1",
+            (event_id,),
+        ).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d['teacher_usernames'] = json.loads(d.get('teacher_usernames_json', '[]') or '[]')
+    except Exception:
+        d['teacher_usernames'] = []
+    try:
+        d['section_keys'] = json.loads(d.get('section_keys_json', '[]') or '[]')
+    except Exception:
+        d['section_keys'] = []
+    return d
+
+
+def db_save_event_schedule(e: dict) -> str:
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    event_id = e.get('event_id') or str(uuid.uuid4())
+    teacher_usernames = [str(u).strip() for u in e.get('teacher_usernames', []) if str(u).strip()]
+    section_keys = [normalize_section_key(s) for s in e.get('section_keys', []) if str(s).strip()]
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO event_schedules "
+            "(event_id,title,description,teacher_usernames_json,section_keys_json,start_at,end_at,is_active,created_by,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,1,?,?,?) "
+            "ON CONFLICT(event_id) DO UPDATE SET "
+            "title=excluded.title, description=excluded.description, "
+            "teacher_usernames_json=excluded.teacher_usernames_json, "
+            "section_keys_json=excluded.section_keys_json, "
+            "start_at=excluded.start_at, end_at=excluded.end_at, updated_at=excluded.updated_at",
+            (
+                event_id,
+                str(e.get('title', '')).strip(),
+                str(e.get('description', '')).strip(),
+                json.dumps(teacher_usernames),
+                json.dumps(section_keys),
+                str(e.get('start_at', '')).strip(),
+                str(e.get('end_at', '')).strip(),
+                str(e.get('created_by', '')).strip(),
+                now,
+                now,
+            ),
+        )
+    return event_id
+
+
+def db_get_all_no_class_days():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM no_class_days WHERE is_active=1 ORDER BY from_date, to_date"
+        ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d['teacher_usernames'] = json.loads(d.get('teacher_usernames_json', '[]') or '[]')
+        except Exception:
+            d['teacher_usernames'] = []
+        d['apply_all_teachers'] = int(d.get('apply_all_teachers') or 0)
+        out.append(d)
+    return out
+
+
+def _no_class_applies_to_teacher(item: dict, teacher_username: str) -> bool:
+    if int(item.get('apply_all_teachers') or 0) == 1:
+        return True
+    usernames = [str(u or '').strip().lower() for u in list(item.get('teacher_usernames', []) or []) if str(u or '').strip()]
+    if not usernames:
+        return True
+    teacher_norm = str(teacher_username or '').strip().lower()
+    return bool(teacher_norm and teacher_norm in usernames)
+
+
+def db_get_no_class_days_for_date(date_ymd, teacher_username=''):
+    d = str(date_ymd or '').strip()
+    if not d:
+        return []
+    base_items = db_get_all_no_class_days()
+    return [
+        item for item in base_items
+        if str(item.get('from_date', '')).strip() <= d <= str(item.get('to_date', '')).strip()
+        and _no_class_applies_to_teacher(item, teacher_username)
+    ]
+
+
+def db_save_no_class_day(item: dict) -> int:
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    teacher_usernames = [str(u).strip() for u in list(item.get('teacher_usernames', []) or []) if str(u).strip()]
+    apply_all_teachers = 1 if item.get('apply_all_teachers') else 0
+    with get_db() as conn:
+        cur = conn.execute(
+            "INSERT INTO no_class_days "
+            "(title,description,from_date,to_date,teacher_usernames_json,apply_all_teachers,is_active,created_by,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,1,?,?,?)",
+            (
+                str(item.get('title', '')).strip(),
+                str(item.get('description', '')).strip(),
+                str(item.get('from_date', '')).strip(),
+                str(item.get('to_date', '')).strip(),
+                json.dumps(teacher_usernames),
+                apply_all_teachers,
+                str(item.get('created_by', '')).strip(),
+                now,
+                now,
+            ),
+        )
+        return int(cur.lastrowid)
+
+
+def db_delete_no_class_day(no_class_day_id: int) -> None:
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE no_class_days SET is_active=0, updated_at=? WHERE id=?",
+            (now, int(no_class_day_id)),
         )
 
 def get_todays_schedules(username=None):
@@ -1375,6 +1806,45 @@ def _normalize_hhmm(value):
             continue
     return None
 
+
+def _parse_event_schedule_id(schedule_id):
+    """Parse schedule ids in form event:<event_id>:<teacher_username>:<section_key>."""
+    raw = str(schedule_id or '').strip()
+    if not raw.startswith('event:'):
+        return None
+    parts = raw.split(':', 3)
+    if len(parts) != 4:
+        return None
+    return {
+        'event_id': parts[1],
+        'teacher_username': parts[2],
+        'section_key': normalize_section_key(parts[3]),
+    }
+
+
+def _event_related_session_ids(schedule_id, include_ended=False):
+    """Return session ids linked to the same event_id across all teachers/sections."""
+    meta = _parse_event_schedule_id(schedule_id)
+    if not meta:
+        return []
+    like_pattern = f"event:{meta['event_id']}:%"
+    with get_db() as conn:
+        if include_ended:
+            rows = conn.execute(
+                "SELECT sess_id FROM sessions "
+                "WHERE class_type='school_event' AND schedule_id LIKE ? "
+                "ORDER BY started_at DESC",
+                (like_pattern,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT sess_id FROM sessions "
+                "WHERE class_type='school_event' AND ended_at IS NULL AND schedule_id LIKE ? "
+                "ORDER BY started_at DESC",
+                (like_pattern,),
+            ).fetchall()
+    return [r['sess_id'] for r in rows]
+
 def _time_mins(value):
     hhmm = _normalize_hhmm(value)
     if not hhmm:
@@ -1391,8 +1861,13 @@ def check_and_start_scheduled_sessions():
     now_dt = datetime.now()
     today_dow = now_dt.weekday()
     current_time_str = now_dt.strftime('%H:%M')
+    today_ymd = now_dt.strftime('%Y-%m-%d')
     
     with app.app_context():
+        no_class_today = db_get_no_class_days_for_date(today_ymd)
+        if no_class_today:
+            print(f"[AUTO] No-class day active on {today_ymd}; skipping automatic schedule starts.")
+
         # Get all active schedules for today
         schedules = [s for s in db_get_all_schedules() if int(s['day_of_week']) == today_dow]
         active_sessions = get_active_sessions()
@@ -1441,6 +1916,9 @@ def check_and_start_scheduled_sessions():
                 print(f"[AUTO WARN] Invalid schedule window schedule_id={s.get('schedule_id')} start={start_hhmm} end={end_hhmm}")
                 continue
 
+            if db_get_no_class_days_for_date(today_ymd, s.get('teacher_username', '')):
+                continue
+
             if not already_ran and start_dt <= now_dt < end_dt:
                 # Automate session start
                 sess_id = str(uuid.uuid4())[:13]
@@ -1453,6 +1931,7 @@ def check_and_start_scheduled_sessions():
                     'subject_id': s['subject_id'],
                     'subject_name': s['subject_name'],
                     'course_code': s['course_code'],
+                    'class_type': s.get('class_type', 'lecture'),
                     'units': subj.get('units', 3) if subj else 3,
                     'time_slot': f"{start_hhmm} - {end_hhmm}",
                     'section_key': s['section_key'],
@@ -1468,6 +1947,69 @@ def check_and_start_scheduled_sessions():
                 print(f"[AUTO] Started session {sess_id} for {s['subject_name']} ({s['teacher_username']})")
             elif already_ran and start_dt <= now_dt < end_dt:
                 print(f"[AUTO] Skipped schedule_id={s.get('schedule_id')} (already ran today)")
+
+        # One-time school events: create event sessions for selected teacher/section pairs.
+        event_schedules = db_get_all_event_schedules()
+        for ev in event_schedules:
+            start_raw = str(ev.get('start_at', '')).strip()
+            end_raw = str(ev.get('end_at', '')).strip()
+            if not start_raw or not end_raw:
+                continue
+            try:
+                start_dt = datetime.strptime(start_raw, '%Y-%m-%d %H:%M:%S')
+                end_dt = datetime.strptime(end_raw, '%Y-%m-%d %H:%M:%S')
+            except Exception:
+                continue
+            event_blocked = False
+            for teacher_username in (ev.get('teacher_usernames', []) or ['']):
+                if db_get_no_class_days_for_date(start_dt.strftime('%Y-%m-%d'), teacher_username):
+                    event_blocked = True
+                    break
+            if event_blocked:
+                continue
+            if not (start_dt <= now_dt < end_dt):
+                continue
+
+            teacher_usernames = ev.get('teacher_usernames', []) or []
+            section_keys = ev.get('section_keys', []) or []
+            if not teacher_usernames:
+                teacher_usernames = ['']
+            if not section_keys:
+                section_keys = ['']
+
+            for teacher_username in teacher_usernames:
+                teacher = db_get_user(teacher_username) if teacher_username else {}
+                teacher_name = teacher.get('full_name', teacher_username or 'Event Monitor')
+                for section_key in section_keys:
+                    schedule_key = f"event:{ev.get('event_id')}:{teacher_username}:{normalize_section_key(section_key)}"
+                    with get_db() as conn:
+                        already_ran = conn.execute(
+                            "SELECT 1 FROM sessions WHERE schedule_id=?",
+                            (schedule_key,),
+                        ).fetchone()
+                    if already_ran:
+                        continue
+
+                    sess_id = str(uuid.uuid4())[:13]
+                    new_sess = {
+                        'sess_id': sess_id,
+                        'subject_id': f"event:{ev.get('event_id')}",
+                        'subject_name': ev.get('title', 'School Event'),
+                        'course_code': 'EVENT',
+                        'class_type': 'school_event',
+                        'units': 0,
+                        'time_slot': f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}",
+                        'section_key': normalize_section_key(section_key),
+                        'teacher_username': teacher_username,
+                        'teacher_name': teacher_name,
+                        'started_at': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                        'late_cutoff': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                        'auto_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                        'grace_period': 0,
+                        'schedule_id': schedule_key,
+                    }
+                    save_session(sess_id, new_sess)
+                    print(f"[AUTO EVENT] Started session {sess_id} for event {ev.get('event_id')}")
 
         # 2. End sessions that passed their auto_end_at
         for sid, asess in active_sessions.items():
@@ -1738,14 +2280,16 @@ def db_resolve_excuse(excuse_id: int, resolution: str, reviewed_by: str) -> dict
             # If record exists, UPDATE will mark it as excused
             conn.execute(
                 "INSERT INTO attendance_logs "
-                "(sess_id, nfc_id, student_name, student_id, status, tap_time, "
-                " tx_hash, block_number, excuse_note, excuse_request_id, created_at) "
-                "VALUES (?, ?, ?, ?, 'excused', ?, '', 0, ?, ?, ?) "
+                 "(sess_id, nfc_id, student_name, student_id, status, class_type, tap_time, "
+                 " tx_hash, block_number, excuse_note, excuse_request_id, created_at) "
+                 "VALUES (?, ?, ?, ?, 'excused', "
+                 " COALESCE((SELECT class_type FROM sessions WHERE sess_id=?), 'lecture'),"
+                 " ?, '', 0, ?, ?, ?) "
                 "ON CONFLICT(sess_id, nfc_id) DO UPDATE SET "
-                "status='excused', excuse_note=excluded.excuse_note, "
+                 "status='excused', class_type=excluded.class_type, excuse_note=excluded.excuse_note, "
                 "excuse_request_id=excluded.excuse_request_id",
-                (row_dict['sess_id'], row_dict['nfc_id'], row_dict['student_name'], row_dict['student_id'],
-                 now, note, resolved_excuse_id, now)
+                 (row_dict['sess_id'], row_dict['nfc_id'], row_dict['student_name'], row_dict['student_id'],
+                  row_dict['sess_id'], now, note, resolved_excuse_id, now)
             )
             # Defer session save_session sync until after this DB transaction closes.
             session_sync = {
@@ -2076,7 +2620,7 @@ def get_student_session_rows_for_export(nfc_id):
     with get_db() as conn:
         log_rows = conn.execute(
             "SELECT al.status, al.tx_hash, al.block_number, al.tap_time, al.excuse_note, "
-            "al.sess_id, s.subject_name, s.course_code, s.teacher_name, s.time_slot, s.started_at "
+            "al.sess_id, s.subject_name, s.course_code, s.class_type, s.teacher_name, s.time_slot, s.started_at "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "WHERE al.nfc_id=? "
@@ -2113,6 +2657,7 @@ def get_student_session_rows_for_export(nfc_id):
             {
                 'code': lg['course_code'] or '',
                 'subject': lg['subject_name'] or '',
+                'class_type': (lg['class_type'] or 'lecture').capitalize(),
                 'teacher': lg['teacher_name'] or '',
                 'date': lg['started_at'] or '',
                 'time_slot': lg['time_slot'] or '',
@@ -2393,15 +2938,61 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
         'total_enrolled': len(section_students),
     }
 
-def get_active_session_for_nfc(nfc_id):
+def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
     all_students = get_all_students()
     student = next((s for s in all_students if s['nfcId'] == nfc_id), None)
     if not student: return None, None
     student_key = build_student_section_key(student)
     if not student_key: return None, None
+
+    preferred = str(preferred_sess_id or '').strip()
+    if preferred:
+        with get_db() as conn:
+            pref_row = conn.execute(
+                "SELECT * FROM sessions WHERE ended_at IS NULL AND sess_id=? LIMIT 1",
+                (preferred,),
+            ).fetchone()
+
+            if pref_row:
+                pref_dict = dict(pref_row)
+                pref_section = normalize_section_key(pref_dict.get('section_key', ''))
+                pref_class_type = str(pref_dict.get('class_type', 'lecture') or 'lecture').strip().lower()
+
+                # Normal schedules must match the student's section exactly.
+                if pref_section == student_key:
+                    s = _session_row_with_logs(get_db(), pref_row)
+                    return pref_row['sess_id'], s
+
+                # School events can have sibling sessions (same event_id) for other sections.
+                # If monitor page sent one event session id, route tap to the event sibling
+                # matching the student's actual section.
+                if pref_class_type == 'school_event':
+                    meta = _parse_event_schedule_id(pref_dict.get('schedule_id', ''))
+                    if meta and meta.get('event_id'):
+                        pattern = f"event:{meta['event_id']}:%:{student_key}"
+                        sibling = conn.execute(
+                            "SELECT * FROM sessions "
+                            "WHERE ended_at IS NULL AND class_type='school_event' AND schedule_id LIKE ? "
+                            "ORDER BY started_at DESC LIMIT 1",
+                            (pattern,),
+                        ).fetchone()
+                        if sibling:
+                            s = _session_row_with_logs(get_db(), sibling)
+                            return sibling['sess_id'], s
+
+                # Preferred session was explicitly provided but does not match this student's
+                # valid session context. Do not fall back to another active session, otherwise
+                # taps from event monitor can be routed into regular sessions (and vice versa).
+                return None, None
+
+        # Preferred session id was provided but not active/not found.
+        # Keep strict behavior and avoid cross-session fallback.
+        return None, None
+
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM sessions WHERE ended_at IS NULL AND section_key=?",
+            "SELECT * FROM sessions WHERE ended_at IS NULL AND section_key=? "
+            "ORDER BY started_at DESC LIMIT 1",
             (student_key,)
         ).fetchone()
     if row:
@@ -2443,8 +3034,61 @@ def signup():
 @app.route('/')
 @admin_required
 def index():
+    raw_active = get_active_sessions()
+
+    def _event_id(sess):
+        class_type = str((sess or {}).get('class_type', 'lecture') or 'lecture').strip().lower()
+        if class_type != 'school_event':
+            return None
+        schedule_id = str((sess or {}).get('schedule_id', '') or '').strip()
+        if schedule_id.startswith('event:'):
+            parts = schedule_id.split(':', 3)
+            if len(parts) == 4:
+                return parts[1]
+        subject_id = str((sess or {}).get('subject_id', '') or '').strip()
+        if subject_id.startswith('event:'):
+            return subject_id.split(':', 1)[1]
+        return None
+
+    unified_active = {}
+    event_buckets = {}
+    for sid, sess in raw_active.items():
+        ev_id = _event_id(sess)
+        if not ev_id:
+            unified_active[sid] = sess
+            continue
+
+        if ev_id not in event_buckets:
+            base = dict(sess or {})
+            event_buckets[ev_id] = {
+                'sid': sid,
+                'base': base,
+                'sections': set(),
+                'teachers': set(),
+                'present_ids': set(str(x) for x in (base.get('present') or [])),
+            }
+
+        bucket = event_buckets[ev_id]
+        section_key = str((sess or {}).get('section_key', '') or '').strip()
+        teacher_name = str((sess or {}).get('teacher_name', '') or '').strip()
+        if section_key:
+            bucket['sections'].add(section_key)
+        if teacher_name:
+            bucket['teachers'].add(teacher_name)
+        for pid in (sess or {}).get('present') or []:
+            bucket['present_ids'].add(str(pid))
+
+    for bucket in event_buckets.values():
+        merged = bucket['base']
+        if bucket['sections']:
+            merged['section_key'] = ' | '.join(sorted(bucket['sections']))
+        if bucket['teachers']:
+            merged['teacher_name'] = ', '.join(sorted(bucket['teachers']))
+        merged['present'] = sorted(bucket['present_ids'])
+        unified_active[bucket['sid']] = merged
+
     return render_template('index.html',
-                           active_sessions=get_active_sessions(),
+                           active_sessions=unified_active,
                            subjects_db=db_get_all_subjects(),
                            users_db=db_get_all_users())
 
@@ -3325,15 +3969,7 @@ def teacher_sessions_students():
 @app.route('/teacher/create-session')
 @login_required
 def teacher_create_session():
-    return _teacher_create_session_page_impl(
-        session_obj=session,
-        redirect=redirect,
-        url_for=url_for,
-        get_current_user=get_current_user,
-        clear_session=session.clear,
-        build_teacher_context=_build_teacher_context,
-        render_template=render_template,
-    )
+    return redirect(url_for('teacher_schedule'))
 
 @app.route('/teacher/records')
 @login_required
@@ -3359,7 +3995,57 @@ def api_session_attendance(sess_id):
             return jsonify({'error': 'Session not found'}), 404
         if not _is_my_session(sess):
             return jsonify({'error': 'Access denied'}), 403
-        logs = db_get_session_attendance(sess_id)
+        class_type = str(sess.get('class_type', 'lecture')).strip().lower()
+        is_school_event = class_type == 'school_event'
+
+        related_ids = [sess_id]
+        related_sessions = [sess]
+        section_keys = {normalize_section_key(sess.get('section_key', ''))}
+        teachers_involved = [str(sess.get('teacher_name', '') or '').strip()]
+
+        if is_school_event:
+            related_ids = _event_related_session_ids(sess.get('schedule_id', ''), include_ended=True)
+            if not related_ids:
+                related_ids = [sess_id]
+            related_sessions = []
+            for rid in related_ids:
+                rs = load_session(rid)
+                if rs:
+                    related_sessions.append(rs)
+                    sk = normalize_section_key(rs.get('section_key', ''))
+                    if sk:
+                        section_keys.add(sk)
+                    tname = str(rs.get('teacher_name', '') or '').strip()
+                    if tname:
+                        teachers_involved.append(tname)
+
+            sched_meta = _parse_event_schedule_id(sess.get('schedule_id', ''))
+            ev = db_get_event_schedule_by_id(sched_meta.get('event_id')) if sched_meta else None
+            if ev:
+                for sk in list(ev.get('section_keys', []) or []):
+                    skn = normalize_section_key(sk)
+                    if skn:
+                        section_keys.add(skn)
+                for uname in list(ev.get('teacher_usernames', []) or []):
+                    u = db_get_user(uname)
+                    tname = str((u or {}).get('full_name', uname) or '').strip()
+                    if tname:
+                        teachers_involved.append(tname)
+
+        teachers_involved = sorted({t for t in teachers_involved if t})
+
+        logs = []
+        if is_school_event and related_ids:
+            with get_db() as _conn:
+                ph = ','.join(['?'] * len(related_ids))
+                logs_rows = _conn.execute(
+                    "SELECT * FROM attendance_logs WHERE sess_id IN (" + ph + ") ORDER BY created_at, tap_time",
+                    tuple(related_ids),
+                ).fetchall()
+            logs = [dict(r) for r in logs_rows]
+        else:
+            logs = db_get_session_attendance(sess_id)
+
         logs_by_nfc = {lg['nfc_id']: lg for lg in logs}
         section_key = normalize_section_key(sess.get('section_key', ''))
         sk_parts    = section_key.split('|')
@@ -3370,10 +4056,18 @@ def api_session_attendance(sess_id):
         # Get excuse request details
         excuse_details = {}
         with get_db() as _conn:
-            excuses = _conn.execute(
-                "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
-                (sess_id,)
-            ).fetchall()
+            if is_school_event and related_ids:
+                ph = ','.join(['?'] * len(related_ids))
+                excuses = _conn.execute(
+                    "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests "
+                    "WHERE sess_id IN (" + ph + ") AND status='approved'",
+                    tuple(related_ids),
+                ).fetchall()
+            else:
+                excuses = _conn.execute(
+                    "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
+                    (sess_id,)
+                ).fetchall()
             for exc in excuses:
                 excuse_details[exc['nfc_id']] = {
                     'reason': exc['reason_type'],
@@ -3390,11 +4084,22 @@ def api_session_attendance(sess_id):
             nid = lg['nfc_id']
             st  = get_student_by_nfc_cached(nid) or {}
             excuse_info = excuse_details.get(nid, {})
+            origin = (
+                str(st.get('course') or '').strip(),
+                str(st.get('year_level') or '').strip(),
+                str(st.get('section') or '').strip(),
+            )
+            section_origin = '-'.join([x for x in origin if x]) or '-'
             students_map[nid] = {
                 'nfc_id':     nid,
                 'name':       lg.get('student_name') or st.get('name') or nid,
                 'student_id': lg.get('student_id')   or st.get('student_id', ''),
-                'status':     (lg.get('status') or 'absent').lower(),
+                'section_origin': section_origin,
+                'program': st.get('course', ''),
+                'year_level': st.get('year_level', ''),
+                'section': st.get('section', ''),
+                'status':     ('present' if is_school_event and (str(lg.get('status') or '').lower() in ('present', 'late')) else (lg.get('status') or 'absent').lower()),
+                'class_type': (lg.get('class_type') or sess.get('class_type', 'lecture')).lower(),
                 'tx_hash':    lg.get('tx_hash') or '',
                 'block':      str(lg.get('block_number') or ''),
                 'time':       lg.get('tap_time') or '',
@@ -3406,10 +4111,13 @@ def api_session_attendance(sess_id):
         # Primary approach: use get_all_students() and match by section_key
         # This is more reliable as it handles both blockchain-sourced and database students
         all_students = get_all_students()
-        enrolled = [s for s in all_students if build_student_section_key(s) == section_key]
+        if is_school_event:
+            enrolled = [s for s in all_students if build_student_section_key(s) in section_keys]
+        else:
+            enrolled = [s for s in all_students if build_student_section_key(s) == section_key]
 
         # Fallback: if no students found via section_key, try exact database query
-        if not enrolled and program and year_level and section_val:
+        if (not is_school_event) and (not enrolled) and program and year_level and section_val:
             with get_db() as _conn:
                 _rows = _conn.execute(
                     "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
@@ -3421,11 +4129,21 @@ def api_session_attendance(sess_id):
             nid = s['nfcId']
             if nid in students_map:
                 continue
+            section_origin = '-'.join([
+                str(s.get('course') or '').strip(),
+                str(s.get('year_level') or '').strip(),
+                str(s.get('section') or '').strip(),
+            ]).strip('-') or '-'
             students_map[nid] = {
                 'nfc_id':     nid,
                 'name':       s.get('name', nid),
                 'student_id': s.get('student_id', ''),
+                'section_origin': section_origin,
+                'program': s.get('course', ''),
+                'year_level': s.get('year_level', ''),
+                'section': s.get('section', ''),
                 'status':     'absent',
+                'class_type': str(sess.get('class_type', 'lecture')).lower(),
                 'tx_hash':    '',
                 'block':      '',
                 'time':       '',
@@ -3439,7 +4157,11 @@ def api_session_attendance(sess_id):
             'students':     students_out,
             'subject_name': sess.get('subject_name', ''),
             'course_code':  sess.get('course_code', ''),
+            'class_type':   sess.get('class_type', 'lecture'),
             'section_key':  section_key,
+            'sections_involved': sorted([sk for sk in section_keys if sk]),
+            'teachers_involved': teachers_involved,
+            'students_involved_count': len(students_out),
             'time_slot':    sess.get('time_slot', ''),
             'started_at':   sess.get('started_at', ''),
             'ended_at':     sess.get('ended_at', ''),
@@ -3597,6 +4319,7 @@ def start_session():
         'subject_id':    subject_id,
         'subject_name':  subj_data.get('name',''),
         'course_code':   subj_data.get('course_code',''),
+        'class_type':    'lecture',
         'units':         units,
         'time_slot':     time_slot,
         'section_key':   section_key,
@@ -3669,27 +4392,182 @@ def live_session(sess_id):
         flash('Access denied.'); return redirect(url_for('teacher_dashboard'))
     all_students     = get_all_students()
     section_key      = sess.get('section_key','')
-    section_students = [s for s in all_students
-                        if build_student_section_key(s) == normalize_section_key(section_key)]
-    present_set  = set(sess.get('present',[]))
-    late_set     = set(sess.get('late',[]))
-    excused_set  = set(sess.get('excused',[]))
+    is_school_event = str(sess.get('class_type', 'lecture')).strip().lower() == 'school_event'
+    section_keys_for_view = {normalize_section_key(section_key)} if section_key else set()
+    related_event_sessions = [sess]
+
+    if is_school_event:
+        related_ids = _event_related_session_ids(sess.get('schedule_id', ''), include_ended=True)
+        if not related_ids:
+            related_ids = [sess_id]
+        related_event_sessions = []
+        for rid in related_ids:
+            rs = load_session(rid)
+            if rs:
+                related_event_sessions.append(rs)
+                sessions_db[rid] = rs
+
+        sched_meta = _parse_event_schedule_id(sess.get('schedule_id', ''))
+        ev = db_get_event_schedule_by_id(sched_meta.get('event_id')) if sched_meta else None
+        if ev:
+            section_keys = [normalize_section_key(s) for s in list(ev.get('section_keys', []) or []) if str(s or '').strip()]
+            if section_keys:
+                section_keys_for_view = set(section_keys)
+
+    section_students = [
+        s for s in all_students
+        if build_student_section_key(s) in section_keys_for_view
+    ]
+
+    # Ensure live view always has a usable student display name.
+    normalized_students = []
+    for st in section_students:
+        sd = dict(st or {})
+        display_name = str(sd.get('name') or sd.get('full_name') or '').strip()
+        if not display_name:
+            raw_name = str(sd.get('raw_name') or '').strip()
+            if raw_name:
+                display_name = raw_name.split('|', 1)[0].strip()
+        if not display_name:
+            display_name = str(sd.get('student_id') or sd.get('nfcId') or 'Unknown').strip()
+        sd['name'] = display_name
+        normalized_students.append(sd)
+    section_students = normalized_students
+
+    present_set  = set()
+    late_set     = set()
+    excused_set  = set()
+    excuse_notes = {}
+    for src in related_event_sessions:
+        present_set.update(src.get('present', []))
+        late_set.update(src.get('late', []))
+        excused_set.update(src.get('excused', []))
+        for k, v in (src.get('excuse_notes', {}) or {}).items():
+            excuse_notes[k] = v
+
+    if not is_school_event:
+        # For normal schedules use only the current session state.
+        present_set = set(sess.get('present', []))
+        late_set = set(sess.get('late', []))
+        excused_set = set(sess.get('excused', []))
+        excuse_notes = sess.get('excuse_notes', {})
+
     student_statuses = []
-    excuse_notes = sess.get('excuse_notes', {})
     for s in section_students:
         nid = s['nfcId']
-        if   nid in excused_set: status = 'excused'
-        elif nid in late_set:    status = 'late'
-        elif nid in present_set: status = 'present'
-        else:                    status = 'absent'
+        if is_school_event:
+            status = 'present' if (nid in present_set or nid in late_set) else 'absent'
+        else:
+            if   nid in excused_set: status = 'excused'
+            elif nid in late_set:    status = 'late'
+            elif nid in present_set: status = 'present'
+            else:                    status = 'absent'
         student_statuses.append({**s, 'status': status, 'reason': excuse_notes.get(nid, '')})
+    session_meta = None
+    class_type_label = 'Lecture'
+    class_type_raw = str(sess.get('class_type', 'lecture') or 'lecture').strip().lower()
+    if class_type_raw == 'laboratory':
+        class_type_label = 'Laboratory'
+    elif class_type_raw == 'school_event':
+        class_type_label = 'School Event'
+
+    def _fmt_session_date(dt_raw):
+        try:
+            dt = datetime.strptime(str(dt_raw or '').strip(), '%Y-%m-%d %H:%M:%S')
+            return dt.strftime('%B %d, %Y')
+        except Exception:
+            return ''
+
+    def _fmt_session_time(dt_raw):
+        try:
+            dt = datetime.strptime(str(dt_raw or '').strip(), '%Y-%m-%d %H:%M:%S')
+            return dt.strftime('%I:%M %p').lstrip('0')
+        except Exception:
+            return ''
+
+    if is_school_event:
+        sched_meta = _parse_event_schedule_id(sess.get('schedule_id', ''))
+        if sched_meta:
+            ev = db_get_event_schedule_by_id(sched_meta.get('event_id'))
+            if ev:
+                teacher_names = []
+                for uname in list(ev.get('teacher_usernames', []) or []):
+                    u = db_get_user(uname)
+                    teacher_names.append((u or {}).get('full_name', uname))
+                section_keys = [normalize_section_key(s) for s in list(ev.get('section_keys', []) or []) if str(s or '').strip()]
+                programs = sorted({str(s).split('|')[0] for s in section_keys if '|' in str(s) and str(s).split('|')[0]})
+                years = sorted({str(s).split('|')[1] for s in section_keys if len(str(s).split('|')) > 1 and str(s).split('|')[1]})
+                sections = sorted({str(s).split('|')[2] for s in section_keys if len(str(s).split('|')) > 2 and str(s).split('|')[2]})
+                start_at = str(ev.get('start_at', '') or '').strip()
+                end_at = str(ev.get('end_at', '') or '').strip()
+                start_dt = None
+                end_dt = None
+                try:
+                    start_dt = datetime.strptime(start_at, '%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    start_dt = None
+                try:
+                    end_dt = datetime.strptime(end_at, '%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    end_dt = None
+                session_meta = {
+                    'title': str(ev.get('title', '') or '').strip() or sess.get('subject_name', 'School Event'),
+                    'description': str(ev.get('description', '') or '').strip(),
+                    'teachers': teacher_names,
+                    'programs': programs,
+                    'years': years,
+                    'sections': sections,
+                    'students': sorted([str(s.get('name', '') or '').strip() for s in section_students if str(s.get('name', '') or '').strip()]),
+                    'section_keys': section_keys,
+                    'date': (start_dt.strftime('%B %d, %Y') if start_dt else ''),
+                    'start_time': (start_dt.strftime('%I:%M %p').lstrip('0') if start_dt else ''),
+                    'end_time': (end_dt.strftime('%I:%M %p').lstrip('0') if end_dt else ''),
+                    'class_type': 'School Event',
+                }
+    if not session_meta:
+        section_key_norm = normalize_section_key(section_key)
+        sk_parts = section_key_norm.split('|')
+        program = sk_parts[0] if len(sk_parts) > 0 else ''
+        year = sk_parts[1] if len(sk_parts) > 1 else ''
+        section_name = sk_parts[2] if len(sk_parts) > 2 else ''
+        teacher_name = str(sess.get('teacher_name', '') or '').strip()
+        time_slot = str(sess.get('time_slot', '') or '').strip()
+        start_time = ''
+        end_time = ''
+        if time_slot:
+            slot_parts = [p.strip() for p in time_slot.replace(' to ', '-').split('-', 1)]
+            if len(slot_parts) == 2:
+                start_time, end_time = slot_parts[0], slot_parts[1]
+            else:
+                start_time = time_slot
+        if not start_time:
+            start_time = _fmt_session_time(sess.get('started_at', ''))
+        if not end_time:
+            end_time = _fmt_session_time(sess.get('auto_end_at', ''))
+        session_meta = {
+            'title': str(sess.get('subject_name', '') or '').strip() or 'Class Session',
+            'description': 'Regular class attendance session based on scheduled subject and section.',
+            'teachers': [teacher_name] if teacher_name else [],
+            'programs': [program] if program else [],
+            'years': [year] if year else [],
+            'sections': [section_name] if section_name else [],
+            'students': sorted([str(s.get('name', '') or '').strip() for s in section_students if str(s.get('name', '') or '').strip()]),
+            'section_keys': [section_key_norm] if section_key_norm else [],
+            'date': _fmt_session_date(sess.get('started_at', '')),
+            'start_time': start_time,
+            'end_time': end_time,
+            'class_type': class_type_label,
+        }
     return render_template('session_live.html', sess=sess, sess_id=sess_id,
                            section_students=section_students,
                            student_statuses=student_statuses,
-                           present_list=[s for s in section_students if s['nfcId'] in present_set],
-                           absent_list=[s for s in section_students if s['nfcId'] not in present_set and s['nfcId'] not in excused_set],
+                           present_list=[s for s in section_students if s['nfcId'] in present_set or (is_school_event and s['nfcId'] in late_set)],
+                           absent_list=[s for s in section_students if ((s['nfcId'] not in present_set and s['nfcId'] not in late_set) if is_school_event else (s['nfcId'] not in present_set and s['nfcId'] not in excused_set))],
                            tap_log=sess.get('tap_log',[]),
                            is_active=not sess.get('ended_at'),
+                           is_school_event=is_school_event,
+                           session_meta=session_meta,
+                           can_end_early=(not is_school_event),
                            fmt_time=fmt_time, fmt_time_short=fmt_time_short)
 
 @app.route('/teacher/session/<sess_id>/end', methods=['POST'])
@@ -3701,6 +4579,9 @@ def end_session(sess_id):
     
     if not _is_my_session(sess):
         flash('Access denied.'); return redirect(url_for('teacher_dashboard'))
+    if str(sess.get('class_type', 'lecture')).strip().lower() == 'school_event':
+        flash('School event sessions end automatically at the scheduled end time.')
+        return redirect(url_for('live_session', sess_id=sess_id))
     result = _finalize_session(
         sess_id,
         ended_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -3891,6 +4772,23 @@ def poll_session(sess_id):
     if sess is None:
         return jsonify({'error': 'not found', 'active': False}), 404
     sessions_db[sess_id] = sess
+    is_school_event = str(sess.get('class_type', 'lecture')).strip().lower() == 'school_event'
+
+    related_ids = [sess_id]
+    related_sessions = [sess]
+    if is_school_event:
+        related_ids = _event_related_session_ids(sess.get('schedule_id', ''), include_ended=False)
+        if not related_ids:
+            related_ids = [sess_id]
+        related_sessions = []
+        for rid in related_ids:
+            rs = load_session(rid)
+            if rs:
+                related_sessions.append(rs)
+                sessions_db[rid] = rs
+        if not related_sessions:
+            related_sessions = [sess]
+            related_ids = [sess_id]
 
     new_taps     = []
     new_warnings = []
@@ -3903,16 +4801,29 @@ def poll_session(sess_id):
         since_dt = datetime.fromtimestamp(since_buffered).strftime('%Y-%m-%d %H:%M:%S')
 
         with get_db() as conn:
-            tap_rows = conn.execute(
-                "SELECT al.nfc_id, al.student_name, al.student_id, al.status, "
-                "al.tap_time, al.tx_hash, al.block_number, al.created_at "
-                "FROM attendance_logs al "
-                "WHERE al.sess_id = ? "
-                "  AND al.status IN ('present','late') "
-                "  AND al.created_at > ? "
-                "ORDER BY al.created_at ASC",
-                (sess_id, since_dt)
-            ).fetchall()
+            if is_school_event and related_ids:
+                placeholders = ','.join(['?'] * len(related_ids))
+                query = (
+                    "SELECT al.nfc_id, al.student_name, al.student_id, al.status, "
+                    "al.tap_time, al.tx_hash, al.block_number, al.created_at "
+                    "FROM attendance_logs al "
+                    f"WHERE al.sess_id IN ({placeholders}) "
+                    "  AND al.status IN ('present','late') "
+                    "  AND al.created_at > ? "
+                    "ORDER BY al.created_at ASC"
+                )
+                tap_rows = conn.execute(query, tuple(related_ids) + (since_dt,)).fetchall()
+            else:
+                tap_rows = conn.execute(
+                    "SELECT al.nfc_id, al.student_name, al.student_id, al.status, "
+                    "al.tap_time, al.tx_hash, al.block_number, al.created_at "
+                    "FROM attendance_logs al "
+                    "WHERE al.sess_id = ? "
+                    "  AND al.status IN ('present','late') "
+                    "  AND al.created_at > ? "
+                    "ORDER BY al.created_at ASC",
+                    (sess_id, since_dt)
+                ).fetchall()
 
         for row in tap_rows:
             try:
@@ -3931,24 +4842,54 @@ def poll_session(sess_id):
             })
 
         # Warnings/invalids from in-memory (not in DB) — use in-memory session
-        mem_sess = sessions_db.get(sess_id, sess)
-        new_warnings = [t for t in mem_sess.get('warn_log', [])
-                        if t.get('timestamp', 0) > since_buffered]
-        new_invalids = [t for t in mem_sess.get('invalid_log', [])
-                        if t.get('timestamp', 0) > since_buffered]
+        if is_school_event:
+            merged_warn = []
+            merged_invalid = []
+            for rs in related_sessions:
+                merged_warn.extend(rs.get('warn_log', []))
+                merged_invalid.extend(rs.get('invalid_log', []))
+            new_warnings = [t for t in merged_warn if t.get('timestamp', 0) > since_buffered]
+            new_invalids = [t for t in merged_invalid if t.get('timestamp', 0) > since_buffered]
+        else:
+            mem_sess = sessions_db.get(sess_id, sess)
+            new_warnings = [t for t in mem_sess.get('warn_log', [])
+                            if t.get('timestamp', 0) > since_buffered]
+            new_invalids = [t for t in mem_sess.get('invalid_log', [])
+                            if t.get('timestamp', 0) > since_buffered]
+
+    present_ids = []
+    late_ids = []
+    excused_ids = []
+    warned_ids = []
+    if is_school_event:
+        ps, ls, es, ws = set(), set(), set(), set()
+        for rs in related_sessions:
+            ps.update(rs.get('present', []))
+            ls.update(rs.get('late', []))
+            es.update(rs.get('excused', []))
+            ws.update(rs.get('warned', []))
+        present_ids = list(ps)
+        late_ids = list(ls)
+        excused_ids = list(es)
+        warned_ids = list(ws)
+    else:
+        present_ids = list(sess.get('present', []))
+        late_ids = list(sess.get('late', []))
+        excused_ids = list(sess.get('excused', []))
+        warned_ids = list(sess.get('warned', []))
 
     return jsonify({
-        'present_count': len(sess.get('present', [])),
-        'late_count':    len(sess.get('late', [])),
-        'excused_count': len(sess.get('excused', [])),
-        'warned_count':  len(sess.get('warned', [])),
+        'present_count': len(present_ids),
+        'late_count':    len(late_ids),
+        'excused_count': len(excused_ids),
+        'warned_count':  len(warned_ids),
         'new_taps':      new_taps,
         'new_warnings':  new_warnings,
         'new_invalids':  new_invalids,
-        'active':        not sess.get('ended_at'),
-        'late_ids':      sess.get('late', []),
-        'excused_ids':   sess.get('excused', []),
-        'present_ids':   sess.get('present', []),
+        'active':        any(not rs.get('ended_at') for rs in related_sessions),
+        'late_ids':      late_ids,
+        'excused_ids':   excused_ids,
+        'present_ids':   present_ids,
         'server_time':   now_ts,
         'auto_end_at':   sess.get('auto_end_at'),
         'grace_period':  sess.get('grace_period', 15),
@@ -4179,6 +5120,7 @@ def mark_pico():
     data=request.get_json()
     if not data or 'nfc_id' not in data: return jsonify({'status':'error'}), 400
     nfc_id=data['nfc_id'].strip().upper()
+    preferred_sess_id = str(data.get('sess_id', '') or '').strip()
     print(f"[NFC TAP] {nfc_id}")
 
     if nfc_is_waiting():
@@ -4203,7 +5145,7 @@ def mark_pico():
                                 'message': 'This student is marked as Excused and cannot tap in.',
                                 'nfc_id': nfc_id})
 
-    sess_id, sess = get_active_session_for_nfc(nfc_id)
+    sess_id, sess = get_active_session_for_nfc(nfc_id, preferred_sess_id=preferred_sess_id)
     if not sess:
         all_s   = get_all_students()
         student = next((s for s in all_s if s['nfcId']==nfc_id), None)
@@ -4237,7 +5179,8 @@ def mark_pico():
     now_dt       = datetime.now()
     late_cutoff  = sess.get('late_cutoff','')
     is_late      = False
-    if late_cutoff:
+    is_school_event = str(sess.get('class_type', 'lecture')).strip().lower() == 'school_event'
+    if (not is_school_event) and late_cutoff:
         try:
             cutoff_dt = datetime.strptime(late_cutoff, '%Y-%m-%d %H:%M:%S')
             is_late   = now_dt > cutoff_dt
@@ -4295,6 +5238,10 @@ def mark_pico():
     tap_time      = datetime.now().strftime('%H:%M:%S')
     tap_timestamp = time.time()
     status_label  = 'late' if is_late else 'present'
+    if is_school_event:
+        # School events only track present/absent.
+        status_label = 'present'
+        is_late = False
 
     # Save to attendance_logs table
     db_save_attendance_log(
@@ -4325,6 +5272,59 @@ def mark_pico():
     }
     save_session(sess_id, sess)
     sessions_db[sess_id] = sess
+
+    # Keep all teacher-linked school-event sessions synchronized so taps from one
+    # teacher account immediately reflect in other assigned teacher accounts.
+    schedule_meta = _parse_event_schedule_id(sess.get('schedule_id', '')) if is_school_event else None
+    if schedule_meta:
+        pattern = f"event:{schedule_meta['event_id']}:%"
+        with get_db() as conn:
+            sibling_rows = conn.execute(
+                "SELECT sess_id FROM sessions "
+                "WHERE ended_at IS NULL AND class_type='school_event' AND schedule_id LIKE ?",
+                (pattern,),
+            ).fetchall()
+        for sr in sibling_rows:
+            sibling_id = sr['sess_id']
+            if sibling_id == sess_id:
+                continue
+            sibling = load_session(sibling_id)
+            if not sibling or sibling.get('ended_at'):
+                continue
+            db_save_attendance_log(
+                sess_id=sibling_id,
+                nfc_id=nfc_id,
+                student_name=name,
+                student_id=student_id,
+                status='present',
+                tap_time=tap_time_db,
+                tx_hash=tx_hash or '',
+                block_number=block_num or 0,
+                class_type='school_event',
+            )
+            if nfc_id not in sibling.get('present', []):
+                sibling.setdefault('present', []).append(nfc_id)
+            if nfc_id in sibling.get('late', []):
+                sibling['late'].remove(nfc_id)
+            sibling.setdefault('tap_log', []).append(
+                {
+                    'nfc_id': nfc_id,
+                    'name': name,
+                    'time': tap_time,
+                    'timestamp': tap_timestamp,
+                    'tx_hash': tx_hash,
+                    'block': block_num,
+                    'student_id': student_id,
+                    'is_late': False,
+                }
+            )
+            sibling.setdefault('tx_hashes', {})[nfc_id] = {
+                'tx_hash': tx_hash,
+                'block': block_num,
+                'time': tap_time,
+            }
+            save_session(sibling_id, sibling)
+            sessions_db[sibling_id] = sibling
 
     recent_attendance.append({
         'nfc_id':    nfc_id,
@@ -4608,7 +5608,7 @@ def admin_create_instructor():
             initial_password=password,
         )
         flash(f'Instructor account "{username}" created successfully.', 'success')
-        return redirect(url_for('manage_users'))
+        return redirect(url_for('dashboard', tab='faculty'))
     return render_template('admin_create_instructor.html')
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -4622,6 +5622,7 @@ def admin_schedules():
         db_get_all_schedules=db_get_all_schedules,
         db_get_all_subjects=db_get_all_subjects,
         db_get_all_users=db_get_all_users,
+        db_get_all_no_class_days=db_get_all_no_class_days,
         get_all_section_keys=_get_all_section_keys,
         session_obj=session,
         render_template=render_template,
@@ -4644,6 +5645,116 @@ def admin_schedule_create():
         db_save_schedule=db_save_schedule,
         session_obj=session,
     )
+
+
+@app.route('/admin/event-schedules/create', methods=['POST'])
+@admin_required
+def admin_event_schedule_create():
+    try:
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        start_dt_local = request.form.get('start_at', '').strip()
+        end_dt_local = request.form.get('end_at', '').strip()
+        teachers_csv = request.form.get('selected_teachers', '').strip()
+        sections_csv = request.form.get('selected_sections', '').strip()
+
+        if not title:
+            flash('Event title is required.', 'danger')
+            return redirect(url_for('admin_schedules'))
+        if not start_dt_local or not end_dt_local:
+            flash('Event start and end date/time are required.', 'danger')
+            return redirect(url_for('admin_schedules'))
+
+        try:
+            start_dt = datetime.strptime(start_dt_local, '%Y-%m-%dT%H:%M')
+            end_dt = datetime.strptime(end_dt_local, '%Y-%m-%dT%H:%M')
+        except Exception:
+            flash('Invalid event date/time format.', 'danger')
+            return redirect(url_for('admin_schedules'))
+
+        if end_dt <= start_dt:
+            flash('Event end time must be later than start time.', 'danger')
+            return redirect(url_for('admin_schedules'))
+
+        teacher_usernames = [u.strip() for u in teachers_csv.split(',') if u.strip()]
+        section_keys = [normalize_section_key(s.strip()) for s in sections_csv.split(',') if s.strip()]
+        if not teacher_usernames:
+            flash('Please add at least one teacher for the event.', 'danger')
+            return redirect(url_for('admin_schedules'))
+        if not section_keys:
+            flash('Please add at least one section for the event.', 'danger')
+            return redirect(url_for('admin_schedules'))
+
+        db_save_event_schedule(
+            {
+                'title': title,
+                'description': description,
+                'teacher_usernames': teacher_usernames,
+                'section_keys': section_keys,
+                'start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'created_by': session.get('username', ''),
+            }
+        )
+        flash('School event schedule created successfully.', 'success')
+    except Exception as exc:
+        flash(f'Error creating event schedule: {exc}', 'danger')
+    return redirect(url_for('admin_schedules'))
+
+
+@app.route('/admin/no-class-days/create', methods=['POST'])
+@admin_required
+def admin_no_class_day_create():
+    try:
+        title = request.form.get('title', '').strip()
+        description = request.form.get('description', '').strip()
+        from_date = request.form.get('from_date', '').strip()
+        to_date = request.form.get('to_date', '').strip()
+
+        if not title:
+            flash('No-class title is required.', 'danger')
+            return redirect(url_for('admin_schedules'))
+        if not from_date or not to_date:
+            flash('No-class date range is required.', 'danger')
+            return redirect(url_for('admin_schedules'))
+
+        try:
+            fd = datetime.strptime(from_date, '%Y-%m-%d').date()
+            td = datetime.strptime(to_date, '%Y-%m-%d').date()
+        except Exception:
+            flash('Invalid no-class date format.', 'danger')
+            return redirect(url_for('admin_schedules'))
+
+        if td < fd:
+            flash('No-class end date must be on or after start date.', 'danger')
+            return redirect(url_for('admin_schedules'))
+
+        db_save_no_class_day(
+            {
+                'title': title,
+                'description': description,
+                'from_date': fd.strftime('%Y-%m-%d'),
+                'to_date': td.strftime('%Y-%m-%d'),
+                'teacher_usernames': [u.strip() for u in request.form.get('selected_teachers', '').split(',') if u.strip()],
+                'apply_all_teachers': bool(request.form.get('apply_all_teachers')),
+                'created_by': session.get('username', ''),
+            }
+        )
+        flash('No-class date range saved successfully.', 'success')
+    except Exception as exc:
+        flash(f'Error saving no-class date range: {exc}', 'danger')
+    return redirect(url_for('admin_schedules'))
+
+
+@app.route('/admin/no-class-days/<int:no_class_day_id>/delete', methods=['POST'])
+@admin_required
+def admin_no_class_day_delete(no_class_day_id):
+    try:
+        db_delete_no_class_day(no_class_day_id)
+        flash('No-class range removed successfully.', 'success')
+    except Exception as exc:
+        flash(f'Error removing no-class range: {exc}', 'danger')
+    return redirect(url_for('admin_schedules'))
 
 @app.route('/admin/schedules/<schedule_id>/edit', methods=['POST'])
 @admin_required

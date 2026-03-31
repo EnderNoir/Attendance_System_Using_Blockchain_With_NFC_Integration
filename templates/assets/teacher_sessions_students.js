@@ -4,6 +4,13 @@
   let currentStudName = null;
   const sessCache = {};
 
+  function classTypeLabel(v) {
+    const t = String(v || 'lecture').toLowerCase();
+    if (t === 'laboratory') return 'Laboratory';
+    if (t === 'school_event') return 'School Event';
+    return 'Lecture';
+  }
+
   // ── Readable date formatter ──
   function fmtReadable(dtStr) {
     if (!dtStr) return '—';
@@ -207,6 +214,9 @@
   function renderSessModal(sessId, data) {
     const s = sessionsData[sessId];
     const sts = data.students || [];
+    const classType = String(s.class_type || data.class_type || 'lecture').toLowerCase();
+    const teachersInvolved = (data.teachers_involved || []).join(', ') || (s.teacher_name || '-');
+    const sectionsInvolved = (data.sections_involved || []).map((x) => String(x || '').replace(/\|/g, ' · ')).join(', ') || ((s.section_key || '').replace(/\|/g, ' · '));
     const cnt = { present: 0, late: 0, absent: 0, excused: 0 };
     sts.forEach(st => { if (cnt[st.status] !== undefined) cnt[st.status]++; });
 
@@ -214,8 +224,16 @@
     document.getElementById('sm_info_grid').innerHTML = `
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-book"></i> Subject</div>
       <div class="sm-info-val">${s.subject_name}${s.course_code ? ' <code style="font-size:10px;">[' + s.course_code + ']</code>' : ''}</div></div>
+    <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-collection"></i> Class Type</div>
+      <div class="sm-info-val">${classTypeLabel(s.class_type || data.class_type || 'lecture')}</div></div>
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-grid"></i> Section</div>
       <div class="sm-info-val">${(s.section_key || '').replace(/\|/g, ' · ')}</div></div>
+    ${classType === 'school_event' ? `
+    <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-people"></i> Teachers Involved</div>
+      <div class="sm-info-val">${teachersInvolved}</div></div>
+    <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-diagram-3"></i> Sections Involved</div>
+      <div class="sm-info-val">${sectionsInvolved}</div></div>
+    ` : ''}
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-clock"></i> Time Slot</div>
       <div class="sm-info-val">${s.time_slot || '—'}</div></div>
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-people"></i> Total Enrolled</div>
@@ -254,6 +272,7 @@
         <th style="width:32px;">#</th>
         <th>Student Name</th>
         <th>Student ID</th>
+        <th>${classType === 'school_event' ? 'Program-Year-Section' : 'Class Type'}</th>
         <th>Status</th>
         <th>Date</th>
         <th>Time</th>
@@ -279,6 +298,9 @@
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '—'}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '—'}</td>
+            <td>${classType === 'school_event'
+              ? `<span style="font-size:11px;color:var(--muted);">${st.section_origin || '—'}</span>`
+              : `<span class="att-status st-excused">${classTypeLabel(st.class_type || s.class_type || data.class_type || 'lecture')}</span>`}</td>
             <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || '—'}</span></td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.date}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
@@ -350,6 +372,9 @@
         <th>#</th>
         <th>Course Code</th>
         <th>Subject Name</th>
+        <th>Class Type</th>
+        <th>Status</th>
+        <th>Tap Time</th>
         <th>Date</th>
         <th>Time Slot</th>
         <th>Excused Reason</th>
@@ -369,6 +394,9 @@
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${i + 1}</td>
             <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
             <td><span style="font-weight:600;">${s.subject_name || '—'}</span></td>
+            <td><span class="att-status st-excused">${classTypeLabel(s.class_type || 'lecture')}</span></td>
+            <td><span class="att-status ${stCls[s.status] || 'st-absent'}">${stLbl[s.status] || '—'}</span></td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? normalizeTimeToAmPm(s.tap_time) : '—'}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${pickHistoryDate(s)}</td>
             <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || s.tap_time || '')}</td>
             <td style="font-size:11px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>

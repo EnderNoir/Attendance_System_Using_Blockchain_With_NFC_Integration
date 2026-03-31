@@ -26,6 +26,15 @@
             <i class="bi bi-search sched-search-icon"></i>
             <div class="sched-search-dropdown" id="schedSearchDrop"></div>
         </div>
+        <div class="teacher-filter-row">
+            <input list="programOptions" type="text" id="tfProgram" class="sched-mini-input" placeholder="Program" oninput="applyTeacherFilters()">
+            <datalist id="programOptions"></datalist>
+            <input list="yearOptions" type="text" id="tfYear" class="sched-mini-input" placeholder="Year" oninput="applyTeacherFilters()">
+            <datalist id="yearOptions"></datalist>
+            <input list="sectionOptions" type="text" id="tfSection" class="sched-mini-input" placeholder="Section" oninput="applyTeacherFilters()">
+            <datalist id="sectionOptions"></datalist>
+            <button type="button" class="btn-outline" onclick="resetTeacherFilters()" style="height:36px;">Reset</button>
+        </div>
     </div>
 </div>
 
@@ -60,7 +69,6 @@
     <div class="modal-box">
         <div class="modal-header-custom">
             <h3><i class="bi bi-calendar-event"></i> Schedule Details</h3>
-            <button class="modal-close-btn" onclick="closeSchedModal()">✕</button>
         </div>
         <div class="modal-body-custom">
             <div
@@ -94,6 +102,10 @@
                 <span class="info-val-m" id="infoDayTime">—</span>
             </div>
             <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-collection"></i> Class Type</span>
+                <span class="info-val-m" id="infoClassType">—</span>
+            </div>
+            <div class="info-row-m">
                 <span class="info-lbl-m"><i class="bi bi-hourglass-split"></i> Grace Period</span>
                 <span class="info-val-m" id="infoGrace">—</span>
             </div>
@@ -107,6 +119,56 @@
                     <i class="bi bi-broadcast"></i> Monitor Live
                 </a>
                 <button class="btn-outline" onclick="closeSchedModal()"><i class="bi bi-x"></i> Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop-custom" id="slotModal" onclick="if(event.target===this)closeSlotModal()">
+    <div class="modal-box">
+        <div class="modal-header-custom">
+            <h3><i class="bi bi-collection"></i> Schedule Slot Details</h3>
+            <button class="modal-close-btn" onclick="closeSlotModal()">x</button>
+        </div>
+        <div class="modal-body-custom">
+            <div class="slot-summary" id="slotSummary">-</div>
+            <div class="pm-tab-bar" style="margin-bottom:12px;">
+                <button class="pm-tab active-tab" id="slot-tab-current" type="button" onclick="switchSlotTab('current')">Current Schedules</button>
+                <button class="pm-tab" id="slot-tab-archive" type="button" onclick="switchSlotTab('archive')">Archived Schedules</button>
+            </div>
+            <div id="slotPaneCurrent" class="slot-pane active">
+                <div class="slot-search-wrap">
+                    <input type="text" id="slotCurrentSearch" class="ac-input" placeholder="Search subject or instructor..." autocomplete="off" oninput="onSlotSearchInput('current')" onfocus="onSlotSearchInput('current')">
+                    <div class="ac-dropdown" id="slotCurrentSearchDrop">
+                        <table class="ac-table">
+                            <thead>
+                                <tr>
+                                    <th class="ac-th">Subject</th>
+                                    <th class="ac-th">Instructor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slotCurrentSearchBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="slotCurrentList"></div>
+            </div>
+            <div id="slotPaneArchive" class="slot-pane">
+                <div class="slot-search-wrap">
+                    <input type="text" id="slotArchiveSearch" class="ac-input" placeholder="Search subject or instructor..." autocomplete="off" oninput="onSlotSearchInput('archive')" onfocus="onSlotSearchInput('archive')">
+                    <div class="ac-dropdown" id="slotArchiveSearchDrop">
+                        <table class="ac-table">
+                            <thead>
+                                <tr>
+                                    <th class="ac-th">Subject</th>
+                                    <th class="ac-th">Instructor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slotArchiveSearchBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="slotArchiveList"></div>
             </div>
         </div>
     </div>

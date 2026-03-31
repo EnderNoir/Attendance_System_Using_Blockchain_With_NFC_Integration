@@ -74,10 +74,10 @@
     <div>
       {% if is_active %}
       <div class="live-badge" style="margin-bottom:10px;">
-        <div class="live-dot"></div> LIVE CLASS
+        <div class="live-dot"></div> {% if is_school_event %}LIVE SCHOOL EVENT{% else %}LIVE CLASS{% endif %}
       </div>
       {% else %}
-      <div class="ended-badge" style="margin-bottom:10px;"><i class="bi bi-check-circle"></i> CLASS ENDED</div>
+      <div class="ended-badge" style="margin-bottom:10px;"><i class="bi bi-check-circle"></i> {% if is_school_event %}EVENT ENDED{% else %}CLASS ENDED{% endif %}</div>
       {% endif %}
       <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);margin-bottom:4px;">
         {% if sess.course_code %}[{{ sess.course_code }}]{% endif %}
@@ -88,16 +88,70 @@
       <div style="font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;">
         <span><i class="bi bi-people"></i> {{ sess.section_key.replace('|',' · ') }}</span>
         <span><i class="bi bi-person-badge"></i> {{ sess.teacher_name }}</span>
-        <span><i class="bi bi-clock"></i> Class started {{ fmt_time(sess.started_at) }}</span>
-        {% if sess.late_cutoff %}<span><i class="bi bi-exclamation-triangle"></i> Late after {{
+        <span><i class="bi bi-clock"></i> {% if is_school_event %}Event started{% else %}Class started{% endif %} {{ fmt_time(sess.started_at) }}</span>
+        {% if (not is_school_event) and sess.late_cutoff %}<span><i class="bi bi-exclamation-triangle"></i> Late after {{
           fmt_time_short(sess.late_cutoff) }}</span>{% endif %}
         {% if sess.ended_at %}<span><i class="bi bi-stop-circle"></i> Ended {{ fmt_time(sess.ended_at) }}</span>{% endif
         %}
       </div>
+
+      {% if session_meta %}
+      <div style="margin-top:12px;color:var(--muted);font-size:12px;line-height:1.65;">
+        {{ session_meta.description or 'Attendance session details.' }}
+      </div>
+      <div style="margin-top:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
+          <tbody>
+            <tr>
+              <td style="width:180px;background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Teacher(s)</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ (session_meta.teachers|join(', ')) if session_meta.teachers else '—' }}</td>
+            </tr>
+            <tr>
+              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Program(s)</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ (session_meta.programs|join(', ')) if session_meta.programs else '—' }}</td>
+            </tr>
+            <tr>
+              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Year(s)</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ (session_meta.years|join(', ')) if session_meta.years else '—' }}</td>
+            </tr>
+            <tr>
+              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Section(s)</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ (session_meta.sections|join(', ')) if session_meta.sections else '—' }}</td>
+            </tr>
+            <tr>
+              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Student(s) Involved</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">
+                {% if session_meta.students %}
+                {{ session_meta.students|length }} student{{ 's' if session_meta.students|length != 1 else '' }}
+                {% else %}
+                —
+                {% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Date</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ session_meta.date or '—' }}</td>
+            </tr>
+            <tr>
+              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Start Time</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ session_meta.start_time or '—' }}</td>
+            </tr>
+            <tr>
+              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">End Time</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ session_meta.end_time or '—' }}</td>
+            </tr>
+            <tr>
+              <td style="background:rgba(255,255,255,.03);padding:9px 12px;color:var(--muted);font-weight:700;vertical-align:top;">Class Type</td>
+              <td style="padding:9px 12px;word-break:break-word;">{{ session_meta.class_type or '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
       <a href="{{ url_for('teacher_dashboard') }}" class="btn-outline-sm"><i class="bi bi-arrow-left"></i> Back</a>
-      {% if is_active and session.get('role') != 'admin' %}
+      {% if is_active and session.get('role') != 'admin' and can_end_early %}
       <button type="button" class="btn-end" onclick="openEndModal()">
         <i class="bi bi-stop-fill"></i> End Class Session
       </button>
@@ -128,12 +182,20 @@
 <div class="scan-indicator">
   <span class="scan-icon">📡</span>
   <div>
-    <div style="font-weight:600;font-size:14px;color:var(--success);">NFC Reader Active — Accepting Student Taps</div>
+    <div style="font-weight:600;font-size:14px;color:var(--success);">{% if is_school_event %}NFC Reader Active — Accepting Event Attendance Taps{% else %}NFC Reader Active — Accepting Student Taps{% endif %}</div>
     <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+      {% if is_school_event %}
+      Students in the assigned event sections can tap their NFC card to mark attendance.
+      {% else %}
       Students in <strong style="color:var(--text);">{{ sess.section_key.replace('|',' · ') }}</strong>
       can tap their NFC card to mark their classroom attendance.
+      {% endif %}
+      {% if is_school_event %}
+      Attendance mode: <strong style="color:var(--success);">Present / Absent only</strong>.
+      {% else %}
       Students are marked <strong style="color:var(--warning);">Late</strong> after {{ sess.grace_period or 15 }}
       minutes.
+      {% endif %}
     </div>
   </div>
 </div>
@@ -176,11 +238,13 @@
       student_statuses|selectattr('status','equalto','present')|list|length }}</div>
     <div class="sl">Present</div>
   </div>
+  {% if not is_school_event %}
   <div class="stat-mini">
     <div class="sv" style="color:var(--warning);" id="sc_late">{{
       student_statuses|selectattr('status','equalto','late')|list|length }}</div>
     <div class="sl">Late</div>
   </div>
+  {% endif %}
   <div class="stat-mini">
     <div class="sv" style="color:var(--danger);" id="sc_absent">{{
       student_statuses|selectattr('status','equalto','absent')|list|length }}</div>
@@ -243,9 +307,13 @@
         style="background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 10px;font-size:12px;font-family:'DM Sans',sans-serif;appearance:none;cursor:pointer;">
         <option value="">All</option>
         <option value="present">Present</option>
+        {% if not is_school_event %}
         <option value="late">Late</option>
+        {% endif %}
         <option value="absent">Absent</option>
+        {% if not is_school_event %}
         <option value="excused">Excused</option>
+        {% endif %}
       </select>
     </div>
     <div style="padding:12px 20px 0;">
@@ -281,7 +349,7 @@
           {% elif s.status == 'absent' %}✕ Absent
           {% else %}— Unknown{% endif %}
         </span>
-        {% if is_active %}
+        {% if is_active and not is_school_event %}
         <button class="btn-excuse {% if s.status in ('absent','present','late') %}show-excuse{% endif %}"
           id="sexc_{{ s.nfcId }}" onclick="openExcuse('{{ s.nfcId }}','{{ s.name|e }}')" title="Mark as Excused"
           style="{% if s.status == 'excused' %}display:none;{% endif %}">

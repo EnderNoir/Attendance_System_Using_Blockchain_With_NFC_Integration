@@ -4,6 +4,8 @@ const DASHBOARD_BOOTSTRAP = window.DASHBOARD_BOOTSTRAP || {};
 const RAW_STUDENTS = Array.isArray(DASHBOARD_BOOTSTRAP.students) ? DASHBOARD_BOOTSTRAP.students : [];
 const RAW_TEACHERS = DASHBOARD_BOOTSTRAP.teachers || {};
 const PHOTO_MAP = DASHBOARD_BOOTSTRAP.photos || {};
+const CURRENT_ROLE = String(DASHBOARD_BOOTSTRAP.currentRole || '').toLowerCase();
+const CURRENT_USERNAME = String(DASHBOARD_BOOTSTRAP.currentUsername || '');
 
 const studentData = RAW_STUDENTS.map((s, idx) => {
   const nfc = s.nfcId || s.nfc_id || '';
@@ -262,10 +264,15 @@ function openStudentRecord(idx){
     `<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;">Switch to this tab to load session history.</div>`;
   document.getElementById('sessCountLabel').textContent = '';
   document.getElementById('sessSubject').innerHTML = '<option value="">All Subjects</option>';
+  const classTypeSel = document.getElementById('sessClassType');
+  if (classTypeSel) classTypeSel.value = '';
 
   // Show sessions tab for students
+  if (document.getElementById('mtab_action')) document.getElementById('mtab_action').style.display='none';
   document.querySelectorAll('.mtab')[2].style.display='';
   document.getElementById('mpane-sessions').style.display='';
+  document.getElementById('mpane-action').style.display='none';
+  document.getElementById('actionContent').innerHTML='';
 
   // Reset to Info tab
   document.querySelectorAll('.mpane').forEach(p=>p.classList.remove('active'));
@@ -403,6 +410,7 @@ function renderSessions(sessions){
         <tr>
           <th>Course Code</th>
           <th>Subject Name</th>
+          <th>Class Type</th>
           <th>Instructor Name</th>
           <th>Date</th>
           <th>Time Slot</th>
@@ -417,6 +425,8 @@ function renderSessions(sessions){
         ${sessions.map((s) => {
           const sbClass = `sb-${s.status}`;
           const statusLabel = s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : '-';
+          const classType = String(s.class_type || 'lecture').toLowerCase();
+          const classTypeLabel = classType === 'laboratory' ? 'Laboratory' : 'Lecture';
           const doc = s.attachment_url
             ? `<a href="${s.attachment_url}" target="_blank" class="sess-doc-link"><i class="bi bi-paperclip"></i> View</a>`
             : '<span class="muted-dash">-</span>';
@@ -429,6 +439,7 @@ function renderSessions(sessions){
           return `<tr>
             <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span class="muted-dash">-</span>'}</td>
             <td style="font-weight:600;">${s.subject_name || '-'}</td>
+            <td><span class="status-badge ${classType === 'laboratory' ? 'sb-excused' : 'sb-present'}">${classTypeLabel}</span></td>
             <td>${s.teacher_name || '-'}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;">${pickSessionDate(s)}</td>
             <td style="font-size:11px;color:var(--muted);">${formatTimeSlot(s.time_slot || s.tap_time || '')}</td>
@@ -448,10 +459,12 @@ function filterSessions(){
   const q    = (document.getElementById('sessSearch').value||'').toLowerCase();
   const st   = document.getElementById('sessStatus').value;
   const subj = document.getElementById('sessSubject').value;
+  const classType = document.getElementById('sessClassType').value;
   const filtered = allSessions.filter(s=>
     (!q    || s.subject_name.toLowerCase().includes(q) || (s.teacher_name||'').toLowerCase().includes(q)) &&
     (!st   || s.status === st) &&
-    (!subj || s.subject_name === subj)
+    (!subj || s.subject_name === subj) &&
+    (!classType || (String(s.class_type || 'lecture').toLowerCase() === classType))
   );
   renderSessions(filtered);
 }
@@ -460,6 +473,7 @@ function resetSessFilters(){
   document.getElementById('sessSearch').value='';
   document.getElementById('sessStatus').value='';
   document.getElementById('sessSubject').value='';
+  document.getElementById('sessClassType').value='';
   renderSessions(allSessions);
 }
 
@@ -473,9 +487,11 @@ function exportStudentSessions(){
   const fname = `${lastName}_${firstName}_attendance_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}.xlsx`;
   const q    = document.getElementById('sessStatus').value;
   const subj = document.getElementById('sessSubject').value;
+  const classType = document.getElementById('sessClassType').value;
   let url = `/export/student_sessions/${s.nfc}?name=${encodeURIComponent(s.name)}&filename=${encodeURIComponent(fname)}`;
   if(q)    url += `&status=${encodeURIComponent(q)}`;
   if(subj) url += `&subject=${encodeURIComponent(subj)}`;
+  if(classType) url += `&class_type=${encodeURIComponent(classType)}`;
   window.location.href = url;
 }
 
@@ -567,6 +583,7 @@ function openTeacherRecord(username){
 
   const roleOpts   = ['teacher','admin'].map(v=>`<option value="${v}" ${u.role===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
   const statusOpts = ['approved','pending','rejected'].map(v=>`<option value="${v}" ${u.status===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
+  const canChangeRole = CURRENT_ROLE === 'super_admin';
 
   const tEditPhotoInner = u.photo
     ? `<img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`
@@ -595,10 +612,13 @@ function openTeacherRecord(username){
         <input class="upd-input" id="tf_email" value="${u.email||''}"/>
       </div>
       <div class="upd-field"><span class="upd-label">Role</span>
-        <select class="upd-input" id="tf_role" style="appearance:none;">${roleOpts}</select>
+        ${canChangeRole
+          ? `<select class="upd-input" id="tf_role" style="appearance:none;">${roleOpts}</select>`
+          : `<input class="upd-input" id="tf_role" value="${u.role.charAt(0).toUpperCase()+u.role.slice(1)}" readonly/>`
+        }
       </div>
       <div class="upd-field"><span class="upd-label">Account Status</span>
-        <select class="upd-input" id="tf_status" style="appearance:none;">${statusOpts}</select>
+        <input class="upd-input" id="tf_status" value="${u.status.charAt(0).toUpperCase()+u.status.slice(1)}" readonly/>
       </div>
       <div class="upd-field"><span class="upd-label">Registered</span>
         <input class="upd-input" value="${u.created||'-'}" readonly/>
@@ -619,8 +639,22 @@ function openTeacherRecord(username){
     <div id="dashSectionGrid">${buildSectionGrid(u.sections || [])}</div>`;
 
   // Hide sessions tab for teachers
+  document.getElementById('mtab_action').style.display='';
   document.querySelectorAll('.mtab')[2].style.display='none';
   document.getElementById('mpane-sessions').style.display='none';
+  document.getElementById('mpane-action').style.display='';
+
+  const canDelete = CURRENT_ROLE === 'super_admin' || CURRENT_ROLE === 'admin';
+  const canDeleteThisUser = canDelete && username !== CURRENT_USERNAME && username !== 'admin';
+  document.getElementById('actionContent').innerHTML = canDeleteThisUser
+    ? `<div style="border:1px dashed rgba(239,68,68,.35);border-radius:12px;padding:16px;background:rgba(239,68,68,.06);">
+        <div style="font-size:14px;font-weight:700;color:var(--danger);margin-bottom:8px;"><i class="bi bi-exclamation-triangle"></i> Danger Zone</div>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Deleting this account permanently removes faculty access.</p>
+        <button class="btn-rst" style="border-color:var(--danger);color:var(--danger);" onclick="deleteFacultyAccount('${u.username}','${(u.name || '').replace(/'/g, "\\'")}')">
+          <i class="bi bi-trash"></i> Delete Account
+        </button>
+      </div>`
+    : '<div style="font-size:12px;color:var(--muted);">No account actions available for this user.</div>';
 
   // Reset to Info tab
   document.querySelectorAll('.mpane').forEach(p=>p.classList.remove('active'));
@@ -687,7 +721,7 @@ function saveTeacherUpdate(){
   if(pwErr) pwErr.style.display='none';
   const g=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
   const payload={username:curId,full_name:g('tf_name'),new_username:g('tf_username'),
-    email:g('tf_email'),role:g('tf_role'),status:g('tf_status'),new_password:pw||null,
+    email:g('tf_email'),role:(CURRENT_ROLE==='super_admin'?g('tf_role').toLowerCase():''),status:'',new_password:pw||null,
     sections:getSelectedSections()};
   btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass"></i> Saving...';
   fetch('/update_faculty',{method:'POST',credentials:'same-origin',
@@ -736,18 +770,45 @@ const totalTc=Object.keys(teacherData).length;
 function filterTeachers(){
   const q=document.getElementById('tc_search').value.toLowerCase();
   const role=document.getElementById('tc_role').value;
-  const st=document.getElementById('tc_status').value;
   let shown=0;
   document.querySelectorAll('#facultyList .person-row').forEach(r=>{
     const m=(!q||r.dataset.name.includes(q)||r.dataset.username.includes(q))&&
-            (!role||r.dataset.role===role)&&(!st||r.dataset.status===st);
+            (!role||r.dataset.role===role);
     r.style.display=m?'':'none'; if(m)shown++;
   });
   document.getElementById('tc_count').textContent=`${shown} of ${totalTc} faculty`;
 }
 function resetTeacherFilters(){
-  ['tc_search','tc_role','tc_status'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['tc_search','tc_role'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   filterTeachers();
 }
+
+async function deleteFacultyAccount(username, fullName) {
+  if (!username) return;
+  const ok = await showAppConfirm(
+    `Delete account for ${fullName || username}? This cannot be undone.`,
+    'Delete Faculty Account',
+    'Delete',
+    'Cancel'
+  );
+  if (!ok) return;
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = `/admin/users/${encodeURIComponent(username)}/delete`;
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function applyInitialDashboardTab() {
+  const params = new URLSearchParams(window.location.search || '');
+  const tab = String(params.get('tab') || '').toLowerCase();
+  if (tab !== 'faculty') return;
+  const facultyBtn = Array.from(document.querySelectorAll('.tab-btn')).find((b) =>
+    String(b.textContent || '').toLowerCase().includes('faculty')
+  );
+  if (facultyBtn) switchTab('faculty', facultyBtn);
+}
+
+applyInitialDashboardTab();
 
 fetch('/api/block_number').then(r=>r.json()).then(d=>{if(d.block!==undefined)document.getElementById('blockNum').textContent=d.block;}).catch(()=>{});

@@ -20,6 +20,7 @@ def attendance_stats_impl(
     f_sec_ltr = request_obj.args.get('section_letter', '').strip()
     f_instr = request_obj.args.get('instructor', '').strip()
     f_tod = request_obj.args.get('time_of_day', '').strip()
+    f_class_type = request_obj.args.get('class_type', '').strip().lower()
     role = session_obj.get('role')
     username = session_obj.get('username')
     now = datetime.now()
@@ -70,6 +71,9 @@ def attendance_stats_impl(
     if f_instr:
         where.append('s.teacher_name = ?')
         params.append(f_instr)
+    if f_class_type in ('lecture', 'laboratory', 'school_event'):
+        where.append('LOWER(COALESCE(s.class_type,\'lecture\')) = ?')
+        params.append(f_class_type)
     if f_tod == 'morning':
         where.append("CAST(strftime('%H',s.started_at) AS INTEGER) < 12")
     elif f_tod == 'afternoon':

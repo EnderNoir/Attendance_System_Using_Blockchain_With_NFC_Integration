@@ -109,6 +109,7 @@
         <div class="sc-meta">
           <span><i class="bi bi-grid"></i> {{ s.section_key.replace('|',' · ') }}</span>
           <span><i class="bi bi-clock"></i> {{ s.time_slot or '—' }}</span>
+          <span><i class="bi bi-collection"></i> {{ s.get('class_type','lecture')|replace('_',' ')|title }}</span>
           <span><i class="bi bi-play-circle"></i> Started {{ fmt_time(s.started_at) }}</span>
         </div>
         <div class="sc-badges">
@@ -186,7 +187,7 @@
     <div class="session-card" id="sc_{{ sid }}" data-subj="{{ s.subject_name|lower }}"
       data-section="{{ s.section_key|lower }}" data-program="{{ (sparts[0] if sparts|length > 0 else '')|lower }}"
       data-year="{{ (sparts[1] if sparts|length > 1 else '')|lower }}"
-      data-sec="{{ ('|' ~ sparts[2]|lower) if sparts|length > 2 else '' }}" onclick="openSessModal('{{ sid }}')">
+      data-sec="{{ ('|' ~ sparts[2]|lower) if sparts|length > 2 else '' }}" data-classtype="{{ s.get('class_type','lecture')|lower }}" onclick="openSessModal('{{ sid }}')">
       <div class="sc-top">
         <div class="sc-info">
           <div class="sc-title">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {%
@@ -194,6 +195,7 @@
           <div class="sc-meta">
             <span><i class="bi bi-grid"></i> {{ s.section_key.replace('|',' · ') }}</span>
             <span><i class="bi bi-clock"></i> {{ s.time_slot or '—' }}</span>
+            <span><i class="bi bi-collection"></i> {{ s.get('class_type','lecture')|replace('_',' ')|title }}</span>
             <!-- Readable date format -->
             <span><i class="bi bi-calendar3"></i> {{ fmt_time(s.started_at) }}</span>
           </div>
@@ -220,8 +222,7 @@
   {% elif not live %}
   <div class="empty-state">
     <i class="bi bi-journal-x"></i>No sessions yet.
-    <a href="{{ url_for('teacher_create_session') }}" style="color:var(--accent);display:block;margin-top:8px;">Start
-      your first session →</a>
+    <a href="{{ url_for('teacher_schedule') }}" style="color:var(--accent);display:block;margin-top:8px;">Check your schedule for the next class →</a>
   </div>
   {% endif %}
 </div>

@@ -25,7 +25,9 @@
       <div class="sched-search-dropdown" id="schedSearchDrop"></div>
     </div>
     {% if can_manage_schedules %}
-    <button class="btn-primary" onclick="openAddModal()"><i class="bi bi-plus-lg"></i> Add Schedule</button>
+    <button class="btn-outline" onclick="openNoClassModal()"><i class="bi bi-calendar2-x"></i> Add No-Class Range</button>
+    <button class="btn-primary" onclick="openAddModal()"><i class="bi bi-plus-lg"></i> Add Class Schedule</button>
+    <button class="btn-outline" onclick="openEventModal()"><i class="bi bi-calendar-plus"></i> Add Event Schedule</button>
     {% endif %}
   </div>
 </div>
@@ -51,7 +53,7 @@
 <div style="text-align:center;padding:48px 0;color:var(--muted);">
   <i class="bi bi-calendar-x" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3;"></i>
   <div style="font-size:14px;font-weight:600;">No schedules found.</div>
-  {% if can_manage_schedules %}<div style="font-size:12px;margin-top:6px;">Click <b>Add Schedule</b> to create one.</div>{%
+  {% if can_manage_schedules %}<div style="font-size:12px;margin-top:6px;">Click <b>Add Class Schedule</b> to create one.</div>{%
   endif %}
 </div>
 {% endif %}
@@ -106,15 +108,17 @@
             id="infoSectionName">-</span></div>
         <div class="pm-info-row"><span class="pm-info-lbl">Day & Time</span><span class="pm-info-val"
             id="infoDayTime">-</span></div>
+        <div class="pm-info-row"><span class="pm-info-lbl">Class Type</span><span class="pm-info-val"
+          id="infoClassType">-</span></div>
         <div class="pm-info-row"><span class="pm-info-lbl">Grace Period</span><span class="pm-info-val"
             id="infoGrace">-</span></div>
         <div class="pm-info-row"><span class="pm-info-lbl">Next Class</span><span class="pm-info-val"
             id="infoNextClass">-</span></div>
         <div class="pm-info-row" style="border-bottom:none;">
-          <span class="pm-info-lbl">Recurring</span>
-          <span class="pm-info-val"><span
+          <span class="pm-info-lbl" id="infoPatternLbl">Schedule Pattern</span>
+          <span class="pm-info-val" id="infoPatternVal"><span
               style="background:rgba(45,106,39,.1);color:var(--success);border:1px solid rgba(45,106,39,.25);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;"><i
-                class="bi bi-arrow-repeat"></i> Auto-Recurring</span></span>
+                class="bi bi-arrow-repeat"></i> Weekly Recurring</span></span>
         </div>
 
         <div style="margin-top:20px;text-align:center;">
@@ -177,6 +181,11 @@
             <select class="ac-input mb-2" name="day_of_week" id="editDay">
               {% for d in dow_list %}<option value="{{ loop.index0 }}">{{ d }}</option>{% endfor %}
             </select>
+            <select class="ac-input mb-2" name="class_type" id="editClassType">
+              <option value="lecture">Lecture</option>
+              <option value="laboratory">Laboratory</option>
+              <option value="school_event">School Event</option>
+            </select>
             <div class="time-row">
               <input type="time" name="start_time" id="editStartTime" class="time-input" required>
               <input type="time" name="end_time" id="editEndTime" class="time-input" required>
@@ -207,6 +216,74 @@
       </div>
       {% endif %}
 
+    </div>
+  </div>
+</div>
+
+<!-- -- GROUPED SLOT MODAL -- -->
+<div class="modal-backdrop-custom" id="slotModal" onclick="if(event.target===this)closeSlotModal()">
+  <div class="modal-box">
+    <div class="modal-header-cs">
+      <h3><i class="bi bi-grid-3x3-gap"></i> Schedules In This Time Slot</h3>
+      <button class="modal-close-btn" onclick="closeSlotModal()">x</button>
+    </div>
+    <div class="pm-tab-bar">
+      <button class="pm-tab active-tab" id="slot-tab-current" onclick="switchSlotTab('current')">
+        <i class="bi bi-calendar-check"></i> Current Schedules
+      </button>
+      <button class="pm-tab" id="slot-tab-archive" onclick="switchSlotTab('archive')">
+        <i class="bi bi-archive"></i> Archived Schedules
+      </button>
+    </div>
+    <div class="modal-body-cs">
+      <div id="slotSummary" class="slot-summary"></div>
+      <div id="slotPaneCurrent" class="slot-pane active">
+        <div class="slot-search-wrap">
+          <input type="text" id="slotCurrentSearch" class="ac-input" placeholder="Search subject or instructor..." autocomplete="off" oninput="onSlotSearchInput('current')" onfocus="onSlotSearchInput('current')">
+          <div class="ac-dropdown" id="slotCurrentSearchDrop">
+            <table class="ac-table">
+              <thead>
+                <tr>
+                  <th class="ac-th">Subject</th>
+                  <th class="ac-th">Instructor</th>
+                </tr>
+              </thead>
+              <tbody id="slotCurrentSearchBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="slotCurrentList"></div>
+      </div>
+      <div id="slotPaneArchive" class="slot-pane">
+        <div class="slot-search-wrap">
+          <input type="text" id="slotArchiveSearch" class="ac-input" placeholder="Search subject or instructor..." autocomplete="off" oninput="onSlotSearchInput('archive')" onfocus="onSlotSearchInput('archive')">
+          <div class="ac-dropdown" id="slotArchiveSearchDrop">
+            <table class="ac-table">
+              <thead>
+                <tr>
+                  <th class="ac-th">Subject</th>
+                  <th class="ac-th">Instructor</th>
+                </tr>
+              </thead>
+              <tbody id="slotArchiveSearchBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="slotArchiveList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- -- DAY NO-CLASS DETAILS MODAL -- -->
+<div class="modal-backdrop-custom" id="dayNoClassModal" onclick="if(event.target===this)closeDayNoClassModal()">
+  <div class="modal-box">
+    <div class="modal-header-cs">
+      <h3 id="dayNoClassTitle"><i class="bi bi-calendar2-x"></i> No-Class Day Details</h3>
+      <button class="modal-close-btn" onclick="closeDayNoClassModal()">x</button>
+    </div>
+    <div class="modal-body-cs">
+      <div id="dayNoClassBody"></div>
     </div>
   </div>
 </div>
@@ -290,23 +367,54 @@
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label-sm">Quick Presets</label>
-          <div class="time-presets">
-            <button type="button" class="tp-btn" onclick="applyPreset('add','07:30','09:00')">7:30-9:00</button>
-            <button type="button" class="tp-btn" onclick="applyPreset('add','09:00','10:30')">9:00-10:30</button>
-            <button type="button" class="tp-btn" onclick="applyPreset('add','10:30','12:00')">10:30-12:00</button>
-            <button type="button" class="tp-btn" onclick="applyPreset('add','13:00','14:30')">1:00-2:30</button>
-            <button type="button" class="tp-btn" onclick="applyPreset('add','14:30','16:00')">2:30-4:00</button>
-            <button type="button" class="tp-btn" onclick="applyPreset('add','16:00','17:30')">4:00-5:30</button>
+          <label class="form-label-sm">Class Types *</label>
+          <div class="class-type-row">
+            <label class="class-type-item">
+              <input type="checkbox" id="addLectureEnabled" name="lecture_enabled" checked onchange="toggleClassTypeFields()">
+              <span>Lecture</span>
+            </label>
+            <label class="class-type-item">
+              <input type="checkbox" id="addLabEnabled" name="laboratory_enabled" onchange="toggleClassTypeFields()">
+              <span>Laboratory</span>
+            </label>
           </div>
-          <div class="time-row">
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Lecture Time</label>
+          <div class="time-presets" id="addLecturePresets">
+            <button type="button" class="tp-btn" onclick="applyPreset('addLecture','07:30','09:00')">7:30-9:00</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('addLecture','09:00','10:30')">9:00-10:30</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('addLecture','10:30','12:00')">10:30-12:00</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('addLecture','13:00','14:30')">1:00-2:30</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('addLecture','14:30','16:00')">2:30-4:00</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('addLecture','16:00','17:30')">4:00-5:30</button>
+          </div>
+          <div class="time-row" id="addLectureRow">
             <div>
               <label class="form-label-sm">Start Time *</label>
-              <input type="time" name="start_time" id="addStartTime" class="time-input" required>
+              <input type="time" name="lecture_start_time" id="addLectureStartTime" class="time-input">
             </div>
             <div>
               <label class="form-label-sm">End Time *</label>
-              <input type="time" name="end_time" id="addEndTime" class="time-input" required>
+              <input type="time" name="lecture_end_time" id="addLectureEndTime" class="time-input">
+            </div>
+          </div>
+        </div>
+        <div class="mb-3" id="addLabBlock" style="display:none;">
+          <label class="form-label-sm">Laboratory Time</label>
+          <div class="time-presets">
+            <button type="button" class="tp-btn" onclick="applyPreset('addLab','13:00','15:00')">1:00-3:00</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('addLab','15:00','17:00')">3:00-5:00</button>
+            <button type="button" class="tp-btn" onclick="applyPreset('addLab','17:00','19:00')">5:00-7:00</button>
+          </div>
+          <div class="time-row" id="addLabRow">
+            <div>
+              <label class="form-label-sm">Lab Start Time *</label>
+              <input type="time" name="laboratory_start_time" id="addLabStartTime" class="time-input">
+            </div>
+            <div>
+              <label class="form-label-sm">Lab End Time *</label>
+              <input type="time" name="laboratory_end_time" id="addLabEndTime" class="time-input">
             </div>
           </div>
         </div>
@@ -319,6 +427,151 @@
             <i class="bi bi-check-circle"></i> Create Schedule
           </button>
           <button type="button" class="btn-outline" onclick="closeAddModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if can_manage_schedules %}
+<div class="add-modal-backdrop" id="noClassModal" onclick="if(event.target===this)closeNoClassModal()">
+  <div class="modal-box">
+    <div class="modal-header-cs">
+      <h3><i class="bi bi-calendar2-x"></i> New No-Class / Holiday Range</h3>
+      <button class="modal-close-btn" onclick="closeNoClassModal()">x</button>
+    </div>
+    <div class="modal-body-cs">
+      <div class="mb-3">
+        <label class="form-label-sm">Existing No-Class Ranges</label>
+        <div id="noClassExistingList" style="max-height:180px;overflow:auto;"></div>
+      </div>
+      <form method="POST" action="{{ url_for('admin_no_class_day_create') }}" id="noClassForm">
+        <div class="mb-3">
+          <label class="form-label-sm">Title *</label>
+          <input class="ac-input" name="title" required placeholder="e.g. Midterm Break">
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Description</label>
+          <textarea class="ac-input" name="description" rows="3" placeholder="Optional description"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">From Date *</label>
+          <input type="date" class="ac-input" name="from_date" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">To Date *</label>
+          <input type="date" class="ac-input" name="to_date" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Affected Teachers</label>
+          <label class="class-type-item" style="margin-bottom:8px;">
+            <input type="checkbox" id="noClassApplyAllTeachers" name="apply_all_teachers" value="1" onchange="toggleNoClassTeacherScope()">
+            <span>Apply to all teachers</span>
+          </label>
+          <div id="noClassTeacherPicker" style="display:flex;gap:8px;">
+            <input list="noClassTeacherOptions" class="ac-input" id="noClassTeacherInput" placeholder="Search teacher name">
+            <button type="button" class="btn-outline" onclick="addNoClassTeacher()">Add</button>
+          </div>
+          <datalist id="noClassTeacherOptions">
+            {% for uname, t in teachers.items() %}
+            <option value="{{ t.full_name }}" data-username="{{ uname }}"></option>
+            {% endfor %}
+          </datalist>
+          <input type="hidden" name="selected_teachers" id="noClassTeachersHidden">
+          <div id="noClassTeachersList" class="active-filters" style="margin-top:8px;"></div>
+          <div class="muted-note" style="margin-top:6px;">If no teachers are selected, all schedules are affected.</div>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button type="submit" class="btn-primary" style="flex:1;justify-content:center;"><i class="bi bi-check-circle"></i> Save No-Class Range</button>
+          <button type="button" class="btn-outline" onclick="closeNoClassModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="add-modal-backdrop" id="eventModal" onclick="if(event.target===this)closeEventModal()">
+  <div class="modal-box">
+    <div class="modal-header-cs">
+      <h3><i class="bi bi-calendar-event"></i> New Event Schedule</h3>
+      <button class="modal-close-btn" onclick="closeEventModal()">x</button>
+    </div>
+    <div class="modal-body-cs">
+      <form method="POST" action="{{ url_for('admin_event_schedule_create') }}" id="eventForm">
+        <div class="mb-3">
+          <label class="form-label-sm">Title *</label>
+          <input class="ac-input" name="title" id="eventTitle" required placeholder="e.g. University-Wide Assembly">
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Description</label>
+          <textarea class="ac-input" name="description" id="eventDescription" rows="3" placeholder="Event description and notes"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Teachers Involved *</label>
+          <div style="display:flex;gap:8px;">
+            <input list="eventTeacherOptions" class="ac-input" id="eventTeacherInput" placeholder="Search teacher name">
+            <button type="button" class="btn-outline" onclick="addEventTeacher()">Add</button>
+          </div>
+          <datalist id="eventTeacherOptions">
+            {% for uname, t in teachers.items() %}
+            <option value="{{ t.full_name }}" data-username="{{ uname }}"></option>
+            {% endfor %}
+          </datalist>
+          <input type="hidden" name="selected_teachers" id="eventTeachersHidden">
+          <div id="eventTeachersList" class="active-filters" style="margin-top:8px;"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Programs / Year / Sections Involved *</label>
+          <div class="section-fields" style="margin-bottom:8px;">
+            <div>
+              <label class="form-label-sm" style="margin-top:0;">Program</label>
+              <input list="eventProgramOptions" class="ac-input" id="eventProgramInput" placeholder="Search program">
+            </div>
+            <div>
+              <label class="form-label-sm" style="margin-top:0;">Year Level</label>
+              <input list="eventYearOptions" class="ac-input" id="eventYearInput" placeholder="Search year level">
+            </div>
+            <div>
+              <label class="form-label-sm" style="margin-top:0;">Section</label>
+              <input list="eventSectionOptions" class="ac-input" id="eventSectionInput" placeholder="Search section">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn-outline" onclick="addEventSection()">Add</button>
+          </div>
+          <datalist id="eventProgramOptions">
+            {% for sk in sections %}
+            {% set sp = sk.split('|') %}
+            <option value="{{ sp[0] if sp|length > 0 else '' }}"></option>
+            {% endfor %}
+          </datalist>
+          <datalist id="eventYearOptions">
+            {% for sk in sections %}
+            {% set sp = sk.split('|') %}
+            <option value="{{ sp[1] if sp|length > 1 else '' }}"></option>
+            {% endfor %}
+          </datalist>
+          <datalist id="eventSectionOptions">
+            {% for sk in sections %}
+            {% set sp = sk.split('|') %}
+            <option value="{{ sp[2] if sp|length > 2 else '' }}"></option>
+            {% endfor %}
+          </datalist>
+          <input type="hidden" name="selected_sections" id="eventSectionsHidden">
+          <div id="eventSectionsTableWrap" style="margin-top:10px;"></div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Start Date/Time *</label>
+          <input type="datetime-local" class="ac-input" name="start_at" id="eventStartAt" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">End Date/Time *</label>
+          <input type="datetime-local" class="ac-input" name="end_at" id="eventEndAt" required>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button type="submit" class="btn-primary" style="flex:1;justify-content:center;"><i class="bi bi-check-circle"></i> Create Event Schedule</button>
+          <button type="button" class="btn-outline" onclick="closeEventModal()">Cancel</button>
         </div>
       </form>
     </div>
@@ -339,6 +592,8 @@
     schedules: {{ schedules | tojson }},
     subjects: {{ subjects | tojson if subjects else '{}' }},
     teachers: {{ teachers | tojson if teachers else '{}' }},
+    noClassDays: {{ no_class_days | tojson if no_class_days else '[]' }},
+    sections: {{ sections | tojson if sections else '[]' }},
     dowList: {{ (dow_names if dow_names is defined else ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']) | tojson }},
     canManageSchedules: {{ can_manage_schedules | tojson }},
     teacherView: false

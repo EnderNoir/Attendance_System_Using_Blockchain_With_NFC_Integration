@@ -4,8 +4,42 @@ def admin_sessions_page_impl(*, get_db, session_row_with_logs, render_template, 
         ended_rows = conn.execute(
             "SELECT * FROM sessions WHERE ended_at IS NOT NULL ORDER BY ended_at DESC"
         ).fetchall()
-        active = {row['sess_id']: session_row_with_logs(conn, row) for row in active_rows}
-        ended = {row['sess_id']: session_row_with_logs(conn, row) for row in ended_rows}
+
+        def _event_group_key(sess):
+            if str((sess or {}).get('class_type', 'lecture') or 'lecture').strip().lower() != 'school_event':
+                return None
+            schedule_id = str((sess or {}).get('schedule_id', '') or '').strip()
+            if schedule_id.startswith('event:'):
+                parts = schedule_id.split(':', 3)
+                if len(parts) == 4:
+                    return parts[1]
+            subject_id = str((sess or {}).get('subject_id', '') or '').strip()
+            if subject_id.startswith('event:'):
+                return subject_id.split(':', 1)[1]
+            return None
+
+        active = {}
+        ended = {}
+        seen_active_events = set()
+        seen_ended_events = set()
+
+        for row in active_rows:
+            sess = session_row_with_logs(conn, row)
+            grp = _event_group_key(sess)
+            if grp:
+                if grp in seen_active_events:
+                    continue
+                seen_active_events.add(grp)
+            active[row['sess_id']] = sess
+
+        for row in ended_rows:
+            sess = session_row_with_logs(conn, row)
+            grp = _event_group_key(sess)
+            if grp:
+                if grp in seen_ended_events:
+                    continue
+                seen_ended_events.add(grp)
+            ended[row['sess_id']] = sess
 
     return render_template(
         'admin_sessions.html',
@@ -40,12 +74,32 @@ def teacher_dashboard_page_impl(
         return redirect(url_for('login'))
 
     sections, my_subjects, _ = build_teacher_context(user)
-    live_sessions = {
-        sess_id: sess
-        for sess_id, sess in get_active_sessions().items()
-        if sess.get('teacher') == session_obj['username']
-        or sess.get('teacher_name') == session_obj.get('full_name')
-    }
+
+    def _event_group_key(sess):
+        class_type = str((sess or {}).get('class_type', 'lecture') or 'lecture').strip().lower()
+        if class_type != 'school_event':
+            return None
+        schedule_id = str((sess or {}).get('schedule_id', '') or '').strip()
+        if schedule_id.startswith('event:'):
+            parts = schedule_id.split(':', 3)
+            if len(parts) == 4:
+                return parts[1]
+        subject_id = str((sess or {}).get('subject_id', '') or '').strip()
+        if subject_id.startswith('event:'):
+            return subject_id.split(':', 1)[1]
+        return None
+
+    live_sessions = {}
+    seen_event_groups = set()
+    for sess_id, sess in get_active_sessions().items():
+        if not (sess.get('teacher') == session_obj['username'] or sess.get('teacher_name') == session_obj.get('full_name')):
+            continue
+        grp = _event_group_key(sess)
+        if grp:
+            if grp in seen_event_groups:
+                continue
+            seen_event_groups.add(grp)
+        live_sessions[sess_id] = sess
 
     with get_db() as conn:
         total_sessions = conn.execute(
@@ -95,7 +149,33 @@ def teacher_sessions_students_page_impl(
             "ORDER BY started_at DESC",
             (session_obj['username'], session_obj.get('full_name', '')),
         ).fetchall()
-        sessions_data = {row['sess_id']: session_row_with_logs(conn, row) for row in rows}
+        raw_sessions = [session_row_with_logs(conn, row) for row in rows]
+
+    def _event_group_key(sess):
+        if str((sess or {}).get('class_type', 'lecture') or 'lecture').strip().lower() != 'school_event':
+            return None
+        schedule_id = str((sess or {}).get('schedule_id', '') or '').strip()
+        if schedule_id.startswith('event:'):
+            parts = schedule_id.split(':', 3)
+            if len(parts) == 4:
+                return parts[1]
+        subject_id = str((sess or {}).get('subject_id', '') or '').strip()
+        if subject_id.startswith('event:'):
+            return subject_id.split(':', 1)[1]
+        return None
+
+    sessions_data = {}
+    seen_event_groups = set()
+    for sess in raw_sessions:
+        sid = sess.get('sess_id')
+        if not sid:
+            continue
+        grp = _event_group_key(sess)
+        if grp:
+            if grp in seen_event_groups:
+                continue
+            seen_event_groups.add(grp)
+        sessions_data[sid] = sess
 
     subjects = sorted(
         set(
@@ -117,6 +197,7 @@ def teacher_sessions_students_page_impl(
             'course_code': session_data.get('course_code', ''),
             'section_key': session_data.get('section_key', ''),
             'teacher_name': session_data.get('teacher_name', ''),
+            'class_type': session_data.get('class_type', 'lecture'),
             'started_at': session_data.get('started_at', ''),
             'ended_at': session_data.get('ended_at', ''),
             'time_slot': session_data.get('time_slot', ''),
@@ -190,9 +271,33 @@ def teacher_records_page_impl(
             "SELECT * FROM sessions WHERE teacher_username=? AND ended_at IS NOT NULL ORDER BY started_at DESC",
             (session_obj['username'],),
         ).fetchall()
-        teacher_sessions_data = {
-            row['sess_id']: session_row_with_logs(conn, row) for row in rows
-        }
+        raw_sessions = [session_row_with_logs(conn, row) for row in rows]
+
+    def _event_group_key(sess):
+        if str((sess or {}).get('class_type', 'lecture') or 'lecture').strip().lower() != 'school_event':
+            return None
+        schedule_id = str((sess or {}).get('schedule_id', '') or '').strip()
+        if schedule_id.startswith('event:'):
+            parts = schedule_id.split(':', 3)
+            if len(parts) == 4:
+                return parts[1]
+        subject_id = str((sess or {}).get('subject_id', '') or '').strip()
+        if subject_id.startswith('event:'):
+            return subject_id.split(':', 1)[1]
+        return None
+
+    teacher_sessions_data = {}
+    seen_event_groups = set()
+    for sess in raw_sessions:
+        sid = sess.get('sess_id')
+        if not sid:
+            continue
+        grp = _event_group_key(sess)
+        if grp:
+            if grp in seen_event_groups:
+                continue
+            seen_event_groups.add(grp)
+        teacher_sessions_data[sid] = sess
 
     subjects = sorted(
         set(

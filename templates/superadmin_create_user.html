@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Create Account — DAVS{% endblock %}
+{% block page_title %}SUPER ADMIN / CREATE ACCOUNT{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/superadmin-create-user.css') }}">
+{% endblock %}
+{% block content %}
+<div class="sacu-wrap">
+  <a href="{{ url_for('superadmin_users') }}" class="btn-outline sacu-back-link"><i class="bi bi-arrow-left"></i> Back</a>
+  <h2 class="sacu-title">Create New Account</h2>
+  <p class="sacu-subtitle">The account will be immediately approved (no pending review).</p>
+
+  <form method="POST" class="card sacu-form">
+    <div class="mb-3">
+      <label class="form-label">Full Name *</label>
+      <input type="text" name="full_name" class="form-control" placeholder="e.g. Maria Santos" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Username * <span class="sacu-label-help">(lowercase, no spaces)</span></label>
+      <input type="text" name="username" class="form-control" placeholder="e.g. msantos"
+             oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'')" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Email</label>
+      <input type="email" name="email" class="form-control" placeholder="msantos@cvsu.edu.ph">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Role *</label>
+      <select name="role" class="form-select" required>
+        <option value="teacher">Instructor</option>
+        <option value="admin">Admin</option>
+        {% if show_super_admin %}
+        <option value="super_admin">Super Admin</option>
+        {% endif %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Initial Password * <span class="sacu-label-help">(default: test12345, editable)</span></label>
+      <input type="text" name="password" class="form-control" minlength="8" value="test12345" placeholder="test12345">
+      <small class="text-muted">Share this temporary password securely and require immediate change after first login.</small>
+    </div>
+    <div class="sacu-actions">
+      <a href="{{ url_for('superadmin_users') }}" class="btn-outline">Cancel</a>
+      <button type="submit" class="btn-primary"><i class="bi bi-person-check"></i> Create Account</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

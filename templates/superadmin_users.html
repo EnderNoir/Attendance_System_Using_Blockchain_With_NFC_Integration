@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}User Management — DAVS{% endblock %}
+{% block page_title %}{% if is_super_admin %}SUPER ADMIN / USERS{% else %}ADMIN / USERS{% endif %}{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/superadmin-users.css') }}">
+{% endblock %}
+{% block content %}
+<div class="sa-users-head-row">
+  <div>
+    <h2 class="sa-users-title">User Management</h2>
+    <p class="sa-users-subtitle">
+      {% if is_super_admin %}
+      Only Super Admins can create or change Admin/Super Admin accounts.
+      {% else %}
+      Admins can create teacher accounts and view admin/teacher users.
+      {% endif %}
+    </p>
+  </div>
+  <a href="{{ create_user_url }}" class="btn-primary"><i class="bi bi-person-plus"></i> {{ create_button_label }}</a>
+</div>
+
+<div class="card user-table-wrap">
+  <table class="table mb-0">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>{% if can_change_role %}Change Role{% else %}Access{% endif %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for uname, u in users.items() | sort(attribute='0') %}
+      <tr>
+        <td><strong>{{ u.full_name or '—' }}</strong></td>
+        <td><code>{{ uname }}</code></td>
+        <td class="sa-users-email">{{ u.email or '—' }}</td>
+        <td>
+          {% if u.role == 'super_admin' %}<span class="role-badge-sa"><i class="bi bi-shield-lock"></i> Super Admin</span>
+          {% elif u.role == 'admin' %}<span class="role-badge-a"><i class="bi bi-shield-check"></i> Admin</span>
+          {% else %}<span class="role-badge-t"><i class="bi bi-person"></i> Instructor</span>{% endif %}
+        </td>
+        <td>
+          {% if u.status == 'approved' %}<span class="pill-ok">Approved</span>
+          {% elif u.status == 'pending' %}<span class="pill-pend">Pending</span>
+          {% else %}<span class="pill-rej">{{ u.status }}</span>{% endif %}
+        </td>
+        <td>
+          {% if can_change_role and uname != session.get('username') %}
+          <form method="POST" action="{{ url_for('superadmin_promote', username=uname) }}" class="promote-form">
+            <select name="role" class="form-select form-select-sm sa-users-role-select">
+              <option value="teacher" {% if u.role=='teacher' %}selected{% endif %}>Instructor</option>
+              <option value="admin" {% if u.role=='admin' %}selected{% endif %}>Admin</option>
+              {# Only allow promoting to Super Admin if none exists yet, or this user IS already Super Admin #}
+              {% if u.role == 'super_admin' or super_admin_count == 0 %}
+              <option value="super_admin" {% if u.role=='super_admin' %}selected{% endif %}>Super Admin</option>
+              {% else %}
+              <option value="super_admin" disabled title="A Super Admin already exists">Super Admin (taken)</option>
+              {% endif %}
+            </select>
+            <button type="submit" class="btn-primary sa-users-apply-btn">Apply</button>
+          </form>
+          {% elif can_change_role %}
+          <span class="sa-users-self">— (you)</span>
+          {% else %}
+          <span class="sa-users-self">View only</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

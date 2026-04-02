@@ -1,0 +1,175 @@
+.excuse-wrap {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.excuse-card {
+    padding: 30px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+}
+
+.excuse-head {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.excuse-icon-wrap {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(59, 130, 246, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+    font-size: 28px;
+    color: #3b82f6;
+}
+
+.excuse-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.excuse-subtitle {
+    font-size: 14px;
+    color: var(--muted);
+}
+
+.excuse-block {
+    margin-bottom: 20px;
+}
+
+.excuse-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+.excuse-info-box {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.excuse-student-name {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.excuse-meta {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+}
+
+.excuse-subject-name {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.excuse-class-meta {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.excuse-session-date {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+.excuse-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 14px;
+}
+
+.excuse-select {
+    appearance: none;
+    cursor: pointer;
+}
+
+.excuse-textarea {
+    font-family: inherit;
+    resize: vertical;
+}
+
+.excuse-attach-block {
+    margin-bottom: 28px;
+}
+
+.excuse-file-input {
+    width: 100%;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.excuse-file-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+}
+
+.excuse-submit-btn {
+    width: 100%;
+    background: #3b82f6;
+    color: #fff;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+@media (max-width: 768px) {
+    .excuse-wrap {
+        padding: 12px;
+    }
+
+    .excuse-card {
+        padding: 18px;
+        border-radius: 14px;
+    }
+
+    .excuse-title {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .excuse-wrap {
+        padding: 8px;
+    }
+
+    .excuse-card {
+        padding: 14px;
+    }
+
+    .excuse-meta {
+        font-size: 12px;
+        line-height: 1.5;
+        word-break: break-word;
+    }
+}

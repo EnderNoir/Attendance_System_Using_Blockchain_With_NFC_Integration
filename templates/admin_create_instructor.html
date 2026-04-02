@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}Create Instructor — DAVS{% endblock %}
+{% block page_title %}ADMIN / CREATE INSTRUCTOR{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-create-instructor.css') }}">
+{% endblock %}
+{% block content %}
+<div class="aci-wrap">
+  <a href="{{ url_for('dashboard', tab='faculty') }}" class="btn-outline aci-back-link"><i class="bi bi-arrow-left"></i> Back to Faculty Accounts</a>
+  <h2 class="aci-title">Create Instructor Account</h2>
+  <p class="aci-subtitle">
+    Creates an approved Instructor account. Only Super Admin can create Admin accounts.
+  </p>
+
+  <form method="POST" class="card aci-form">
+    <div class="mb-3">
+      <label class="form-label">Full Name *</label>
+      <input type="text" name="full_name" class="form-control" placeholder="e.g. Juan dela Cruz" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Username * <span class="aci-label-help">(lowercase, no spaces)</span></label>
+      <input type="text" name="username" class="form-control" placeholder="e.g. jdelacruz"
+             oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'')" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Email</label>
+      <input type="email" name="email" class="form-control" placeholder="instructor@cvsu.edu.ph">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Initial Password * <span class="aci-label-help">(default: test12345, editable)</span></label>
+      <input type="text" name="password" class="form-control" minlength="8" value="test12345" placeholder="test12345">
+    </div>
+    <div class="aci-info-box">
+      <i class="bi bi-info-circle aci-info-icon"></i>
+      The instructor should change this temporary password immediately after first login from their profile page.
+    </div>
+    <div class="aci-actions">
+      <a href="{{ url_for('dashboard', tab='faculty') }}" class="btn-outline">Cancel</a>
+      <button type="submit" class="btn-primary"><i class="bi bi-person-check"></i> Create Instructor</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

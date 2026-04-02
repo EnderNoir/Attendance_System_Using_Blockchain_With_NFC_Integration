@@ -1,0 +1,297 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DAVS Blockchain Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
+  
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/public_blockchain_visualization.css') }}" />
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div class="logo"><i class="bi bi-diagram-3-fill"></i> Blockchain Demo</div>
+      <div class="tab-row" id="tabButtons">
+        <button class="tab-btn active" data-tab="hash">Hash</button>
+        <button class="tab-btn" data-tab="block">Block</button>
+        <button class="tab-btn" data-tab="blockchain">Blockchain</button>
+        <button class="tab-btn" data-tab="distributed">Distributed</button>
+        <button class="tab-btn" data-tab="tokens">Tokens</button>
+      </div>
+      <div class="top-actions">
+        <button class="btn" id="tourStartBtn" type="button"><i class="bi bi-signpost-split"></i> Start 60s Tour</button>
+        <button class="btn" id="themeBtn" type="button"><i class="bi bi-moon-fill"></i> Theme</button>
+        <a class="btn primary" href="{{ url_for('login') }}"><i class="bi bi-box-arrow-in-right"></i> Staff Login</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>How DAVS Uses Blockchain for Attendance Records</h1>
+      <p>
+        This page uses real chain data from this project. In DAVS, attendance events are validated first,
+        then written to the smart contract, and finally connected to a transaction hash and block for audit proof.
+        You can explore each concept below in beginner-friendly language, with examples tied to your attendance workflow.
+      </p>
+      <div class="example-box">
+        <strong style="font-family:'Space Mono',monospace;font-size:12px;">Real attendance example in this system</strong>
+        <p class="mini" style="margin:6px 0 0;">
+          Example flow: Student 2022-000123 taps NFC for Computer Programming 1 at 08:03 AM.
+          DAVS checks active session and enrollment, writes attendance to blockchain,
+          then stores a transaction hash (for example 0xabc...123) that can be verified later in reports.
+        </p>
+      </div>
+      <div class="chips">
+        <span class="chip" id="chipNetwork"><i class="bi bi-diagram-3"></i> Network: --</span>
+        <span class="chip" id="chipLatest"><i class="bi bi-box"></i> Latest Block: --</span>
+        <span class="chip" id="chipLoaded"><i class="bi bi-collection"></i> Blocks Loaded: --</span>
+        <span class="chip" id="chipValidity"><i class="bi bi-shield"></i> Chain: --</span>
+      </div>
+      <div class="chips" id="contextChips"></div>
+      <div class="error" id="errorBox"></div>
+    </section>
+
+    <section class="controls">
+      <div class="field">
+        <label class="label" for="subjectFilter">Subject</label>
+        <select id="subjectFilter"><option value="">All Subjects</option></select>
+      </div>
+      <div class="field">
+        <label class="label" for="yearFilter">Year</label>
+        <select id="yearFilter"><option value="">All Years</option></select>
+      </div>
+      <div class="field">
+        <label class="label" for="limitRange">Blocks</label>
+        <input class="input" id="limitRange" type="range" min="5" max="60" value="20" />
+      </div>
+      <div class="field">
+        <label class="label" for="limitText">Current</label>
+        <input class="input" id="limitText" type="text" readonly value="20" />
+      </div>
+      <div class="field">
+        <label class="label" for="autoRefresh">Auto Refresh</label>
+        <label class="btn" for="autoRefresh"><input id="autoRefresh" type="checkbox" checked /> Enabled</label>
+      </div>
+      <div class="field">
+        <label class="label">Actions</label>
+        <button class="btn" id="refreshBtn" type="button"><i class="bi bi-arrow-repeat"></i> Refresh Data</button>
+      </div>
+    </section>
+
+    <section class="tab-panel active" id="tab-hash">
+      <div class="big-stage">
+        <div class="explain">
+          <strong>Hash means fingerprint:</strong> if you change even one character, you get a completely different output.
+          In DAVS, this helps prove that attendance-related data has not been silently altered.
+        </div>
+        <div class="row-2">
+          <div>
+            <label class="label" for="hashInput">Data</label>
+            <textarea id="hashInput" rows="9" placeholder="Example: NFC Tap | StudentID | Subject | Time"></textarea>
+            <div class="row-2" style="margin-top:8px;">
+              <div>
+                <label class="label" for="nonceInput">Nonce</label>
+                <input id="nonceInput" class="input" type="number" value="0" min="0" />
+              </div>
+              <div>
+                <label class="label">Characters</label>
+                <input id="charCount" class="input" type="text" value="0" readonly />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="label">SHA256 Hash Output</label>
+            <div class="mono" id="hashOutput">--</div>
+            <p class="mini" style="margin-top:8px;">Try changing one letter to see the avalanche effect.</p>
+            <details style="margin-top:8px;">
+              <summary>Why is this important for attendance?</summary>
+              <p class="mini">
+                If a record says a student was Present at 08:03, the corresponding blockchain transaction hash is fixed.
+                If someone later changes that record to Absent without proper blockchain entry, the hash linkage will not match.
+                That mismatch is a red flag during audits.
+              </p>
+            </details>
+            <div class="example-box">
+              <strong style="font-family:'Space Mono',monospace;font-size:12px;">System-connected example</strong>
+              <p class="mini" style="margin:6px 0 0;">
+                Input message: NFC Tap | 2022-000123 | Computer Programming 1 | Present | 2026-03-29 08:03
+                <br/>Small edit (Present -> Late) creates a totally different hash.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="tab-block">
+      <div class="big-stage">
+        <div class="explain">
+          <strong>Block = container:</strong> each block contains transaction references, a nonce, its own hash, and the previous block hash.
+          In this project, a block may include attendance transaction hashes from one or more class sessions.
+        </div>
+        <div class="row-2">
+          <div>
+            <h3 style="margin:0 0 10px;">Block Simulator</h3>
+            <div class="kv"><div class="k">Block #</div><div><input id="simBlockNumber" class="input" type="number" value="1" min="1" /></div></div>
+            <div class="kv"><div class="k">Prev Hash</div><div><input id="simPrevHash" class="input" type="text" /></div></div>
+            <div class="kv"><div class="k">Data</div><div><textarea id="simData" rows="5">Attendance Batch: BSIT 3A | Present=32</textarea></div></div>
+            <div class="kv"><div class="k">Difficulty</div><div><select id="simDifficulty"><option value="3">Easy (3 leading zeros)</option><option value="4">Normal (4 leading zeros)</option></select></div></div>
+            <div class="kv"><div class="k">Nonce</div><div><input id="simNonce" class="input" type="text" value="0" readonly /></div></div>
+            <div class="kv"><div class="k">Hash</div><div class="mono" id="simHash">--</div></div>
+            <button class="btn primary" id="mineBtn" type="button"><i class="bi bi-hammer"></i> Mine Demo Block</button>
+            <div class="mini" id="mineStatus" style="margin-top:8px;"></div>
+          </div>
+          <div>
+            <h3 style="margin:0 0 10px;">Real DAVS Block Details</h3>
+            <label class="label" for="blockPicker">Select Block</label>
+            <select id="blockPicker"></select>
+            <div id="blockDetails" style="margin-top:10px;" class="mini">Loading...</div>
+          </div>
+        </div>
+        <div class="explain" style="margin-top:12px;">
+          <strong>Try Tampering Mode:</strong> edit simulated block data below.
+          The demo will instantly recompute the block hash and test whether linkage to the next block remains valid.
+        </div>
+        <div class="row-2">
+          <div>
+            <label class="label" for="tamperInput">Edited Block Data (tamper simulation)</label>
+            <textarea id="tamperInput" rows="4" placeholder="Change any value here to simulate tampering..."></textarea>
+            <p class="mini" style="margin-top:8px;">Leave empty to represent original unchanged block.</p>
+          </div>
+          <div id="tamperResult" class="mini">
+            <div class="kv"><div class="k">Original Hash</div><div class="mono" id="tamperOrigHash">--</div></div>
+            <div class="kv"><div class="k">Tampered Hash</div><div class="mono" id="tamperHash">--</div></div>
+            <div class="kv"><div class="k">Next Block #</div><div id="tamperNextBlock">--</div></div>
+            <div class="kv"><div class="k">Expected Prev Hash</div><div class="mono" id="tamperExpected">--</div></div>
+            <div class="status" id="tamperStatus">No block selected yet.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="tab-blockchain">
+      <div class="big-stage">
+        <div class="explain">
+          <strong>Blockchain = linked blocks:</strong> each block points to the previous one. If a block changes, chain linkage is broken.
+          Click any block card to inspect it. This is the same principle used by DAVS for trustworthy attendance evidence.
+        </div>
+        <div class="example-box">
+          <strong style="font-family:'Space Mono',monospace;font-size:12px;">How this helps teachers and admins</strong>
+          <p class="mini" style="margin:6px 0 0;">
+            During disputes (for example, a student claims they tapped on time), admins can cross-check
+            the stored transaction hash and block metadata. If hashes and chain links are valid,
+            the attendance trail is consistent.
+          </p>
+        </div>
+        <div class="chain" id="chainRoot"></div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="tab-distributed">
+      <div class="big-stage">
+        <div class="explain">
+          <strong>Distributed concept:</strong> peers keep copies of ledger data. If one peer is behind, it syncs from the latest valid chain.
+          This means attendance verification does not depend on only one viewer screen or one report export.
+        </div>
+        <button class="btn" id="syncDemoBtn" type="button"><i class="bi bi-broadcast"></i> Run Peer Sync Demo</button>
+        <div class="peer-grid" style="margin-top:10px;" id="peerGrid"></div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="tab-tokens">
+      <div class="big-stage">
+        <div class="explain">
+          <strong>Token note for this project:</strong> attendance does not require students to transfer tokens.
+          Blockchain transactions are used here as immutable record anchors.
+          Students use NFC tap flow, while blockchain provides verifiable proof in the background.
+        </div>
+        <h3 style="margin:0 0 8px;">Attendance Transaction Density</h3>
+        <div class="bars" id="txBars"></div>
+        <details style="margin-top:10px;">
+          <summary>Simple glossary</summary>
+          <p class="mini"><strong>Hash:</strong> digital fingerprint.</p>
+          <p class="mini"><strong>Nonce:</strong> changing number used to find valid hash patterns in mining demos.</p>
+          <p class="mini"><strong>Block:</strong> container of transaction references + metadata.</p>
+          <p class="mini"><strong>Chain:</strong> ordered, linked blocks.</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="flow">
+      <h3 style="margin:0;">How Blockchain Is Used In This Attendance System</h3>
+      <div class="flow-grid">
+        <div class="step">
+          <strong>1. NFC Tap</strong>
+          <p class="mini">Student taps NFC card/phone. Example: 2022-000123 taps at 08:03 for Computer Programming 1.</p>
+        </div>
+        <div class="step">
+          <strong>2. Session Validation</strong>
+          <p class="mini">DAVS checks active session, schedule window, and enrollment before accepting Present/Late status.</p>
+        </div>
+        <div class="step">
+          <strong>3. Blockchain Write</strong>
+          <p class="mini">System writes attendance event to smart contract and receives tx hash + block number as audit reference.</p>
+        </div>
+        <div class="step">
+          <strong>4. Audit Verification</strong>
+          <p class="mini">Reports can show tx hash and block details so admins can verify that records are consistent and untampered.</p>
+        </div>
+      </div>
+      <div class="example-box">
+        <strong style="font-family:'Space Mono',monospace;font-size:12px;">Why this is beginner-friendly in practice</strong>
+        <p class="mini" style="margin:6px 0 0;">
+          Think of blockchain here like a permanent receipt system: when attendance is recorded,
+          DAVS gets a receipt number (transaction hash) stored inside a sealed page (block).
+          Sealed pages are linked in order, so changing an old page is easy to detect.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <div class="tour-overlay" id="tourOverlay" aria-hidden="true">
+    <div class="tour-card">
+      <div class="tour-head">
+        <h3 class="tour-title" id="tourTitle">Welcome Tour</h3>
+        <div class="tour-progress" id="tourProgress">Step 1/8</div>
+      </div>
+      <div class="tour-bar"><div class="tour-bar-fill" id="tourBarFill"></div></div>
+      <p class="mini" id="tourText">This guided tour explains each tab in sequence.</p>
+      <div class="tour-grid">
+        <div class="tour-pane">
+          <strong>Why It Matters</strong>
+          <p class="mini" id="tourWhy">Understanding this helps connect blockchain theory with attendance records in DAVS.</p>
+        </div>
+        <div class="tour-pane">
+          <strong>Try This Now</strong>
+          <ul class="tour-list" id="tourTryList">
+            <li>Follow the prompt in this step.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="tour-pane" style="margin-top:8px;">
+        <strong>What You Will Learn</strong>
+        <p class="mini" id="tourLearn">A practical understanding of data integrity, chain linkage, and auditability.</p>
+      </div>
+      <div class="chips" style="margin-top:8px;">
+        <span class="chip"><i class="bi bi-clock"></i> Remaining: <span id="tourTime" style="margin-left:4px;">60s</span></span>
+      </div>
+      <div class="tour-actions">
+        <button class="btn" id="tourPauseBtn" type="button"><i class="bi bi-pause-circle"></i> Pause</button>
+        <button class="btn" id="tourTryBtn" type="button"><i class="bi bi-magic"></i> Do It For Me</button>
+        <button class="btn" id="tourSkipBtn" type="button"><i class="bi bi-stop-circle"></i> Stop Tour</button>
+        <button class="btn" id="tourPrevBtn" type="button"><i class="bi bi-arrow-left-circle"></i> Back</button>
+        <button class="btn primary" id="tourNextBtn" type="button"><i class="bi bi-arrow-right-circle"></i> Next</button>
+      </div>
+    </div>
+  </div>
+
+  
+
+  <script src="{{ url_for('static', filename='js/public_blockchain_visualization.js') }}"></script>
+</body>
+</html>
+

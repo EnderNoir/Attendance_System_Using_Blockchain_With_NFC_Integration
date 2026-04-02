@@ -1,0 +1,176 @@
+.role-badge-sa {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(109, 40, 217, 0.1);
+  color: #5B21B6;
+  border: 1.5px solid rgba(109, 40, 217, 0.25);
+}
+
+.role-badge-a {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(192, 57, 43, 0.1);
+  color: #8B1A0A;
+  border: 1.5px solid rgba(192, 57, 43, 0.25);
+}
+
+.role-badge-t {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(45, 106, 39, 0.1);
+  color: #1A5A17;
+  border: 1.5px solid rgba(45, 106, 39, 0.25);
+}
+
+.sa-users-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sa-users-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.sa-users-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.user-table-wrap {
+  overflow-x: auto;
+}
+
+.sa-users-email {
+  font-size: 12px;
+}
+
+.promote-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sa-users-role-select {
+  width: auto;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.sa-users-apply-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.sa-users-self {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+@media (max-width: 768px) {
+  .user-table-wrap {
+    overflow: visible;
+  }
+
+  .user-table-wrap table,
+  .user-table-wrap tbody,
+  .user-table-wrap tr,
+  .user-table-wrap td {
+    display: block;
+    width: 100%;
+  }
+
+  .user-table-wrap thead {
+    display: none;
+  }
+
+  .user-table-wrap tr {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+
+  .user-table-wrap td {
+    border: none !important;
+    padding: 4px 0 !important;
+  }
+
+  .user-table-wrap td:nth-child(1)::before {
+    content: 'User';
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .user-table-wrap td:nth-child(2)::before {
+    content: 'Username';
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .user-table-wrap td:nth-child(3)::before {
+    content: 'Email';
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .user-table-wrap td:nth-child(4)::before {
+    content: 'Role';
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .user-table-wrap td:nth-child(5)::before {
+    content: 'Status';
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .user-table-wrap td:nth-child(6)::before {
+    content: 'Change Role';
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .promote-form {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .promote-form .form-select,
+  .promote-form .btn-primary {
+    width: 100% !important;
+  }
+}

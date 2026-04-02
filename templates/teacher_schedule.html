@@ -1,0 +1,182 @@
+﻿{% extends 'base.html' %}
+{% block title %}My Schedule — DAVS{% endblock %}
+{% block page_title %}MY SCHEDULE{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/teacher_schedule.css') }}">
+{% endblock %}
+{% block content %}
+
+
+{% set dow_list = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
+
+<div id="presessionContainer"></div>
+
+<!-- PAGE HEADER -->
+<div class="sched-page-header">
+    <div>
+        <h2 style="font-size:18px;font-weight:700;margin:0;">My Weekly Schedule</h2>
+        <p style="color:var(--muted);font-size:12px;margin:4px 0 0;">
+            Your assigned class schedules. Click any block to view full details.
+        </p>
+    </div>
+    <div class="sched-search-bar">
+        <div class="sched-search-wrap">
+            <input type="text" id="schedSearchInput" class="sched-search-input" placeholder="Filter by subject…"
+                autocomplete="off" oninput="onSearchInput()" onfocus="onSearchInput()">
+            <i class="bi bi-search sched-search-icon"></i>
+            <div class="sched-search-dropdown" id="schedSearchDrop"></div>
+        </div>
+        <div class="teacher-filter-row">
+            <input list="programOptions" type="text" id="tfProgram" class="sched-mini-input" placeholder="Program" oninput="applyTeacherFilters()">
+            <datalist id="programOptions"></datalist>
+            <input list="yearOptions" type="text" id="tfYear" class="sched-mini-input" placeholder="Year" oninput="applyTeacherFilters()">
+            <datalist id="yearOptions"></datalist>
+            <input list="sectionOptions" type="text" id="tfSection" class="sched-mini-input" placeholder="Section" oninput="applyTeacherFilters()">
+            <datalist id="sectionOptions"></datalist>
+            <button type="button" class="btn-outline" onclick="resetTeacherFilters()" style="height:36px;">Reset</button>
+        </div>
+    </div>
+</div>
+
+<!-- FILTER CHIPS -->
+<div class="active-filters" id="activeFilters"></div>
+
+<!-- CALENDAR -->
+<div class="cal-wrap">
+    <table class="cal-table" id="calTable">
+        <thead>
+            <tr>
+                <th class="time-col"><i class="bi bi-clock"></i> Time</th>
+                {% for d in dow_list %}
+                <th id="th_dow_{{ loop.index0 }}">{{ d }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody id="calBody"></tbody>
+    </table>
+</div>
+
+{% if not schedules %}
+<div style="text-align:center;padding:48px 0;color:var(--muted);">
+    <i class="bi bi-calendar-x" style="font-size:40px;display:block;margin-bottom:10px;opacity:.3;"></i>
+    <div style="font-size:14px;font-weight:600;">No schedules assigned yet.</div>
+    <div style="font-size:12px;margin-top:6px;">Contact your administrator to get schedules assigned.</div>
+</div>
+{% endif %}
+
+<!-- VIEW-ONLY MODAL -->
+<div class="modal-backdrop-custom" id="scheduleModal" onclick="if(event.target===this)closeSchedModal()">
+    <div class="modal-box">
+        <div class="modal-header-custom">
+            <h3><i class="bi bi-calendar-event"></i> Schedule Details</h3>
+        </div>
+        <div class="modal-body-custom">
+            <div
+                style="text-align:center;margin-bottom:18px;padding-bottom:16px;border-bottom:1.5px solid var(--border);">
+                <div
+                    style="width:52px;height:52px;margin:0 auto 10px;border-radius:12px;background:rgba(45,106,39,.1);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--accent);">
+                    <i class="bi bi-calendar-event"></i>
+                </div>
+                <div style="font-size:16px;font-weight:700;" id="infoSubjectName">—</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:3px;font-family:'Space Mono',monospace;"
+                    id="infoCourseCode">—</div>
+                <div id="infoLiveIndicator" style="display:none;margin-top:8px;">
+                    <span
+                        style="background:rgba(16,185,129,.12);color:#10b981;border:1.5px solid rgba(16,185,129,.3);border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:6px;">
+                        <span
+                            style="width:6px;height:6px;border-radius:50%;background:#10b981;animation:blink 1.5s infinite;display:inline-block;"></span>
+                        Live Now
+                    </span>
+                </div>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-person-badge"></i> Teacher</span>
+                <span class="info-val-m" id="infoTeacherName">—</span>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-layers"></i> Section</span>
+                <span class="info-val-m" id="infoSectionName">—</span>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-calendar3-week"></i> Day & Time</span>
+                <span class="info-val-m" id="infoDayTime">—</span>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-collection"></i> Class Type</span>
+                <span class="info-val-m" id="infoClassType">—</span>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-hourglass-split"></i> Grace Period</span>
+                <span class="info-val-m" id="infoGrace">—</span>
+            </div>
+            <div class="info-row-m">
+                <span class="info-lbl-m"><i class="bi bi-clock-history"></i> Next Class</span>
+                <span class="info-val-m" id="infoNextClass">—</span>
+            </div>
+            <div
+                style="margin-top:18px;padding-top:14px;border-top:1.5px solid var(--border);display:flex;justify-content:center;">
+                <a id="monitorLiveBtn" class="btn-primary" href="#" style="display:none;margin-right:8px;">
+                    <i class="bi bi-broadcast"></i> Monitor Live
+                </a>
+                <button class="btn-outline" onclick="closeSchedModal()"><i class="bi bi-x"></i> Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop-custom" id="slotModal" onclick="if(event.target===this)closeSlotModal()">
+    <div class="modal-box">
+        <div class="modal-header-custom">
+            <h3><i class="bi bi-collection"></i> Schedule Slot Details</h3>
+            <button class="modal-close-btn" onclick="closeSlotModal()">x</button>
+        </div>
+        <div class="modal-body-custom">
+            <div class="slot-summary" id="slotSummary">-</div>
+            <div class="pm-tab-bar" style="margin-bottom:12px;">
+                <button class="pm-tab active-tab" id="slot-tab-current" type="button" onclick="switchSlotTab('current')">Current Schedules</button>
+                <button class="pm-tab" id="slot-tab-archive" type="button" onclick="switchSlotTab('archive')">Archived Schedules</button>
+            </div>
+            <div id="slotPaneCurrent" class="slot-pane active">
+                <div class="slot-search-wrap">
+                    <input type="text" id="slotCurrentSearch" class="ac-input" placeholder="Search subject or instructor..." autocomplete="off" oninput="onSlotSearchInput('current')" onfocus="onSlotSearchInput('current')">
+                    <div class="ac-dropdown" id="slotCurrentSearchDrop">
+                        <table class="ac-table">
+                            <thead>
+                                <tr>
+                                    <th class="ac-th">Subject</th>
+                                    <th class="ac-th">Instructor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slotCurrentSearchBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="slotCurrentList"></div>
+            </div>
+            <div id="slotPaneArchive" class="slot-pane">
+                <div class="slot-search-wrap">
+                    <input type="text" id="slotArchiveSearch" class="ac-input" placeholder="Search subject or instructor..." autocomplete="off" oninput="onSlotSearchInput('archive')" onfocus="onSlotSearchInput('archive')">
+                    <div class="ac-dropdown" id="slotArchiveSearchDrop">
+                        <table class="ac-table">
+                            <thead>
+                                <tr>
+                                    <th class="ac-th">Subject</th>
+                                    <th class="ac-th">Instructor</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slotArchiveSearchBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="slotArchiveList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+{% block extra_scripts %}
+<script>{% include 'assets/teacher_schedule.js' %}</script>
+{% endblock %}
+{% endblock %}

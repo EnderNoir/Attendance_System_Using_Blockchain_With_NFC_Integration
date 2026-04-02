@@ -1,0 +1,757 @@
+﻿/* Session rows */
+  .sess-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 7px;
+    transition: border-color .2s;
+    flex-wrap: wrap;
+    cursor: pointer;
+  }
+
+  .sess-row:hover {
+    border-color: rgba(45, 106, 39, .4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .07);
+  }
+
+  .sess-row.live-row {
+    border-color: rgba(45, 106, 39, .4);
+    box-shadow: 0 0 0 1px rgba(45, 106, 39, .08);
+  }
+
+  .sr-name {
+    font-weight: 700;
+    font-size: 14px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sr-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .btn-vr {
+    background: rgba(45, 106, 39, .08);
+    border: 1px solid rgba(45, 106, 39, .2);
+    color: var(--accent);
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 12px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all .2s;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .btn-vr:hover {
+    background: rgba(45, 106, 39, .18);
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--success);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes pulse {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: .2;
+    }
+  }
+
+  .badge-live {
+    background: rgba(45, 106, 39, .12);
+    color: var(--success);
+    border: 1px solid rgba(45, 106, 39, .25);
+    border-radius: 20px;
+    padding: 2px 9px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .badge-done {
+    background: rgba(100, 116, 139, .08);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 9px;
+    font-size: 10px;
+  }
+
+  .tab-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    flex-wrap: wrap;
+  }
+
+  .tab-btn {
+    flex: 1;
+    min-width: 80px;
+    padding: 9px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .tab-btn.active {
+    background: rgba(45, 106, 39, .1);
+    color: var(--accent);
+  }
+
+  .tab-pane {
+    display: none;
+  }
+
+  .tab-pane.active {
+    display: block;
+  }
+
+  /* Filter bar */
+  .filter-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 12px;
+  }
+
+  .fg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 130px;
+  }
+
+  .fl {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .fs {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    appearance: none;
+    transition: border-color .2s;
+  }
+
+  .fs:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .btn-rst {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 7px;
+    padding: 7px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    align-self: flex-end;
+    white-space: nowrap;
+    transition: all .2s;
+  }
+
+  .btn-rst:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  /* ΓòÉΓòÉ SESSION DETAIL MODAL (matches teacher sessions & students style) ΓòÉΓòÉ */
+  .sess-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    padding: 16px;
+  }
+
+  .sess-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .sess-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    max-width: 1600px;
+    width: min(98vw, 1600px);
+    max-height: 98vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform: scale(.93);
+    transition: transform .25s cubic-bezier(.34, 1.56, .64, 1);
+  }
+
+  .sess-overlay.show .sess-modal {
+    transform: scale(1);
+  }
+
+  .sm-bar {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    background: var(--surface);
+  }
+
+  .sm-bar h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .sm-back {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    transition: all .2s;
+  }
+
+  .sm-back:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .sm-itabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+
+  .sm-itab {
+    padding: 11px 20px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .sm-itab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .sm-ipane {
+    display: none;
+    overflow: visible;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .sm-ipane.active {
+    display: flex;
+  }
+
+  /* Info grid inside modal */
+  .sm-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 16px 20px;
+  }
+
+  @media(max-width:480px) {
+    .sm-info-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .sm-info-box {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px;
+  }
+
+  .sm-info-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+  }
+
+  .sm-info-val {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  /* Stat boxes inside modal */
+  .sm-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 0 20px 16px;
+  }
+
+  @media(max-width:500px) {
+    .sm-stat-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .sm-stat {
+    text-align: center;
+    padding: 12px 8px;
+    border-radius: 10px;
+    border: 1px solid;
+  }
+
+  .sm-stat-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .sm-stat-lbl {
+    font-size: 10px;
+    margin-top: 4px;
+    font-weight: 600;
+  }
+
+  /* Attendance tab inside modal */
+  .att-tab-top {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 8px;
+    background: var(--surface);
+  }
+
+  .att-tab-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+
+  .btn-export-xl {
+    background: rgba(16, 185, 129, .1);
+    border: 1px solid rgba(16, 185, 129, .3);
+    color: var(--success);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .btn-export-xl:hover {
+    background: rgba(16, 185, 129, .2);
+  }
+
+  /* Attendance table */
+  .att-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .att-table th {
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+    background: var(--bg);
+  }
+
+  .att-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  .att-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .att-table tr:hover td {
+    background: rgba(45, 106, 39, .03);
+  }
+
+  .att-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .att-tx,
+  .att-tx-copy {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: rgba(45, 106, 39, .7);
+    background: rgba(45, 106, 39, .05);
+    border: 1px solid rgba(45, 106, 39, .15);
+    border-radius: 4px;
+    padding: 1px 5px;
+    display: inline-block;
+    white-space: nowrap;
+    margin-top: 3px;
+  }
+
+  .att-tx-copy {
+    cursor: copy;
+    max-width: none;
+  }
+
+  .att-tx-copy.copied {
+    color: var(--success);
+    border-color: rgba(45, 106, 39, .35);
+    background: rgba(45, 106, 39, .12);
+  }
+
+  .att-tx-copy.copy-failed {
+    color: var(--danger);
+    border-color: rgba(192, 57, 43, .35);
+    background: rgba(192, 57, 43, .12);
+  }
+
+  .att-scroll {
+    overflow: visible;
+    flex: 1;
+    padding: 0 4px;
+  }
+
+  .att-status {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-block;
+  }
+
+  .st-present {
+    background: rgba(45, 106, 39, .1);
+    color: var(--success);
+    border: 1px solid rgba(45, 106, 39, .2);
+  }
+
+  .st-late {
+    background: rgba(245, 197, 24, .1);
+    color: var(--warning);
+    border: 1px solid rgba(245, 197, 24, .2);
+  }
+
+  .st-absent {
+    background: rgba(192, 57, 43, .08);
+    color: var(--danger);
+    border: 1px solid rgba(192, 57, 43, .15);
+  }
+
+  .st-excused {
+    background: rgba(96, 165, 250, .08);
+    color: #60a5fa;
+    border: 1px solid rgba(96, 165, 250, .2);
+  }
+
+  /* Light mode fixes */
+  [data-theme="light"] .sm-info-box {
+    background: #F8FAF8;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .sm-bar {
+    background: #FFFFFF;
+    border-bottom-color: #D4DDD4;
+  }
+
+  [data-theme="light"] .sm-itabs {
+    background: #FFFFFF;
+  }
+
+  [data-theme="light"] .att-tab-top {
+    background: #FFFFFF;
+  }
+
+  [data-theme="light"] .att-table th {
+    background: #F0F5F0;
+    color: #3A5A37;
+  }
+
+  [data-theme="light"] .att-table td {
+    color: #1A1A1A;
+  }
+
+  [data-theme="light"] .sm-info-lbl {
+    color: #3A5A37;
+  }
+
+  [data-theme="light"] .sm-info-val {
+    color: #1A1A1A;
+  }
+
+  [data-theme="light"] .sm-stat-num {
+    color: #1A1A1A;
+  }
+
+  [data-theme="light"] .sess-modal {
+    border-color: #C8D8C8;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, .18);
+  }
+
+  [data-theme="light"] .fs {
+    background: #F8FAF8;
+    border-color: #C8D8C8;
+    color: #1A1A1A;
+  }
+
+  [data-theme="light"] .filter-bar {
+    background: #FFFFFF;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .tab-row {
+    background: #FFFFFF;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .tab-btn {
+    color: #5A6B5A;
+  }
+
+  [data-theme="light"] .tab-btn.active {
+    background: rgba(45, 106, 39, .12);
+    color: #2D6A27;
+  }
+
+  [data-theme="light"] .badge-done {
+    background: #EEF2EE;
+    color: #4A6B4A;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .btn-rst {
+    color: #5A6B5A;
+    border-color: #C8D8C8;
+  }
+
+  [data-theme="light"] .sm-back {
+    border-color: #C8D8C8;
+    color: #5A6B5A;
+  }
+
+  [data-theme="light"] .sm-itab {
+    color: #5A6B5A;
+  }
+
+  [data-theme="light"] .att-tab-title {
+    color: #3A5A37;
+  }
+
+  [data-theme="light"] .att-table tr:hover td {
+    background: rgba(45, 106, 39, .04);
+  }
+
+  [data-theme="light"] .sess-row {
+    background: #FFFFFF;
+    border-color: #D4DDD4;
+  }
+
+  [data-theme="light"] .sess-row:hover {
+    border-color: #2D6A27;
+    background: #F8FAF8;
+  }
+
+  @keyframes sp {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media(max-width:480px) {
+    .sr-name {
+      font-size: 13px;
+    }
+
+    .btn-vr {
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+  }
+
+  @media(max-width:768px) {
+    .filter-bar {
+      padding: 10px;
+      gap: 10px;
+    }
+
+    .sess-row {
+      padding: 12px;
+      border-radius: 10px;
+      gap: 8px;
+    }
+
+    .btn-vr {
+      width: 100%;
+      justify-content: center;
+      order: 3;
+    }
+
+    .tab-row {
+      padding: 5px;
+      gap: 5px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+    }
+
+    .tab-btn {
+      flex: 0 0 auto;
+      min-width: 0;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .sr-sub {
+      line-height: 1.45;
+      white-space: normal;
+    }
+
+    .sm-bar,
+    .att-tab-top {
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+
+    .sm-itabs {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap;
+    }
+
+    .sm-itab {
+      flex: 0 0 auto;
+      padding: 10px 14px;
+      font-size: 11px;
+    }
+
+    .sm-info-grid,
+    .sm-stat-grid,
+    .att-scroll {
+      padding-left: 12px !important;
+      padding-right: 12px !important;
+    }
+
+    .att-table {
+      min-width: 620px;
+    }
+  }
+
+  @media(max-width:480px) {
+    .sm-back,
+    .btn-export-xl {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .sm-bar h3 {
+      width: 100%;
+      order: 3;
+      white-space: normal;
+    }
+
+    .tab-btn {
+      padding: 8px 12px;
+    }
+  }
+

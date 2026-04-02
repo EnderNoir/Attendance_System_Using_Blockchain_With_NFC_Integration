@@ -1,0 +1,111 @@
+/* Attendance record page styles: extracted from template for maintainability. */
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+  margin-bottom: 18px;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: var(--accent);
+}
+
+.summary-pill {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.summary-pill .val {
+  font-family: "Space Mono", monospace;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.summary-pill .lbl {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.sess-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  transition: border-color 0.2s;
+}
+
+.sess-card:hover {
+  border-color: var(--border);
+}
+
+.sess-card.present {
+  border-left: 3px solid var(--success);
+}
+
+.sess-card.late {
+  border-left: 3px solid var(--warning);
+}
+
+.sess-card.excused {
+  border-left: 3px solid #60a5fa;
+}
+
+.sess-card.absent {
+  border-left: 3px solid var(--danger);
+}
+
+@media (max-width: 768px) {
+  .summary-pill {
+    min-width: calc(50% - 5px);
+    padding: 10px 12px;
+  }
+
+  .sess-card {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  #sessionDetailList,
+  .scroll-container {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .timeline-item {
+    align-items: flex-start !important;
+    flex-wrap: wrap;
+    gap: 8px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-pill {
+    min-width: 100%;
+  }
+
+  .summary-pill .val {
+    font-size: 18px;
+  }
+
+  .back-link {
+    margin-bottom: 12px;
+  }
+}

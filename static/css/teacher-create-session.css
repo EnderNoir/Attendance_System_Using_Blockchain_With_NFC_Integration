@@ -1,0 +1,24 @@
+.sess-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:10px;transition:border-color .2s;}
+.sess-card:hover{border-color:rgba(45,106,39,.3);}
+.sess-card.live{border-color:rgba(45,106,39,.4);background:rgba(45,106,39,.03);}
+.live-dot{width:7px;height:7px;background:var(--success);border-radius:50%;animation:pulse 1.5s infinite;flex-shrink:0;display:inline-block;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;}
+.fg{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;}
+.fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.fs{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;appearance:none;width:100%;}
+.fs:focus{outline:none;border-color:var(--accent);}
+.btn-rst{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:7px 12px;font-size:12px;cursor:pointer;align-self:flex-end;transition:all .2s;white-space:nowrap;}
+.btn-rst:hover{border-color:var(--danger);color:var(--danger);}
+.add-subj-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:flex-end;}
+@media(max-width:860px){.add-subj-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:540px){.add-subj-grid{grid-template-columns:1fr;}}
+.add-subj-grid .btn-primary{height:40px;white-space:nowrap;}
+.start-form{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
+.start-form > .sf-field{flex:1;min-width:140px;}
+.start-form > .sf-field-sm{flex:0 0 110px;}
+.start-form > button{flex-shrink:0;height:40px;}
+@media(max-width:540px){.start-form > button{width:100%;justify-content:center;}.start-form > .sf-field-sm{flex:1;}}
+.sec-mono{font-family:'Space Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:1px;margin-bottom:8px;}
+.slot-past{color:var(--muted) !important;font-style:italic;}
+.grace-hint{font-size:10px;color:var(--muted);margin-top:3px;}

@@ -150,6 +150,10 @@ Contributions are welcome! Please follow these steps:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+## Project Notes
+
+- Thesis alignment gap report: `docs/thesis_alignment_gap_analysis.md`
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
@@ -171,4 +175,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 **⭐ If you find this project helpful, please consider giving it a star!**
 
 ```
-

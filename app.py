@@ -1883,6 +1883,9 @@ def check_and_start_scheduled_sessions():
         schedules = [s for s in db_get_all_schedules() if int(s['day_of_week']) == today_dow]
         active_sessions = get_active_sessions()
         
+        if schedules:
+            print(f"[AUTO] Checking {len(schedules)} schedule(s) for today ({now_dt.strftime('%A %Y-%m-%d %H:%M:%S')})")
+        
         for s in schedules:
             start_time = s['start_time']
             end_time   = s['end_time']
@@ -2103,12 +2106,23 @@ def automation_loop():
     after the trigger time while still being lightweight.
     """
     poll_seconds = 5
+    last_log_time = 0
     while True:
         try:
+            current_time = time.time()
+            # Log status every 60 seconds
+            if current_time - last_log_time > 60:
+                now_dt = datetime.now()
+                active_count = len(get_active_sessions())
+                print(f"[AUTO] Heartbeat: {now_dt.strftime('%Y-%m-%d %H:%M:%S')} | Active sessions: {active_count}")
+                last_log_time = current_time
+            
             check_and_start_scheduled_sessions()
             check_and_end_expired_sessions()
         except Exception as e:
+            import traceback
             print(f"[AUTO ERROR] {e}")
+            print(f"[AUTO ERROR] Traceback: {traceback.format_exc()}")
         time.sleep(poll_seconds)
 
 def ensure_automation_thread_running():
@@ -2119,7 +2133,7 @@ def ensure_automation_thread_running():
             return
         AUTO_THREAD = Thread(target=automation_loop, daemon=True, name='davs-automation-loop')
         AUTO_THREAD.start()
-        print('[AUTO] Automation loop started.')
+        print(f'[AUTO] Automation loop started at {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
 
 @app.before_request
 def _ensure_automation_thread_running():
@@ -4375,6 +4389,75 @@ def blockchain_status():
         'online': BLOCKCHAIN_ONLINE,
         'student_cache_count': student_count,
         'message': 'Blockchain online' if BLOCKCHAIN_ONLINE else f'Offline — {student_count} students loaded from cache'
+    })
+
+@app.route('/api/diagnostics')
+@login_required
+def diagnostics():
+    """
+    Debug endpoint: shows server state and session information.
+    Helps diagnose why sessions might not be starting on Railway.
+    """
+    now_dt = datetime.now()
+    active = get_active_sessions()
+    
+    with get_db() as conn:
+        schedules_today = conn.execute(
+            "SELECT schedule_id, subject_name, teacher_username, start_time, end_time "
+            "FROM schedules WHERE day_of_week=? AND is_active=1",
+            (now_dt.weekday(),)
+        ).fetchall()
+        
+        all_sessions = conn.execute(
+            "SELECT sess_id, subject_name, teacher_username, started_at, ended_at "
+            "FROM sessions WHERE started_at LIKE ? ORDER BY started_at DESC LIMIT 20",
+            (f"{now_dt.strftime('%Y-%m-%d')}%",)
+        ).fetchall()
+    
+    automation_running = AUTO_THREAD and AUTO_THREAD.is_alive()
+    
+    return jsonify({
+        'server_time': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+        'server_weekday': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][now_dt.weekday()],
+        'active_sessions_count': len(active),
+        'active_sessions': [
+            {
+                'sess_id': sid,
+                'subject': s.get('subject_name'),
+                'teacher': s.get('teacher'),
+                'section': s.get('section_key'),
+                'started_at': s.get('started_at'),
+                'auto_end_at': s.get('auto_end_at'),
+            }
+            for sid, s in list(active.items())[:10]
+        ],
+        'schedules_today': [dict(s) for s in schedules_today],
+        'sessions_today': [dict(s) for s in all_sessions],
+        'automation_running': automation_running,
+        'automation_thread_name': AUTO_THREAD.name if AUTO_THREAD else 'None',
+    })
+
+@app.route('/api/active_sessions')
+def api_active_sessions():
+    """
+    Public endpoint: returns all active sessions (for monitoring dashboards).
+    Does NOT require login.
+    """
+    active = get_active_sessions()
+    return jsonify({
+        'active_count': len(active),
+        'sessions': [
+            {
+                'sess_id': sid,
+                'subject': s.get('subject_name'),
+                'teacher': s.get('teacher'),
+                'section': s.get('section_key'),
+                'started_at': s.get('started_at'),
+                'students_present': len(s.get('present', [])),
+                'students_late': len(s.get('late', [])),
+            }
+            for sid, s in active.items()
+        ]
     })
 
 def _is_my_session(sess):

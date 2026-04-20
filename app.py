@@ -7,11 +7,15 @@ import json, os, secrets, time, hashlib, uuid, re, sqlite3
 from collections import deque
 from werkzeug.utils import secure_filename
 import secrets as _sec
+from dotenv import load_dotenv
 # pdfminer is imported inside parse_registration_pdf() so a startup
 # import glitch can never permanently disable PDF parsing for the session.
 
+# Load environment variables from .env file
+load_dotenv()
+
 app = Flask(__name__)
-app.secret_key = 'davs-super-secret-2024'
+app.secret_key = os.getenv('SECRET_KEY', 'davs-super-secret-2024')
 
 # ── Jinja2 custom filters ─────────────────────────────────────────────────────
 import json as _json_mod
@@ -354,9 +358,16 @@ else:
 
 contract_data_path = os.path.join(os.path.dirname(__file__), 'attendance-contract.json')
 try:
+    # Read address from .env
+    contract_address = os.getenv('ATTENDANCE_CONTRACT_ADDRESS')
+    if not contract_address:
+        raise ValueError("ATTENDANCE_CONTRACT_ADDRESS not found in .env")
+    
+    # Read ABI from JSON file
     with open(contract_data_path) as f:
         contract_data = json.load(f)
-    contract      = web3.eth.contract(address=contract_data['address'], abi=contract_data['abi'])
+    
+    contract      = web3.eth.contract(address=contract_address, abi=contract_data['abi'])
     admin_account = web3.eth.accounts[0] if BLOCKCHAIN_ONLINE else None
 except Exception as _ce:
     print(f"[WARNING] Could not load contract: {_ce}")
@@ -6034,5 +6045,12 @@ def _launch_nfc_listener():
 
 if __name__ == '__main__':
     ensure_automation_thread_running()
-    _launch_nfc_listener()
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+    # Only launch NFC listener in development
+    if os.getenv('FLASK_ENV') != 'production':
+        _launch_nfc_listener()
+    
+    # Get port from environment variable (for Heroku compatibility)
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_ENV') != 'production'
+    
+    app.run(debug=debug, host='0.0.0.0', port=port, use_reloader=False)

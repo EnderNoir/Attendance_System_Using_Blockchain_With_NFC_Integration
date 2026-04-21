@@ -377,13 +377,37 @@ except Exception as _ce:
     print("[INFO] Offline mode active: contract file missing or unreadable.")
 
 BASE_DIR      = os.path.dirname(__file__)
-DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 UPLOAD_FOLDER_EXCUSES = os.path.join(BASE_DIR, 'static', 'uploads', 'excuses')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(UPLOAD_FOLDER_EXCUSES, exist_ok=True)
 
 ALLOWED_EXTENSIONS_EXCUSES = {'png', 'jpg', 'jpeg', 'pdf'}
+
+# Database configuration
+# Check if running on Railway (uses DATABASE_URL environment variable)
+import urllib.parse
+if 'DATABASE_URL' in os.environ:
+    # Railway PostgreSQL connection or local PostgreSQL connection
+    DATABASE_URL = os.environ['DATABASE_URL']
+    # Parse the URL to extract components
+    parsed_url = urllib.parse.urlparse(DATABASE_URL)
+    # Check if it's a PostgreSQL URL (has a scheme)
+    if parsed_url.scheme == 'postgresql' or parsed_url.scheme == 'postgres':
+        DB_HOST = parsed_url.hostname
+        DB_PORT = parsed_url.port or 5432
+        DB_NAME = parsed_url.path[1:]  # Remove leading slash
+        DB_USER = parsed_url.username
+        DB_PASS = parsed_url.password
+        DB_TYPE = 'postgresql'
+    else:
+        # It's a SQLite URL (like sqlite:///filename.db)
+        DB_TYPE = 'sqlite'
+        DB_FILE = os.path.join(BASE_DIR, 'davs.db')
+else:
+    # Local SQLite connection
+    DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
+    DB_TYPE = 'sqlite'
 
 EXCUSE_REASONS = [
     ('sickness', 'Sickness / Illness'),
@@ -463,11 +487,36 @@ def generate_cvsu_email(name, provided_email=''):
 
 
 def get_db():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA foreign_keys=ON')
-    return conn
+    if DB_TYPE == 'postgresql':
+        # For PostgreSQL
+        import psycopg2
+        import psycopg2.extras
+        try:
+            conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                database=DB_NAME,
+                user=DB_USER,
+                password=DB_PASS,
+                connect_timeout=10
+            )
+            # Set row factory to dict-like access
+            conn.row_factory = psycopg2.extras.DictRow
+            return conn
+        except Exception as e:
+            print(f"Error connecting to PostgreSQL: {e}")
+            raise
+    else:
+        # For SQLite (local development)
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            conn.row_factory = sqlite3.Row
+            conn.execute('PRAGMA journal_mode=WAL')
+            conn.execute('PRAGMA foreign_keys=ON')
+            return conn
+        except Exception as e:
+            print(f"Error connecting to SQLite: {e}")
+            raise
 
 
 def init_db():

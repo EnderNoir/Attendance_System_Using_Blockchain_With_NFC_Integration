@@ -379,7 +379,12 @@ except Exception as _ce:
 BASE_DIR      = os.path.dirname(__file__)
 DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
 DATABASE_URL  = os.getenv('DATABASE_URL', '').strip()
-DB_BACKEND    = 'postgres' if DATABASE_URL else 'sqlite'
+_DB_URL_LOWER = DATABASE_URL.lower()
+DB_BACKEND    = 'postgres' if _DB_URL_LOWER.startswith(('postgres://', 'postgresql://')) else 'sqlite'
+if _DB_URL_LOWER.startswith('sqlite:///'):
+    _sqlite_target = DATABASE_URL[10:]
+    if _sqlite_target:
+        DB_FILE = _sqlite_target if os.path.isabs(_sqlite_target) else os.path.join(BASE_DIR, _sqlite_target)
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 UPLOAD_FOLDER_EXCUSES = os.path.join(BASE_DIR, 'static', 'uploads', 'excuses')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)

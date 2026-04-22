@@ -45,6 +45,10 @@ function loadSessionRecords() {
           ${s.units ? `<span><i class="bi bi-layers"></i> ${s.units} units</span>` : ''}
         </div>
         ${s.excuse_note ? `<div style="font-size:11px;color:var(--warning);margin-top:6px;"><i class="bi bi-info-circle"></i> Reason: <strong>${s.excuse_note}</strong></div>` : ''}
+        ${s.tx_hash ? `<div style="font-size:10px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:5px;">
+          <i class="bi bi-blockchain"></i> TX: <code style="color:var(--accent);">${s.tx_hash.slice(0, 20)}...</code>
+          <a href="https://sepolia.etherscan.io/tx/${s.tx_hash}" target="_blank" title="View on Etherscan" style="color:var(--muted);"><i class="bi bi-box-arrow-up-right"></i></a>
+        </div>` : ''}
       </div>
       <span style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0;
         ${s.status === 'present'

@@ -1,4 +1,4 @@
-﻿/* -- DATA -- */
+/* -- DATA -- */
   const SCHEDULE_BOOTSTRAP = window.ADMIN_SCHEDULES_BOOTSTRAP || {};
   const ALL_SCHEDULES = Array.isArray(SCHEDULE_BOOTSTRAP.schedules) ? SCHEDULE_BOOTSTRAP.schedules : [];
   const ALL_SUBJECTS = SCHEDULE_BOOTSTRAP.subjects || {};
@@ -482,6 +482,7 @@
       document.getElementById('editProgram').value = sk[0] || '';
       document.getElementById('editYear').value = sk[1] || '1st Year';
       document.getElementById('editSection').value = sk[2] || '';
+      document.getElementById('editSemesterInput').value = s.semester || '1st Semester';
       document.getElementById('editDay').value = dayIdx;
       document.getElementById('editClassType').value = String(s.class_type || 'lecture').toLowerCase();
       document.getElementById('editStartTime').value = to24h(s.start_time);
@@ -977,13 +978,22 @@
     items.forEach(it => {
       const tr = document.createElement('tr'); tr.className = 'ac-tr';
       tr.innerHTML = '<td class="ac-td">' + esc(it[colA]) + '</td><td class="ac-td muted">' + esc(it[colB]) + '</td>';
-      tr.onclick = () => { hid.value = it.id; inp.value = it.label; drop.classList.remove('open'); };
+      tr.onmousedown = (e) => {
+        e.preventDefault(); // Prevent input from losing focus immediately
+        hid.value = it.id;
+        inp.value = it.label;
+        drop.classList.remove('open');
+      };
       tbody.appendChild(tr);
     });
     drop.classList.add('open');
   }
   function subjDataFn(q) { return Object.entries(ALL_SUBJECTS).filter(e => !q || (e[1].name || '').toLowerCase().includes(q) || (e[1].course_code || '').toLowerCase().includes(q)).slice(0, 10).map(e => ({ id: e[0], label: e[1].name, code: e[1].course_code || '-' })); }
   function teacherDataFn(q) { return Object.entries(ALL_TEACHERS).filter(e => !q || (e[1].full_name || '').toLowerCase().includes(q) || e[0].toLowerCase().includes(q)).slice(0, 10).map(e => ({ id: e[0], label: e[1].full_name, role: e[1].role })); }
+  function semesterDataFn(q) {
+    const opts = [{id:'1st Semester', label:'1st Semester'}, {id:'2nd Semester', label:'2nd Semester'}, {id:'Summer', label:'Summer'}];
+    return opts.filter(o => !q || o.label.toLowerCase().includes(q));
+  }
 
   function validateSchedForm(prefix) {
     const hid = document.getElementById(prefix + 'SubjHidden');
@@ -1098,8 +1108,10 @@
       toggleClassTypeFields();
       makeAC('addSubjInput', 'addSubjHidden', 'addSubjBody', 'addSubjDrop', subjDataFn, 'code', 'label');
       makeAC('addTeacherInput', 'addTeacherHidden', 'addTeacherBody', 'addTeacherDrop', teacherDataFn, 'label', 'role');
+      makeAC('addSemesterInput', 'addSemesterInput', 'addSemesterBody', 'addSemesterDrop', semesterDataFn, 'id', 'label');
       makeAC('editSubjInput', 'editSubjHidden', 'editSubjBody', 'editSubjDrop', subjDataFn, 'code', 'label');
       makeAC('editTeacherInput', 'editTeacherHidden', 'editTeacherBody', 'editTeacherDrop', teacherDataFn, 'label', 'role');
+      makeAC('editSemesterInput', 'editSemesterInput', 'editSemesterBody', 'editSemesterDrop', semesterDataFn, 'id', 'label');
     }
     checkPresessions();
     setInterval(checkRecurringSessions, 60000);

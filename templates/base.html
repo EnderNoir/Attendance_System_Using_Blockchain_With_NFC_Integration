@@ -379,6 +379,34 @@
     </div>
   </div>
 
+  <!-- Phone NFC Modal -->
+  <div class="app-dialog-overlay" id="phoneNfcModal" onclick="if(event.target===this) closePhoneNFC()">
+    <div class="app-dialog" style="max-width: 400px;">
+      <div class="app-dialog-header">
+        <div class="app-dialog-title"><i class="bi bi-phone"></i> Phone NFC Reader</div>
+        <button type="button" class="app-dialog-close" onclick="closePhoneNFC()"><i class="bi bi-x"></i></button>
+      </div>
+      <div class="app-dialog-body" style="text-align: center; padding: 24px;">
+        <div id="phoneNfcIcon" style="font-size: 48px; margin-bottom: 16px;">
+          <i class="bi bi-phone"></i>
+        </div>
+        <div class="app-dialog-title" id="phoneNfcTitle" style="font-size: 18px; margin-bottom: 8px;">Ready to Scan</div>
+        <p id="phoneNfcDesc" style="color: var(--muted); margin-bottom: 20px;">
+          Hold the student's card against the back of your phone.
+        </p>
+        <div id="phoneNfcLastUidWrap" style="background: rgba(45,106,39,0.1); border: 1.5px dashed var(--accent); border-radius: 12px; padding: 12px; margin-top: 10px;">
+          <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); font-weight: 700; margin-bottom: 4px;">Last Captured UID</div>
+          <div id="phoneNfcLastUid" style="font-family: 'Space Mono', monospace; font-size: 20px; font-weight: 700; color: var(--text);">—</div>
+          <div id="phoneNfcHex" style="font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 4px;">--:--:--:--</div>
+        </div>
+        <div style="margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <input type="checkbox" id="chkNfcReverse" onchange="toggleNfcReverse(this.checked)" style="width: 16px; height: 16px; cursor: pointer;" />
+          <label for="chkNfcReverse" style="font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text);">Match External Reader (LSB)</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
   <script>{% include 'assets/base.js' %}</script>
   {% block extra_scripts %}{% endblock %}

@@ -187,6 +187,8 @@ def send_teacher_session_summary(
     absent_count,
     excused_count,
     student_rows,
+    session_tx_hash=None,
+    session_block_number=None,
     send_email_fn: Optional[Callable] = None,
 ):
     """Send session summary email to teacher when session ends."""
@@ -231,6 +233,42 @@ def send_teacher_session_summary(
             {tx_cell}
           </td>
         </tr>'''
+    
+    # Add session blockchain info if available
+    session_blockchain_info = ''
+    if session_tx_hash:
+        session_blockchain_info = f'''
+      <!-- Session Blockchain Info -->
+      <tr>
+        <td style="background:#E8F5E9;padding:16px 32px;border-top:1px solid #ddd;">
+          <div style="font-size:13px;font-weight:700;color:#2D6A27;margin-bottom:12px;">
+            📋 Session Blockchain Record
+          </div>
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding:6px 0;font-size:12px;color:#666;width:120px;">Transaction Hash:</td>
+              <td style="padding:6px 0;font-size:11px;font-family:monospace;color:#2D6A27;word-break:break-all;">
+                {session_tx_hash}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;font-size:12px;color:#666;">Block Number:</td>
+              <td style="padding:6px 0;font-size:12px;font-family:monospace;color:#333;">
+                {session_block_number}
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2" style="padding:8px 0;font-size:11px;color:#999;border-top:1px solid #ccc;margin-top:8px;padding-top:8px;">
+                ✓ This entire session's attendance record has been permanently recorded on the Sepolia blockchain.<br/>
+                <a href="https://sepolia.etherscan.io/tx/{session_tx_hash}" style="color:#2D6A27;text-decoration:none;font-weight:bold;" target="_blank">
+                  View on Blockchain Explorer
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>'''
+    
     html = f'''<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:Calibri,Arial,sans-serif;">
@@ -345,12 +383,13 @@ def send_teacher_session_summary(
           </table>
         </td>
       </tr>
+      {session_blockchain_info}
       <!-- Footer -->
       <tr>
         <td style="padding:16px 32px 28px;">
           <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
             This is an automated session summary from the DAVS system.<br>
-            All TX hashes are immutable blockchain records verifiable on the Hardhat network.<br>
+            All TX hashes are immutable blockchain records verifiable on the Sepolia testnet.<br>
             Please do not reply to this email.
           </div>
         </td>

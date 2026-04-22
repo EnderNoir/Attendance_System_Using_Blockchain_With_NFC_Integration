@@ -1,5 +1,5 @@
 {
-  "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+  "address": "0x715928AAc13165f136c42d5F8cd403c23de4F719",
   "abi": [
     {
       "type": "constructor",
@@ -269,5 +269,8 @@
         }
       ]
     }
-  ]
+  ],
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2026-04-21T10:58:29.704Z"
 }

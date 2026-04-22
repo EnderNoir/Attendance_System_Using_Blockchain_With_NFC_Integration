@@ -9,7 +9,7 @@
 <!-- Welcome bar -->
 <div class="welcome-bar">
   <div>
-    <div class="welcome-name">Welcome back, {{ user.full_name.split(' ')[0] }}! 👋</div>
+    <div class="welcome-name">Welcome back, {{ (user.full_name or 'Teacher').split(' ')[0] }}! 👋</div>
     <div class="welcome-sub">
       {{ sections|length }} section{{ 's' if sections|length != 1 }} assigned
       &nbsp;·&nbsp; {{ my_subjects|length }} subject{{ 's' if my_subjects|length != 1 }} in schedule
@@ -54,7 +54,7 @@
           {% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif %}{{ s.subject_name }}
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px;">
-          {{ s.section_key.replace('|',' · ') }} &nbsp;·&nbsp;
+          {{ (s.section_key or '').replace('|',' · ') }} &nbsp;·&nbsp;
           <span style="color:var(--success);font-weight:600;">{{ s.present|length }} present</span>
           &nbsp;·&nbsp; Started {{ fmt_time_short(s.started_at) }}
         </div>

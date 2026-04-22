@@ -8,12 +8,14 @@ Usage:
     python migrate_db.py
 """
 
-import sqlite3
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+from services.ops.db_compat import connect_db
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DB_FILE = os.path.join(PROJECT_ROOT, 'davs.db')
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs')
 
 # All columns that should exist across all tables.
 # Format: (table, column_name, definition)
@@ -63,6 +65,10 @@ COLUMNS_TO_ADD = [
     ("sessions", "grace_period",    "INTEGER NOT NULL DEFAULT 15"),
     ("sessions", "auto_end_at",     "TEXT"),
     ("sessions", "schedule_id",     "TEXT DEFAULT NULL"),
+    ('schedules', 'semester', "TEXT NOT NULL DEFAULT '1st Semester'"),
+    ('sessions', 'semester', "TEXT NOT NULL DEFAULT '1st Semester'"),
+    ('sessions', 'session_tx_hash', "TEXT NOT NULL DEFAULT ''"),
+    ('sessions', 'session_block_number', "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 # Tables that must exist (created if missing)
@@ -118,6 +124,7 @@ TABLES_TO_CREATE = [
             day_of_week      INTEGER NOT NULL DEFAULT 1,
             start_time       TEXT NOT NULL DEFAULT '',
             end_time         TEXT NOT NULL DEFAULT '',
+            semester         TEXT NOT NULL DEFAULT '',
             grace_minutes    INTEGER NOT NULL DEFAULT 15,
             is_active        INTEGER NOT NULL DEFAULT 1,
             created_by       TEXT NOT NULL DEFAULT '',
@@ -175,33 +182,33 @@ INDEXES = [
 
 def get_existing_columns(conn, table):
     try:
-        return [row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        rows = conn.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema='public' AND table_name=? "
+            "ORDER BY ordinal_position",
+            (table,)
+        ).fetchall()
+        return [row[0] for row in rows]
     except Exception:
         return []
 
 
 def get_existing_tables(conn):
     return [row[0] for row in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema='public' AND table_type='BASE TABLE'"
     ).fetchall()]
 
 
 def migrate():
-    if not os.path.exists(DB_FILE):
-        print(f"[ERROR] Database not found: {DB_FILE}")
-        print("Start the Flask app once first to create the database, then re-run this script.")
-        return
-
-    print(f"[MIGRATE] Opening: {DB_FILE}")
-    conn = sqlite3.connect(DB_FILE)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
+    print("[MIGRATE] Opening PostgreSQL connection")
+    conn = connect_db(DATABASE_URL)
 
     existing_tables = get_existing_tables(conn)
     print(f"[MIGRATE] Tables found: {existing_tables}")
 
     # ── 1. Create missing tables ───────────────────────────────────────────
-    print("\n── Creating missing tables ──")
+    print("\n-- Creating missing tables --")
     for table_name, create_sql in TABLES_TO_CREATE:
         if table_name not in existing_tables:
             conn.execute(create_sql)
@@ -213,16 +220,16 @@ def migrate():
                     "VALUES (1, 0, '', '', ?)",
                     (datetime.now().strftime('%Y-%m-%d %H:%M:%S'),)
                 )
-            print(f"  ✅ Created table: {table_name}")
+            print(f"  [OK] Created table: {table_name}")
         else:
-            print(f"  ✔  Table already exists: {table_name}")
+            print(f"  [SKIP] Table already exists: {table_name}")
 
-    # ── 2. Add missing columns ─────────────────────────────────────────────
-    print("\n── Adding missing columns ──")
+    # -- 2. Add missing columns --
+    print("\n-- Adding missing columns --")
     added, skipped = [], []
     for table, col, defn in COLUMNS_TO_ADD:
         if table not in get_existing_tables(conn):
-            print(f"  ⚠  Table {table} not found, skipping {col}")
+            print(f"  [WARN] Table {table} not found, skipping {col}")
             continue
         existing_cols = get_existing_columns(conn, table)
         if col in existing_cols:
@@ -231,12 +238,12 @@ def migrate():
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {defn}")
             added.append(f"{table}.{col}")
-            print(f"  ✅ Added: {table}.{col}")
+            print(f"  [NEW] Added: {table}.{col}")
         except Exception as e:
-            print(f"  ⚠  Could not add {table}.{col}: {e}")
+            print(f"  [ERR] Could not add {table}.{col}: {e}")
 
-    # ── 3. Backfill data from old column names ─────────────────────────────
-    print("\n── Backfilling data from renamed columns ──")
+    # -- 3. Backfill data from old column names --
+    print("\n-- Backfilling data from renamed columns --")
     for table, src, dst in BACKFILLS:
         existing_cols = get_existing_columns(conn, table)
         if src in existing_cols and dst in existing_cols:
@@ -245,20 +252,20 @@ def migrate():
                     f"UPDATE {table} SET {dst} = {src} "
                     f"WHERE ({dst} IS NULL OR {dst} = '') AND ({src} IS NOT NULL AND {src} != '')"
                 )
-                print(f"  ✅ Backfilled {table}.{src} → {table}.{dst}")
+                print(f"  [OK] Backfilled {table}.{src} -> {table}.{dst}")
             except Exception as e:
-                print(f"  ⚠  Backfill {table}.{src}→{dst}: {e}")
+                print(f"  [ERR] Backfill {table}.{src}->{dst}: {e}")
         else:
-            print(f"  ✔  Skipped backfill {table}.{src}→{dst} (one or both columns missing)")
+            print(f"  [SKIP] Skipped backfill {table}.{src}->{dst} (one or both columns missing)")
 
-    # ── 4. Create indexes ──────────────────────────────────────────────────
-    print("\n── Creating indexes ──")
+    # -- 4. Create indexes --
+    print("\n-- Creating indexes --")
     for idx_name, idx_sql in INDEXES:
         try:
             conn.execute(idx_sql)
-            print(f"  ✅ Index: {idx_name}")
+            print(f"  [OK] Index: {idx_name}")
         except Exception as e:
-            print(f"  ⚠  Index {idx_name}: {e}")
+            print(f"  [ERR] Index {idx_name}: {e}")
 
     conn.commit()
     conn.close()
@@ -270,7 +277,7 @@ def migrate():
         for c in added: print(f"    + {c}")
     if skipped:
         print(f"  Skipped {len(skipped)} already-existing column(s)")
-    print(f"\n✅ Restart Flask now: python app.py")
+    print(f"\n[INFO] Restart Flask now: python app.py")
     print(f"{'='*50}\n")
 
 

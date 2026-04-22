@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Live Class Session — DAVS{% endblock %}
 {% block page_title %}LIVE CLASSROOM SESSION{% endblock %}
 {% block extra_head %}
@@ -77,7 +77,8 @@
         <div class="live-dot"></div> {% if is_school_event %}LIVE SCHOOL EVENT{% else %}LIVE CLASS{% endif %}
       </div>
       {% else %}
-      <div class="ended-badge" style="margin-bottom:10px;"><i class="bi bi-check-circle"></i> {% if is_school_event %}EVENT ENDED{% else %}CLASS ENDED{% endif %}</div>
+      <div class="ended-badge" style="margin-bottom:10px;"><i class="bi bi-check-circle"></i> {% if is_school_event
+        %}EVENT ENDED{% else %}CLASS ENDED{% endif %}</div>
       {% endif %}
       <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--accent);margin-bottom:4px;">
         {% if sess.course_code %}[{{ sess.course_code }}]{% endif %}
@@ -86,10 +87,12 @@
       </div>
       <h2 style="font-size:22px;font-weight:700;margin-bottom:4px;">{{ sess.subject_name }}</h2>
       <div style="font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;">
-        <span><i class="bi bi-people"></i> {{ sess.section_key.replace('|',' · ') }}</span>
+        <span><i class="bi bi-people"></i> {{ (sess.section_key or '').replace('|',' · ') }}</span>
         <span><i class="bi bi-person-badge"></i> {{ sess.teacher_name }}</span>
-        <span><i class="bi bi-clock"></i> {% if is_school_event %}Event started{% else %}Class started{% endif %} {{ fmt_time(sess.started_at) }}</span>
-        {% if (not is_school_event) and sess.late_cutoff %}<span><i class="bi bi-exclamation-triangle"></i> Late after {{
+        <span><i class="bi bi-clock"></i> {% if is_school_event %}Event started{% else %}Class started{% endif %} {{
+          fmt_time(sess.started_at) }}</span>
+        {% if (not is_school_event) and sess.late_cutoff %}<span><i class="bi bi-exclamation-triangle"></i> Late after
+          {{
           fmt_time_short(sess.late_cutoff) }}</span>{% endif %}
         {% if sess.ended_at %}<span><i class="bi bi-stop-circle"></i> Ended {{ fmt_time(sess.ended_at) }}</span>{% endif
         %}
@@ -103,23 +106,37 @@
         <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
           <tbody>
             <tr>
-              <td style="width:180px;background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Teacher(s)</td>
-              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ (session_meta.teachers|join(', ')) if session_meta.teachers else '—' }}</td>
+              <td
+                style="width:180px;background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">
+                Teacher(s)</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{
+                (session_meta.teachers|join(', ')) if session_meta.teachers else '—' }}</td>
             </tr>
             <tr>
-              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Program(s)</td>
-              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ (session_meta.programs|join(', ')) if session_meta.programs else '—' }}</td>
+              <td
+                style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">
+                Program(s)</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{
+                (session_meta.programs|join(', ')) if session_meta.programs else '—' }}</td>
             </tr>
             <tr>
-              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Year(s)</td>
-              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ (session_meta.years|join(', ')) if session_meta.years else '—' }}</td>
+              <td
+                style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">
+                Year(s)</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{
+                (session_meta.years|join(', ')) if session_meta.years else '—' }}</td>
             </tr>
             <tr>
-              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Section(s)</td>
-              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ (session_meta.sections|join(', ')) if session_meta.sections else '—' }}</td>
+              <td
+                style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">
+                Section(s)</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{
+                (session_meta.sections|join(', ')) if session_meta.sections else '—' }}</td>
             </tr>
             <tr>
-              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Student(s) Involved</td>
+              <td
+                style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">
+                Student(s) Involved</td>
               <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">
                 {% if session_meta.students %}
                 {{ session_meta.students|length }} student{{ 's' if session_meta.students|length != 1 else '' }}
@@ -129,19 +146,30 @@
               </td>
             </tr>
             <tr>
-              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Date</td>
-              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ session_meta.date or '—' }}</td>
+              <td
+                style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">
+                Date</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{
+                session_meta.date or '—' }}</td>
             </tr>
             <tr>
-              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">Start Time</td>
-              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ session_meta.start_time or '—' }}</td>
+              <td
+                style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">
+                Start Time</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{
+                session_meta.start_time or '—' }}</td>
             </tr>
             <tr>
-              <td style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">End Time</td>
-              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{ session_meta.end_time or '—' }}</td>
+              <td
+                style="background:rgba(255,255,255,.03);padding:9px 12px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:700;vertical-align:top;">
+                End Time</td>
+              <td style="padding:9px 12px;border-bottom:1px solid var(--border);word-break:break-word;">{{
+                session_meta.end_time or '—' }}</td>
             </tr>
             <tr>
-              <td style="background:rgba(255,255,255,.03);padding:9px 12px;color:var(--muted);font-weight:700;vertical-align:top;">Class Type</td>
+              <td
+                style="background:rgba(255,255,255,.03);padding:9px 12px;color:var(--muted);font-weight:700;vertical-align:top;">
+                Class Type</td>
               <td style="padding:9px 12px;word-break:break-word;">{{ session_meta.class_type or '—' }}</td>
             </tr>
           </tbody>
@@ -182,12 +210,13 @@
 <div class="scan-indicator">
   <span class="scan-icon">📡</span>
   <div>
-    <div style="font-weight:600;font-size:14px;color:var(--success);">{% if is_school_event %}NFC Reader Active — Accepting Event Attendance Taps{% else %}NFC Reader Active — Accepting Student Taps{% endif %}</div>
+    <div style="font-weight:600;font-size:14px;color:var(--success);">{% if is_school_event %}NFC Reader Active —
+      Accepting Event Attendance Taps{% else %}NFC Reader Active — Accepting Student Taps{% endif %}</div>
     <div style="font-size:12px;color:var(--muted);margin-top:2px;">
       {% if is_school_event %}
       Students in the assigned event sections can tap their NFC card to mark attendance.
       {% else %}
-      Students in <strong style="color:var(--text);">{{ sess.section_key.replace('|',' · ') }}</strong>
+      Students in <strong style="color:var(--text);">{{ (sess.section_key or '').replace('|',' · ') }}</strong>
       can tap their NFC card to mark their classroom attendance.
       {% endif %}
       {% if is_school_event %}
@@ -222,13 +251,16 @@
          color:transparent;z-index:-1;font-size:1px;" aria-hidden="true" />
 
 <!-- NFC Tap Display Strip -->
-<div class="nfc-tap-strip" id="nfcTapStrip">
+<div class="nfc-tap-strip" id="nfcTapStrip" style="display: flex; align-items: center;">
   <span class="nfc-strip-icon" id="nfcStripIcon">💳</span>
   <div style="flex:1;min-width:0;">
     <div class="nfc-strip-label">Last NFC Card Tapped</div>
     <div class="nfc-strip-uid" id="nfcStripUid">Waiting for card tap…</div>
   </div>
-  <div class="nfc-strip-status" id="nfcStripStatus" style="color:var(--muted);">—</div>
+  <div class="nfc-strip-status" id="nfcStripStatus" style="color:var(--muted); margin-right: 12px;">—</div>
+  <button type="button" class="btn-outline" style="margin-left: auto; white-space: nowrap;" onclick="startPhoneNFC()">
+    <i class="bi bi-phone"></i> Use Phone's NFC
+  </button>
 </div>
 {% endif %}
 

@@ -2042,3 +2042,69 @@
         padding: 14px;
       }
     }
+
+/* -- PHONE NFC MODAL -- */
+.app-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.app-dialog-overlay.show {
+  display: flex;
+}
+.app-dialog {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 18px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 16px 60px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes modalPop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.app-dialog-header {
+  padding: 16px 20px;
+  background: rgba(45, 106, 39, 0.06);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.app-dialog-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-dialog-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  transition: all 0.2s;
+  border-radius: 8px;
+}
+.app-dialog-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text);
+}
+.app-dialog-body {
+  padding: 24px;
+}
+

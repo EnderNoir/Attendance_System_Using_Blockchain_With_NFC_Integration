@@ -45,11 +45,11 @@ def attendance_stats_impl(
         start_dt = datetime(2000, 1, 1)
         end_dt = None
 
-    where = ['s.started_at >= ?']
-    params = [start_dt.strftime('%Y-%m-%d %H:%M:%S')]
+    where = ['s.started_at::date >= ?']
+    params = [start_dt.strftime('%Y-%m-%d')]
     if end_dt:
-        where.append('s.started_at <= ?')
-        params.append(end_dt.strftime('%Y-%m-%d %H:%M:%S'))
+        where.append('s.started_at::date <= ?')
+        params.append(end_dt.strftime('%Y-%m-%d'))
     if role == 'teacher':
         where.append('s.teacher_username = ?')
         params.append(username)
@@ -75,9 +75,9 @@ def attendance_stats_impl(
         where.append('LOWER(COALESCE(s.class_type,\'lecture\')) = ?')
         params.append(f_class_type)
     if f_tod == 'morning':
-        where.append("CAST(strftime('%H',s.started_at) AS INTEGER) < 12")
+        where.append('EXTRACT(HOUR FROM s.started_at::timestamp) < 12')
     elif f_tod == 'afternoon':
-        where.append("CAST(strftime('%H',s.started_at) AS INTEGER) >= 12")
+        where.append('EXTRACT(HOUR FROM s.started_at::timestamp) >= 12')
     elif f_tod and ':' in f_tod:
         where.append('s.time_slot = ?')
         params.append(f_tod)
@@ -85,13 +85,15 @@ def attendance_stats_impl(
     wsql = ' AND '.join(where)
 
     if period == 'today':
-        tkey_expr = "strftime('%H:00',s.started_at)"
+        tkey_expr = "TO_CHAR(s.started_at::timestamp, 'HH24:00')"
     elif period == 'month':
-        tkey_expr = "strftime('%m/%d',s.started_at)"
+        tkey_expr = "TO_CHAR(s.started_at::date, 'MM/DD')"
     elif period == 'year':
-        tkey_expr = "strftime('%m',s.started_at)"
+        tkey_expr = "TO_CHAR(s.started_at::date, 'MM')"
     else:
-        tkey_expr = "strftime('%Y',s.started_at)"
+        tkey_expr = "TO_CHAR(s.started_at::date, 'YYYY')"
+
+    params = tuple(params)
 
     with get_db_fn() as conn:
         donut_rows = conn.execute(
@@ -99,30 +101,31 @@ def attendance_stats_impl(
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "WHERE " + wsql + ' GROUP BY al.status',
-            params,
+            tuple(params),
         ).fetchall()
         trend_rows = conn.execute(
             "SELECT " + tkey_expr + " as tkey, al.status, COUNT(*) as cnt "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "WHERE " + wsql + ' GROUP BY tkey, al.status ORDER BY tkey',
-            params,
+            tuple(params),
         ).fetchall()
         subj_rows = conn.execute(
             "SELECT s.subject_name, s.course_code, al.status, COUNT(*) as cnt "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "WHERE " + wsql + ' GROUP BY s.subject_name, s.course_code, al.status',
-            params,
+            tuple(params),
         ).fetchall()
-        sess_count = conn.execute(
+        sess_count_row = conn.execute(
             'SELECT COUNT(DISTINCT s.sess_id) as cnt FROM sessions s WHERE ' + wsql,
-            params,
-        ).fetchone()['cnt']
+            tuple(params),
+        ).fetchone()
+        sess_count = sess_count_row['cnt'] if sess_count_row else 0
         subj_labels_rows = conn.execute(
             "SELECT DISTINCT s.subject_name, s.course_code FROM sessions s "
             "WHERE " + wsql + ' ORDER BY s.subject_name',
-            params,
+            tuple(params),
         ).fetchall()
 
     donut = {'present': 0, 'late': 0, 'absent': 0, 'excused': 0}

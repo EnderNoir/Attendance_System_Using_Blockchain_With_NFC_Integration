@@ -5,12 +5,12 @@ Fixes the root cause of students reappearing after reset:
 
   ROOT CAUSE: get_all_students() in app.py reads StudentRegistered events
   directly from the Hardhat blockchain on every Flask startup. Clearing
-  SQLite alone does nothing — the blockchain still has all the registrations
+    PostgreSQL cleanup alone does nothing — the blockchain still has all the registrations
   and app.py repopulates the students table automatically on next run.
 
   THE FIX: This script deletes the attendance-contract.json file after
-  clearing SQLite. Without it, app.py sets contract=None and falls back to
-  SQLite-only mode (no blockchain reads). On next deploy you restore it.
+    clearing PostgreSQL data. Without it, app.py keeps reading historical
+    blockchain registrations. On next deploy you restore it.
   Alternatively use --keep-contract to skip that step if you want to redeploy
   the contract yourself via Hardhat.
 
@@ -22,12 +22,17 @@ Usage:
 WARNING: Permanently deletes ALL data. Cannot be undone.
 """
 
-import sqlite3, hashlib, os, sys, shutil
+import hashlib, os, sys, shutil
 from datetime import datetime
+from dotenv import load_dotenv
+from services.ops.db_compat import connect_db
+
+# ── Load environment ──────────────────────────────────────────────────────────
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # ── Config ────────────────────────────────────────────────────────────────────
-BASE_DIR       = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DB_FILE        = os.path.join(BASE_DIR, 'davs.db')
+DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs')
 CONTRACT_FILE  = os.path.join(BASE_DIR, 'attendance-contract.json')
 UPLOAD_FOLDER  = os.path.join(BASE_DIR, 'static', 'uploads')
 
@@ -47,22 +52,21 @@ def sep():     print("  " + "─" * 50)
 
 # ── STEP 1: Verify DB exists ──────────────────────────────────────────────────
 def check_db():
-    if not os.path.exists(DB_FILE):
-        err(f"Database not found: {DB_FILE}")
-        print("  Start Flask once to create the database, then re-run this script.")
+    try:
+        with connect_db(DATABASE_URL) as conn:
+            conn.execute("SELECT 1")
+        ok("Connected to PostgreSQL")
+    except Exception as e:
+        err(f"Could not connect to PostgreSQL: {e}")
+        print("  Set DATABASE_URL in .env, then re-run this script.")
         sys.exit(1)
-    size = os.path.getsize(DB_FILE)
-    ok(f"Found davs.db ({size // 1024} KB)")
 
-# ── STEP 2: Clear all SQLite tables ──────────────────────────────────────────
-def reset_sqlite():
-    print("\n  Clearing SQLite tables...")
+# ── STEP 2: Clear all PostgreSQL tables ──────────────────────────────────────
+def reset_postgres():
+    print("\n  Clearing database tables...")
     sep()
 
-    conn = sqlite3.connect(DB_FILE)
-    conn.execute("PRAGMA foreign_keys = OFF")
-    conn.execute("PRAGMA journal_mode = WAL")
-    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    conn = connect_db(DATABASE_URL)
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     pw  = hash_password(ADMIN_PASSWORD)
 
@@ -85,7 +89,8 @@ def reset_sqlite():
         try:
             # Check if table exists first
             exists = conn.execute(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
+                "SELECT COUNT(*) FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_name=?",
                 (table,)
             ).fetchone()[0]
             if not exists:
@@ -101,7 +106,8 @@ def reset_sqlite():
     for table in ['nfc_scanner', 'nfc_registration']:
         try:
             exists = conn.execute(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
+                "SELECT COUNT(*) FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_name=?",
                 (table,)
             ).fetchone()[0]
             if not exists:
@@ -146,28 +152,7 @@ def reset_sqlite():
     except Exception as e:
         warn(f"Legacy users table skipped: {e}")
 
-    # ── Run VACUUM to actually shrink the file ────────────────────────────────
     conn.commit()
-    try:
-        conn.execute("VACUUM")
-        ok("VACUUM complete           (file size reduced)")
-    except Exception as e:
-        warn(f"VACUUM failed: {e}")
-
-    # ── Delete WAL files to ensure changes are committed ────────────────────
-    try:
-        wal_file = DB_FILE + '-wal'
-        shm_file = DB_FILE + '-shm'
-        if os.path.exists(wal_file):
-            os.remove(wal_file)
-            ok("Removed WAL file          (davs.db-wal)")
-        if os.path.exists(shm_file):
-            os.remove(shm_file)
-            ok("Removed SHM file          (davs.db-shm)")
-    except Exception as e:
-        warn(f"Could not remove WAL/SHM files: {e}")
-
-    conn.execute("PRAGMA foreign_keys = ON")
     conn.close()
 
 # ── STEP 3: Clear uploaded photos ────────────────────────────────────────────
@@ -202,10 +187,10 @@ def reset_contract():
         ef = contract.events.StudentRegistered.create_filter(from_block=0, ...)
         entries = ef.get_all_entries()   # ← reads ALL past blockchain events
         ...
-        db_save_student(s)               # ← repopulates SQLite automatically
+        db_save_student(s)               # ← repopulates PostgreSQL automatically
 
     By removing attendance-contract.json, app.py sets contract=None and
-    get_all_students() falls back to SQLite which is now empty.
+    get_all_students() no longer reloads historical student identity events.
     """
     print("\n  Resetting blockchain contract reference...")
     sep()
@@ -233,10 +218,9 @@ def reset_contract():
         print("  │                                                     │")
         print("  │  To restore blockchain mode:                        │")
         print("  │    1. Stop Flask                                    │")
-        print("  │    2. npx hardhat node                              │")
-        print("  │    3. npx hardhat run scripts/deploy.js             │")
-        print("  │           --network localhost                       │")
-        print("  │    4. python app.py                                 │")
+        print("  │    2. npx hardhat run scripts/deploy.js             │")
+        print("  │           --network sepolia                         │")
+        print("  │    3. python app.py                                 │")
         print("  │                                                     │")
         print("  │  Or to restore your backup without redeploying:    │")
         print("  │    rename attendance-contract.json.reset_backup     │")
@@ -249,7 +233,7 @@ def reset_contract():
 def verify_reset():
     print("\n  Verifying reset...")
     sep()
-    conn = sqlite3.connect(DB_FILE)
+    conn = connect_db(DATABASE_URL)
 
     checks = [
         ('students',         'SELECT COUNT(*) FROM students'),
@@ -298,7 +282,7 @@ def main():
     if not auto_yes:
         print("""
   ⚠  This will permanently delete:
-       • All students (SQLite + blockchain contract reference)
+    • All students (PostgreSQL + blockchain contract reference)
        • All classroom sessions and attendance logs
        • All teacher/admin accounts
        • All subjects and uploaded photos
@@ -312,7 +296,7 @@ def main():
             sys.exit(0)
 
     # Run all reset steps
-    reset_sqlite()
+    reset_postgres()
     reset_uploads()
 
     if not keep_contract:
@@ -337,9 +321,8 @@ def main():
     print()
     if not keep_contract:
         print("   To re-enable blockchain after fresh deploy:")
-        print("   1.  npx hardhat node")
-        print("   2.  npx hardhat run scripts/deploy.js --network localhost")
-        print("   3.  python app.py")
+        print("   1.  npx hardhat run scripts/deploy.js --network sepolia")
+        print("   2.  python app.py")
         print()
 
 if __name__ == '__main__':

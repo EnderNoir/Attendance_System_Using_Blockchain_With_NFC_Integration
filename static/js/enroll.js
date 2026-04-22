@@ -24,7 +24,7 @@ function cvsuEmail(name) {
   const words = clean.split(' ').filter(Boolean);
   if (words.length < 2) return '';
   const firstSlug = words.slice(0, -1).map(w => w.toLowerCase().replace(/[^a-z]/g, '')).join('');
-  const lastSlug  = words[words.length - 1].toLowerCase().replace(/[^a-z]/g, '');
+  const lastSlug = words[words.length - 1].toLowerCase().replace(/[^a-z]/g, '');
   if (!firstSlug || !lastSlug) return '';
   return `sc.${firstSlug}.${lastSlug}@cvsu.edu.ph`;
 }
@@ -33,16 +33,16 @@ function cvsuEmail(name) {
    SHARED: NFC HID READER
 ═══════════════════════════════════════════════════════════════════ */
 const nfcHid = document.getElementById('nfcHidInput');
-let   nfcBuf  = '', nfcTimer = null;
+let nfcBuf = '', nfcTimer = null;
 const NFC_TIMEOUT = 300;
-let   phase2Active = false;   // true only during batch NFC phase
+let phase2Active = false;   // true only during batch NFC phase
 
 function refocusNFC() {
   const tag = document.activeElement ? document.activeElement.tagName : '';
   if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') nfcHid.focus();
 }
 
-nfcHid.addEventListener('keydown', function(e) {
+nfcHid.addEventListener('keydown', function (e) {
   clearTimeout(nfcTimer);
   if (e.key === 'Enter') {
     const uid = nfcBuf.trim(); nfcBuf = ''; nfcHid.value = '';
@@ -59,6 +59,11 @@ nfcHid.addEventListener('keydown', function(e) {
 document.addEventListener('click', refocusNFC);
 nfcHid.addEventListener('blur', () => setTimeout(refocusNFC, 150));
 window.addEventListener('load', () => nfcHid.focus());
+
+// Export to window for global access (e.g. from Phone NFC reader in base.js)
+window.phase2Active = phase2Active;
+window.s_applyUID = s_applyUID;
+window.handleNFCTap = handleNFCTap;
 
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -80,7 +85,7 @@ function s_processPdf(file) {
   const btn = document.getElementById('s_btnUpload'); btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span> Parsing…';
   const fd = new FormData(); fd.append('file', file);
-  fetch('/parse_registration_pdf', { method:'POST', credentials:'same-origin', body:fd })
+  fetch('/parse_registration_pdf', { method: 'POST', credentials: 'same-origin', body: fd })
     .then(r => {
       if (!r.ok && r.status === 302) throw new Error('Session expired.');
       const ct = r.headers.get('content-type') || '';
@@ -88,7 +93,7 @@ function s_processPdf(file) {
       return r.json();
     })
     .then(data => {
-      if (data.error) { s_setBanner('error','❌','Could not read PDF', data.error); return; }
+      if (data.error) { s_setBanner('error', '❌', 'Could not read PDF', data.error); return; }
       s_autofill(data);
       s_setBanner('success', '✅', 'Filled from: ' + file.name,
         'Fields auto-populated. Subjects will be saved when you click Register.');
@@ -123,9 +128,9 @@ function s_autofill(d) {
   }
   if (d.course) {
     const sel = document.getElementById('f_course');
-    const allowed = ['BS Computer Science','BS Information Technology'];
+    const allowed = ['BS Computer Science', 'BS Information Technology'];
     const match = allowed.find(c => c.toLowerCase() === d.course.toLowerCase() ||
-      d.course.toLowerCase().includes(c.replace('BS ','').toLowerCase()));
+      d.course.toLowerCase().includes(c.replace('BS ', '').toLowerCase()));
     if (match) { sel.value = match; s_highlight(sel); }
   }
   if (d.year_level) {
@@ -139,15 +144,15 @@ function s_autofill(d) {
 function s_highlight(el) {
   el.style.transition = 'box-shadow .3s,border-color .3s';
   el.style.borderColor = 'var(--success)';
-  el.style.boxShadow   = '0 0 0 3px rgba(45,106,39,.15)';
+  el.style.boxShadow = '0 0 0 3px rgba(45,106,39,.15)';
   setTimeout(() => { el.style.borderColor = ''; el.style.boxShadow = ''; }, 2000);
 }
 
 function s_setBanner(cls, icon, title, sub) {
   document.getElementById('s_uploadBanner').className = 'upload-banner ' + cls;
-  document.getElementById('s_ubIcon').textContent  = icon;
+  document.getElementById('s_ubIcon').textContent = icon;
   document.getElementById('s_ubTitle').textContent = title;
-  document.getElementById('s_ubSub').textContent   = sub;
+  document.getElementById('s_ubSub').textContent = sub;
   const btn = document.getElementById('s_btnUpload');
   btn.disabled = (cls === 'loading');
   btn.innerHTML = cls === 'loading'
@@ -175,12 +180,12 @@ function s_applyUID(uid) {
   document.getElementById('nfc_id').value = uid;
   const strip = document.getElementById('nfcCardStrip');
   strip.className = 'nfc-card-strip captured';
-  document.getElementById('nfcStripIcon').textContent  = '✅';
+  document.getElementById('nfcStripIcon').textContent = '✅';
   document.getElementById('nfcStripTitle').textContent = 'Card Captured!';
-  document.getElementById('nfcStripSub').textContent   = 'NFC card UID recorded. Click Register to save.';
+  document.getElementById('nfcStripSub').textContent = 'NFC card UID recorded. Click Register to save.';
   const disp = document.getElementById('nfcUidDisplay');
   disp.textContent = uid;
-  disp.className   = 'nfc-uid-display has-uid';
+  disp.className = 'nfc-uid-display has-uid';
   const hiddenInput = document.getElementById('nfc_id');
   hiddenInput.classList.remove('is-invalid');
   const err = hiddenInput.parentNode.querySelector('.reg-err');
@@ -191,7 +196,7 @@ function previewStudentPhoto(input) {
   if (!input.files || !input.files[0]) return;
   const reader = new FileReader();
   reader.onload = e => {
-    const img  = document.getElementById('photoPreviewImg');
+    const img = document.getElementById('photoPreviewImg');
     const init = document.getElementById('photoPreviewInit');
     img.src = e.target.result; img.style.display = 'block'; init.style.display = 'none';
     const wrap = document.getElementById('photoPreviewWrap');
@@ -203,18 +208,18 @@ function previewStudentPhoto(input) {
 function validateRegisterForm() {
   let ok = true;
   const req = [
-    {id:'f_name',       msg:'Full name required.'},
-    {id:'f_student_id', msg:'Student ID required.'},
-    {id:'f_course',     msg:'Select a program.'},
-    {id:'f_year_level', msg:'Select year level.'},
-    {id:'f_section',    msg:'Select section.'},
-    {id:'f_adviser',    msg:'Adviser name required.'},
-    {id:'f_school_year',msg:'School year required.'},
-    {id:'nfc_id',       msg:'Tap an NFC card first.'},
+    { id: 'f_name', msg: 'Full name required.' },
+    { id: 'f_student_id', msg: 'Student ID required.' },
+    { id: 'f_course', msg: 'Select a program.' },
+    { id: 'f_year_level', msg: 'Select year level.' },
+    { id: 'f_section', msg: 'Select section.' },
+    { id: 'f_adviser', msg: 'Adviser name required.' },
+    { id: 'f_school_year', msg: 'School year required.' },
+    { id: 'nfc_id', msg: 'Tap an NFC card first.' },
   ];
   document.querySelectorAll('.form-control.is-invalid').forEach(el => el.classList.remove('is-invalid'));
   document.querySelectorAll('.reg-err').forEach(el => el.remove());
-  req.forEach(({id, msg}) => {
+  req.forEach(({ id, msg }) => {
     const el = document.getElementById(id);
     if (!el) return;
     if (!el.value || !el.value.trim()) {
@@ -235,7 +240,7 @@ function validateRegisterForm() {
   });
   if (!ok) {
     const first = document.querySelector('.form-control.is-invalid,.nfc-card-strip.error');
-    if (first) first.scrollIntoView({ behavior:'smooth', block:'center' });
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   return ok;
 }
@@ -254,18 +259,18 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ═══════════════════════════════════════════════════════════════════
    TAB 2 — BATCH ENROLL
 ═══════════════════════════════════════════════════════════════════ */
-let b_students      = [];
+let b_students = [];
 let assignmentIndex = 0;
-let pendingUID      = null;
-let history_stack   = [];
+let pendingUID = null;
+let history_stack = [];
 
 function gotoPhase(n) {
   document.querySelectorAll('.phase').forEach((p, i) => p.classList.toggle('active', i + 1 === n));
-  ['beStep1','beStep2','beStep3'].forEach((id, i) => {
+  ['beStep1', 'beStep2', 'beStep3'].forEach((id, i) => {
     const el = document.getElementById(id);
-    el.classList.remove('active','done');
+    el.classList.remove('active', 'done');
     if (i + 1 === n) el.classList.add('active');
-    if (i + 1 < n)  el.classList.add('done');
+    if (i + 1 < n) el.classList.add('done');
   });
   phase2Active = (n === 2);
   if (n === 2) { refocusNFC(); renderQueue(); }
@@ -290,11 +295,11 @@ function b_processPDFFiles(files) {
     `Processing ${pdfs.length} PDF(s)…`, 'Extracting student data and sorting alphabetically…');
   const fd = new FormData();
   pdfs.forEach(f => fd.append('files', f));
-  fetch('/parse_batch_pdfs', { method:'POST', credentials:'same-origin', body:fd })
+  fetch('/parse_batch_pdfs', { method: 'POST', credentials: 'same-origin', body: fd })
     .then(r => { if (!r.ok) throw new Error('Server error ' + r.status); return r.json(); })
     .then(data => {
       if (data.error) {
-        b_setBanner('error','❌','Could not parse PDFs', data.error);
+        b_setBanner('error', '❌', 'Could not parse PDFs', data.error);
         (data.details || []).forEach(e => showMsg(e, 'error'));
         return;
       }
@@ -304,17 +309,17 @@ function b_processPDFFiles(files) {
         return { ...s, nfc_id: null, _skipped: false };
       });
       if (!b_students.length) {
-        b_setBanner('error','❌','No student data found','Check that the PDFs are CvSU registration forms.');
+        b_setBanner('error', '❌', 'No student data found', 'Check that the PDFs are CvSU registration forms.');
         return;
       }
-      b_setBanner('success','✅',
+      b_setBanner('success', '✅',
         `Found ${b_students.length} student(s) — sorted alphabetically`,
         'Review data below. Click Edit on any row to fill missing fields.');
       renderReviewTable();
       document.getElementById('reviewPanel').style.display = 'block';
       (data.errors || []).forEach(e => showMsg('⚠ ' + e, 'info'));
     })
-    .catch(err => b_setBanner('error','❌','Upload failed', err.message));
+    .catch(err => b_setBanner('error', '❌', 'Upload failed', err.message));
 }
 
 /* ── Review table ─────────────────────────────────────────────────── */
@@ -322,21 +327,21 @@ function renderReviewTable() {
   const tbody = document.getElementById('studentTbody');
   tbody.innerHTML = '';
   b_students.forEach((s, i) => {
-    const missName   = !s.name;
-    const missSid    = !s.student_id;
+    const missName = !s.name;
+    const missSid = !s.student_id;
     const missCourse = !s.course;
-    const missYear   = !s.year_level;
-    const hasMiss    = missName || missSid || missCourse || missYear;
+    const missYear = !s.year_level;
+    const hasMiss = missName || missSid || missCourse || missYear;
 
     // Ensure email shown is always populated
     if (!s.email && s.name) s.email = cvsuEmail(s.name);
 
-    const nameHtml   = (s.name   || '<em style="color:var(--muted)">—</em>') + (missName   ? '<span class="miss-badge">!</span>' : '');
-    const sidHtml    = (s.student_id || '<em style="color:var(--muted)">—</em>') + (missSid ? '<span class="miss-badge">!</span>' : '');
+    const nameHtml = (s.name || '<em style="color:var(--muted)">—</em>') + (missName ? '<span class="miss-badge">!</span>' : '');
+    const sidHtml = (s.student_id || '<em style="color:var(--muted)">—</em>') + (missSid ? '<span class="miss-badge">!</span>' : '');
     const courseHtml = (s.course || '<em style="color:var(--muted)">—</em>') + (missCourse ? '<span class="miss-badge">!</span>' : '');
-    const yearSec    = [s.year_level, s.section].filter(Boolean).join(' / ') || '<em style="color:var(--muted)">—</em>';
-    const emailHtml  = s.email   || '<em style="color:var(--muted)">—</em>';
-    const file       = (s.filename || '').replace(/\.pdf$/i, '');
+    const yearSec = [s.year_level, s.section].filter(Boolean).join(' / ') || '<em style="color:var(--muted)">—</em>';
+    const emailHtml = s.email || '<em style="color:var(--muted)">—</em>';
+    const file = (s.filename || '').replace(/\.pdf$/i, '');
 
     const mainRow = document.createElement('tr');
     mainRow.id = `strow_${i}`;
@@ -373,15 +378,15 @@ function renderReviewTable() {
 
 function buildIEFields(s, i) {
   const courseOpts = [
-    'BS Computer Science','BS Information Technology','BS Information Systems',
-    'BS Computer Engineering','BS Electronics Engineering',
-    'BS Civil Engineering','BS Education','BS Nursing','BS Accountancy','BS Business Administration'
+    'BS Computer Science', 'BS Information Technology', 'BS Information Systems',
+    'BS Computer Engineering', 'BS Electronics Engineering',
+    'BS Civil Engineering', 'BS Education', 'BS Nursing', 'BS Accountancy', 'BS Business Administration'
   ].map(c => `<option value="${c}" ${s.course === c ? 'selected' : ''}>${c}</option>`).join('');
-  const yearOpts = ['1st Year','2nd Year','3rd Year','4th Year','5th Year']
+  const yearOpts = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year']
     .map(y => `<option value="${y}" ${s.year_level === y ? 'selected' : ''}>${y}</option>`).join('');
-  const semOpts  = ['First','Second','Summer']
+  const semOpts = ['First', 'Second', 'Summer']
     .map(v => `<option value="${v}" ${s.semester === v ? 'selected' : ''}>${v} Semester</option>`).join('');
-  const secOpts  = ['A','B','C','D']
+  const secOpts = ['A', 'B', 'C', 'D']
     .map(v => `<option value="${v}" ${s.section === v ? 'selected' : ''}>${v}</option>`).join('');
 
   // Pre-generate email for the edit field
@@ -389,15 +394,15 @@ function buildIEFields(s, i) {
 
   return `
     <div class="ie-field"><label class="ie-label">Full Name *</label>
-      <input class="ie-input ${!s.name?'warn':''}" id="ie_name_${i}" value="${esc(s.name)}" placeholder="Full Name"
+      <input class="ie-input ${!s.name ? 'warn' : ''}" id="ie_name_${i}" value="${esc(s.name)}" placeholder="Full Name"
              oninput="autoEmailFromName(${i})"/></div>
     <div class="ie-field"><label class="ie-label">Student ID</label>
-      <input class="ie-input ${!s.student_id?'warn':''}" id="ie_sid_${i}" value="${esc(s.student_id)}" placeholder="e.g. 2021-00123"/></div>
+      <input class="ie-input ${!s.student_id ? 'warn' : ''}" id="ie_sid_${i}" value="${esc(s.student_id)}" placeholder="e.g. 2021-00123"/></div>
     <div class="ie-field"><label class="ie-label">Course *</label>
-      <select class="ie-input ${!s.course?'warn':''}" id="ie_course_${i}">
+      <select class="ie-input ${!s.course ? 'warn' : ''}" id="ie_course_${i}">
         <option value="">— Select —</option>${courseOpts}</select></div>
     <div class="ie-field"><label class="ie-label">Year Level *</label>
-      <select class="ie-input ${!s.year_level?'warn':''}" id="ie_year_${i}">
+      <select class="ie-input ${!s.year_level ? 'warn' : ''}" id="ie_year_${i}">
         <option value="">— Select —</option>${yearOpts}</select></div>
     <div class="ie-field"><label class="ie-label">Section</label>
       <select class="ie-input" id="ie_sec_${i}">
@@ -419,7 +424,7 @@ function buildIEFields(s, i) {
 
 // Live email update when name is changed in edit row
 function autoEmailFromName(i) {
-  const nameEl  = document.getElementById(`ie_name_${i}`);
+  const nameEl = document.getElementById(`ie_name_${i}`);
   const emailEl = document.getElementById(`ie_email_${i}`);
   if (!nameEl || !emailEl) return;
   const generated = cvsuEmail(nameEl.value);
@@ -429,7 +434,7 @@ function autoEmailFromName(i) {
 function toggleInlineEdit(i) {
   const editRow = document.getElementById(`stedit_${i}`);
   const editBtn = document.getElementById(`editbtn_${i}`);
-  const isOpen  = editRow.style.display !== 'none';
+  const isOpen = editRow.style.display !== 'none';
   document.querySelectorAll('[id^="stedit_"]').forEach(r => r.style.display = 'none');
   document.querySelectorAll('[id^="editbtn_"]').forEach(b => b.classList.remove('open'));
   if (!isOpen) { editRow.style.display = ''; editBtn.classList.add('open'); editBtn.innerHTML = '<i class="bi bi-x-lg"></i> Close'; }
@@ -439,17 +444,17 @@ function toggleInlineEdit(i) {
 function saveInlineEdit(i) {
   const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
   const s = b_students[i];
-  s.name        = g(`ie_name_${i}`)    || s.name;
-  s.student_id  = g(`ie_sid_${i}`)     || s.student_id;
-  s.course      = g(`ie_course_${i}`)  || s.course;
-  s.year_level  = g(`ie_year_${i}`)    || s.year_level;
-  s.section     = g(`ie_sec_${i}`)     || s.section;
-  s.email       = g(`ie_email_${i}`)   || s.email || cvsuEmail(s.name);
-  s.semester    = g(`ie_sem_${i}`)     || s.semester;
-  s.school_year = g(`ie_sy_${i}`)      || s.school_year;
-  s.adviser     = g(`ie_adv_${i}`)     || s.adviser;
-  s.contact     = g(`ie_contact_${i}`) || s.contact;
-  s.major       = g(`ie_major_${i}`)   || s.major || 'N/A';
+  s.name = g(`ie_name_${i}`) || s.name;
+  s.student_id = g(`ie_sid_${i}`) || s.student_id;
+  s.course = g(`ie_course_${i}`) || s.course;
+  s.year_level = g(`ie_year_${i}`) || s.year_level;
+  s.section = g(`ie_sec_${i}`) || s.section;
+  s.email = g(`ie_email_${i}`) || s.email || cvsuEmail(s.name);
+  s.semester = g(`ie_sem_${i}`) || s.semester;
+  s.school_year = g(`ie_sy_${i}`) || s.school_year;
+  s.adviser = g(`ie_adv_${i}`) || s.adviser;
+  s.contact = g(`ie_contact_${i}`) || s.contact;
+  s.major = g(`ie_major_${i}`) || s.major || 'N/A';
   renderReviewTable();
 }
 
@@ -467,30 +472,30 @@ function updateCurrentCard() {
     (b_students[assignmentIndex].nfc_id || b_students[assignmentIndex]._skipped)) {
     assignmentIndex++;
   }
-  const total    = b_students.length;
+  const total = b_students.length;
   const assigned = b_students.filter(s => s.nfc_id).length;
-  const pct      = total ? Math.round(assigned / total * 100) : 0;
+  const pct = total ? Math.round(assigned / total * 100) : 0;
   document.getElementById('progBarInner').style.width = pct + '%';
   document.getElementById('progLabel').textContent = `${assigned} / ${total} assigned`;
   if (assignmentIndex >= b_students.length) { allAssigned(); return; }
   const s = b_students[assignmentIndex];
   document.getElementById('currAvatar').textContent = (s.name || '?')[0].toUpperCase();
-  document.getElementById('currName').textContent   = s.name || '(No name)';
-  document.getElementById('currMeta').textContent   =
+  document.getElementById('currName').textContent = s.name || '(No name)';
+  document.getElementById('currMeta').textContent =
     [s.course, s.year_level, s.section ? 'Section ' + s.section : ''].filter(Boolean).join(' · ');
-  document.getElementById('currOrder').textContent  = `Student ${assignmentIndex + 1} of ${total}`;
+  document.getElementById('currOrder').textContent = `Student ${assignmentIndex + 1} of ${total}`;
   resetTapZone(); pendingUID = null;
   document.getElementById('btnConfirm').disabled = true;
-  document.getElementById('btnUndo').disabled    = history_stack.length === 0;
+  document.getElementById('btnUndo').disabled = history_stack.length === 0;
   document.getElementById('dupWarn').classList.remove('show');
   renderQueue(); refocusNFC();
 }
 
 function resetTapZone() {
-  document.getElementById('tapZone').className   = 'tap-zone waiting';
-  document.getElementById('tapIcon').textContent  = '💳';
+  document.getElementById('tapZone').className = 'tap-zone waiting';
+  document.getElementById('tapIcon').textContent = '💳';
   document.getElementById('tapTitle').textContent = 'Tap the NFC card for this student';
-  document.getElementById('tapSub').textContent   = 'Hold the card near the USB reader — the UID will appear automatically';
+  document.getElementById('tapSub').textContent = 'Hold the card near the USB reader — the UID will appear automatically';
   document.getElementById('uidDisplay').style.display = 'none';
 }
 
@@ -498,20 +503,20 @@ function renderQueue() {
   const tbody = document.getElementById('queueTbody');
   tbody.innerHTML = '';
   b_students.forEach((s, i) => {
-    const isCurrent  = i === assignmentIndex && !s.nfc_id && !s._skipped;
+    const isCurrent = i === assignmentIndex && !s.nfc_id && !s._skipped;
     const isAssigned = !!s.nfc_id;
-    const isSkipped  = s._skipped;
+    const isSkipped = s._skipped;
     let statusHtml;
-    if (isAssigned)     statusHtml = `<span class="status-tag st-assigned">✓ ${s.nfc_id}</span>`;
+    if (isAssigned) statusHtml = `<span class="status-tag st-assigned">✓ Assigned</span>`;
     else if (isSkipped) statusHtml = `<span class="status-tag st-skipped">Skipped</span>`;
     else if (isCurrent) statusHtml = `<span class="status-tag st-current">← Current</span>`;
-    else                statusHtml = `<span class="status-tag st-waiting">Waiting</span>`;
+    else statusHtml = `<span class="status-tag st-waiting">Waiting</span>`;
     const tr = document.createElement('tr');
-    if (isCurrent)  tr.className = 'row-current';
+    if (isCurrent) tr.className = 'row-current';
     if (isAssigned || isSkipped) tr.className = 'row-done';
     tr.innerHTML = `
       <td><span class="order-badge">${i + 1}</span></td>
-      <td style="font-weight:${isCurrent?700:500};">${s.name || '—'}</td>
+      <td style="font-weight:${isCurrent ? 700 : 500};">${s.name || '—'}</td>
       <td style="font-size:12px;color:var(--muted);">${[s.course, s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
       <td>${isAssigned ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
       <td>${statusHtml}</td>`;
@@ -533,11 +538,11 @@ function handleNFCTap(uid) {
   }
   document.getElementById('dupWarn').classList.remove('show');
   pendingUID = uid;
-  document.getElementById('tapZone').className   = 'tap-zone scanned';
-  document.getElementById('tapIcon').textContent  = '✅';
+  document.getElementById('tapZone').className = 'tap-zone scanned';
+  document.getElementById('tapIcon').textContent = '✅';
   document.getElementById('tapTitle').textContent = 'Card detected — confirm assignment';
-  document.getElementById('tapSub').textContent   = 'Check the UID below then click Confirm to assign this card.';
-  document.getElementById('uidText').textContent  = uid;
+  document.getElementById('tapSub').textContent = 'Check the UID below then click Confirm to assign this card.';
+  document.getElementById('uidText').textContent = uid;
   document.getElementById('uidDisplay').style.display = '';
   document.getElementById('btnConfirm').disabled = false;
 }
@@ -553,7 +558,7 @@ function confirmAssignment() {
 function undoAssignment() {
   if (!history_stack.length) return;
   const last = history_stack.pop();
-  b_students[last.index].nfc_id   = null;
+  b_students[last.index].nfc_id = null;
   b_students[last.index]._skipped = false;
   assignmentIndex = last.index; pendingUID = null;
   document.getElementById('dupWarn').classList.remove('show');
@@ -567,6 +572,9 @@ function skipStudent() {
   assignmentIndex++; pendingUID = null;
   updateCurrentCard();
 }
+
+/* ── Web NFC API Support (Phone NFC) ──────────────────────── */
+// Handled by startPhoneNFC() in base.js
 
 function allAssigned() {
   if (!b_students.some(s => s.nfc_id)) {
@@ -585,10 +593,10 @@ function b_goBack() {
 
 /* ── Summary ──────────────────────────────────────────────────────── */
 function renderSummary() {
-  const total    = b_students.length;
+  const total = b_students.length;
   const assigned = b_students.filter(s => s.nfc_id).length;
-  const skipped  = b_students.filter(s => s._skipped).length;
-  const nocard   = total - assigned - skipped;
+  const skipped = b_students.filter(s => s._skipped).length;
+  const nocard = total - assigned - skipped;
   document.getElementById('summaryGrid').innerHTML = `
     <div class="sum-chip total"><div style="font-size:28px;">👥</div>
       <div><div class="sum-val">${total}</div><div class="sum-lab">Total Students</div></div></div>
@@ -606,12 +614,12 @@ function renderSummary() {
   const subjKeys = Object.keys(allSubjects);
   if (subjKeys.length) {
     document.getElementById('subjectSummaryBox').style.display = '';
-    document.getElementById('subjectList').innerHTML = subjKeys.map(k => {
+    const tableRows = subjKeys.map(k => {
       const s = allSubjects[k];
-      return `<span style="background:rgba(45,106,39,.08);border:1px solid rgba(45,106,39,.2);
-        border-radius:6px;padding:4px 10px;font-size:11px;font-family:'Space Mono',monospace;
-        color:var(--accent);">[${s.course_code}] ${s.name}</span>`;
+      return `<tr><td style="padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.15);font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;">${s.course_code}</td>
+              <td style="padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.15);font-size:12px;">${s.name}</td></tr>`;
     }).join('');
+    document.getElementById('subjectList').innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.3);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Code</th><th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.3);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Subject</th></tr></thead><tbody>${tableRows}</tbody></table>`;
   }
 
   const tbody = document.getElementById('resultTbody');
@@ -645,9 +653,9 @@ function doRegister() {
 
 function b_setBanner(cls, icon, title, sub) {
   document.getElementById('b_uploadBanner').className = 'upload-banner ' + cls;
-  document.getElementById('b_ubIcon').textContent  = icon;
+  document.getElementById('b_ubIcon').textContent = icon;
   document.getElementById('b_ubTitle').textContent = title;
-  document.getElementById('b_ubSub').textContent   = sub;
+  document.getElementById('b_ubSub').textContent = sub;
   const btn = document.getElementById('b_btnUpload');
   btn.disabled = (cls === 'loading');
   btn.innerHTML = cls === 'loading'
@@ -681,5 +689,5 @@ function showMsg(text, type = 'info') {
 
 function esc(v) {
   if (!v) return '';
-  return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

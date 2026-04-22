@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Sessions & Students — DAVS{% endblock %}
 {% block page_title %}SESSIONS & STUDENTS{% endblock %}
 {% block extra_head %}
@@ -56,9 +56,6 @@
     <div class="stud-bar">
       <button class="sm-back" onclick="closeStudModal()"><i class="bi bi-arrow-left"></i> Back</button>
       <h3 id="stud_name">Student History</h3>
-      <button class="btn-export-xl" id="stud_export_btn" onclick="exportCurrentStudent()">
-        <i class="bi bi-file-earmark-excel"></i> Export
-      </button>
     </div>
     <div class="stud-meta" id="stud_meta"></div>
     <div class="hist-table-wrap" id="stud_hist">
@@ -107,7 +104,7 @@
         <div class="sc-title">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif
           %}{{ s.subject_name }}</div>
         <div class="sc-meta">
-          <span><i class="bi bi-grid"></i> {{ s.section_key.replace('|',' · ') }}</span>
+          <span><i class="bi bi-grid"></i> {{ (s.section_key or '').replace('|',' · ') }}</span>
           <span><i class="bi bi-clock"></i> {{ s.time_slot or '—' }}</span>
           <span><i class="bi bi-collection"></i> {{ s.get('class_type','lecture')|replace('_',' ')|title }}</span>
           <span><i class="bi bi-play-circle"></i> Started {{ fmt_time(s.started_at) }}</span>
@@ -183,7 +180,7 @@
   <div style="max-height:580px;overflow-y:auto;padding-right:4px;" id="sessions_list">
     {% for sid,s in ended.items()|sort(attribute='1.started_at',reverse=True) %}
     {% set pc=s.present|length %}{% set lc=s.late|default([])|length %}{% set ec=s.excused|default([])|length %}
-    {% set sparts = s.section_key.split('|') %}
+    {% set sparts = (s.section_key or '').split('|') %}
     <div class="session-card" id="sc_{{ sid }}" data-subj="{{ s.subject_name|lower }}"
       data-section="{{ s.section_key|lower }}" data-program="{{ (sparts[0] if sparts|length > 0 else '')|lower }}"
       data-year="{{ (sparts[1] if sparts|length > 1 else '')|lower }}"
@@ -193,11 +190,14 @@
           <div class="sc-title">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {%
             endif %}{{ s.subject_name }}</div>
           <div class="sc-meta">
-            <span><i class="bi bi-grid"></i> {{ s.section_key.replace('|',' · ') }}</span>
+            <span><i class="bi bi-grid"></i> {{ (s.section_key or '').replace('|',' · ') }}</span>
             <span><i class="bi bi-clock"></i> {{ s.time_slot or '—' }}</span>
             <span><i class="bi bi-collection"></i> {{ s.get('class_type','lecture')|replace('_',' ')|title }}</span>
             <!-- Readable date format -->
             <span><i class="bi bi-calendar3"></i> {{ fmt_time(s.started_at) }}</span>
+            {% if s.session_tx_hash %}
+            <span style="color:var(--accent);"><i class="bi bi-blockchain"></i> TX: {{ s.session_tx_hash[:10] }}...</span>
+            {% endif %}
           </div>
           <div class="sc-badges">
             <span class="badge-done"><i class="bi bi-check-circle"></i> Done</span>
@@ -296,7 +296,8 @@
 
 
 
+{% endblock %}
+
 {% block extra_scripts %}
 <script>{% include 'assets/teacher_sessions_students.js' %}</script>
-{% endblock %}
 {% endblock %}

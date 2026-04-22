@@ -1,0 +1,7 @@
+Flask>=2.2,<4.0
+web3>=6.0,<8.0
+requests>=2.31
+psycopg2-binary>=2.9
+pdfminer.six>=20221105
+python-dotenv>=1.0
+gunicorn>=21.2

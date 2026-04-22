@@ -213,7 +213,7 @@
       <div style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;flex-shrink:0;"></div>
       <div>
         <div style="font-weight:600;font-size:13px;">{{ s.subject_name }}{% if s.course_code %} <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);">[{{ s.course_code }}]</span>{% endif %}</div>
-        <div style="font-size:11px;color:var(--muted);">{{ s.section_key.replace('|',' · ') }} · {{ s.teacher_name }}</div>
+        <div style="font-size:11px;color:var(--muted);">{{ (s.section_key or '').replace('|',' · ') }} · {{ s.teacher_name }}</div>
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">

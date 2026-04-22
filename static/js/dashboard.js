@@ -1,4 +1,4 @@
-﻿// Dashboard page script: extracted from template for easier debugging.
+// Dashboard page script: extracted from template for easier debugging.
 
 const DASHBOARD_BOOTSTRAP = window.DASHBOARD_BOOTSTRAP || {};
 const RAW_STUDENTS = Array.isArray(DASHBOARD_BOOTSTRAP.students) ? DASHBOARD_BOOTSTRAP.students : [];
@@ -404,54 +404,99 @@ function renderSessions(sessions){
     wrap.innerHTML = '<div style="text-align:center;color:var(--muted);padding:24px;font-size:12px;"><i class="bi bi-calendar-x" style="font-size:24px;display:block;opacity:.2;margin-bottom:6px;"></i>No sessions found.</div>';
     return;
   }
-  wrap.innerHTML = `
-    <table class="sess-table">
-      <thead>
-        <tr>
-          <th>Course Code</th>
-          <th>Subject Name</th>
-          <th>Class Type</th>
-          <th>Instructor Name</th>
-          <th>Date</th>
-          <th>Time Slot</th>
-          <th>Transaction Number (TX)</th>
-          <th>Block Number</th>
-          <th>Status</th>
-          <th>Excused Reason</th>
-          <th>Document</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${sessions.map((s) => {
-          const sbClass = `sb-${s.status}`;
-          const statusLabel = s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : '-';
-          const classType = String(s.class_type || 'lecture').toLowerCase();
-          const classTypeLabel = classType === 'laboratory' ? 'Laboratory' : 'Lecture';
-          const doc = s.attachment_url
-            ? `<a href="${s.attachment_url}" target="_blank" class="sess-doc-link"><i class="bi bi-paperclip"></i> View</a>`
-            : '<span class="muted-dash">-</span>';
-          const reason = s.status === 'excused' && s.excuse_note
-            ? `<span style="color:#60a5fa;font-weight:600;">${s.excuse_note}</span>`
-            : '<span class="muted-dash">-</span>';
-          const tx = s.tx_hash
-            ? `<button type="button" class="att-tx-copy" title="Copy to clipboard" data-tx="${s.tx_hash}">${s.tx_hash}</button>`
-            : '<span class="muted-dash">-</span>';
-          return `<tr>
-            <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span class="muted-dash">-</span>'}</td>
-            <td style="font-weight:600;">${s.subject_name || '-'}</td>
-            <td><span class="status-badge ${classType === 'laboratory' ? 'sb-excused' : 'sb-present'}">${classTypeLabel}</span></td>
-            <td>${s.teacher_name || '-'}</td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;">${pickSessionDate(s)}</td>
-            <td style="font-size:11px;color:var(--muted);">${formatTimeSlot(s.time_slot || s.tap_time || '')}</td>
-            <td>${tx}</td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '-'}</td>
-            <td><span class="status-badge ${sbClass}">${statusLabel}</span></td>
-            <td>${reason}</td>
-            <td>${doc}</td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>`;
+  
+  const bySem = {};
+  sessions.forEach(s => {
+    const sem = s.semester || '1st Year 1st Sem';
+    if (!bySem[sem]) bySem[sem] = [];
+    bySem[sem].push(s);
+  });
+
+  const SEM_ORDER = [
+    '1st Year 1st Sem', '1st Year 2nd Sem', '1st Year Summer',
+    '2nd Year 1st Sem', '2nd Year 2nd Sem', '2nd Year Summer',
+    '3rd Year 1st Sem', '3rd Year 2nd Sem', '3rd Year Summer',
+    '4th Year 1st Sem', '4th Year 2nd Sem', '4th Year Summer'
+  ];
+
+  const sortedSems = Object.keys(bySem).sort((a, b) => {
+    let ia = SEM_ORDER.indexOf(a);
+    let ib = SEM_ORDER.indexOf(b);
+    if (ia === -1) ia = 99;
+    if (ib === -1) ib = 99;
+    if (ia !== ib) return ia - ib;
+    return a.localeCompare(b);
+  });
+
+  let html = '';
+  sortedSems.forEach((sem, sIdx) => {
+    const semSessions = bySem[sem];
+    html += `
+      <div class="sem-accordion" style="margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface);">
+        <div class="sem-accordion-header" style="padding: 12px 16px; background: rgba(45,106,39,.05); display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
+          <div style="cursor: pointer; flex: 1;" onclick="const b=this.parentElement.nextElementSibling; const i=this.querySelector('i'); if(b.style.display==='none'){b.style.display='block';i.classList.replace('bi-chevron-down','bi-chevron-up');}else{b.style.display='none';i.classList.replace('bi-chevron-up','bi-chevron-down');}">
+            <span>${sem} <span style="font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 8px;">(${semSessions.length} sessions)</span></span>
+            <i class="bi bi-chevron-${sIdx === 0 ? 'up' : 'down'}" style="margin-left: 8px;"></i>
+          </div>
+          <button class="btn-success-custom" style="padding: 6px 12px; font-size: 11px; margin-left: 12px; font-family: 'DM Sans', sans-serif;" onclick="exportStudentSemester('${sem}')">
+            <i class="bi bi-file-earmark-excel"></i> Export Semester
+          </button>
+        </div>
+        <div class="sem-accordion-body" style="display: ${sIdx === 0 ? 'block' : 'none'}; padding: 0; overflow-x: auto;">
+          <table class="sess-table" style="margin: 0; border: none; border-radius: 0; width: 100%; min-width: 800px;">
+            <thead>
+              <tr>
+                <th>Course Code</th>
+                <th>Subject Name</th>
+                <th>Class Type</th>
+                <th>Instructor Name</th>
+                <th>Date</th>
+                <th>Time Slot</th>
+                <th>Tapped Time</th>
+                <th>Transaction Number (TX)</th>
+                <th>Block Number</th>
+                <th>Status</th>
+                <th>Excused Reason</th>
+                <th>Document</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${semSessions.map((s) => {
+                const sbClass = `sb-${s.status}`;
+                const statusLabel = s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : '-';
+                const classType = String(s.class_type || 'lecture').toLowerCase();
+                const classTypeLabel = classType === 'laboratory' ? 'Laboratory' : 'Lecture';
+                const doc = s.attachment_url
+                  ? `<a href="${s.attachment_url}" target="_blank" class="sess-doc-link"><i class="bi bi-paperclip"></i> View</a>`
+                  : '<span class="muted-dash">-</span>';
+                const reason = s.status === 'excused' && s.excuse_note
+                  ? `<span style="color:#60a5fa;font-weight:600;">${s.excuse_note}</span>`
+                  : '<span class="muted-dash">-</span>';
+                const tx = s.tx_hash
+                  ? `<a href="https://sepolia.etherscan.io/tx/${s.tx_hash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:none; word-break: break-all;">${s.tx_hash.slice(0, 16)}...</a>`
+                  : '<span class="muted-dash">-</span>';
+                return `<tr>
+                  <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span class="muted-dash">-</span>'}</td>
+                  <td style="font-weight:600;">${s.subject_name || '-'}</td>
+                  <td><span class="status-badge ${classType === 'laboratory' ? 'sb-excused' : 'sb-present'}">${classTypeLabel}</span></td>
+                  <td>${s.teacher_name || '-'}</td>
+                  <td style="font-family:'Space Mono',monospace;font-size:11px;">${pickSessionDate(s)}</td>
+                  <td style="font-size:11px;color:var(--muted);">${formatTimeSlot(s.time_slot || s.tap_time || '')}</td>
+                  <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? toAmPm(s.tap_time.split(' ')[1]||s.tap_time) : '—'}</td>
+                  <td>${tx}</td>
+                  <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '-'}</td>
+                  <td><span class="status-badge ${sbClass}">${statusLabel}</span></td>
+                  <td>${reason}</td>
+                  <td>${doc}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  });
+  wrap.innerHTML = html;
   bindTxCopyButtons(wrap);
 }
 
@@ -477,18 +522,18 @@ function resetSessFilters(){
   renderSessions(allSessions);
 }
 
-function exportStudentSessions(){
+function exportStudentSemester(sem){
   const s = studentData.find(x=>x.nfc===curId);
   if(!s) return;
   const nameParts = s.name.split(' ');
   const lastName  = (nameParts[nameParts.length-1]||'student').toLowerCase().replace(/[^a-z0-9]/g,'');
   const firstName = (nameParts[0]||'').toLowerCase().replace(/[^a-z0-9]/g,'');
   const now = new Date();
-  const fname = `${lastName}_${firstName}_attendance_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}.xlsx`;
+  const fname = `${lastName}_${firstName}_${sem.replace(/[^a-z0-9]/gi, '_')}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}.xlsx`;
   const q    = document.getElementById('sessStatus').value;
   const subj = document.getElementById('sessSubject').value;
   const classType = document.getElementById('sessClassType').value;
-  let url = `/export/student_sessions/${s.nfc}?name=${encodeURIComponent(s.name)}&filename=${encodeURIComponent(fname)}`;
+  let url = `/export/student_sessions/${s.nfc}?name=${encodeURIComponent(s.name)}&semester=${encodeURIComponent(sem)}&filename=${encodeURIComponent(fname)}`;
   if(q)    url += `&status=${encodeURIComponent(q)}`;
   if(subj) url += `&subject=${encodeURIComponent(subj)}`;
   if(classType) url += `&class_type=${encodeURIComponent(classType)}`;

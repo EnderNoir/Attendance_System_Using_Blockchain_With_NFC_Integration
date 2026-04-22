@@ -499,11 +499,52 @@
     background: rgba(45, 106, 39, .12);
   }
 
-  .att-tx-copy.copy-failed {
+.att-tx-copy.copy-failed {
     color: var(--danger);
     border-color: rgba(192, 57, 43, .35);
     background: rgba(192, 57, 43, .12);
   }
+
+.sess-tx-copy {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+.sess-tx-copy.copied {
+    color: var(--success);
+    border-color: var(--success);
+    background: rgba(45, 106, 39, .12);
+  }
+
+.sess-tx-copy.copy-failed {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: rgba(192, 57, 43, .12);
+  }
+
+.sess-tx-link {
+  font-size: 12px;
+  color: #4f46e5;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.sess-tx-link:hover {
+  text-decoration: underline;
+}
+
+.sess-tx-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 
   .att-scroll {
     overflow: visible;

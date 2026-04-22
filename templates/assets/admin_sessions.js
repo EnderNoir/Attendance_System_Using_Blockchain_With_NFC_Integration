@@ -7,10 +7,13 @@ const sessionsData = {
     class_type: "{{ s.get('class_type','lecture')|e }}",
     section_key: "{{ s.section_key|e }}",
     teacher_name: "{{ s.teacher_name|e }}",
-    time_slot: "{{ s.get('time_slot','')|e }}",
+    time_slot: "{{ (s.time_slot|fmt_timeslot)|e if s.time_slot else '' }}",
+    semester: "{{ s.semester|e }}",
     started_at: "{{ s.started_at|e }}",
     ended_at: null,
     units: "{{ s.get('units','3') }}",
+    session_tx_hash: "{{ s.session_tx_hash|e if s.session_tx_hash else '' }}",
+    session_block_number: "{{ s.session_block_number|e if s.session_block_number else '' }}",
   },
   {% endfor %}
   {% for sid, s in ended.items() %}
@@ -20,10 +23,13 @@ const sessionsData = {
     class_type: "{{ s.get('class_type','lecture')|e }}",
     section_key: "{{ s.section_key|e }}",
     teacher_name: "{{ s.teacher_name|e }}",
-    time_slot: "{{ s.get('time_slot','')|e }}",
+    time_slot: "{{ (s.time_slot|fmt_timeslot)|e if s.time_slot else '' }}",
+    semester: "{{ s.semester|e }}",
     started_at: "{{ s.started_at|e }}",
     ended_at: "{{ s.ended_at|e }}",
     units: "{{ s.get('units','3') }}",
+    session_tx_hash: "{{ s.session_tx_hash|e if s.session_tx_hash else '' }}",
+    session_block_number: "{{ s.session_block_number|e if s.session_block_number else '' }}",
   },
   {% endfor %}
 };
@@ -127,7 +133,7 @@ function copyText(text) {
 function bindTxCopyHandlers() {
   const scope = document.getElementById('sm_att_list');
   if (!scope) return;
-  scope.querySelectorAll('.att-tx-copy').forEach((btn) => {
+  scope.querySelectorAll('.att-tx-copy, .sess-tx-copy').forEach((btn) => {
     btn.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -207,14 +213,31 @@ function renderSessModal(sessId, data) {
     if (cnt[status] !== undefined) cnt[status]++;
   });
 
+  let sessTxHtml = '';
+  if (s.session_tx_hash) {
+    sessTxHtml = `
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-blockchain"></i> Session TX</div>
+      <div class="sm-info-val">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <a href="https://sepolia.etherscan.io/tx/${s.session_tx_hash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:underline; word-break: break-all;">
+            ${s.session_tx_hash}
+          </a>
+        </div>
+        ${s.session_block_number ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Block #${s.session_block_number}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
   document.getElementById('sm_info_grid').innerHTML = `
+    ${sessTxHtml}
     <div class="sm-info-box">
       <div class="sm-info-lbl"><i class="bi bi-book"></i> Subject</div>
       <div class="sm-info-val">${s.subject_name}${s.course_code ? ' <code style="font-size:10px;background:rgba(45,106,39,.08);color:var(--accent);padding:1px 5px;border-radius:3px;">[' + s.course_code + ']</code>' : ''}</div>
     </div>
     <div class="sm-info-box">
       <div class="sm-info-lbl"><i class="bi bi-grid"></i> Section</div>
-      <div class="sm-info-val">${(s.section_key || '').replace(/\|/g, ' | ')}</div>
+      <div class="sm-info-val">${(s.section_key || '').replace(/\|/g, ' | ')}${s.semester ? ' | ' + s.semester : ''}</div>
     </div>
     <div class="sm-info-box">
       <div class="sm-info-lbl"><i class="bi bi-person-badge"></i> Instructor</div>
@@ -312,12 +335,9 @@ function renderSessModal(sessId, data) {
         <th>Student ID</th>
         <th>${classType === 'school_event' ? 'Program-Year-Section' : 'Class Type'}</th>
         <th>Status</th>
-        <th>Date</th>
-        <th>Time</th>
+        <th>Tapped Time</th>
         <th>Excused Reason</th>
         <th>Document</th>
-        <th>Transaction Number (TX)</th>
-        <th>Block Number</th>
       </tr></thead>
       <tbody>
         ${sts.map((st, i) => {
@@ -336,14 +356,9 @@ function renderSessModal(sessId, data) {
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '-'}</td>
             <td style="font-size:11px;color:var(--muted);">${classType === 'school_event' ? (st.section_origin || '-') : classTypeLabel}</td>
             <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || status}</span></td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.date}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
             <td style="font-size:11px;">${status === 'excused' ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>${reasonDetail}` : '<span style="color:var(--muted);">-</span>'}</td>
             <td>${status === 'excused' ? docLink : '<span style="color:var(--muted);font-size:11px;">-</span>'}</td>
-            <td>${st.tx_hash
-              ? `<button type="button" class="att-tx-copy" title="Copy to clipboard" data-tx="${st.tx_hash}">${st.tx_hash}</button>`
-              : '<span style="color:var(--muted);font-size:11px;">-</span>'}</td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.block || '-'}</td>
           </tr>`;
         }).join('')}
       </tbody>

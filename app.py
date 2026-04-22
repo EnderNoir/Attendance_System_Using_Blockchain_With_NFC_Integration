@@ -3,20 +3,21 @@ from web3 import Web3
 from datetime import datetime
 from functools import wraps
 from threading import Thread, Lock
-import json, os, secrets, time, hashlib, uuid, re, sqlite3
+import json, os, secrets, time, hashlib, uuid, re
 from collections import deque
 from werkzeug.utils import secure_filename
 import secrets as _sec
+import psycopg2
+from dotenv import load_dotenv
 # pdfminer is imported inside parse_registration_pdf() so a startup
 # import glitch can never permanently disable PDF parsing for the session.
 
 app = Flask(__name__)
 app.secret_key = 'davs-super-secret-2024'
+load_dotenv()
 
 # ── Jinja2 custom filters ─────────────────────────────────────────────────────
 import json as _json_mod
-app.jinja_env.filters['from_json'] = lambda s: _json_mod.loads(s) if s else []
-
 from services.cvsu_parsing import (
     _extract_cvsu_fields,
     _generate_cvsu_email,
@@ -143,7 +144,7 @@ def send_teacher_session_summary(
         subject_name, section_key, time_slot,
         started_at, ended_at,
         present_count, late_count, absent_count, excused_count,
-        student_rows):
+        student_rows, session_tx_hash=None, session_block_number=None):
         """Send session summary email to teacher when session ends."""
         _send_teacher_session_summary_template(
                 teacher_email=teacher_email,
@@ -158,6 +159,8 @@ def send_teacher_session_summary(
                 absent_count=absent_count,
                 excused_count=excused_count,
                 student_rows=student_rows,
+                session_tx_hash=session_tx_hash,
+                session_block_number=session_block_number,
                 send_email_fn=_send_email,
         )
 
@@ -343,21 +346,46 @@ def inject_globals():
         fmt_time_short= fmt_time_short,
     )
 
-hardhat_url = "http://127.0.0.1:8545"
-web3 = Web3(Web3.HTTPProvider(hardhat_url))
+BLOCKCHAIN_RPC_URL = os.getenv('BLOCKCHAIN_RPC_URL', '').strip() or os.getenv('SEPOLIA_RPC_URL', '').strip()
+if not BLOCKCHAIN_RPC_URL:
+    BLOCKCHAIN_RPC_URL = 'http://127.0.0.1:8545'
+
+web3 = Web3(Web3.HTTPProvider(BLOCKCHAIN_RPC_URL, request_kwargs={'timeout': 30}))
 
 BLOCKCHAIN_ONLINE = web3.is_connected()
 if BLOCKCHAIN_ONLINE:
-    print("[OK] Connected to Hardhat Network")
+    try:
+        _cid = int(web3.eth.chain_id)
+        if _cid == 11155111:
+            print('[OK] Connected to Sepolia')
+        elif _cid in (31337, 1337):
+            print('[OK] Connected to local EVM node')
+        else:
+            print(f'[OK] Connected to chain {_cid}')
+    except Exception:
+        print('[OK] Connected to blockchain RPC')
 else:
-    print("[WARNING] Hardhat not running — students will load from SQLite cache.")
+    print('[WARNING] Blockchain RPC unreachable — students will load from database cache.')
 
 contract_data_path = os.path.join(os.path.dirname(__file__), 'attendance-contract.json')
+ADMIN_PRIVATE_KEY = (os.getenv('ADMIN_PRIVATE_KEY') or '').strip()
+if ADMIN_PRIVATE_KEY and not ADMIN_PRIVATE_KEY.startswith('0x'):
+    ADMIN_PRIVATE_KEY = '0x' + ADMIN_PRIVATE_KEY
+
 try:
     with open(contract_data_path) as f:
         contract_data = json.load(f)
     contract      = web3.eth.contract(address=contract_data['address'], abi=contract_data['abi'])
-    admin_account = web3.eth.accounts[0] if BLOCKCHAIN_ONLINE else None
+    admin_account = None
+    if BLOCKCHAIN_ONLINE:
+        if ADMIN_PRIVATE_KEY:
+            admin_account = web3.eth.account.from_key(ADMIN_PRIVATE_KEY).address
+        else:
+            try:
+                accounts = web3.eth.accounts
+                admin_account = accounts[0] if accounts else None
+            except Exception:
+                admin_account = None
 except Exception as _ce:
     print(f"[WARNING] Could not load contract: {_ce}")
     contract      = None
@@ -365,8 +393,9 @@ except Exception as _ce:
     BLOCKCHAIN_ONLINE = False
     print("[INFO] Offline mode active: contract file missing or unreadable.")
 
+BLOCKCHAIN_LOCK = Lock()
 BASE_DIR      = os.path.dirname(__file__)
-DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
+DATABASE_URL  = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 UPLOAD_FOLDER_EXCUSES = os.path.join(BASE_DIR, 'static', 'uploads', 'excuses')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -402,13 +431,27 @@ def _canonical_role(role_value):
     return role_norm or 'teacher'
 
 def normalize_section_key(key):
+    """
+    Returns a canonical section key: 'Course|Year|Section'
+    Example: 'BSIT|1|A' -> 'BS Information Technology|1st Year|A'
+    Handles both '|' and '-' as separators.
+    """
     if not key:
-        return key
+        return ""
+        
+    # Standardize separator
+    key = str(key).replace('-', '|')
     parts = [p.strip() for p in key.split('|')]
-    if len(parts) == 3:
-        course    = parts[0].strip()
-        year      = parts[1].strip()
-        section   = parts[2].strip().upper()
+    
+    if len(parts) >= 3:
+        course = parts[0]
+        year = parts[1]
+        section = parts[2].upper()
+        
+        # Normalize course
+        course_canonical = normalize_course_name(course)
+        
+        # Normalize year level
         year_map = {
             '1': '1st Year', '2': '2nd Year', '3': '3rd Year', '4': '4th Year', '5': '5th Year',
             '1st': '1st Year', '2nd': '2nd Year', '3rd': '3rd Year', '4th': '4th Year',
@@ -416,12 +459,14 @@ def normalize_section_key(key):
             '4th year': '4th Year', '5th year': '5th Year',
         }
         year_normalized = year_map.get(year.lower(), year)
-        course_canonical = normalize_course_name(course)
+        
         return f"{course_canonical}|{year_normalized}|{section}"
-    return key
+        
+    return key.strip()
 
 def build_student_section_key(student):
-    course = (student.get('course') or '').strip()
+    # Use 'course' (from _student_row) or original 'program' column
+    course = (student.get('course') or student.get('program') or '').strip()
     year_level = (student.get('year_level') or '').strip()
     section = (student.get('section') or '').strip().upper()
     if not course or not year_level or not section:
@@ -452,11 +497,204 @@ def generate_cvsu_email(name, provided_email=''):
 
 
 def get_db():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA foreign_keys=ON')
-    return conn
+    class _CompatRow(dict):
+        def __init__(self, keys, values):
+            super().__init__(zip(keys, values))
+            self._keys = list(keys)
+            self._values = list(values)
+
+        def __getitem__(self, key):
+            if isinstance(key, int):
+                return self._values[key]
+            return super().__getitem__(key)
+
+    class _CompatCursor:
+        def __init__(self, cursor):
+            self._cursor = cursor
+            self._keys = []
+
+        def _rewrite_insert_or_replace(self, stmt):
+            match = re.match(
+                r'^INSERT\s+OR\s+REPLACE\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)\s*;?$',
+                stmt,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if not match:
+                return None
+
+            table_name = match.group(1)
+            columns = [column.strip().strip('"') for column in match.group(2).split(',')]
+            values_clause = match.group(3).strip()
+            conflict_column = 'id' if 'id' in columns else columns[0]
+            update_columns = [column for column in columns if column != conflict_column]
+
+            if update_columns:
+                updates = ', '.join(f'{column}=EXCLUDED.{column}' for column in update_columns)
+                return (
+                    f'INSERT INTO {table_name} ({", ".join(columns)}) '
+                    f'VALUES ({values_clause}) '
+                    f'ON CONFLICT ({conflict_column}) DO UPDATE SET {updates}'
+                )
+
+            return (
+                f'INSERT INTO {table_name} ({", ".join(columns)}) '
+                f'VALUES ({values_clause}) '
+                f'ON CONFLICT ({conflict_column}) DO NOTHING'
+            )
+
+        def _rewrite_sql(self, sql):
+            stmt = (sql or '').strip()
+            if not stmt:
+                return stmt, None
+
+            up = stmt.upper()
+            if up.startswith('PRAGMA JOURNAL_MODE') or up.startswith('PRAGMA FOREIGN_KEYS'):
+                return None, []
+
+            m = re.match(r'^PRAGMA\s+TABLE_INFO\(([^\)]+)\)\s*$', stmt, flags=re.IGNORECASE)
+            if m:
+                table_name = m.group(1).strip().strip('"\'')
+                qry = (
+                    "SELECT (ordinal_position - 1) AS cid, "
+                    "column_name AS name, data_type AS type, "
+                    "0 AS notnull, column_default AS dflt_value, 0 AS pk "
+                    "FROM information_schema.columns "
+                    "WHERE table_schema='public' AND table_name=%s "
+                    "ORDER BY ordinal_position"
+                )
+                return qry, (table_name,)
+
+            if "FROM SQLITE_MASTER" in up:
+                return (
+                    "SELECT table_name AS name "
+                    "FROM information_schema.tables "
+                    "WHERE table_schema='public' AND table_type='BASE TABLE'"
+                ), None
+
+            stmt = re.sub(
+                r'INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT',
+                'BIGSERIAL PRIMARY KEY',
+                stmt,
+                flags=re.IGNORECASE,
+            )
+            if re.search(r'INSERT\s+OR\s+REPLACE\s+INTO', stmt, flags=re.IGNORECASE):
+                rewritten = self._rewrite_insert_or_replace(stmt)
+                if rewritten:
+                    stmt = rewritten
+                else:
+                    stmt = re.sub(r'INSERT\s+OR\s+REPLACE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
+            if re.search(r'INSERT\s+OR\s+IGNORE\s+INTO', stmt, flags=re.IGNORECASE):
+                stmt = re.sub(r'INSERT\s+OR\s+IGNORE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
+                if 'ON CONFLICT' not in stmt.upper():
+                    stmt = stmt.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+
+            stmt = stmt.replace('?', '%s')
+            return stmt, None
+
+        def execute(self, sql, params=None):
+            rewritten, forced_params = self._rewrite_sql(sql)
+            if rewritten is None:
+                self._keys = []
+                self._empty = forced_params or []
+                return self
+
+            run_params = forced_params if forced_params is not None else params
+            if run_params is None:
+                self._cursor.execute(rewritten)
+            else:
+                self._cursor.execute(rewritten, run_params)
+            self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
+            self._empty = None
+            return self
+
+        def executemany(self, sql, seq_of_params):
+            rewritten, forced_params = self._rewrite_sql(sql)
+            if rewritten is None:
+                self._keys = []
+                self._empty = []
+                return self
+            if forced_params is not None:
+                raise RuntimeError('Forced SQL params are not supported with executemany')
+            self._cursor.executemany(rewritten, seq_of_params)
+            self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
+            self._empty = None
+            return self
+
+        def fetchone(self):
+            if self._empty is not None:
+                return None
+            row = self._cursor.fetchone()
+            if row is None:
+                return None
+            return _CompatRow(self._keys, row)
+
+        def fetchall(self):
+            if self._empty is not None:
+                return []
+            rows = self._cursor.fetchall()
+            return [_CompatRow(self._keys, r) for r in rows]
+
+        @property
+        def rowcount(self):
+            return self._cursor.rowcount
+
+        @property
+        def lastrowid(self):
+            """Emulate SQLite's lastrowid for PostgreSQL via the underlying cursor."""
+            try:
+                return self._cursor.fetchone()[0]
+            except Exception:
+                return None
+
+        @property
+        def description(self):
+            return self._cursor.description
+
+        def close(self):
+            self._cursor.close()
+
+    class _CompatConnection:
+        def __init__(self, dsn):
+            self._conn = psycopg2.connect(dsn)
+            self.row_factory = None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            try:
+                if exc_type is None:
+                    self._conn.commit()
+                else:
+                    self._conn.rollback()
+            finally:
+                self._conn.close()
+
+        def cursor(self):
+            return _CompatCursor(self._conn.cursor())
+
+        def execute(self, sql, params=None):
+            cur = self.cursor()
+            return cur.execute(sql, params)
+
+        def executemany(self, sql, seq_of_params):
+            cur = self.cursor()
+            return cur.executemany(sql, seq_of_params)
+
+        def executescript(self, sql_script):
+            for part in [p.strip() for p in (sql_script or '').split(';') if p.strip()]:
+                self.execute(part)
+
+        def commit(self):
+            self._conn.commit()
+
+        def rollback(self):
+            self._conn.rollback()
+
+        def close(self):
+            self._conn.close()
+
+    return _CompatConnection(DATABASE_URL)
 
 
 def init_db():
@@ -527,7 +765,10 @@ def init_db():
             total_absent    INTEGER NOT NULL DEFAULT 0,
             total_excused   INTEGER NOT NULL DEFAULT 0,
             warn_log_json   TEXT NOT NULL DEFAULT '[]',
-            invalid_log_json TEXT NOT NULL DEFAULT '[]'
+            invalid_log_json TEXT NOT NULL DEFAULT '[]',
+            semester        TEXT NOT NULL DEFAULT '1st Semester',
+            session_tx_hash TEXT NOT NULL DEFAULT '',
+            session_block_number INTEGER NOT NULL DEFAULT 0
         );
     CREATE INDEX IF NOT EXISTS idx_sess_ended   ON sessions(ended_at);
     CREATE INDEX IF NOT EXISTS idx_sess_section ON sessions(section_key);
@@ -602,6 +843,7 @@ def init_db():
         day_of_week      INTEGER NOT NULL DEFAULT 1,
         start_time       TEXT NOT NULL DEFAULT '',
         end_time         TEXT NOT NULL DEFAULT '',
+        semester         TEXT NOT NULL DEFAULT '',
         class_type       TEXT NOT NULL DEFAULT 'lecture',
         grace_minutes    INTEGER NOT NULL DEFAULT 15,
         is_active        INTEGER NOT NULL DEFAULT 1,
@@ -664,7 +906,7 @@ def init_db():
     _migrate_add_missing_columns()
     _migrate_users_to_accounts()
     _migrate_nfc_registration()
-    print('[DB] Schema ready ->', DB_FILE)
+    print('[DB] Schema ready -> PostgreSQL')
 
 
 def _migrate_add_missing_columns():
@@ -675,6 +917,7 @@ def _migrate_add_missing_columns():
         ('students', 'reg_block', 'INTEGER NOT NULL DEFAULT 0'),
         ('students', 'photo_file', "TEXT NOT NULL DEFAULT ''"),
         ('students', 'updated_at', "TEXT NOT NULL DEFAULT ''"),
+        ('students', 'student_status', "TEXT NOT NULL DEFAULT 'active'"),  # active, graduated, alumni
         ('sessions', 'teacher_username', "TEXT NOT NULL DEFAULT ''"),
         ('sessions', 'class_type', "TEXT NOT NULL DEFAULT 'lecture'"),
         ('sessions', 'total_enrolled', 'INTEGER NOT NULL DEFAULT 0'),
@@ -687,6 +930,8 @@ def _migrate_add_missing_columns():
         ('sessions', 'grace_period', 'INTEGER NOT NULL DEFAULT 15'),
         ('sessions', 'auto_end_at', 'TEXT'),
         ('sessions', 'schedule_id', 'TEXT DEFAULT NULL'),
+        ('sessions', 'session_tx_hash', "TEXT NOT NULL DEFAULT ''"),
+        ('sessions', 'session_block_number', 'INTEGER NOT NULL DEFAULT 0'),
         ('accounts', 'updated_at', "TEXT NOT NULL DEFAULT ''"),
         ('photos', 'uploaded_at', "TEXT NOT NULL DEFAULT ''"),
         ('attendance_logs', 'excuse_request_id', 'INTEGER DEFAULT NULL'),
@@ -708,7 +953,12 @@ def _migrate_add_missing_columns():
         ('schedules', 'updated_at', "TEXT NOT NULL DEFAULT ''"),
     ]
     with get_db() as conn:
-        existing_tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        existing_tables = [
+            r[0] for r in conn.execute(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema='public' AND table_type='BASE TABLE'"
+            ).fetchall()
+        ]
 
         if 'schedules' not in existing_tables:
             conn.execute(
@@ -724,6 +974,7 @@ def _migrate_add_missing_columns():
                     day_of_week      INTEGER NOT NULL DEFAULT 1,
                     start_time       TEXT NOT NULL DEFAULT '',
                     end_time         TEXT NOT NULL DEFAULT '',
+                    semester         TEXT NOT NULL DEFAULT '',
                     class_type       TEXT NOT NULL DEFAULT 'lecture',
                     grace_minutes    INTEGER NOT NULL DEFAULT 15,
                     is_active        INTEGER NOT NULL DEFAULT 1,
@@ -805,51 +1056,82 @@ def _migrate_add_missing_columns():
             conn.execute('CREATE INDEX IF NOT EXISTS idx_excuse_status ON excuse_requests(status)')
             print('[MIGRATION] Created missing table: excuse_requests')
 
-        for table, col, col_def in migrations:
+        def _run_migration_step(sql, params=None):
+            conn.execute('SAVEPOINT mig_step')
             try:
-                conn.execute(f'ALTER TABLE {table} ADD COLUMN {col} {col_def}')
+                if params is None:
+                    conn.execute(sql)
+                else:
+                    conn.execute(sql, params)
+                conn.execute('RELEASE SAVEPOINT mig_step')
+                return True, None
+            except Exception as err:
+                conn.execute('ROLLBACK TO SAVEPOINT mig_step')
+                conn.execute('RELEASE SAVEPOINT mig_step')
+                return False, err
+
+        for table, col, col_def in migrations:
+            ok, _ = _run_migration_step(f'ALTER TABLE {table} ADD COLUMN {col} {col_def}')
+            if ok:
                 print(f'[MIGRATION] Added {table}.{col}')
-            except Exception:
-                pass
-        try:
-            conn.execute("ALTER TABLE no_class_days ADD COLUMN teacher_usernames_json TEXT NOT NULL DEFAULT '[]'")
+
+        ok, _ = _run_migration_step("ALTER TABLE no_class_days ADD COLUMN teacher_usernames_json TEXT NOT NULL DEFAULT '[]'")
+        if ok:
             print('[MIGRATION] Added no_class_days.teacher_usernames_json')
-        except Exception:
-            pass
-        try:
-            conn.execute('ALTER TABLE no_class_days ADD COLUMN apply_all_teachers INTEGER NOT NULL DEFAULT 0')
+
+        ok, _ = _run_migration_step('ALTER TABLE no_class_days ADD COLUMN apply_all_teachers INTEGER NOT NULL DEFAULT 0')
+        if ok:
             print('[MIGRATION] Added no_class_days.apply_all_teachers')
-        except Exception:
-            pass
         try:
             existing = [r[1] for r in conn.execute('PRAGMA table_info(students)').fetchall()]
             if 'course' in existing and 'program' in existing:
-                conn.execute("UPDATE students SET program = course WHERE program = '' AND course != ''")
+                ok, e = _run_migration_step("UPDATE students SET program = course WHERE program = '' AND course != ''")
+                if not ok:
+                    print(f'[MIGRATION] course->program copy: {e}')
         except Exception as e:
             print(f'[MIGRATION] course->program copy: {e}')
         try:
             existing = [r[1] for r in conn.execute('PRAGMA table_info(students)').fetchall()]
             if 'name' in existing and 'full_name' in existing:
-                conn.execute("UPDATE students SET full_name = name WHERE full_name = '' AND name != ''")
+                ok, e = _run_migration_step("UPDATE students SET full_name = name WHERE full_name = '' AND name != ''")
+                if not ok:
+                    print(f'[MIGRATION] name->full_name copy: {e}')
         except Exception as e:
             print(f'[MIGRATION] name->full_name copy: {e}')
         try:
             existing = [r[1] for r in conn.execute('PRAGMA table_info(students)').fetchall()]
             if 'tx_hash' in existing and 'reg_tx_hash' in existing:
-                conn.execute("UPDATE students SET reg_tx_hash = tx_hash WHERE reg_tx_hash = '' AND tx_hash != ''")
+                # DISABLED: Do not copy tx_hash to reg_tx_hash — student identity should never be on blockchain
+                # ok, e = _run_migration_step("UPDATE students SET reg_tx_hash = tx_hash WHERE reg_tx_hash = '' AND tx_hash != ''")
+                # if not ok:
+                #     print(f'[MIGRATION] tx_hash->reg_tx_hash copy: {e}')
+                pass
         except Exception as e:
-            print(f'[MIGRATION] tx_hash->reg_tx_hash copy: {e}')
+            pass
+        
+        # CLEANUP: Clear any erroneous student registration blockchain references
+        # Students should never have reg_tx_hash or eth_address values (those are for attendance only)
+        ok, e = _run_migration_step("UPDATE students SET reg_tx_hash='', reg_block=0, eth_address='' WHERE reg_tx_hash != '' OR reg_block != 0 OR eth_address != ''")
+        if ok:
+            print('[MIGRATION] Cleared erroneous student blockchain references')
+        else:
+            print(f'[MIGRATION] Cleanup student references: {e}')
         try:
             existing = [r[1] for r in conn.execute('PRAGMA table_info(sessions)').fetchall()]
             if 'teacher' in existing and 'teacher_username' in existing:
-                conn.execute("UPDATE sessions SET teacher_username = teacher WHERE teacher_username = '' AND teacher != ''")
+                ok, e = _run_migration_step("UPDATE sessions SET teacher_username = teacher WHERE teacher_username = '' AND teacher != ''")
+                if not ok:
+                    print(f'[MIGRATION] teacher->teacher_username copy: {e}')
         except Exception as e:
             print(f'[MIGRATION] teacher->teacher_username copy: {e}')
-        try:
-            conn.execute('CREATE INDEX IF NOT EXISTS idx_stu_program ON students(program)')
-            conn.execute('CREATE INDEX IF NOT EXISTS idx_stu_section ON students(year_level, section)')
-            conn.execute('CREATE INDEX IF NOT EXISTS idx_sess_teacher ON sessions(teacher_username)')
-        except Exception as e:
+        ok, e = _run_migration_step('CREATE INDEX IF NOT EXISTS idx_stu_program ON students(program)')
+        if not ok:
+            print(f'[MIGRATION] Index creation: {e}')
+        ok, e = _run_migration_step('CREATE INDEX IF NOT EXISTS idx_stu_section ON students(year_level, section)')
+        if not ok:
+            print(f'[MIGRATION] Index creation: {e}')
+        ok, e = _run_migration_step('CREATE INDEX IF NOT EXISTS idx_sess_teacher ON sessions(teacher_username)')
+        if not ok:
             print(f'[MIGRATION] Index creation: {e}')
 
 
@@ -922,22 +1204,19 @@ def _row_to_dict(row):
 def load_sessions():
     with get_db() as conn:
         rows = conn.execute('SELECT * FROM sessions').fetchall()
-        result = {}
-        for r in rows:
-            s = _session_row_with_logs(conn, r)
-            result[r['sess_id']] = s
-    return result
+        return {r['sess_id']: _session_row_with_logs(conn, r) for r in rows}
+
 
 def load_session(sess_id):
     with get_db() as conn:
         row = conn.execute("SELECT * FROM sessions WHERE sess_id=?", (sess_id,)).fetchone()
-        if row is None: return None
+        if not row:
+            return None
         return _session_row_with_logs(conn, row)
+
 
 def _session_row_with_logs(conn, row):
     d = dict(row)
-    if 'teacher_username' in d:
-        d['teacher'] = d.pop('teacher_username')
     if d.get('section_key'):
         d['section_key'] = normalize_section_key(d['section_key'])
     logs = conn.execute(
@@ -947,32 +1226,50 @@ def _session_row_with_logs(conn, row):
     tap_log, excuse_notes, tx_hashes = [], {}, {}
     for lg in logs:
         nid = lg['nfc_id']
-        st  = lg['status']
-        if   st == 'excused': excused.append(nid); excuse_notes[nid] = lg['excuse_note']
-        elif st == 'late':    late.append(nid);    present.append(nid)
-        elif st == 'present': present.append(nid)
-        elif st == 'absent':  absent.append(nid)
-        if lg['tap_time'] and st in ('present','late'):
+        st = lg['status']
+        if st == 'excused':
+            excused.append(nid)
+            excuse_notes[nid] = lg['excuse_note']
+        elif st == 'late':
+            late.append(nid)
+            present.append(nid)
+        elif st == 'present':
+            present.append(nid)
+        elif st == 'absent':
+            absent.append(nid)
+        if lg['tap_time'] and st in ('present', 'late'):
             tap_log.append({
-                'nfc_id': nid, 'name': lg['student_name'],
-                'student_id': lg['student_id'], 'time': lg['tap_time'],
-                'tx_hash': lg['tx_hash'], 'block': lg['block_number'],
-                'is_late': st == 'late', 'timestamp': 0,
+                'nfc_id': nid,
+                'name': lg['student_name'],
+                'student_id': lg['student_id'],
+                'time': lg['tap_time'],
+                'tx_hash': lg['tx_hash'],
+                'block': lg['block_number'],
+                'is_late': st == 'late',
+                'timestamp': 0,
             })
         if lg['tx_hash']:
-            tx_hashes[nid] = {'tx_hash': lg['tx_hash'],
-                              'block': lg['block_number'],
-                              'time': lg['tap_time']}
-    d['present']      = present
-    d['late']         = late
-    d['excused']      = excused
-    d['absent']       = absent
-    d['warned']       = []
-    d['tap_log']      = tap_log
-    d['warn_log']     = json.loads(d.pop('warn_log_json',  '[]') or '[]')
-    d['invalid_log']  = json.loads(d.pop('invalid_log_json','[]') or '[]')
+            tx_hashes[nid] = {
+                'tx_hash': lg['tx_hash'],
+                'block': lg['block_number'],
+                'time': lg['tap_time'],
+            }
+    d['present'] = present
+    d['late'] = late
+    d['excused'] = excused
+    d['absent'] = absent
+    d['grace_period'] = int(d.get('grace_period', 15))
+    d['semester'] = d.get('semester', '1st Semester')
+    d['warned'] = []
+    d['tap_log'] = tap_log
+    d['warn_log'] = json.loads(d.pop('warn_log_json', '[]') or '[]')
+    d['invalid_log'] = json.loads(d.pop('invalid_log_json', '[]') or '[]')
     d['excuse_notes'] = excuse_notes
-    d['tx_hashes']    = tx_hashes
+    d['tx_hashes'] = tx_hashes
+    # Ensure core fields are strings to prevent template crashes
+    for k in ['teacher_name', 'subject_name', 'section_key', 'time_slot']:
+        if k in d and d[k] is None:
+            d[k] = ''
     return d
 
 def save_session(sess_id, s):
@@ -989,8 +1286,8 @@ def save_session(sess_id, s):
             "(sess_id,subject_id,subject_name,course_code,class_type,units,time_slot,"
             " section_key,teacher_username,teacher_name,started_at,late_cutoff,"
             " auto_end_at,ended_at,grace_period,schedule_id,"
-            " warn_log_json,invalid_log_json) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            " warn_log_json,invalid_log_json,semester,session_tx_hash,session_block_number) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(sess_id) DO UPDATE SET "
             "subject_id=excluded.subject_id, subject_name=excluded.subject_name, "
             "course_code=excluded.course_code, class_type=excluded.class_type, "
@@ -1004,14 +1301,19 @@ def save_session(sess_id, s):
             "grace_period=excluded.grace_period, "
             "schedule_id=excluded.schedule_id, "
             "warn_log_json=excluded.warn_log_json, "
-            "invalid_log_json=excluded.invalid_log_json",
+            "invalid_log_json=excluded.invalid_log_json, "
+            "semester=excluded.semester, "
+            "session_tx_hash=excluded.session_tx_hash, "
+            "session_block_number=excluded.session_block_number",
             (sess_id, s.get('subject_id', ''), s.get('subject_name', ''),
              s.get('course_code', ''), class_type, s.get('units', 3), s.get('time_slot', ''),
              sk, teacher_uname, teacher_name,
              s.get('started_at', ''), s.get('late_cutoff', ''),
              s.get('auto_end_at'), s.get('ended_at'),
              s.get('grace_period', 15), schedule_id,
-             json.dumps(s.get('warn_log', [])), json.dumps(s.get('invalid_log', [])))
+             json.dumps(s.get('warn_log', [])), json.dumps(s.get('invalid_log', [])),
+             s.get('semester', '1st Semester'),
+             s.get('session_tx_hash', ''), s.get('session_block_number', 0))
         )
         counts = conn.execute(
             "SELECT status, COUNT(*) as cnt FROM attendance_logs "
@@ -1030,7 +1332,7 @@ def save_sessions(sessions_dict):
     for sid, s in sessions_dict.items():
         save_session(sid, s)
 
-def migrate_json_to_sqlite():
+def migrate_json_to_postgres():
     for fname, table, saver in [
         ('users.json',             'users',             lambda d: [db_save_user(u,v) for u,v in d.items()]),
         ('subjects.json',          'subjects',          lambda d: [db_save_subject(k,v) for k,v in d.items()]),
@@ -1188,8 +1490,8 @@ def db_save_student(s):
                 s.get('date_registered',''),
                 s.get('raw_name',''),
                 s.get('address', s.get('eth_address','')),
-                s.get('tx_hash', s.get('reg_tx_hash','')),
-                s.get('reg_block', 0),
+                '',  # ← ALWAYS EMPTY: reg_tx_hash must never be populated for student identity
+                0,   # ← ALWAYS 0: reg_block must never be populated
                 s.get('photo_file',''),
                 s.get('created_at', now), now
             )
@@ -1586,15 +1888,15 @@ def db_save_schedule(s: dict) -> str:
         conn.execute(
             "INSERT INTO schedules "
             "(schedule_id,section_key,subject_id,subject_name,course_code,"
-            " teacher_username,teacher_name,day_of_week,start_time,end_time,class_type,"
+            " teacher_username,teacher_name,day_of_week,start_time,end_time,semester,class_type,"
             " grace_minutes,is_active,created_by,created_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?) "
             "ON CONFLICT(schedule_id) DO UPDATE SET "
             "section_key=excluded.section_key, subject_id=excluded.subject_id, "
             "subject_name=excluded.subject_name, course_code=excluded.course_code, "
             "teacher_username=excluded.teacher_username, teacher_name=excluded.teacher_name, "
             "day_of_week=excluded.day_of_week, start_time=excluded.start_time, "
-            "end_time=excluded.end_time, class_type=excluded.class_type, "
+            "end_time=excluded.end_time, semester=excluded.semester, class_type=excluded.class_type, "
             "grace_minutes=excluded.grace_minutes, "
             "updated_at=excluded.updated_at",
             (sid,
@@ -1603,6 +1905,7 @@ def db_save_schedule(s: dict) -> str:
              s.get('teacher_username', ''), s.get('teacher_name', ''),
              day_of_week,
              s.get('start_time', ''), s.get('end_time', ''),
+             s.get('semester', ''),
              class_type,
              int(s.get('grace_minutes', 15)),
              s.get('created_by', ''), now, now)
@@ -1931,20 +2234,21 @@ def check_and_start_scheduled_sessions():
                     'subject_id': s['subject_id'],
                     'subject_name': s['subject_name'],
                     'course_code': s['course_code'],
+                    'semester': s.get('semester', '1st Semester'),
                     'class_type': s.get('class_type', 'lecture'),
                     'units': subj.get('units', 3) if subj else 3,
                     'time_slot': f"{start_hhmm} - {end_hhmm}",
-                    'section_key': s['section_key'],
+                    'section_key': normalize_section_key(s['section_key']), # Force normalization
                     'teacher_username': s['teacher_username'],
                     'teacher_name': s['teacher_name'],
                     'started_at': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
                     'late_cutoff': f"{now_dt.strftime('%Y-%m-%d')} {late_cutoff}:00",
                     'auto_end_at': f"{now_dt.strftime('%Y-%m-%d')} {end_hhmm}:00",
-                    'grace_period': s.get('grace_minutes', 15),
+                    'grace_period': int(s.get('grace_minutes', 15)),
                     'schedule_id': s['schedule_id']
                 }
                 save_session(sess_id, new_sess)
-                print(f"[AUTO] Started session {sess_id} for {s['subject_name']} ({s['teacher_username']})")
+                print(f"[AUTO] Started session {sess_id} for {s['subject_name']} ({s['teacher_username']}) - Section: {new_sess['section_key']}")
             elif already_ran and start_dt <= now_dt < end_dt:
                 print(f"[AUTO] Skipped schedule_id={s.get('schedule_id')} (already ran today)")
 
@@ -1996,6 +2300,7 @@ def check_and_start_scheduled_sessions():
                         'subject_id': f"event:{ev.get('event_id')}",
                         'subject_name': ev.get('title', 'School Event'),
                         'course_code': 'EVENT',
+                        'semester': ev.get('semester', '1st Semester'),
                         'class_type': 'school_event',
                         'units': 0,
                         'time_slot': f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}",
@@ -2121,11 +2426,8 @@ DOW_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
 # ── Excuse Request DB helpers ──────────────────────────────────────────────
 
 def _excuse_pk_column(conn) -> str:
-    cols = [r['name'] for r in conn.execute("PRAGMA table_info(excuse_requests)").fetchall()]
-    for cand in ('id', 'excuse_id', 'request_id'):
-        if cand in cols:
-            return cand
-    return 'rowid'
+    # Standard DAVS excuse_requests table uses 'id' as SERIAL PRIMARY KEY.
+    return 'id'
 
 def _excuse_order_expr(conn) -> str:
     cols = [r['name'] for r in conn.execute("PRAGMA table_info(excuse_requests)").fetchall()]
@@ -2161,22 +2463,29 @@ def db_save_excuse_request(data: dict) -> int:
             insert_cols.append('submitted_at')
             values.append(now)
 
-        placeholders = ','.join(['?'] * len(insert_cols))
-        sql = f"INSERT INTO excuse_requests ({','.join(insert_cols)}) VALUES ({placeholders})"
-        cur = conn.execute(sql, tuple(values))
         pk_col = _excuse_pk_column(conn)
-        inserted_id = cur.lastrowid
-        if pk_col != 'rowid':
+        placeholders = ','.join(['?'] * len(insert_cols))
+        # Use RETURNING to get the inserted ID (works with PostgreSQL compatibility layer)
+        returning_clause = f" RETURNING {pk_col}" if pk_col != 'rowid' else ""
+        sql = f"INSERT INTO excuse_requests ({','.join(insert_cols)}) VALUES ({placeholders}){returning_clause}"
+        cur = conn.execute(sql, tuple(values))
+        inserted_id = None
+        if returning_clause:
             try:
-                row = conn.execute(
-                    f"SELECT {pk_col} AS pk FROM excuse_requests WHERE rowid=?",
-                    (cur.lastrowid,)
-                ).fetchone()
-                pk_val = row['pk'] if row else None
-                if pk_val is not None and str(pk_val).strip() != '':
-                    inserted_id = pk_val
+                row = cur.fetchone()
+                if row:
+                    inserted_id = row[pk_col] if isinstance(row, dict) else row[0]
             except Exception:
                 pass
+        if inserted_id is None:
+            try:
+                # Fallback: query the last inserted row
+                row = conn.execute(
+                    f"SELECT {pk_col} AS pk FROM excuse_requests ORDER BY {pk_col} DESC LIMIT 1"
+                ).fetchone()
+                inserted_id = row['pk'] if row else 1
+            except Exception:
+                inserted_id = 1
         return inserted_id
 
 def db_get_all_excuse_requests(status_filter=None):
@@ -2184,10 +2493,10 @@ def db_get_all_excuse_requests(status_filter=None):
         with get_db() as conn:
             pk_col = _excuse_pk_column(conn)
             order_expr = _excuse_order_expr(conn)
-            pk_select = f"er.{pk_col}" if pk_col != 'rowid' else "er.rowid"
+            pk_select = f"er.{pk_col}"
             # Explicitly alias er.id to avoid any column shadowing from JOIN
             base_sql = (
-                f"SELECT {pk_select} AS id, er.rowid AS _rowid, er.sess_id, er.nfc_id, "
+                f"SELECT {pk_select} AS id, er.sess_id, er.nfc_id, "
                 "er.student_name, er.student_id, er.student_email, "
                 "er.reason_type, er.reason_detail, er.attachment_file, "
                 "er.status, er.reviewed_by, er.reviewed_at, "
@@ -2206,14 +2515,7 @@ def db_get_all_excuse_requests(status_filter=None):
                 rows = conn.execute(
                     base_sql + f"ORDER BY {order_expr} DESC"
                 ).fetchall()
-        out = []
-        for r in rows:
-            d = dict(r)
-            if d.get('id') is None or str(d.get('id')).strip() == '':
-                d['id'] = d.get('_rowid')
-            d.pop('_rowid', None)
-            out.append(d)
-        return out
+        return [dict(r) for r in rows]
     except Exception as e:
         print(f'[DB] db_get_all_excuse_requests error: {e}')
         return []
@@ -2221,52 +2523,30 @@ def db_get_all_excuse_requests(status_filter=None):
 def db_get_excuse_request(excuse_id):
     with get_db() as conn:
         pk_col = _excuse_pk_column(conn)
-        pk_where = pk_col if pk_col != 'rowid' else 'rowid'
         row = conn.execute(
-            f"SELECT *, {pk_where} AS id, rowid AS _rowid FROM excuse_requests WHERE {pk_where}=?",
+            f"SELECT *, {pk_col} AS id FROM excuse_requests WHERE {pk_col}=?",
             (excuse_id,)
         ).fetchone()
-        if not row and pk_where != 'rowid':
-            row = conn.execute(
-                "SELECT *, rowid AS id, rowid AS _rowid FROM excuse_requests WHERE rowid=?",
-                (excuse_id,)
-            ).fetchone()
     if not row:
         return None
-    d = dict(row)
-    if d.get('id') is None or str(d.get('id')).strip() == '':
-        d['id'] = d.get('_rowid')
-    d.pop('_rowid', None)
-    return d
+    return dict(row)
 
 def db_resolve_excuse(excuse_id: int, resolution: str, reviewed_by: str) -> dict | None:
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     session_sync = None
     with get_db() as conn:
         pk_col = _excuse_pk_column(conn)
-        pk_where = pk_col if pk_col != 'rowid' else 'rowid'
-        where_col = pk_where
-        where_val = excuse_id
         row = conn.execute(
-            f"SELECT *, {pk_where} AS id, rowid AS _rowid FROM excuse_requests WHERE {pk_where}=?",
+            f"SELECT *, {pk_col} AS id FROM excuse_requests WHERE {pk_col}=?",
             (excuse_id,)
         ).fetchone()
-        if not row and pk_where != 'rowid':
-            row = conn.execute(
-                "SELECT *, rowid AS id, rowid AS _rowid FROM excuse_requests WHERE rowid=?",
-                (excuse_id,)
-            ).fetchone()
-            if row:
-                where_col = 'rowid'
-                where_val = excuse_id
         if not row:
             return None
         row_dict = dict(row)
-        if row_dict.get('id') is None or str(row_dict.get('id')).strip() == '':
-            row_dict['id'] = row_dict.get('_rowid')
+        row_dict['id'] = row_dict.get(pk_col)
         conn.execute(
-            f"UPDATE excuse_requests SET status=?, reviewed_by=?, reviewed_at=? WHERE {where_col}=?",
-            (resolution, reviewed_by, now, where_val)
+            f"UPDATE excuse_requests SET status=?, reviewed_by=?, reviewed_at=? WHERE {pk_col}=?",
+            (resolution, reviewed_by, now, excuse_id)
         )
         if resolution == 'approved':
             r_type = row_dict.get('reason_type', 'others')
@@ -2297,8 +2577,7 @@ def db_resolve_excuse(excuse_id: int, resolution: str, reviewed_by: str) -> dict
                 'nfc_id': row_dict['nfc_id'],
                 'note': note,
             }
-        row_dict.pop('_rowid', None)
-    # Sync with live session if active (outside transaction to avoid sqlite write lock).
+    # Sync with live session if active (outside transaction to avoid DB write lock).
     if session_sync:
         sess = load_session(session_sync['sess_id'])
         if sess:
@@ -2349,21 +2628,10 @@ def load_student_names():
     for s in db_get_all_students():
         student_name_map[s['nfcId']] = s['name']
     if student_name_map:
-        print(f"[INFO] Loaded {len(student_name_map)} student names from SQLite cache.")
-    if BLOCKCHAIN_ONLINE and contract:
-        try:
-            ef = contract.events.StudentRegistered.create_filter(
-                from_block=0, to_block=web3.eth.block_number)
-            for e in ef.get_all_entries():
-                nid  = e['args']['nfcId']
-                name = e['args']['name'].split(' | ')[0]
-                student_name_map[nid] = name
-            print(f"[INFO] Student names enriched from blockchain ({len(student_name_map)} total).")
-        except Exception as ex:
-            print(f"[WARNING] load_student_names blockchain error: {ex}")
+        print(f"[INFO] Loaded {len(student_name_map)} student names from PostgreSQL.")
 
 init_db()
-migrate_json_to_sqlite()
+migrate_json_to_postgres()
 sessions_db = load_sessions()
 
 student_name_map = {}
@@ -2386,9 +2654,28 @@ def fmt_time_short(dt_str):
     if not dt_str: return '—'
     try:
         dt = datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
-        return dt.strftime('%I:%M %p').lstrip('0')
+        return dt.strftime('%I:%M %p').lower().lstrip('0')
     except:
         return dt_str
+
+def fmt_timeslot(slot):
+    if not slot or ' - ' not in slot:
+        return slot
+    try:
+        parts = slot.split(' - ')
+        res = []
+        for p in parts:
+            dt = datetime.strptime(p.strip(), '%H:%M')
+            res.append(dt.strftime('%I:%M %p').lower().lstrip('0'))
+        return " to ".join(res)
+    except:
+        return slot
+
+# Register Jinja2 filters after functions are defined
+app.jinja_env.filters['from_json'] = lambda s: _json_mod.loads(s) if s else []
+app.jinja_env.filters['fmt_timeslot'] = fmt_timeslot
+app.jinja_env.filters['fmt_time'] = fmt_time
+app.jinja_env.filters['fmt_time_short'] = fmt_time_short
 
 # ── Role constants ────────────────────────────────────────────────────────
 SUPER_ADMIN_ROLE = 'super_admin'
@@ -2495,80 +2782,8 @@ def parse_student(raw):
     return r
 
 def get_all_students():
-    global BLOCKCHAIN_ONLINE
     cached = db_get_all_students()
-
-    if contract is None:
-        # Contract not loaded (or reset state); do not attempt event sync.
-        if cached:
-            return cached
-        print("[INFO] No blockchain contract; returning SQLite student cache (empty).")
-        return []
-
-    if not BLOCKCHAIN_ONLINE and contract:
-        try:
-            BLOCKCHAIN_ONLINE = web3.is_connected()
-        except Exception:
-            BLOCKCHAIN_ONLINE = False
-    if BLOCKCHAIN_ONLINE and contract:
-        try:
-            ef = contract.events.StudentRegistered.create_filter(
-                from_block=0, to_block=web3.eth.block_number)
-            entries = ef.get_all_entries()
-            students, seen = [], set()
-            for e in entries:
-                a = e['args']
-                if a['nfcId'] in seen: continue
-                seen.add(a['nfcId'])
-                p = parse_student(a['name'])
-                s = {**p, 'raw_name': a['name'], 'nfcId': a['nfcId'],
-                     'address': a['studentAddr'],
-                     'tx_hash': e['transactionHash'].hex()}
-                ov = db_get_override(a['nfcId'])
-                if ov.get('full_name'):       s['name']            = ov['full_name']
-                if ov.get('student_id'):      s['student_id']      = ov['student_id']
-                if ov.get('email'):           s['email']           = ov['email']
-                if ov.get('contact'):         s['contact']         = ov['contact']
-                if ov.get('adviser'):         s['adviser']         = ov['adviser']
-                if ov.get('major'):           s['major']           = ov['major']
-                if ov.get('semester'):        s['semester']        = ov['semester']
-                if ov.get('school_year'):     s['school_year']     = ov['school_year']
-                if ov.get('date_registered'): s['date_registered'] = ov['date_registered']
-                if ov.get('course'):          s['course']          = ov['course']
-                if ov.get('year_level'):      s['year_level']      = ov['year_level']
-                if ov.get('section'):         s['section']         = ov['section'].upper()
-                s['section'] = s['section'].strip().upper()
-                students.append(s)
-                db_save_student(s)
-            # If blockchain is reachable but has no StudentRegistered events
-            # (e.g., fresh contract deployment), keep using SQLite cache so
-            # admin/teacher lists do not appear empty.
-            if students:
-                return students
-            print("[INFO] Blockchain has no student events yet — using SQLite cache.")
-            if cached:
-                for s in cached:
-                    ov = db_get_override(s['nfcId'])
-                    if ov.get('full_name'):       s['name']            = ov['full_name']
-                    if ov.get('student_id'):      s['student_id']      = ov['student_id']
-                    if ov.get('email'):           s['email']           = ov['email']
-                    if ov.get('contact'):         s['contact']         = ov['contact']
-                    if ov.get('adviser'):         s['adviser']         = ov['adviser']
-                    if ov.get('major'):           s['major']           = ov['major']
-                    if ov.get('semester'):        s['semester']        = ov['semester']
-                    if ov.get('school_year'):     s['school_year']     = ov['school_year']
-                    if ov.get('date_registered'): s['date_registered'] = ov['date_registered']
-                    if ov.get('course'):          s['course']          = ov['course']
-                    if ov.get('year_level'):      s['year_level']      = ov['year_level']
-                    if ov.get('section'):         s['section']         = ov['section'].upper()
-                    s['section'] = (s.get('section') or '').strip().upper()
-                return cached
-            return []
-        except Exception as _be:
-            print(f"[WARNING] Blockchain unreachable: {_be} — falling back to SQLite cache.")
-            BLOCKCHAIN_ONLINE = False
     if not cached:
-        print("[WARNING] No students in SQLite cache and blockchain is offline.")
         return []
     for s in cached:
         ov = db_get_override(s['nfcId'])
@@ -2679,12 +2894,216 @@ def chain_status_code(status: str) -> int:
         'excused': 3,
     }.get((status or '').lower(), 0)
 
+def send_contract_tx(contract_fn):
+    if not (BLOCKCHAIN_ONLINE and contract and admin_account):
+        raise RuntimeError('Blockchain tx unavailable: missing connection, contract, or signer.')
+    if ADMIN_PRIVATE_KEY:
+        for attempt in range(3):
+            with BLOCKCHAIN_LOCK:
+                nonce = web3.eth.get_transaction_count(admin_account, 'pending')
+                tx = contract_fn.build_transaction({
+                    'from': admin_account,
+                    'nonce': nonce,
+                    'chainId': int(web3.eth.chain_id),
+                })
+                
+                # Estimate gas
+                try:
+                    tx['gas'] = int(web3.eth.estimate_gas(tx) * 1.3)
+                except:
+                    tx['gas'] = 600000
+
+                # Set gas prices with extra padding for speed
+                try:
+                    latest = web3.eth.get_block('latest')
+                    base = latest.get('baseFeePerGas', 0)
+                    priority = int(web3.eth.max_priority_fee * 1.5) # 50% more priority
+                    tx['maxPriorityFeePerGas'] = priority
+                    tx['maxFeePerGas'] = int(base * 2 + priority)
+                    if 'gasPrice' in tx: del tx['gasPrice']
+                except:
+                    tx['gasPrice'] = int(web3.eth.gas_price * 1.2) # 20% buffer
+
+                try:
+                    signed = web3.eth.account.sign_transaction(tx, ADMIN_PRIVATE_KEY)
+                    raw = getattr(signed, 'raw_transaction', None) or signed.rawTransaction
+                    return web3.eth.send_raw_transaction(raw)
+                except Exception as e:
+                    err_msg = str(e).lower()
+                    if 'underpriced' in err_msg or 'nonce' in err_msg or 'already known' in err_msg:
+                        print(f"[BLOCKCHAIN] Nonce collision/underpriced (Attempt {attempt+1}). Retrying...")
+                        time.sleep(1.0) # Wait for mempool to settle
+                        continue
+                    raise e
+        return None
+
+    return contract_fn.transact({'from': admin_account})
+
+def ensure_student_registered_on_chain(nfc_id: str, name: str):
+    """Checks if a student is registered on-chain and registers them if not."""
+    if not (BLOCKCHAIN_ONLINE and contract and admin_account):
+        return False
+    try:
+        # Check registration status
+        st_info = contract.functions.studentsByNfc(nfc_id).call()
+        # st_info is (name, nfcId, isRegistered)
+        if st_info[2]: # isRegistered
+            return True
+            
+        print(f"[BLOCKCHAIN] Auto-registering student {nfc_id} ({name}) on-chain...")
+        tx = send_contract_tx(
+            contract.functions.registerStudent(
+                "0x0000000000000000000000000000000000000000", # No address needed for this simplified version
+                nfc_id,
+                name
+            )
+        )
+        if tx:
+            web3.eth.wait_for_transaction_receipt(tx)
+            return True
+    except Exception as e:
+        print(f"[BLOCKCHAIN ERROR] Auto-registration failed for {nfc_id}: {e}")
+    return False
+
 def mark_attendance_on_chain(nfc_id: str, status: str):
-    tx = contract.functions.markAttendanceWithStatus(
-        nfc_id, chain_status_code(status)
-    ).transact({'from': admin_account})
-    receipt = web3.eth.wait_for_transaction_receipt(tx)
-    return receipt['transactionHash'].hex(), receipt['blockNumber']
+    if not (BLOCKCHAIN_ONLINE and contract and admin_account):
+        return "", 0
+    try:
+        # Auto-register if needed
+        st = get_student_by_nfc_cached(nfc_id)
+        if st:
+            ensure_student_registered_on_chain(nfc_id, st.get('name', 'Unknown'))
+            
+        tx = send_contract_tx(
+            contract.functions.markAttendanceWithStatus(
+                nfc_id, chain_status_code(status)
+            )
+        )
+        receipt = web3.eth.wait_for_transaction_receipt(tx)
+        return receipt['transactionHash'].hex(), receipt['blockNumber']
+    except Exception as e:
+        print(f"[BLOCKCHAIN ERROR] mark_attendance_on_chain for {nfc_id}: {e}")
+        return "", 0
+
+def mask_teacher_name(name):
+    if not name: return ""
+    parts = name.split()
+    masked = []
+    for p in parts:
+        if len(p) <= 2:
+            masked.append(p[0] + "*")
+        else:
+            # Mask middle: J**** N***** or J***s N****o
+            masked.append(p[0] + "*" * (len(p)-2) + p[-1])
+    return " ".join(masked)
+
+def record_session_on_chain(session_id: str, subject_name: str, teacher_name: str, 
+                            start_val, end_val, students_data: list,
+                            course_code="", class_type="", section_key="", semester=""):
+    """
+    Record entire session attendance data to blockchain using recordSession().
+    students_data = [(nfc_id1, 'present'), (nfc_id2, 'late'), ...]
+    start_val/end_val can be ISO strings or Unix timestamps.
+    Returns (tx_hash, block_number) or (None, None)
+    """
+    if not (BLOCKCHAIN_ONLINE and contract and admin_account):
+        print("[BLOCKCHAIN] Offline - skipping session recording")
+        return None, None
+        
+    try:
+        # Parse timestamps → Unix
+        if isinstance(start_val, str):
+            start_dt = datetime.strptime(start_val, '%Y-%m-%d %H:%M:%S')
+            start_ts = int(start_dt.timestamp())
+        else:
+            start_ts = int(start_val)
+            
+        if isinstance(end_val, str):
+            end_dt = datetime.strptime(end_val, '%Y-%m-%d %H:%M:%S')
+            end_ts = int(end_dt.timestamp())
+        else:
+            end_ts = int(end_val)
+        
+        # ── Build logData for blockchain event ─────────────────────────
+        m_teacher = mask_teacher_name(teacher_name)
+        log_date = ""
+        try:
+            if isinstance(start_val, str):
+                dt = datetime.strptime(start_val, '%Y-%m-%d %H:%M:%S')
+                log_date = dt.strftime('%B %d %Y')
+            else:
+                dt = datetime.fromtimestamp(start_val)
+                log_date = dt.strftime('%B %d %Y')
+        except:
+            log_date = datetime.now().strftime('%B %d %Y')
+
+        # Include course code and subject in the first line of logData
+        # Instructor Name: J***s N****o,
+        # Course Code: COSC80,
+        # Class Type: (lab or lecture),
+        # Program, Year, Sem, Section,
+        # April 21 2026 (Date of the session),
+        
+        sec_parts = section_key.replace('|', ', ') if section_key else "—"
+        log_lines = [
+            f"Instructor Name: {m_teacher}",
+            f"Course Code: {course_code or '—'}",
+            f"Class Type: {(class_type or 'lecture').upper()}",
+            f"{sec_parts}{', ' + semester if semester else ''}",
+            f"{log_date}",
+            "Attendance Log (ID - NFC - STATUS):"
+        ]
+        
+        nfc_ids = []
+        status_codes = []
+        for item in students_data:
+            if not isinstance(item, (list, tuple)) or len(item) < 2:
+                print(f"[BLOCKCHAIN ERROR] Invalid student data item: {item}")
+                continue
+                
+            nfc_id, status = item[0], item[1]
+            nfc_ids.append(nfc_id)
+            status_codes.append(chain_status_code(status))
+            
+            # Fetch student_id if possible for the log
+            st = get_student_by_nfc_cached(nfc_id)
+            sid = st.get('student_id', 'N/A') if st else 'N/A'
+            log_lines.append(f"{sid}({nfc_id} - {status.upper()})")
+            
+        log_data = "\n".join(log_lines)
+        
+        print(f"[BLOCKCHAIN] Recording session {session_id}: {len(nfc_ids)} students")
+        
+        tx_hash_obj = send_contract_tx(
+            contract.functions.recordSession(
+                session_id,
+                subject_name,
+                teacher_name,
+                start_ts,
+                end_ts,
+                nfc_ids,
+                status_codes,
+                log_data
+            )
+        )
+        
+        if not tx_hash_obj:
+            return None, None
+            
+        receipt = web3.eth.wait_for_transaction_receipt(tx_hash_obj)
+        tx_hash = receipt['transactionHash'].hex()
+        if not tx_hash.startswith('0x'):
+            tx_hash = '0x' + tx_hash
+        block_num = receipt['blockNumber']
+        
+        print(f"[BLOCKCHAIN] Session {session_id} recorded: TX={tx_hash[:16]}... Block={block_num}")
+        return tx_hash, block_num
+        
+    except Exception as e:
+        print(f"[ERROR] record_session_on_chain {session_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
 
 def get_student_by_nfc_cached(nfc_id: str):
     st = db_get_student(nfc_id)
@@ -2771,6 +3190,114 @@ def get_active_sessions():
             result[r['sess_id']] = s
     return result
 
+def _prepare_session_blockchain_data(sess_id, sess):
+    """
+    ═══════════════════════════════════════════════════════════════════
+    Prepare and record comprehensive session attendance data on blockchain.
+    
+    Records entire session metadata with:
+    - Session ID, subject, teacher, timing
+    - Total enrolled/present/late/absent/excused counts
+    - Individual student statuses in single transaction
+    ═══════════════════════════════════════════════════════════════════
+    """
+    try:
+        with get_db() as conn:
+            # Get all attendance records for this session
+            records = conn.execute(
+                """SELECT nfc_id, status, tap_time, tx_hash, block_number 
+                   FROM attendance_logs WHERE sess_id=? ORDER BY tap_time""",
+                (sess_id,)
+            ).fetchall()
+            
+            # Calculate summary stats
+            summary = {
+                'sess_id': sess_id,
+                'subject_name': sess.get('subject_name', ''),
+                'subject_id': sess.get('subject_id', ''),
+                'teacher_name': sess.get('teacher_name', ''),
+                'teacher_username': sess.get('teacher', ''),
+                'section_key': sess.get('section_key', ''),
+                'started_at': sess.get('started_at', ''),
+                'ended_at': sess.get('ended_at', ''),
+                'class_type': sess.get('class_type', 'lecture'),
+                'attendance_records': len(records),
+                'on_chain_records': len([r for r in records if r.get('tx_hash')]),
+            }
+            
+            # Count by status
+            status_counts = {}
+            for status in ['present', 'late', 'absent', 'excused']:
+                count = len([r for r in records if r.get('status') == status])
+                summary[f'total_{status}'] = count
+                status_counts[status] = count
+            
+            # Prepare arrays for blockchain recording
+            student_nfc_ids = [r['nfc_id'] for r in records]
+            student_statuses = [r['status'] for r in records]
+            
+            # Record session to blockchain if online
+            tx_hash = None
+            block_number = None
+            
+            if BLOCKCHAIN_ONLINE and contract and admin_account and student_nfc_ids:
+                try:
+                    # Convert ISO datetime to Unix timestamp
+                    start_dt = datetime.strptime(sess.get('started_at', '2000-01-01 00:00:00'), '%Y-%m-%d %H:%M:%S')
+                    end_dt = datetime.strptime(sess.get('ended_at', '2000-01-01 00:00:01'), '%Y-%m-%d %H:%M:%S')
+                    start_timestamp = int(start_dt.timestamp())
+                    end_timestamp = int(end_dt.timestamp())
+                    
+                    # Prepare students data as a list of tuples (nfc_id, status)
+                    students_data = list(zip(student_nfc_ids, student_statuses))
+                    
+                    tx_hash, block_number = record_session_on_chain(
+                        sess_id,
+                        summary['subject_name'],
+                        summary['teacher_name'],
+                        start_timestamp,
+                        end_timestamp,
+                        students_data
+                    )
+                    
+                    if tx_hash:
+                        # Update session with transaction hash
+                        conn.execute(
+                            "UPDATE sessions SET session_tx_hash=?, session_block_number=? WHERE sess_id=?",
+                            (tx_hash, block_number, sess_id)
+                        )
+                        summary['session_tx_hash'] = tx_hash
+                        summary['session_block_number'] = block_number
+                        print(f"[BLOCKCHAIN] Session {sess_id} recorded: TX={tx_hash[:16]}... Block={block_number}")
+                    else:
+                        print(f"[BLOCKCHAIN] Failed to record session {sess_id} to blockchain")
+                        
+                except Exception as e:
+                    print(f"[ERROR] Failed to record session to blockchain: {e}")
+            
+            # Store session summary for auditing
+            conn.execute(
+                """INSERT OR REPLACE INTO sessions 
+                   (sess_id, started_at, ended_at) 
+                   VALUES (?, ?, ?)""",
+                (sess_id, summary.get('started_at'), summary.get('ended_at'))
+            )
+            
+        print(f"[SESSION] Session {sess_id} blockchain data prepared: "
+              f"Present={summary.get('total_present')}, "
+              f"Late={summary.get('total_late')}, "
+              f"Absent={summary.get('total_absent')}, "
+              f"Excused={summary.get('total_excused')}, "
+              f"TxHash={tx_hash[:16] + '...' if tx_hash else 'PENDING'}")
+        
+        return summary
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to prepare session blockchain data: {e}")
+        return None
+
+
+
 def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     """Finalize a live session and keep DB/UI/blockchain/email in sync."""
     sess = load_session(sess_id)
@@ -2786,6 +3313,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     present_set = set(sess.get('present', []))
     late_set = set(sess.get('late', []))
     excused_set = set(sess.get('excused', []))
+
     with get_db() as conn:
         excused_from_db = conn.execute(
             "SELECT DISTINCT nfc_id FROM attendance_logs WHERE sess_id=? AND status='excused'",
@@ -2816,6 +3344,38 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
         )
         absent_ids.append(nid)
 
+    # Record entire session to blockchain (1 session = 1 TX)
+    with get_db() as conn:
+        logs = conn.execute(
+            "SELECT nfc_id, status FROM attendance_logs WHERE sess_id=?",
+            (sess_id,)
+        ).fetchall()
+        students_data = [(row['nfc_id'], row['status']) for row in logs]
+        
+        start_iso = sess.get('started_at', ended_at)
+        tx_hash, block_num = record_session_on_chain(
+            session_id=sess_id,
+            subject_name=sess.get('subject_name', 'Class Session'),
+            teacher_name=sess.get('teacher_name', 'Teacher'),
+            start_val=start_iso,
+            end_val=ended_at,
+            students_data=students_data,
+            course_code=sess.get('course_code', ''),
+            class_type=sess.get('class_type', ''),
+            section_key=sess.get('section_key', ''),
+            semester=sess.get('semester', '')
+        )
+        
+        # Store session TX hash in DB (queryable for UI/export/email)
+        if tx_hash:
+            conn.execute(
+                "UPDATE sessions SET session_tx_hash=?, session_block_number=? WHERE sess_id=?",
+                (tx_hash, block_num or 0, sess_id)
+            )
+            print(f"[✅ BLOCKCHAIN] Session {sess_id} TX={tx_hash[:16]}...")
+        else:
+            print(f"[⚠️ ] Session {sess_id} blockchain record failed")
+
     with get_db() as conn:
         conn.execute(
             "UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
@@ -2824,32 +3384,31 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
 
     sess['ended_at'] = ended_at
     sess['absent'] = absent_ids
+    # Reload with TX hash
+    sess = load_session(sess_id)
     save_session(sess_id, sess)
     sessions_db[sess_id] = sess
 
+    
+    if tx_hash:
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE sessions SET session_tx_hash=?, session_block_number=? WHERE sess_id=?",
+                (tx_hash, block_num or 0, sess_id)
+            )
+            # Synchronize all attendance logs with session TX hash and block number
+            conn.execute(
+                "UPDATE attendance_logs SET tx_hash=?, block_number=? WHERE sess_id=?",
+                (tx_hash, block_num or 0, sess_id)
+            )
+        print(f"[✅ BLOCKCHAIN] Session {sess_id} synced with TX={tx_hash[:16]}...")
+    else:
+        print(f"[⚠️] Session {sess_id} blockchain FAILED")
+
     def _post_finalize_worker():
         with app.app_context():
-            if BLOCKCHAIN_ONLINE and contract and admin_account:
-                for st in section_students:
-                    nid = st['nfcId']
-                    if nid in present_set or nid in excused_set:
-                        continue
-                    with get_db() as conn:
-                        current = conn.execute(
-                            "SELECT status FROM attendance_logs WHERE sess_id=? AND nfc_id=?",
-                            (sess_id, nid)
-                        ).fetchone()
-                    if current and current['status'] == 'excused':
-                        continue
-                    try:
-                        abs_tx, abs_block = mark_attendance_on_chain(nid, 'absent')
-                        with get_db() as conn:
-                            conn.execute(
-                                "UPDATE attendance_logs SET tx_hash=?, block_number=? WHERE sess_id=? AND nfc_id=?",
-                                (abs_tx, abs_block, sess_id, nid)
-                            )
-                    except Exception as e:
-                        print(f"[WARN] Failed absent chain mark for {nid}: {e}")
+            # REDUNDANT: Individual "Absent" marks are now avoided to prevent blockchain congestion.
+            # The record_session_on_chain call already includes status for all students.
 
             for st in section_students:
                 nid = st['nfcId']
@@ -2878,9 +3437,38 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                 except Exception as e:
                     print(f"[EMAIL] Failed absence email for {nid}: {e}")
 
+            # Send final receipts to all students (Present, Late, Excused) with the session TX hash
+            for st in section_students:
+                nid = st['nfcId']
+                if nid in absent_ids: # Already handled above
+                    continue
+                try:
+                    with get_db() as conn:
+                        lg = conn.execute(
+                            "SELECT status, tap_time, tx_hash, block_number FROM attendance_logs WHERE sess_id=? AND nfc_id=?",
+                            (sess_id, nid)
+                        ).fetchone()
+                    if lg:
+                        send_student_attendance_receipt(
+                            student_name=st.get('name', nid),
+                            student_email=st.get('email', ''),
+                            student_id=st.get('student_id', ''),
+                            subject_name=sess.get('subject_name', ''),
+                            section_key=sess.get('section_key', ''),
+                            teacher_name=sess.get('teacher_name', ''),
+                            tap_time=lg['tap_time'] or ended_at,
+                            status=lg['status'],
+                            tx_hash=lg['tx_hash'] or tx_hash or '',
+                            block_num=lg['block_number'] or block_num or 0,
+                            sess_id=sess_id,
+                            nfc_id=nid,
+                        )
+                except Exception as e:
+                    print(f"[EMAIL] Failed final receipt email for {nid}: {e}")
+
             try:
                 users = db_get_all_users()
-                teacher_username = sess.get('teacher', '')
+                teacher_username = sess.get('teacher_username', '') or sess.get('teacher', '')
                 teacher_email = users.get(teacher_username, {}).get('email', '')
                 if teacher_email:
                     logs = {lg['nfc_id']: lg for lg in db_get_session_attendance(sess_id)}
@@ -2906,6 +3494,12 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                             'tx_hash': lg.get('tx_hash', '') if lg else '',
                             'block_num': lg.get('block_number', '') if lg else '',
                         })
+                    
+                    # Reload session to get the latest TX hash/block
+                    fresh_sess = load_session(sess_id)
+                    session_tx_hash = fresh_sess.get('session_tx_hash', '')
+                    session_block_number = fresh_sess.get('session_block_number', 0)
+                    
                     send_teacher_session_summary(
                         teacher_email=teacher_email,
                         teacher_name=sess.get('teacher_name', ''),
@@ -2919,6 +3513,8 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                         absent_count=absent_count,
                         excused_count=excused_count,
                         student_rows=rows,
+                        session_tx_hash=session_tx_hash,
+                        session_block_number=session_block_number,
                     )
             except Exception as e:
                 print(f"[EMAIL] Teacher summary error: {e}")
@@ -3190,7 +3786,275 @@ def admin_settings_test():
         return jsonify({'ok': True, 'message': f'Test email sent to {test_to}'})
     except Exception as e:
         return jsonify({'ok': False, 'message': str(e)})
- 
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ALUMNI & STUDENT MANAGEMENT ROUTES
+# NOTE: Student management UI has been integrated into /dashboard (Students tab)
+# These API endpoints support the alumni/semester features in Students & Faculty
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route('/admin/students', methods=['GET'])
+@admin_required
+def admin_students():
+    """Redirect to dashboard for student management."""
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/api/students/all', methods=['GET'])
+@admin_required
+def api_get_all_students():
+    """Fetch all students with status and enrollment info."""
+    try:
+        with get_db() as conn:
+            students = conn.execute(
+                """SELECT nfcId, full_name, student_id, email, 
+                           semester, school_year, student_status 
+                   FROM students ORDER BY full_name"""
+            ).fetchall()
+        
+        return jsonify({
+            'ok': True,
+            'students': [dict(row) for row in students]
+        })
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch students: {e}")
+        return jsonify({'ok': False, 'message': str(e)}), 500
+
+
+@app.route('/api/student/update-status/<nfc_id>', methods=['POST'])
+@admin_required
+def api_update_student_status(nfc_id):
+    """Update a student's status (active/graduated/alumni)."""
+    try:
+        nfc_id = nfc_id.strip().upper()
+        new_status = request.json.get('status', 'active')
+        
+        # Validate status
+        if new_status not in ['active', 'graduated', 'alumni']:
+            return jsonify({'ok': False, 'message': 'Invalid status'}), 400
+        
+        with get_db() as conn:
+            # Check student exists
+            student = conn.execute(
+                "SELECT full_name FROM students WHERE nfcId=?",
+                (nfc_id,)
+            ).fetchone()
+            
+            if not student:
+                return jsonify({'ok': False, 'message': 'Student not found'}), 404
+            
+            # Update status
+            conn.execute(
+                "UPDATE students SET student_status=? WHERE nfcId=?",
+                (new_status, nfc_id)
+            )
+        
+        print(f"[STUDENT] {student['full_name']} status changed to {new_status}")
+        return jsonify({
+            'ok': True,
+            'message': f'Status updated to {new_status}',
+            'status': new_status
+        })
+    
+    except Exception as e:
+        print(f"[ERROR] Failed to update student status: {e}")
+        return jsonify({'ok': False, 'message': str(e)}), 500
+
+
+@app.route('/api/student/move-semester/<nfc_id>', methods=['POST'])
+@admin_required
+def api_move_student_semester(nfc_id):
+    """Move student to next semester and update their enrollment."""
+    try:
+        nfc_id = nfc_id.strip().upper()
+        data = request.json or {}
+        
+        new_semester = data.get('new_semester', '').strip()
+        new_school_year = data.get('new_school_year', '').strip()
+        
+        # Validate inputs
+        if new_semester not in ['First', 'Second', 'Summer']:
+            return jsonify({'ok': False, 'message': 'Invalid semester'}), 400
+        
+        if not new_school_year or not new_school_year.replace('-', '').isdigit():
+            return jsonify({'ok': False, 'message': 'Invalid school year format'}), 400
+        
+        with get_db() as conn:
+            # Get student info
+            student = conn.execute(
+                """SELECT full_name, student_id, nfcId, semester, school_year 
+                   FROM students WHERE nfcId=?""",
+                (nfc_id,)
+            ).fetchone()
+            
+            if not student:
+                return jsonify({'ok': False, 'message': 'Student not found'}), 404
+            
+            old_sem = student.get('semester')
+            old_year = student.get('school_year')
+            
+            # Update semester and school year
+            conn.execute(
+                """UPDATE students SET semester=?, school_year=? WHERE nfcId=?""",
+                (new_semester, new_school_year, nfc_id)
+            )
+            
+            # Log semester progression
+            print(f"[SEMESTER] {student['full_name']} moved from {old_sem} {old_year} "
+                  f"to {new_semester} {new_school_year}")
+        
+        return jsonify({
+            'ok': True,
+            'message': f'Moved to {new_semester} Semester {new_school_year}',
+            'new_semester': new_semester,
+            'new_school_year': new_school_year
+        })
+    
+    except Exception as e:
+        print(f"[ERROR] Failed to move student semester: {e}")
+        return jsonify({'ok': False, 'message': str(e)}), 500
+
+
+@app.route('/api/students/move-up-all', methods=['POST'])
+@admin_required
+def api_move_up_all_students():
+    """Move all active students to next semester with program-specific Summer handling.
+    
+    CS/IT Progression: 1st Year 1st → 1st Year 2nd → 2nd Year 1st → 2nd Year 2nd 
+                      → 3rd Year 1st → 3rd Year 2nd → Summer/OJT → 4th Year 1st → 4th Year 2nd → Graduated
+    
+    Other Programs:    1st Year 1st → 1st Year 2nd → 2nd Year 1st → 2nd Year 2nd 
+                      → 3rd Year 1st → 3rd Year 2nd → 4th Year 1st → 4th Year 2nd 
+                      → Summer → Graduated
+    """
+    print("[API] Starting move-up-all operation...")
+    
+    CS_PROGRAMS = ['BS Computer Science', 'BS Information Technology', 'BS Information Systems']
+    
+    try:
+        # Base progression (same for all)
+        base_progression = [
+            ('1st Year', 'First'),
+            ('1st Year', 'Second'),
+            ('2nd Year', 'First'),
+            ('2nd Year', 'Second'),
+            ('3rd Year', 'First'),
+            ('3rd Year', 'Second'),
+        ]
+        
+        # CS/IT specific progression
+        cs_progression = base_progression + [
+            ('3rd Year', 'Summer'),    # Summer/OJT for CS/IT
+            ('4th Year', 'First'),
+            ('4th Year', 'Second'),
+        ]
+        
+        # Other programs progression
+        other_progression = base_progression + [
+            ('4th Year', 'First'),
+            ('4th Year', 'Second'),
+            ('4th Year', 'Summer'),    # Summer for other programs (after 4th year)
+        ]
+        
+        conn = get_db()
+        
+        # Get all active students with their program
+        students = conn.execute(
+            """SELECT nfc_id, full_name, year_level, semester, school_year, program
+               FROM students 
+               WHERE student_status='active' 
+               ORDER BY nfc_id"""
+        ).fetchall()
+        
+        updated_count = 0
+        skipped_count = 0
+        graduated_count = 0
+        
+        print(f"[API] Found {len(students)} active students")
+        
+        for student in students:
+            year_level = (student.get('year_level') or '').strip()
+            current_sem = (student.get('semester') or 'First').strip()
+            school_year = (student.get('school_year') or '2024-2025').strip()
+            program = (student.get('program') or '').strip()
+            nfc_id = student.get('nfc_id')
+            full_name = student.get('full_name') or ''
+            
+            print(f"[API] Processing: {full_name} (Program: {program}, YL: {year_level}, SEM: {current_sem})")
+            
+            # Select progression based on program
+            is_cs = any(cs_prog in program for cs_prog in CS_PROGRAMS)
+            progression = cs_progression if is_cs else other_progression
+            
+            # Find current position in progression
+            current_pos = None
+            for idx, (yr_lvl, sem) in enumerate(progression):
+                if yr_lvl == year_level and sem == current_sem:
+                    current_pos = idx
+                    break
+            
+            if current_pos is None:
+                print(f"[API] SKIP: {full_name} - not in standard progression")
+                skipped_count += 1
+                continue
+            
+            next_pos = current_pos + 1
+            
+            if next_pos >= len(progression):
+                # Graduated
+                print(f"[API] UPDATE {full_name}: -> GRADUATED")
+                conn.execute(
+                    """UPDATE students SET student_status=%s WHERE nfc_id=%s""",
+                    ('graduated', nfc_id)
+                )
+                graduated_count += 1
+            else:
+                next_year_level, next_sem = progression[next_pos]
+                
+                # Calculate new school year
+                if next_sem == 'First' and current_sem == 'Second':
+                    try:
+                        [start, end] = school_year.split('-')
+                        next_year = f"{int(end)}-{int(end) + 1}"
+                    except:
+                        next_year = school_year
+                elif current_sem == 'Summer':
+                    # Moving from Summer to next year's 1st sem
+                    try:
+                        [start, end] = school_year.split('-')
+                        next_year = f"{int(end)}-{int(end) + 1}"
+                    except:
+                        next_year = school_year
+                else:
+                    next_year = school_year
+                
+                print(f"[API] UPDATE {full_name}: {year_level} {current_sem} -> {next_year_level} {next_sem}")
+                conn.execute(
+                    """UPDATE students SET year_level=%s, semester=%s, school_year=%s WHERE nfc_id=%s""",
+                    (next_year_level, next_sem, next_year, nfc_id)
+                )
+                updated_count += 1
+        
+        # Commit
+        print(f"[API] Committing {updated_count + graduated_count} changes...")
+        conn._conn.commit()
+        conn._conn.close()
+        
+        print(f"[API] Complete! Updated: {updated_count}, Graduated: {graduated_count}, Skipped: {skipped_count}")
+        
+        return jsonify({
+            'ok': True,
+            'message': f'Successfully moved {updated_count + graduated_count} students',
+            'updated_count': updated_count + graduated_count
+        })
+    
+    except Exception as e:
+        print(f"[API] ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'ok': False, 'message': str(e)}), 500
+
 
 @app.route('/register', methods=['GET','POST'])
 @admin_required
@@ -3198,6 +4062,13 @@ def register():
     if request.method == 'POST':
         nfc_id = request.form['nfc_id'].strip().upper()
         name   = request.form['name'].strip()
+        
+        # ── Check for duplicate NFC ID ──────────────────────────────────
+        existing_student = db_get_student(nfc_id)
+        if existing_student:
+            flash(f'⚠ NFC ID {nfc_id} is already registered to {existing_student.get("full_name", "Unknown")}. Use a different NFC card or update the existing student.', 'warning')
+            return render_template('enroll.html', subjects_db=db_get_all_subjects(), users_db=db_get_all_users())
+        
         extras = []
         raw_date = request.form.get('date_registered','').strip()
         if raw_date:
@@ -3235,12 +4106,33 @@ def register():
         major = request.form.get('major','').strip() or 'N/A'
         extras.append(f"Major:{major}")
         on_chain = name + (' | ' + ' | '.join(extras) if extras else '')
-        pk   = "0x" + secrets.token_hex(32)
-        addr = web3.eth.account.from_key(pk).address
         p = parse_student(on_chain)
         student_name_map[nfc_id] = name
+        # ── Blockchain Registration ─────────────────────────────────────
+        reg_tx = ''
+        reg_block = 0
+        student_address = request.form.get('eth_address', '0x0000000000000000000000000000000000000000').strip() or '0x0000000000000000000000000000000000000000'
+        
+        if BLOCKCHAIN_ONLINE and contract and admin_account:
+            try:
+                print(f"[BLOCKCHAIN] Registering student {name} ({nfc_id}) on-chain...")
+                tx_hash = send_contract_tx(
+                    contract.functions.registerStudent(
+                        student_address,
+                        nfc_id,
+                        name
+                    )
+                )
+                if tx_hash:
+                    receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
+                    reg_tx = receipt['transactionHash'].hex()
+                    reg_block = receipt['blockNumber']
+                    print(f"[BLOCKCHAIN] Student {nfc_id} registered on-chain: TX={reg_tx[:16]}")
+            except Exception as e:
+                print(f"[BLOCKCHAIN ERROR] Failed on-chain registration for {nfc_id}: {e}")
+
         db_save_student({**p, 'nfcId': nfc_id, 'raw_name': on_chain,
-                         'address': addr, 'tx_hash': ''})
+                         'address': student_address, 'tx_hash': reg_tx, 'reg_block': reg_block})
         send_student_welcome_email(
             student_name=name,
             student_email=email_val,
@@ -3260,24 +4152,7 @@ def register():
         saved_subj = _register_save_pending_subjects(request, session)
         if saved_subj:
             print(f"[INFO] {saved_subj} subject(s) added to catalogue from registration.")
-        if BLOCKCHAIN_ONLINE and contract:
-            try:
-                tx = contract.functions.registerStudent(addr, nfc_id, on_chain).transact({'from': admin_account})
-                receipt = web3.eth.wait_for_transaction_receipt(tx)
-                tx_hash = receipt['transactionHash'].hex()
-                with get_db() as _conn:
-                    _conn.execute(
-                        "UPDATE students SET reg_tx_hash=?, eth_address=?, updated_at=? WHERE nfc_id=?",
-                        (tx_hash, addr, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), nfc_id))
-                flash(f'Student {name} registered successfully (blockchain confirmed).')
-            except Exception as e:
-                msg = str(e)
-                if 'already' in msg.lower():
-                    flash(f'Student {name} saved. Note: NFC already on blockchain.')
-                else:
-                    flash(f'Student {name} saved locally. Blockchain error: {e}')
-        else:
-            flash(f'Student {name} registered successfully (offline mode).')
+        flash(f'Student {name} registered successfully.')
         return redirect(url_for('index'))
     return render_template('enroll.html', subjects_db=db_get_all_subjects(), users_db=db_get_all_users())
 
@@ -3341,7 +4216,6 @@ def batch_register():
     students_in = [s for s in students_in if s.get('nfc_id')]
  
     success_count  = 0
-    blockchain_ok  = 0
     errors         = []
     subjects_saved = 0
  
@@ -3384,8 +4258,14 @@ def batch_register():
             if not name:
                 errors.append(f"Missing name for NFC {nfc_id}")
                 continue
- 
-            # Build on-chain registration string
+            
+            # ── Check for duplicate NFC ID ──────────────────────────────
+            existing_student = db_get_student(nfc_id)
+            if existing_student:
+                errors.append(f"NFC ID {nfc_id} is already registered to {existing_student.get('full_name', 'Unknown')}. Skipped.")
+                continue
+
+            # Build normalized payload string for parse_student()
             extras    = []
             email_val = (student.get('email') or '').strip()
             if not email_val:
@@ -3420,18 +4300,14 @@ def batch_register():
  
             on_chain = name + (' | ' + ' | '.join(extras) if extras else '')
  
-            # Generate Ethereum address
-            pk   = "0x" + secrets.token_hex(32)
-            addr = web3.eth.account.from_key(pk).address
- 
-            # Parse and save to SQLite cache
+            # Parse and save to PostgreSQL
             p = parse_student(on_chain)
             student_name_map[nfc_id] = name
             db_save_student({
                 **p,
                 'nfcId':      nfc_id,
                 'raw_name':   on_chain,
-                'address':    addr,
+                'address':    '',
                 'tx_hash':    '',
                 'photo_file': student.get('photo_file', ''),
             })
@@ -3446,39 +4322,13 @@ def batch_register():
             )
             success_count += 1
  
-            # Register on blockchain (non-fatal if offline)
-            if BLOCKCHAIN_ONLINE and contract and admin_account:
-                try:
-                    tx = contract.functions.registerStudent(
-                        addr, nfc_id, on_chain
-                    ).transact({'from': admin_account})
-                    receipt  = web3.eth.wait_for_transaction_receipt(tx)
-                    tx_hash  = receipt['transactionHash'].hex()
-                    blk      = receipt['blockNumber']
-                    with get_db() as _conn:
-                        _conn.execute(
-                            "UPDATE students SET reg_tx_hash=?, eth_address=?, "
-                            "reg_block=?, updated_at=? WHERE nfc_id=?",
-                            (tx_hash, addr, blk,
-                             datetime.now().strftime('%Y-%m-%d %H:%M:%S'), nfc_id)
-                        )
-                    blockchain_ok += 1
-                except Exception as be:
-                    msg = str(be)
-                    if 'already' in msg.lower():
-                        blockchain_ok += 1  # already on chain — that's fine
-                    else:
-                        errors.append(f"Blockchain error for {name}: {be}")
- 
         except Exception as e:
             errors.append(f"Error registering {student.get('name', 'Unknown')}: {e}")
  
     # Flash results
     if success_count:
-        chain_note = (f" {blockchain_ok} confirmed on blockchain."
-                      if BLOCKCHAIN_ONLINE else " (offline — saved to SQLite cache)")
         subj_note  = f" {subjects_saved} subject(s) added to catalogue." if subjects_saved else ""
-        flash(f"Registered {success_count} student(s) successfully.{chain_note}{subj_note}")
+        flash(f"Registered {success_count} student(s) successfully.{subj_note}")
  
     if errors:
         flash("Errors: " + " | ".join(errors[:5]) +
@@ -3569,18 +4419,52 @@ def parse_batch_pdfs():
         'sorted_by':    'surname_first',
     })
 
+def _mark_attendance_async(nfc_id, sess_id=None):
+    """Background task: submit attendance to blockchain and update DB with tx_hash."""
+    if not (BLOCKCHAIN_ONLINE and contract and admin_account):
+        return
+    try:
+        tx = send_contract_tx(
+            contract.functions.markAttendanceWithStatus(
+                nfc_id, chain_status_code('present')
+            )
+        )
+        receipt = web3.eth.wait_for_transaction_receipt(tx, timeout=120)
+        tx_hash = receipt['transactionHash'].hex()
+        block_num = receipt['blockNumber']
+        if sess_id:
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE attendance_logs SET tx_hash=?, block_number=? "
+                    "WHERE sess_id=? AND nfc_id=?",
+                    (tx_hash, block_num, sess_id, nfc_id)
+                )
+    except Exception as e:
+        print(f"[WARN] Async blockchain write failed for {nfc_id}: {e}")
+
 @app.route('/mark', methods=['POST'])
 @login_required
 def mark():
     nfc_id = request.form['nfc_id'].strip().upper()
+    sess_id = request.form.get('sess_id', '').strip()
     try:
-        tx = contract.functions.markAttendanceWithStatus(
-            nfc_id, chain_status_code('present')
-        ).transact({'from':admin_account})
-        web3.eth.wait_for_transaction_receipt(tx)
         name = student_name_map.get(nfc_id,"Unknown")
+        
+        # Record to database immediately (no blockchain wait)
+        if sess_id:
+            db_save_attendance_log(
+                sess_id, nfc_id, name, '',
+                status='present', tap_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                tx_hash='', block_number=0
+            )
+        
         recent_attendance.append({'nfc_id':nfc_id,'name':name,'timestamp':time.time()})
         flash(f'Attendance marked for {name}')
+        
+        # Submit blockchain write in background (non-blocking)
+        if BLOCKCHAIN_ONLINE and contract and admin_account:
+            from threading import Thread
+            Thread(target=_mark_attendance_async, args=(nfc_id, sess_id), daemon=True).start()
     except Exception as e:
         flash(f'Error: {e}')
     return redirect(url_for('index'))
@@ -4115,6 +4999,11 @@ def api_session_attendance(sess_id):
             enrolled = [s for s in all_students if build_student_section_key(s) in section_keys]
         else:
             enrolled = [s for s in all_students if build_student_section_key(s) == section_key]
+            # Debugging if no students match
+            if not enrolled and all_students:
+                print(f"[ENROLL DEBUG] No match for section_key='{section_key}'")
+                sample_k = build_student_section_key(all_students[0])
+                print(f"[ENROLL DEBUG] Sample student key='{sample_k}'")
 
         # Fallback: if no students found via section_key, try exact database query
         if (not is_school_event) and (not enrolled) and program and year_level and section_val:
@@ -4417,6 +5306,7 @@ def live_session(sess_id):
     section_students = [
         s for s in all_students
         if build_student_section_key(s) in section_keys_for_view
+        and (s.get('student_status') or 'active') != 'graduated'  # Exclude graduated students
     ]
 
     # Ensure live view always has a usable student display name.
@@ -4643,36 +5533,17 @@ def excuse_student(sess_id):
     db_resolve_excuse(excuse_id, 'approved', session.get('username', ''))
     sess = load_session(sess_id) or sess
     
-    # Blockchain with auto-registration
+    # Blockchain attendance write only (identity data stays in PostgreSQL)
     exc_tx = ''; exc_block = 0
     if BLOCKCHAIN_ONLINE and contract and admin_account:
         try:
-            on_chain = contract.functions.studentsByNfc(nfc_id).call()
-            is_registered_on_chain = on_chain[2]
-            if not is_registered_on_chain:
-                try:
-                    import hashlib as _hl
-                    pk_seed = _hl.sha256(f"davs-student-{nfc_id}".encode()).hexdigest()
-                    pk = "0x" + pk_seed
-                    addr = web3.eth.account.from_key(pk).address
-                    raw_name = student.get('raw_name', '') or student.get('name', '')
-                    reg_tx = contract.functions.registerStudent(
-                        addr, nfc_id, raw_name
-                    ).transact({'from': admin_account})
-                    reg_receipt = web3.eth.wait_for_transaction_receipt(reg_tx)
-                    with get_db() as _conn:
-                        _conn.execute(
-                            "UPDATE students SET reg_tx_hash=?, eth_address=?, reg_block=?, updated_at=? WHERE nfc_id=?",
-                            (reg_receipt['transactionHash'].hex(), addr,
-                            reg_receipt['blockNumber'],
-                            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            nfc_id)
-                        )
-                except Exception as reg_err:
-                    print(f"[WARNING] Auto-registration failed: {reg_err}")
-            exc_tx, exc_block = mark_attendance_on_chain(nfc_id, 'excused')
+            tx_res, block_res = mark_attendance_on_chain(nfc_id, 'excused')
+            exc_tx = tx_res or ''
+            exc_block = block_res or 0
         except Exception as _e:
             print(f"[WARN] excused blockchain tx failed: {_e}")
+            exc_tx = ''
+            exc_block = 0
     
     db_save_attendance_log(
         sess_id=sess_id, nfc_id=nfc_id,
@@ -5187,53 +6058,7 @@ def mark_pico():
         except:
             is_late = False
 
-    # Record on blockchain (skip gracefully if offline)
-    tx_hash=None; block_num=None
-    if BLOCKCHAIN_ONLINE and contract and admin_account:
-            try:
-                # Step 1: Check if student is registered on-chain
-                on_chain = contract.functions.studentsByNfc(nfc_id).call()
-                is_registered_on_chain = on_chain[2]  # isRegistered bool
-    
-                # Step 2: Auto-register on-chain if not registered
-                # This handles students enrolled via SQLite (seed data, offline mode, etc.)
-                if not is_registered_on_chain:
-                    print(f"[BLOCKCHAIN] Student {nfc_id} not on-chain — auto-registering...")
-                    try:
-                        # Generate a deterministic address from nfc_id for offline-enrolled students
-                        import hashlib as _hl
-                        pk_seed   = _hl.sha256(f"davs-student-{nfc_id}".encode()).hexdigest()
-                        pk        = "0x" + pk_seed
-                        addr      = web3.eth.account.from_key(pk).address
-                        raw_name  = student_info.get('raw_name', '') or name
-                        reg_tx    = contract.functions.registerStudent(
-                            addr, nfc_id, raw_name
-                        ).transact({'from': admin_account})
-                        reg_receipt = web3.eth.wait_for_transaction_receipt(reg_tx)
-                        reg_tx_hash = reg_receipt['transactionHash'].hex()
-                        reg_block   = reg_receipt['blockNumber']
-                        # Update SQLite with the on-chain registration proof
-                        with get_db() as _conn:
-                            _conn.execute(
-                                "UPDATE students SET reg_tx_hash=?, eth_address=?, "
-                                "reg_block=?, updated_at=? WHERE nfc_id=?",
-                                (reg_tx_hash, addr,
-                                reg_block,
-                                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                nfc_id)
-                            )
-                        print(f"[BLOCKCHAIN] Auto-registered {name} — TX: {reg_tx_hash} Block: {reg_block}")
-                    except Exception as reg_err:
-                        print(f"[WARNING] Auto-registration failed for {nfc_id}: {reg_err}")
-                        # Continue anyway — markAttendance will fail but we still save to SQLite
-    
-                # Step 3: Mark attendance on blockchain → get TX hash + block number
-                tx_hash, block_num = mark_attendance_on_chain(nfc_id, 'late' if is_late else 'present')
-                print(f"[BLOCKCHAIN] Attendance marked — TX: {tx_hash} Block: {block_num}")
-    
-            except Exception as e:
-                print(f"[WARNING] Blockchain mark failed: {e} — attendance saved to SQLite only.")
-
+    # Record attendance to database immediately (blockchain write happens in background)
     tap_time_db   = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     tap_time      = datetime.now().strftime('%H:%M:%S')
     tap_timestamp = time.time()
@@ -5243,13 +6068,19 @@ def mark_pico():
         status_label = 'present'
         is_late = False
 
-    # Save to attendance_logs table
+    # Save to attendance_logs table immediately (tx_hash empty, will be filled by async task)
     db_save_attendance_log(
         sess_id=sess_id, nfc_id=nfc_id,
         student_name=name, student_id=student_id,
         status=status_label, tap_time=tap_time_db,
-        tx_hash=tx_hash or '', block_number=block_num or 0
+        tx_hash='', block_number=0
     )
+    
+    # Submit blockchain write in background (non-blocking)
+    tx_hash=None; block_num=None
+    if BLOCKCHAIN_ONLINE and contract and admin_account:
+        from threading import Thread
+        Thread(target=_mark_attendance_async, args=(nfc_id, sess_id), daemon=True).start()
 
     # Keep in-memory session dict in sync for live polling
     sess.setdefault('present',[]).append(nfc_id)
@@ -5257,18 +6088,19 @@ def mark_pico():
         sess.setdefault('late',[]).append(nfc_id)
 
     # FIX: always set tap_timestamp so poll_session can detect new taps
+    # Note: tx_hash/block empty initially, will be filled when blockchain confirms
     sess.setdefault('tap_log',[]).append({
         'nfc_id':     nfc_id,
         'name':       name,
         'time':       tap_time,
         'timestamp':  tap_timestamp,
-        'tx_hash':    tx_hash,
-        'block':      block_num,
+        'tx_hash':    '',
+        'block':      0,
         'student_id': student_id,
         'is_late':    is_late,
     })
     sess.setdefault('tx_hashes',{})[nfc_id] = {
-        'tx_hash': tx_hash, 'block': block_num, 'time': tap_time
+        'tx_hash': '', 'block': 0, 'time': tap_time
     }
     save_session(sess_id, sess)
     sessions_db[sess_id] = sess
@@ -6005,7 +6837,17 @@ import subprocess as _sp
 import os as _os
 import sys as _sys
 
+
+def _env_flag(name, default=False):
+    value = (_os.getenv(name) or '').strip().lower()
+    if not value:
+        return default
+    return value in ('1', 'true', 'yes', 'on')
+
 def _launch_nfc_listener():
+    if not _env_flag('ENABLE_NFC_LISTENER', default=False):
+        print('[NFC] Auto-launch disabled. Set ENABLE_NFC_LISTENER=1 to enable locally.')
+        return
     listener = _os.path.join(_os.path.dirname(__file__), 'nfc_listener.py')
     if not _os.path.exists(listener):
         print("[NFC] nfc_listener.py not found — skipping auto-launch.")
@@ -6035,4 +6877,6 @@ def _launch_nfc_listener():
 if __name__ == '__main__':
     ensure_automation_thread_running()
     _launch_nfc_listener()
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+    port = int(_os.getenv('PORT', '5000'))
+    debug = _env_flag('FLASK_DEBUG', default=False)
+    app.run(debug=debug, host='0.0.0.0', port=port, use_reloader=False)

@@ -19,6 +19,15 @@ def _parse_dt(value):
             continue
     return None
 
+def _format_sem(sec_key, raw_sem):
+    parts = str(sec_key or '').split('|')
+    year = parts[1].strip() if len(parts) >= 2 else ''
+    s_map = {'First': '1st Sem', 'Second': '2nd Sem', 'Summer': 'Summer'}
+    sem = s_map.get(str(raw_sem or '').strip(), str(raw_sem or '').strip())
+    if not sem: sem = '1st Sem'
+    if year: return f"{year} {sem}".strip()
+    return sem
+
 
 def _fmt_date_dash(value):
     dt = _parse_dt(value)
@@ -110,6 +119,7 @@ def export_student_sessions_impl(
         f_status = request.args.get('status', '').strip()
         f_subject = request.args.get('subject', '').strip()
         f_class_type = request.args.get('class_type', '').strip().lower()
+        f_semester = request.args.get('semester', '').strip()
         stud_name = request.args.get('name', 'Student').strip()
         now = datetime.now()
 
@@ -118,7 +128,7 @@ def export_student_sessions_impl(
 
         with get_db_fn() as conn:
             log_rows = conn.execute(
-                "SELECT al.*, s.subject_name, s.course_code, s.section_key, "
+                "SELECT al.*, s.subject_name, s.course_code, s.section_key, s.semester, "
                 "s.teacher_name, s.class_type, s.time_slot, s.started_at, s.ended_at "
                 "FROM attendance_logs al "
                 "JOIN sessions s ON al.sess_id = s.sess_id "
@@ -164,6 +174,12 @@ def export_student_sessions_impl(
             class_type = str(lg['class_type'] or 'lecture').strip().lower()
             if f_class_type in ('lecture', 'laboratory') and class_type != f_class_type:
                 continue
+            
+            # Semester filtering
+            lg_sem = _format_sem(lg['section_key'], lg.get('semester'))
+            if f_semester and lg_sem != f_semester:
+                continue
+
             status_counts[status] = status_counts.get(status, 0) + 1
             ex = exc_map.get(lg['sess_id'], {})
             reason = ''
@@ -214,9 +230,11 @@ def export_student_sessions_impl(
                 'Block Number',
                 'Status',
                 'Excused Reason',
-                'Document',
+'Document',
+                'Session TX',
+                'Session Block',
             ]
-            widths = [4, 12, 28, 12, 24, 16, 20, 56, 12, 12, 28, 22]
+            widths = [4, 12, 28, 12, 24, 16, 20, 56, 12, 12, 28, 22, 56, 12]
         else:
             headers = [
                 '#',
@@ -235,8 +253,10 @@ def export_student_sessions_impl(
             'Cavite State University — DAVS Attendance Record',
             f'Student: {stud_name}  |  ID: {sid_}  |  NFC: {nfc_id}',
             f'Program: {prog}  |  Year: {yr}  |  Section: {sec}',
+            f'Semester Filter: {f_semester}' if f_semester else '',
             f'Exported: {now.strftime("%B %d, %Y %I:%M %p")}',
         ]
+        subtitles = [s for s in subtitles if s]
         first_data = H['title_block'](ws, f'Student Attendance Report — {stud_name}', subtitles, len(headers))
         first_data = H['stat_block'](ws, first_data, status_counts, len(headers))
         H['make_header_row'](ws, first_data, headers, widths)
@@ -507,6 +527,14 @@ def export_session_attendance_impl(
                     'attachment_file': exc['attachment_file'],
                 }
 
+            # Get session blockchain transaction
+            sess_tx_row = _conn.execute(
+                "SELECT session_tx_hash, session_block_number FROM sessions WHERE sess_id=?", 
+                (sess_id,)
+            ).fetchone()
+            session_tx_hash = sess_tx_row['session_tx_hash'] if sess_tx_row else ''
+            session_block_number = sess_tx_row['session_block_number'] if sess_tx_row and sess_tx_row['session_block_number'] else 0
+
         counts = {'Present': 0, 'Late': 0, 'Absent': 0, 'Excused': 0}
         rows = []
         reason_labels = {
@@ -588,6 +616,7 @@ def export_session_attendance_impl(
             (f'Event Scope: {section_scope}' if is_school_event else f'Section: {sec}  |  Instructor: {instr}'),
             (f'Teacher(s) Involved: {teacher_scope}' if is_school_event else ''),
             f'Time Slot: {slot}  |  Class Type: {class_type_label}  |  Started: {started}  |  Ended: {ended}',
+            f"Session TX: {session_tx_hash[:10]}...{'' if not session_tx_hash else ' (Sepolia)'}  |  Block: {session_block_number}" if session_tx_hash else '',
             f'Exported: {now.strftime("%B %d, %Y %I:%M %p")}',
         ]
         subtitles = [s for s in subtitles if s]
@@ -606,8 +635,10 @@ def export_session_attendance_impl(
             'Block Number',
             'Excuse Reason',
             'Document',
+            'Session TX',
+            'Session Block',
         ]
-        widths = [4, 24, 14, 24, 12, 12, 16, 14, 56, 12, 30, 24]
+        widths = [4, 24, 14, 24, 12, 12, 16, 14, 56, 12, 30, 24, 56, 12]
         H['make_header_row'](ws, first_data, headers, widths)
         first_data += 1
         col_fmt = {6: ('status',), 9: ('tx',), 10: ('num',)}
@@ -628,6 +659,8 @@ def export_session_attendance_impl(
                     row['block'],
                     row['excuse_reason'],
                     row['excuse_document'],
+                    session_tx_hash or '—',
+                    str(session_block_number) if session_block_number else '—',
                 ],
                 alt=(ri % 2 == 0),
                 col_formats=col_fmt,
@@ -638,6 +671,9 @@ def export_session_attendance_impl(
             f'{len(enrolled)} enrolled',
             '',
             f"{counts['Present']}P/{counts['Late']}L/{counts['Absent']}A/{counts['Excused']}E",
+            '',
+            '',
+            '',
             '',
             '',
             '',

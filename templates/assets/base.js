@@ -284,3 +284,254 @@
         btn.innerHTML = original;
       }, 2000);
     }
+
+
+// --- Phone NFC Logic ---
+let phoneNfcCtrl = null;
+
+/**
+ * Utility to convert NFC Hex UID to Decimal (standard for many HID readers)
+ * Supports byte reversal (LSB vs MSB)
+ */
+function nfcHexToDec(hex, reverse = false) {
+  if (!hex) return '';
+  let finalHex = hex;
+  if (reverse) {
+    // Robust byte reversal for any even-length hex string
+    let pairs = hex.match(/.{1,2}/g) || [];
+    finalHex = pairs.reverse().join('');
+  }
+  try {
+    return BigInt('0x' + finalHex).toString();
+  } catch (e) {
+    console.error("NFC Conversion Error:", e);
+    return finalHex;
+  }
+}
+
+// Load preference from localStorage, default to true (LSB) as it matches the user's laptop reader
+let _phoneNfcReverse = localStorage.getItem('davs_nfc_reverse') !== 'false';
+let _lastRawHex = '';
+
+function startPhoneNFC() {
+  const modal = document.getElementById('phoneNfcModal');
+  if (modal) modal.classList.add('show');
+  
+  // Initialize checkbox state
+  const chk = document.getElementById('chkNfcReverse');
+  if (chk) chk.checked = _phoneNfcReverse;
+  
+  const icon = document.getElementById('phoneNfcIcon');
+  const title = document.getElementById('phoneNfcTitle');
+  const desc = document.getElementById('phoneNfcDesc');
+  
+  title.textContent = 'Phone NFC v2.1';
+  
+  if (!('NDEFReader' in window)) {
+    icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill" style="color:var(--warning); font-size: 40px;"></i>';
+    title.textContent = 'Device Not Compatible';
+    desc.innerHTML = `
+      <div style="text-align: left; font-size: 13px; line-height: 1.5; color: var(--text);">
+        <p>Web NFC is currently only supported on <b>Android phones</b> using <b>Google Chrome</b>.</p>
+        <ul style="margin-top: 8px; padding-left: 18px;">
+          <li style="margin-bottom: 4px;"><b>iPhone Users:</b> Apple restricts NFC access to native apps only.</li>
+          <li style="margin-bottom: 4px;"><b>Desktop Users:</b> Please use your USB NFC reader instead.</li>
+        </ul>
+        <div style="margin-top: 15px; text-align: center;">
+          <button onclick="closePhoneNFC();" 
+                  style="background: var(--accent); color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+            Enter ID Manually
+          </button>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  icon.innerHTML = '<div style="width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto;"></div>';
+  title.textContent = 'Connecting...';
+  desc.textContent = 'Please allow NFC permissions if prompted.';
+
+  try {
+    const ndef = new window.NDEFReader();
+    phoneNfcCtrl = new AbortController();
+    ndef.scan({ signal: phoneNfcCtrl.signal }).then(() => {
+      icon.innerHTML = '<i class="bi bi-check-circle-fill" style="color:var(--success);"></i>';
+      title.textContent = 'NFC Connected';
+      desc.textContent = 'You can now use your phone to read NFC cards. Close this popup to continue reading.';
+      
+      ndef.onreadingerror = () => {
+        showAppToast("NFC Read Error - Please try again", "error");
+      };
+      
+      ndef.onreading = (event) => {
+        let serial = event.serialNumber;
+        let rawUid = '';
+        
+        if (serial) {
+          rawUid = serial.replace(/:/g, '').toUpperCase();
+        } else if (event.message && event.message.records && event.message.records.length > 0) {
+          const record = event.message.records[0];
+          if (record.data) {
+            rawUid = new TextDecoder().decode(record.data).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+          }
+        }
+
+        if (!rawUid) return;
+        _lastRawHex = rawUid;
+
+        // Convert to Decimal
+        const uid = nfcHexToDec(rawUid, _phoneNfcReverse);
+
+        // Update Modal UI
+        const lastUidEl = document.getElementById('phoneNfcLastUid');
+        const hexEl = document.getElementById('phoneNfcHex');
+        if (lastUidEl) {
+          lastUidEl.textContent = uid;
+          lastUidEl.style.color = 'var(--success)';
+          setTimeout(() => { if(lastUidEl) lastUidEl.style.color = ''; }, 1000);
+        }
+        if (hexEl) {
+          // Show formatted hex for debugging (MSB or LSB based on setting)
+          let displayHex = rawUid;
+          if (_phoneNfcReverse) {
+             let pairs = [];
+             for (let i = 0; i < rawUid.length; i += 2) pairs.push(rawUid.substring(i, i + 2));
+             displayHex = pairs.reverse().join('');
+          }
+          hexEl.textContent = displayHex.match(/.{1,2}/g).join(':');
+        }
+
+        // Vibrate to confirm read
+        if (window.navigator && window.navigator.vibrate) {
+          window.navigator.vibrate(100);
+        }
+
+        // --- SMART DISPATCH LOGIC ---
+        const panelBatch = document.getElementById('panelBatch');
+        const phase2 = document.getElementById('batchPhase2') || document.getElementById('phase2');
+        const isBatchNFC = panelBatch && panelBatch.classList.contains('active') && 
+                           phase2 && phase2.classList.contains('active');
+        
+        if (typeof window.handleNFCTap === 'function' && isBatchNFC) {
+           window.handleNFCTap(uid);
+        } 
+        else if (typeof window.s_applyUID === 'function') {
+           try {
+             window.s_applyUID(uid);
+           } catch(e) {
+             console.error("Error in s_applyUID:", e);
+           }
+        }
+        else if (typeof window.processNFCUid === 'function') {
+           window.processNFCUid(uid);
+        }
+        else {
+           // Fallback to HID scan simulation
+           const hidInput = document.getElementById('nfcHidInput') || document.getElementById('nfcHiddenInput');
+           if (hidInput) {
+             hidInput.value = uid;
+             hidInput.dispatchEvent(new Event('input', { bubbles: true }));
+             for(let i=0; i<uid.length; i++) {
+                hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: uid[i] }));
+             }
+             hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
+           }
+        }
+      };
+    }).catch(error => {
+      icon.innerHTML = '<i class="bi bi-x-circle-fill" style="color:var(--danger);"></i>';
+      title.textContent = 'NFC Access Denied';
+      desc.textContent = error.message || 'Could not start NFC scan. Please check your browser settings.';
+    });
+  } catch (error) {
+    icon.innerHTML = '<i class="bi bi-x-circle-fill" style="color:var(--danger);"></i>';
+    title.textContent = 'NFC Error';
+    desc.textContent = error.message;
+  }
+}
+
+function closePhoneNFC() {
+  const modal = document.getElementById('phoneNfcModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function toggleNfcReverse(checked) {
+  _phoneNfcReverse = checked;
+  localStorage.setItem('davs_nfc_reverse', checked);
+  
+  if (_lastRawHex) {
+    const uid = nfcHexToDec(_lastRawHex, _phoneNfcReverse);
+    const lastUidEl = document.getElementById('phoneNfcLastUid');
+    const hexEl = document.getElementById('phoneNfcHex');
+    if (lastUidEl) lastUidEl.textContent = uid;
+    
+    if (hexEl) {
+      let displayHex = _lastRawHex;
+      if (_phoneNfcReverse) {
+         let pairs = [];
+         for (let i = 0; i < _lastRawHex.length; i += 2) pairs.push(_lastRawHex.substring(i, i + 2));
+         displayHex = pairs.reverse().join('');
+      }
+      hexEl.textContent = displayHex.match(/.{1,2}/g).join(':');
+    }
+    
+    // Dispatch updated UID to consumers
+    // --- SMART DISPATCH LOGIC (REPEAT) ---
+    const panelBatch = document.getElementById('panelBatch');
+    const phase2 = document.getElementById('batchPhase2') || document.getElementById('phase2');
+    const isBatchNFC = panelBatch && panelBatch.classList.contains('active') && 
+                       phase2 && phase2.classList.contains('active');
+    
+    if (typeof window.handleNFCTap === 'function' && isBatchNFC) {
+       window.handleNFCTap(uid);
+    } 
+    else if (typeof window.s_applyUID === 'function') {
+       try { window.s_applyUID(uid); } catch(e) {}
+    }
+    else if (typeof window.processNFCUid === 'function') {
+       window.processNFCUid(uid);
+    }
+  }
+}
+
+
+
+// DevTools helper to test NFC scanning without a device
+// Call testNFC('A1B2C3D4') in the browser console.
+window.testNFC = function(uid) {
+  if (!uid) uid = '04A1B2C3D4E5F6';
+  console.log('Simulating NFC tap:', uid);
+  
+  // 1. Check for Enrollment Page (Batch vs Single)
+  const panelBatch = document.getElementById('panelBatch');
+  const phase2 = document.getElementById('batchPhase2');
+  const isBatchNFC = panelBatch && panelBatch.classList.contains('active') && 
+                     phase2 && phase2.classList.contains('active');
+  
+  if (typeof window.handleNFCTap === 'function' && isBatchNFC) {
+     window.handleNFCTap(uid);
+  } 
+  else if (typeof window.s_applyUID === 'function') {
+     try {
+       window.s_applyUID(uid);
+     } catch(e) {
+       alert("testNFC Error: " + e.message);
+     }
+  }
+  else if (typeof window.processNFCUid === 'function') {
+     window.processNFCUid(uid);
+  }
+  else {
+     const hidInput = document.getElementById('nfcHidInput') || document.getElementById('nfcHiddenInput');
+     if (hidInput) {
+       hidInput.value = uid;
+       hidInput.dispatchEvent(new Event('input', { bubbles: true }));
+       for(let i=0; i<uid.length; i++) {
+          hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: uid[i] }));
+       }
+       hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
+     }
+  }
+};
+

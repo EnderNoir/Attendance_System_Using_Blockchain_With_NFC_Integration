@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% block title %}My Schedule — DAVS{% endblock %}
 {% block page_title %}MY SCHEDULE{% endblock %}
 {% block extra_head %}
@@ -118,6 +118,11 @@
                 <a id="monitorLiveBtn" class="btn-primary" href="#" style="display:none;margin-right:8px;">
                     <i class="bi bi-broadcast"></i> Monitor Live
                 </a>
+                <form id="endSessionForm" method="POST" action="#" style="display:none;margin-right:8px;">
+                    <button type="submit" class="btn-danger" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                        <i class="bi bi-stop-circle"></i> End Session
+                    </button>
+                </form>
                 <button class="btn-outline" onclick="closeSchedModal()"><i class="bi bi-x"></i> Close</button>
             </div>
         </div>

@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Classroom Sessions - DAVS{% endblock %}
 {% block page_title %}CLASSROOM SESSIONS{% endblock %}
 {% block extra_head %}
@@ -111,17 +111,17 @@
   <div style="max-height:540px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="liveList">
     {% for sid, s in active.items() %}
     <div class="sess-row live-row" id="lrow_{{ sid }}" data-subject="{{ s.subject_name|lower }}"
-      data-teacher="{{ s.teacher_name|lower }}" data-section="{{ s.section_key|lower }}"
+      data-teacher="{{ s.teacher_name|lower }}" data-section="{{ (s.section_key or '')|lower }}"
       data-classtype="{{ s.get('class_type', 'lecture')|lower }}"
-      data-program="{{ (s.section_key.split('|')[0] if '|' in s.section_key else '')|lower }}"
-      data-year="{{ (s.section_key.split('|')[1] if s.section_key.count('|') >= 1 else '')|lower }}"
-      data-secletter="{{ (s.section_key.split('|')[2] if s.section_key.count('|') >= 2 else '')|lower }}"
+      data-program="{{ ((s.section_key or '').split('|')[0] if '|' in (s.section_key or '') else '')|lower }}"
+      data-year="{{ ((s.section_key or '').split('|')[1] if (s.section_key or '').count('|') >= 1 else '')|lower }}"
+      data-secletter="{{ ((s.section_key or '').split('|')[2] if (s.section_key or '').count('|') >= 2 else '')|lower }}"
       onclick="openSessModal('{{ sid }}')">
       <div class="live-dot"></div>
       <div style="flex:1;min-width:0;">
         <div class="sr-name">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif
           %}{{ s.subject_name }}</div>
-        <div class="sr-sub">{{ s.section_key.replace('|',' | ') }} | {{ s.teacher_name }} | {{ s.get('class_type','lecture')|title }}</div>
+        <div class="sr-sub">{{ (s.section_key or '').replace('|',' | ') }} | {{ s.teacher_name }} | {{ s.get('class_type','lecture')|title }}</div>
       </div>
       <span class="badge-live">LIVE</span>
       <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-vr" style="text-decoration:none;"
@@ -209,9 +209,9 @@
   {% endif %}
   <div style="max-height:540px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="endedList">
     {% for sid, s in ended.items()|sort(attribute='1.ended_at',reverse=True) %}
-    {% set sparts = s.section_key.split('|') %}
+    {% set sparts = (s.section_key or '').split('|') %}
     <div class="sess-row" id="erow_{{ sid }}" data-subject="{{ s.subject_name|lower }}"
-      data-teacher="{{ s.teacher_name|lower }}" data-section="{{ s.section_key|lower }}"
+      data-teacher="{{ s.teacher_name|lower }}" data-section="{{ (s.section_key or '')|lower }}"
       data-classtype="{{ s.get('class_type', 'lecture')|lower }}"
       data-program="{{ (sparts[0] if sparts|length > 0 else '')|lower }}"
       data-year="{{ (sparts[1] if sparts|length > 1 else '')|lower }}"
@@ -219,7 +219,11 @@
       <div style="flex:1;min-width:0;">
         <div class="sr-name">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif
           %}{{ s.subject_name }}</div>
-        <div class="sr-sub">{{ s.section_key.replace('|',' | ') }} | {{ s.teacher_name }} | {{ s.get('class_type','lecture')|title }} | {{ fmt_time(s.ended_at) }}
+        <div class="sr-sub">
+          {{ (s.section_key or '').replace('|',' | ') }} | {{ s.teacher_name }} | {{ s.get('class_type','lecture')|title }} | {{ fmt_time(s.ended_at) }}
+          {% if s.session_tx_hash %}
+          | <span style="color:var(--accent);font-weight:600;"><i class="bi bi-blockchain"></i> TX: {{ s.session_tx_hash[:10] }}...</span>
+          {% endif %}
         </div>
       </div>
       <span class="badge-done"><i class="bi bi-check-circle"></i> Done</span>
@@ -240,8 +244,9 @@
 
 
 
+{% endblock %}
+
 {% block extra_scripts %}
 <script>{% include 'assets/admin_sessions.js' %}</script>
-{% endblock %}
 {% endblock %}
 

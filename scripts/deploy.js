@@ -58,7 +58,7 @@ async function main() {
 
   // Write ABI only to JSON file (address comes from .env)
   const contractJson = {
-    abi: attendance.interface.format("json"),
+    abi: JSON.parse(attendance.interface.format("json")),
   };
 
   fs.writeFileSync(

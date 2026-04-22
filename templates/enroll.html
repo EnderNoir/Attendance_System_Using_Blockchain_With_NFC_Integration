@@ -3,13 +3,10 @@
 {% block page_title %}STUDENT ENROLLMENT{% endblock %}
 {% block content %}
 <!-- Global NFC HID input — shared by both tabs -->
-<input id="nfcHidInput" type="text"
-  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-  tabindex="0"
-  style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;
+<input id="nfcHidInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+  tabindex="0" style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;
          pointer-events:none;border:none;outline:none;background:transparent;
-         color:transparent;z-index:-1;font-size:1px;"
-  aria-hidden="true"/>
+         color:transparent;z-index:-1;font-size:1px;" aria-hidden="true" />
 
 <!-- ── Page header ─────────────────────────────────────────────────── -->
 <div style="margin-bottom:18px;">
@@ -36,28 +33,36 @@
 <div class="etab-panel active" id="panelSingle">
 
   <div class="steps-box">
-    <div class="step-chip"><div class="step-num">1</div><span>Upload PDF or fill manually</span></div>
+    <div class="step-chip">
+      <div class="step-num">1</div><span>Upload PDF or fill manually</span>
+    </div>
     <div class="sep">·</div>
-    <div class="step-chip"><div class="step-num">2</div><span>Complete all fields</span></div>
+    <div class="step-chip">
+      <div class="step-num">2</div><span>Complete all fields</span>
+    </div>
     <div class="sep">·</div>
-    <div class="step-chip"><div class="step-num">3</div><span>Tap NFC card on reader</span></div>
+    <div class="step-chip">
+      <div class="step-num">3</div><span>Tap NFC card on reader</span>
+    </div>
     <div class="sep">·</div>
-    <div class="step-chip"><div class="step-num">4</div><span>Click Register to save</span></div>
+    <div class="step-chip">
+      <div class="step-num">4</div><span>Click Register to save</span>
+    </div>
     <span style="margin-left:auto;font-size:12px;color:var(--muted);">
       <span style="color:var(--danger);font-weight:700;">*</span> = Required
     </span>
   </div>
 
-  <div class="upload-banner" id="s_uploadBanner"
-       ondragover="event.preventDefault();this.classList.add('dragover')"
-       ondragleave="this.classList.remove('dragover')"
-       ondrop="s_handleDrop(event)">
+  <div class="upload-banner" id="s_uploadBanner" ondragover="event.preventDefault();this.classList.add('dragover')"
+    ondragleave="this.classList.remove('dragover')" ondrop="s_handleDrop(event)">
     <div class="ub-icon" id="s_ubIcon">📄</div>
     <div class="ub-text">
       <div class="ub-title" id="s_ubTitle">Auto-fill from CvSU Registration PDF</div>
-      <div class="ub-sub" id="s_ubSub">Drop a PDF here or click Upload — subjects will be saved only when you click Register</div>
+      <div class="ub-sub" id="s_ubSub">Drop a PDF here or click Upload — subjects will be saved only when you click
+        Register</div>
     </div>
-    <button type="button" class="btn-upload" onclick="document.getElementById('s_pdfFileInput').click()" id="s_btnUpload">
+    <button type="button" class="btn-upload" onclick="document.getElementById('s_pdfFileInput').click()"
+      id="s_btnUpload">
       <i class="bi bi-cloud-upload"></i> Upload PDF
     </button>
     <input type="file" id="s_pdfFileInput" accept=".pdf" style="display:none;" onchange="s_handlePdfUpload(this)">
@@ -67,18 +72,21 @@
   <div class="subj-preview" id="s_subjPreview">
     <div class="subj-notice">
       <i class="bi bi-info-circle" style="flex-shrink:0;margin-top:1px;"></i>
-      <span>These subjects will be added to the catalogue only when you click <strong>Register Student on Blockchain</strong>.</span>
+      <span>These subjects will be added to the catalogue only when you click <strong>Register Student</strong>.</span>
     </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-      <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;">// SUBJECTS FOUND IN PDF</span>
+    <div
+      style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+      <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;">//
+        SUBJECTS FOUND IN PDF</span>
       <span style="font-size:11px;color:var(--muted);" id="s_subjPreviewNote"></span>
     </div>
     <div class="subj-preview-inner" id="s_subjPreviewList"></div>
   </div>
 
   <div class="form-card">
-    <form method="POST" action="{{ url_for('register') }}" id="registerForm" enctype="multipart/form-data" onsubmit="return validateRegisterForm()">
-      <input type="hidden" name="pending_subjects_json" id="pendingSubjectsJson" value="[]"/>
+    <form method="POST" action="{{ url_for('register') }}" id="registerForm" enctype="multipart/form-data"
+      onsubmit="return validateRegisterForm()">
+      <input type="hidden" name="pending_subjects_json" id="pendingSubjectsJson" value="[]" />
 
       <div class="full-form">
         <div class="fsec">// Enrollment Details</div>
@@ -93,43 +101,53 @@
         </div>
         <div class="field-wrap">
           <label class="form-label">School Year <span style="color:var(--danger)">*</span></label>
-          <input type="text" class="form-control" name="school_year" id="f_school_year" placeholder="e.g. 2024-2025" required/>
+          <input type="text" class="form-control" name="school_year" id="f_school_year" placeholder="e.g. 2024-2025"
+            required />
         </div>
         <div class="field-wrap">
           <label class="form-label">Date of Admission</label>
-          <input type="month" class="form-control" name="date_registered" id="f_date_registered"/>
+          <input type="month" class="form-control" name="date_registered" id="f_date_registered" />
         </div>
 
         <div class="fsec" style="margin-top:6px;">// Personal Information</div>
         <div class="field-wrap span-3">
-          <label class="form-label">Student Photo <span style="font-size:10px;font-weight:400;color:var(--muted);text-transform:none;">(optional)</span></label>
+          <label class="form-label">Student Photo <span
+              style="font-size:10px;font-weight:400;color:var(--muted);text-transform:none;">(optional)</span></label>
           <div class="photo-row">
-            <div class="photo-preview-wrap" id="photoPreviewWrap" onclick="document.getElementById('studentPhotoInput').click()">
-              <div id="photoPreviewInit" style="text-align:center;"><i class="bi bi-camera" style="font-size:20px;color:var(--muted);display:block;"></i><span style="font-size:10px;color:var(--muted);">Upload</span></div>
-              <img id="photoPreviewImg" src="" style="display:none;width:100%;height:100%;object-fit:cover;"/>
+            <div class="photo-preview-wrap" id="photoPreviewWrap"
+              onclick="document.getElementById('studentPhotoInput').click()">
+              <div id="photoPreviewInit" style="text-align:center;"><i class="bi bi-camera"
+                  style="font-size:20px;color:var(--muted);display:block;"></i><span
+                  style="font-size:10px;color:var(--muted);">Upload</span></div>
+              <img id="photoPreviewImg" src="" style="display:none;width:100%;height:100%;object-fit:cover;" />
             </div>
             <div>
-              <input type="file" id="studentPhotoInput" name="student_photo" accept="image/*" style="display:none;" onchange="previewStudentPhoto(this)">
-              <button type="button" class="btn-outline" style="font-size:12px;padding:7px 14px;" onclick="document.getElementById('studentPhotoInput').click()"><i class="bi bi-cloud-upload"></i> Choose Photo</button>
+              <input type="file" id="studentPhotoInput" name="student_photo" accept="image/*" style="display:none;"
+                onchange="previewStudentPhoto(this)">
+              <button type="button" class="btn-outline" style="font-size:12px;padding:7px 14px;"
+                onclick="document.getElementById('studentPhotoInput').click()"><i class="bi bi-cloud-upload"></i> Choose
+                Photo</button>
               <div style="font-size:11px;color:var(--muted);margin-top:5px;">JPG, PNG, WEBP · Max 5 MB</div>
             </div>
           </div>
         </div>
         <div class="field-wrap span-2">
           <label class="form-label">Student Full Name <span style="color:var(--danger)">*</span></label>
-          <input type="text" class="form-control" name="name" id="f_name" placeholder="e.g. Juan Dela Cruz" required/>
+          <input type="text" class="form-control" name="name" id="f_name" placeholder="e.g. Juan Dela Cruz" required />
         </div>
         <div class="field-wrap">
           <label class="form-label">Student ID Number <span style="color:var(--danger)">*</span></label>
-          <input type="text" class="form-control" name="student_id" id="f_student_id" placeholder="e.g. 2021-00123" required/>
+          <input type="text" class="form-control" name="student_id" id="f_student_id" placeholder="e.g. 2021-00123"
+            required />
         </div>
         <div class="field-wrap span-2">
           <label class="form-label">Email Address</label>
-          <input type="email" class="form-control" name="email" id="f_email" placeholder="e.g. sc.juan.delacruz@cvsu.edu.ph"/>
+          <input type="email" class="form-control" name="email" id="f_email"
+            placeholder="e.g. sc.juan.delacruz@cvsu.edu.ph" />
         </div>
         <div class="field-wrap">
           <label class="form-label">Contact Number</label>
-          <input type="text" class="form-control" name="contact" id="f_contact" placeholder="e.g. 09XX-XXX-XXXX"/>
+          <input type="text" class="form-control" name="contact" id="f_contact" placeholder="e.g. 09XX-XXX-XXXX" />
         </div>
 
         <div class="fsec" style="margin-top:6px;">// Academic Information</div>
@@ -143,7 +161,8 @@
         </div>
         <div class="field-wrap">
           <label class="form-label">Major / Specialization</label>
-          <input type="text" class="form-control" name="major" id="f_major" placeholder="e.g. Software Engineering" value="N/A"/>
+          <input type="text" class="form-control" name="major" id="f_major" placeholder="e.g. Software Engineering"
+            value="N/A" />
         </div>
         <div class="field-wrap">
           <label class="form-label">Year Level <span style="color:var(--danger)">*</span></label>
@@ -168,7 +187,7 @@
         <div class="field-wrap span-2">
           <label class="form-label">Adviser Name <span style="color:var(--danger)">*</span></label>
           <input type="text" class="form-control" name="adviser" id="f_adviser"
-                 placeholder="Type or pick a teacher name…" list="adviserList" required autocomplete="off"/>
+            placeholder="Type or pick a teacher name…" list="adviserList" required autocomplete="off" />
           <datalist id="adviserList">
             {% for u, d in users_db.items() %}{% if d.role in ('teacher','admin') %}
             <option value="{{ d.full_name }}">{{ d.full_name }}</option>
@@ -178,19 +197,22 @@
 
         <div class="fsec" style="margin-top:6px;">// NFC Card</div>
         <div class="span-3">
-          <input type="hidden" name="nfc_id" id="nfc_id" required/>
-          <div class="nfc-card-strip" id="nfcCardStrip">
+          <input type="hidden" name="nfc_id" id="nfc_id" required />
+          <div class="nfc-card-strip" id="nfcCardStrip" style="display: flex; align-items: center;">
             <span class="nfc-strip-icon" id="nfcStripIcon">💳</span>
             <div class="nfc-strip-info">
               <div class="nfc-strip-title" id="nfcStripTitle">Tap NFC card on the reader</div>
               <div class="nfc-strip-sub" id="nfcStripSub">Hold the student's NFC card near the USB reader — the UID will fill automatically</div>
               <div class="nfc-uid-display no-uid" id="nfcUidDisplay">No card tapped yet</div>
             </div>
+            <button type="button" class="btn-outline" style="margin-left: auto; white-space: nowrap;" onclick="startPhoneNFC()">
+              <i class="bi bi-phone"></i> Use Phone's NFC
+            </button>
           </div>
         </div>
 
         <div class="span-3 submit-row">
-          <button type="submit" class="btn-primary"><i class="bi bi-check-circle"></i> Register Student on Blockchain</button>
+          <button type="submit" class="btn-primary"><i class="bi bi-check-circle"></i> Register Student</button>
           <a href="{{ url_for('index') }}" class="btn-outline">Cancel</a>
         </div>
       </div>
@@ -211,34 +233,35 @@
   <!-- Step indicator -->
   <div class="be-steps" id="beSteps">
     <div class="be-step active" id="beStep1">
-      <div class="be-step-num">1</div><div>Upload &amp; Review PDFs</div>
+      <div class="be-step-num">1</div>
+      <div>Upload &amp; Review PDFs</div>
     </div>
     <div class="be-step" id="beStep2">
-      <div class="be-step-num">2</div><div>Assign NFC Cards</div>
+      <div class="be-step-num">2</div>
+      <div>Assign NFC Cards</div>
     </div>
     <div class="be-step" id="beStep3">
-      <div class="be-step-num">3</div><div>Register on Blockchain</div>
+      <div class="be-step-num">3</div>
+      <div>Save to PostgreSQL</div>
     </div>
   </div>
 
   <!-- ── Phase 1: Upload & Review ───────────────────────────────────── -->
   <div class="phase active" id="phase1">
 
-    <div class="upload-banner" id="b_uploadBanner"
-         ondragover="event.preventDefault();this.classList.add('dragover')"
-         ondragleave="this.classList.remove('dragover')"
-         ondrop="b_handleDrop(event)">
+    <div class="upload-banner" id="b_uploadBanner" ondragover="event.preventDefault();this.classList.add('dragover')"
+      ondragleave="this.classList.remove('dragover')" ondrop="b_handleDrop(event)">
       <div class="ub-icon" id="b_ubIcon">📄</div>
       <div class="ub-text">
         <div class="ub-title" id="b_ubTitle">Upload Multiple CvSU Registration PDFs</div>
         <div class="ub-sub" id="b_ubSub">Drop PDF files here or click to browse — sorted alphabetically by surname</div>
       </div>
       <button type="button" class="btn-upload" id="b_btnUpload"
-              onclick="document.getElementById('pdfFilesInput').click()">
+        onclick="document.getElementById('pdfFilesInput').click()">
         <i class="bi bi-cloud-upload"></i> Select PDFs
       </button>
-      <input type="file" id="pdfFilesInput" accept=".pdf" multiple
-             style="display:none;" onchange="b_handleFileSelect(this)">
+      <input type="file" id="pdfFilesInput" accept=".pdf" multiple style="display:none;"
+        onchange="b_handleFileSelect(this)">
     </div>
 
     <div id="reviewPanel" style="display:none;">
@@ -252,8 +275,14 @@
         <table class="st-table" id="studentTable">
           <thead>
             <tr>
-              <th>#</th><th>Student Name</th><th>Student ID</th>
-              <th>Course</th><th>Year / Sec</th><th>Email</th><th>PDF File</th><th>Actions</th>
+              <th>#</th>
+              <th>Student Name</th>
+              <th>Student ID</th>
+              <th>Course</th>
+              <th>Year / Sec</th>
+              <th>Email</th>
+              <th>PDF File</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="studentTbody"></tbody>
@@ -277,12 +306,15 @@
         <i class="bi bi-credit-card-2-front" style="font-size:22px;color:var(--accent);"></i>
         <div style="flex:1;min-width:0;">
           <div style="font-size:14px;font-weight:700;">NFC Card Assignment</div>
-          <div style="font-size:12px;color:var(--muted);">Tap cards in order. Undo returns to the previous student.</div>
+          <div style="font-size:12px;color:var(--muted);">Tap cards in order. Undo returns to the previous student.
+          </div>
         </div>
       </div>
       <div class="nfc-panel-body">
         <div class="prog-strip">
-          <div class="prog-bar-outer"><div class="prog-bar-inner" id="progBarInner" style="width:0%;"></div></div>
+          <div class="prog-bar-outer">
+            <div class="prog-bar-inner" id="progBarInner" style="width:0%;"></div>
+          </div>
           <div class="prog-label" id="progLabel">0 / 0</div>
         </div>
         <div class="curr-card" id="currCard">
@@ -295,8 +327,10 @@
         </div>
         <div class="tap-zone" id="tapZone">
           <span class="tap-icon" id="tapIcon">💳</span>
-          <div style="font-size:15px;font-weight:700;margin-bottom:6px;" id="tapTitle">Tap the NFC card for this student</div>
-          <div style="font-size:13px;color:var(--muted);" id="tapSub">Hold the card near the USB reader — the UID will appear automatically</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:6px;" id="tapTitle">Tap the NFC card for this student
+          </div>
+          <div style="font-size:13px;color:var(--muted);" id="tapSub">Hold the card near the USB reader — the UID will
+            appear automatically</div>
           <div id="uidDisplay" style="display:none;">
             <div class="tap-uid-display" id="uidText">—</div>
           </div>
@@ -315,6 +349,9 @@
           <button class="btn-skip-nfc" id="btnSkip" onclick="skipStudent()">
             <i class="bi bi-skip-forward"></i> Skip This Student
           </button>
+          <button type="button" class="btn-outline" id="btnPhoneNFC" onclick="startPhoneNFC()" style="margin-left:auto; white-space: nowrap;">
+            <i class="bi bi-phone"></i> Use Phone's NFC
+          </button>
         </div>
       </div>
     </div>
@@ -322,7 +359,15 @@
     <div class="section-title">// Assignment Queue</div>
     <div class="st-table-wrap">
       <table class="st-table" id="queueTable">
-        <thead><tr><th>#</th><th>Student Name</th><th>Course / Year</th><th>NFC Card</th><th>Status</th></tr></thead>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Student Name</th>
+            <th>Course / Year</th>
+            <th>NFC Card</th>
+            <th>Status</th>
+          </tr>
+        </thead>
         <tbody id="queueTbody"></tbody>
       </table>
     </div>
@@ -339,7 +384,8 @@
     <div class="summary-grid" id="summaryGrid"></div>
     <div id="subjectSummaryBox" style="display:none;margin-bottom:18px;">
       <div class="section-title">// Subjects Found in PDFs — Will Be Added to Catalogue</div>
-      <div style="background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.15);border-radius:10px;padding:12px 14px;font-size:12px;">
+      <div
+        style="background:rgba(45,106,39,.04);border:1px solid rgba(45,106,39,.15);border-radius:10px;padding:12px 14px;font-size:12px;overflow:auto;max-height:300px;">
         <div id="subjectList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
     </div>
@@ -347,17 +393,25 @@
     <div class="st-table-wrap" style="margin-bottom:20px;">
       <table class="res-table" id="resultTable">
         <thead>
-          <tr><th>#</th><th>Student Name</th><th>Student ID</th><th>Course</th><th>Year / Sec</th><th>NFC Card</th><th>Status</th></tr>
+          <tr>
+            <th>#</th>
+            <th>Student Name</th>
+            <th>Student ID</th>
+            <th>Course</th>
+            <th>Year / Sec</th>
+            <th>NFC Card</th>
+            <th>Status</th>
+          </tr>
         </thead>
         <tbody id="resultTbody"></tbody>
       </table>
     </div>
     <form method="POST" action="{{ url_for('batch_register') }}" id="finalForm">
-      <input type="hidden" name="students_data" id="studentsDataInput"/>
+      <input type="hidden" name="students_data" id="studentsDataInput" />
     </form>
     <div class="btn-row">
       <button type="button" class="btn-primary" id="registerBtn" onclick="doRegister()">
-        <i class="bi bi-check-circle"></i> Register All on Blockchain
+        <i class="bi bi-check-circle"></i> Register All Students
       </button>
       <button type="button" class="btn-outline" onclick="gotoPhase(2)">
         <i class="bi bi-arrow-left"></i> Back to NFC Assignment

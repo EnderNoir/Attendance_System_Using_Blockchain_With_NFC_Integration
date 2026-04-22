@@ -1,4 +1,4 @@
-﻿/* -- SCHEDULE PAGE -- */
+/* -- SCHEDULE PAGE -- */
   .sched-page-header {
     display: flex;
     align-items: flex-start;
@@ -800,21 +800,34 @@
   .ac-input:focus {
     outline: none;
     border-color: var(--accent);
+    background: var(--surface);
+    box-shadow: 0 0 0 3px rgba(45, 106, 39, 0.1);
+  }
+
+  .ac-wrap {
+    position: relative;
+    z-index: 10; /* Lower than dropdown but higher than plain text */
+  }
+
+  .ac-wrap:focus-within {
+    z-index: 5000; /* Bring the entire field to front when active */
   }
 
   .ac-dropdown {
     position: absolute;
-    top: calc(100%+4px);
+    top: 100%;
+    margin-top: 5px;
     left: 0;
     right: 0;
-    z-index: 3000;
+    z-index: 9999; /* Maximize visibility */
     background: var(--surface);
     border: 1.5px solid var(--accent);
-    border-radius: 10px;
-    max-height: 230px;
+    border-radius: 12px;
+    max-height: 250px;
     overflow-y: auto;
-    box-shadow: 0 8px 28px rgba(0, 0, 0, .20);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .25);
     display: none;
+    pointer-events: auto; /* Ensure clicks are captured */
   }
 
   .ac-dropdown.open {

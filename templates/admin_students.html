@@ -1,0 +1,688 @@
+{% extends "base.html" %}
+{% block title %}Student Management — DAVS{% endblock %}
+{% block page_title %}STUDENT MANAGEMENT{% endblock %}
+{% block content %}
+
+<style>
+.student-management-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.status-filter-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 12px;
+}
+
+.status-tab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -14px;
+}
+
+.status-tab:hover {
+  color: var(--text);
+}
+
+.status-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-right: 8px;
+}
+
+.badge-active {
+  background: rgba(76, 175, 80, 0.15);
+  color: #4caf50;
+}
+
+.badge-graduated {
+  background: rgba(33, 150, 243, 0.15);
+  color: #2196f3;
+}
+
+.badge-alumni {
+  background: rgba(156, 39, 176, 0.15);
+  color: #9c27b0;
+}
+
+.students-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.student-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.student-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.student-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.student-name {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.student-details {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.detail-item i {
+  opacity: 0.6;
+}
+
+.student-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn-status {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-status:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.btn-status.primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.btn-semester {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--info-bg);
+  color: var(--info-color);
+  border: 1px solid var(--info-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-semester:hover {
+  background: var(--info-color);
+  color: white;
+}
+
+.search-wrap {
+  margin-bottom: 20px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+
+.search-input::placeholder {
+  color: var(--muted);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+}
+
+.empty-state i {
+  font-size: 48px;
+  opacity: 0.3;
+  margin-bottom: 16px;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-content {
+  background: var(--bg);
+  padding: 24px;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-control {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.btn-modal {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-modal.cancel {
+  background: var(--bg-secondary);
+  color: var(--text);
+  border: 1px solid var(--border-color);
+}
+
+.btn-modal.cancel:hover {
+  background: var(--border-color);
+}
+
+.btn-modal.confirm {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-modal.confirm:hover {
+  opacity: 0.9;
+}
+
+.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+</style>
+
+<div class="student-management-container">
+  <!-- Stats Row -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card">
+      <div class="stat-value" id="countActive">0</div>
+      <div class="stat-label">Active Students</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="countGraduated">0</div>
+      <div class="stat-label">Graduated</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="countAlumni">0</div>
+      <div class="stat-label">Alumni</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="countTotal">0</div>
+      <div class="stat-label">Total Students</div>
+    </div>
+  </div>
+
+  <!-- Status Filter Tabs -->
+  <div>
+    <div class="status-filter-tabs">
+      <button class="status-tab active" onclick="filterByStatus('active')">
+        <i class="bi bi-person-check"></i> Active
+      </button>
+      <button class="status-tab" onclick="filterByStatus('graduated')">
+        <i class="bi bi-mortarboard"></i> Graduated
+      </button>
+      <button class="status-tab" onclick="filterByStatus('alumni')">
+        <i class="bi bi-award"></i> Alumni
+      </button>
+      <button class="status-tab" onclick="filterByStatus('all')">
+        <i class="bi bi-people"></i> All Students
+      </button>
+    </div>
+  </div>
+
+  <!-- Search Bar -->
+  <div class="search-wrap">
+    <input 
+      type="text" 
+      class="search-input" 
+      id="searchInput" 
+      placeholder="Search by name, ID, email, or NFC ID..." 
+      oninput="filterStudents()"
+    />
+  </div>
+
+  <!-- Students List -->
+  <div class="students-grid" id="studentsList">
+    <div class="empty-state">
+      <i class="bi bi-inbox"></i>
+      <p>No students found</p>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Change Status -->
+<div class="modal-overlay" id="statusModal">
+  <div class="modal-content">
+    <div class="modal-title">Update Student Status</div>
+    <div class="modal-body">
+      <div class="form-group">
+        <div class="form-label">Student</div>
+        <div id="statusModalStudent" style="color: var(--text); font-weight: 600;"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Status</label>
+        <select class="form-control" id="statusSelect">
+          <option value="active">Active</option>
+          <option value="graduated">Graduated</option>
+          <option value="alumni">Alumni</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal cancel" onclick="closeModal('statusModal')">Cancel</button>
+      <button class="btn-modal confirm" onclick="confirmStatusChange()">Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Move Semester -->
+<div class="modal-overlay" id="semesterModal">
+  <div class="modal-content">
+    <div class="modal-title">Move to Next Semester</div>
+    <div class="modal-body">
+      <div class="form-group">
+        <div class="form-label">Student</div>
+        <div id="semesterModalStudent" style="color: var(--text); font-weight: 600;"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Current Semester</label>
+        <select class="form-control" id="currentSemesterSelect">
+          <option value="First">First</option>
+          <option value="Second">Second</option>
+          <option value="Summer">Summer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Semester</label>
+        <select class="form-control" id="newSemesterSelect">
+          <option value="First">First</option>
+          <option value="Second">Second</option>
+          <option value="Summer">Summer</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New School Year (e.g. 2025-2026)</label>
+        <input type="text" class="form-control" id="newSchoolYear" placeholder="2025-2026"/>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal cancel" onclick="closeModal('semesterModal')">Cancel</button>
+      <button class="btn-modal confirm" onclick="confirmMoveSemester()">Move Student</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let allStudents = [];
+let filteredStudents = [];
+let currentStatusFilter = 'active';
+let currentEditStudent = null;
+
+// Load students on page load
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadStudents();
+});
+
+async function loadStudents() {
+  try {
+    const response = await fetch('/api/students/all');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    allStudents = data.students || [];
+    updateStats();
+    filterByStatus('active');
+  } catch (error) {
+    console.error('Failed to load students:', error);
+    showMsg('Failed to load students', 'error');
+  }
+}
+
+function updateStats() {
+  const active = allStudents.filter(s => s.student_status === 'active').length;
+  const graduated = allStudents.filter(s => s.student_status === 'graduated').length;
+  const alumni = allStudents.filter(s => s.student_status === 'alumni').length;
+  
+  document.getElementById('countActive').textContent = active;
+  document.getElementById('countGraduated').textContent = graduated;
+  document.getElementById('countAlumni').textContent = alumni;
+  document.getElementById('countTotal').textContent = allStudents.length;
+}
+
+function filterByStatus(status) {
+  currentStatusFilter = status;
+  
+  // Update active tab
+  document.querySelectorAll('.status-tab').forEach(tab => tab.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  filterStudents();
+}
+
+function filterStudents() {
+  const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+  
+  let filtered = allStudents;
+  
+  // Filter by status
+  if (currentStatusFilter !== 'all') {
+    filtered = filtered.filter(s => s.student_status === currentStatusFilter);
+  }
+  
+  // Filter by search term
+  if (searchTerm) {
+    filtered = filtered.filter(s => 
+      (s.full_name || '').toLowerCase().includes(searchTerm) ||
+      (s.student_id || '').toLowerCase().includes(searchTerm) ||
+      (s.email || '').toLowerCase().includes(searchTerm) ||
+      (s.nfcId || '').toLowerCase().includes(searchTerm)
+    );
+  }
+  
+  filteredStudents = filtered;
+  renderStudents();
+}
+
+function renderStudents() {
+  const container = document.getElementById('studentsList');
+  
+  if (filteredStudents.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <p>No students found</p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = filteredStudents.map(student => `
+    <div class="student-card">
+      <div class="student-info">
+        <div class="student-name">
+          <span class="status-badge badge-${student.student_status || 'active'}">
+            ${(student.student_status || 'active').toUpperCase()}
+          </span>
+          ${student.full_name}
+        </div>
+        <div class="student-details">
+          <div class="detail-item">
+            <i class="bi bi-hash"></i>
+            <span>${student.student_id || 'N/A'}</span>
+          </div>
+          <div class="detail-item">
+            <i class="bi bi-envelope"></i>
+            <span>${student.email || 'N/A'}</span>
+          </div>
+          <div class="detail-item">
+            <i class="bi bi-credit-card"></i>
+            <span>${student.nfcId || 'No card'}</span>
+          </div>
+          <div class="detail-item">
+            <i class="bi bi-calendar"></i>
+            <span>${student.semester || 'N/A'} · ${student.school_year || 'N/A'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="student-actions">
+        ${student.student_status === 'active' ? `
+          <button class="btn-semester" onclick="openMoveSemesterModal('${student.nfcId}', '${student.full_name}', '${student.semester}', '${student.school_year}')">
+            <i class="bi bi-arrow-right"></i> Next Semester
+          </button>
+        ` : ''}
+        <button class="btn-status" onclick="openStatusModal('${student.nfcId}', '${student.full_name}', '${student.student_status}')">
+          <i class="bi bi-pencil"></i> Change Status
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openStatusModal(nfcId, studentName, currentStatus) {
+  currentEditStudent = { nfcId, studentName, currentStatus };
+  document.getElementById('statusModalStudent').textContent = studentName;
+  document.getElementById('statusSelect').value = currentStatus || 'active';
+  document.getElementById('statusModal').classList.add('active');
+}
+
+function openMoveSemesterModal(nfcId, studentName, currentSem, currentYear) {
+  currentEditStudent = { nfcId, studentName, currentSem, currentYear };
+  document.getElementById('semesterModalStudent').textContent = studentName;
+  document.getElementById('currentSemesterSelect').value = currentSem || 'First';
+  
+  // Set default new semester
+  const semOptions = ['First', 'Second', 'Summer'];
+  const currentIdx = semOptions.indexOf(currentSem);
+  const nextIdx = (currentIdx + 1) % semOptions.length;
+  document.getElementById('newSemesterSelect').value = semOptions[nextIdx];
+  
+  // Generate next year
+  if (currentYear) {
+    const [start, end] = currentYear.split('-');
+    const nextYear = `${parseInt(end)}-${parseInt(end) + 1}`;
+    document.getElementById('newSchoolYear').value = nextYear;
+  }
+  
+  document.getElementById('semesterModal').classList.add('active');
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).classList.remove('active');
+  currentEditStudent = null;
+}
+
+async function confirmStatusChange() {
+  if (!currentEditStudent) return;
+  
+  const newStatus = document.getElementById('statusSelect').value;
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Updating...';
+  
+  try {
+    const response = await fetch(`/api/student/update-status/${currentEditStudent.nfcId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    closeModal('statusModal');
+    await loadStudents();
+    showMsg(`Status updated to ${newStatus}`, 'success');
+  } catch (error) {
+    console.error('Failed to update status:', error);
+    showMsg('Failed to update status', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Update';
+  }
+}
+
+async function confirmMoveSemester() {
+  if (!currentEditStudent) return;
+  
+  const newSem = document.getElementById('newSemesterSelect').value;
+  const newYear = document.getElementById('newSchoolYear').value;
+  
+  if (!newYear || !newYear.match(/^\d{4}-\d{4}$/)) {
+    showMsg('Invalid school year format (use YYYY-YYYY)', 'warning');
+    return;
+  }
+  
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Moving...';
+  
+  try {
+    const response = await fetch(`/api/student/move-semester/${currentEditStudent.nfcId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        new_semester: newSem,
+        new_school_year: newYear
+      })
+    });
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
+    closeModal('semesterModal');
+    await loadStudents();
+    showMsg(`${currentEditStudent.studentName} moved to ${newSem} Semester ${newYear}`, 'success');
+  } catch (error) {
+    console.error('Failed to move semester:', error);
+    showMsg('Failed to move to next semester', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Move Student';
+  }
+}
+
+// Close modal when clicking overlay
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('modal-overlay')) {
+    e.target.classList.remove('active');
+    currentEditStudent = null;
+  }
+});
+</script>
+
+{% endblock %}

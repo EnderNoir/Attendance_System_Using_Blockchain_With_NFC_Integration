@@ -19,12 +19,30 @@ contract Attendance {
         uint8 status;
     }
 
+    struct SessionRecord {
+        string sessionId;
+        string subjectName;
+        string teacherName;
+        uint256 startTime;
+        uint256 endTime;
+        string[] studentNfcIds;
+        uint8[] studentStatuses;
+        uint256 totalPresent;
+        uint256 totalLate;
+        uint256 totalAbsent;
+        uint256 totalExcused;
+        string logData;
+    }
+
     mapping(string => Student) public studentsByNfc;   // nfcId => Student
     mapping(address => Student) public studentsByAddr; // student address => Student
     mapping(string => AttendanceRecord[]) public attendance; // nfcId => records
+    mapping(string => SessionRecord) public sessionRecords; // sessionId => SessionRecord
+    string[] public sessionIds; // Keep track of all recorded sessions
 
     event StudentRegistered(address indexed studentAddr, string nfcId, string name);
     event AttendanceMarked(string indexed nfcId, uint256 timestamp, uint8 status, string statusLabel);
+    event SessionRecorded(string indexed sessionId, string subjectName, string teacherName, uint256 startTime, uint256 endTime, uint256 studentCount, string logData);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Only admin can perform this action");
@@ -70,7 +88,7 @@ contract Attendance {
 
     // Mark attendance with explicit status for immutable auditing.
     function markAttendanceWithStatus(string memory _nfcId, uint8 _status) public {
-        require(studentsByNfc[_nfcId].isRegistered, "Student not registered");
+        // require(studentsByNfc[_nfcId].isRegistered, "Student not registered"); // Removed as requested
         require(_status <= STATUS_EXCUSED, "Invalid status");
         attendance[_nfcId].push(AttendanceRecord(block.timestamp, _status));
         emit AttendanceMarked(_nfcId, block.timestamp, _status, _statusLabel(_status));
@@ -90,5 +108,80 @@ contract Attendance {
             statuses[i] = records[i].status;
         }
         return (timestamps, statuses);
+    }
+
+    // Record an entire session's attendance data (called by admin at session end)
+    function recordSession(
+        string memory _sessionId,
+        string memory _subjectName,
+        string memory _teacherName,
+        uint256 _startTime,
+        uint256 _endTime,
+        string[] memory _studentNfcIds,
+        uint8[] memory _studentStatuses,
+        string memory _logData
+    ) public onlyAdmin {
+        require(_studentNfcIds.length == _studentStatuses.length, "Mismatched arrays");
+        require(_startTime < _endTime, "Invalid time range");
+        
+        uint256 countPresent = 0;
+        uint256 countLate = 0;
+        uint256 countAbsent = 0;
+        uint256 countExcused = 0;
+        
+        // Count by status
+        for (uint256 i = 0; i < _studentStatuses.length; i++) {
+            uint8 status = _studentStatuses[i];
+            if (status == STATUS_PRESENT) countPresent++;
+            else if (status == STATUS_LATE) countLate++;
+            else if (status == STATUS_ABSENT) countAbsent++;
+            else if (status == STATUS_EXCUSED) countExcused++;
+        }
+        
+        // Store the complete session record immutably on blockchain
+        SessionRecord storage newSession = sessionRecords[_sessionId];
+        newSession.sessionId = _sessionId;
+        newSession.subjectName = _subjectName;
+        newSession.teacherName = _teacherName;
+        newSession.startTime = _startTime;
+        newSession.endTime = _endTime;
+        newSession.studentNfcIds = _studentNfcIds;
+        newSession.studentStatuses = _studentStatuses;
+        newSession.totalPresent = countPresent;
+        newSession.totalLate = countLate;
+        newSession.totalAbsent = countAbsent;
+        newSession.totalExcused = countExcused;
+        newSession.logData = _logData;
+        
+        sessionIds.push(_sessionId);
+        
+        emit SessionRecorded(_sessionId, _subjectName, _teacherName, _startTime, _endTime, _studentNfcIds.length, _logData);
+    }
+
+    // Get a recorded session
+    function getSession(string memory _sessionId)
+        public
+        view
+        returns (SessionRecord memory)
+    {
+        return sessionRecords[_sessionId];
+    }
+
+    // Get all recorded session IDs
+    function getAllSessionIds()
+        public
+        view
+        returns (string[] memory)
+    {
+        return sessionIds;
+    }
+
+    // Get session count
+    function getSessionCount()
+        public
+        view
+        returns (uint256)
+    {
+        return sessionIds.length;
     }
 }

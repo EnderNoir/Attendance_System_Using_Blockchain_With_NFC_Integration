@@ -52,23 +52,20 @@ Usage:
     python seed_dummy_data.py --clear --yes
 """
 
-import sqlite3, hashlib, os, sys, uuid, json, random, secrets
+import hashlib, os, sys, uuid, json, random, secrets
 from datetime import datetime, timedelta, date
+from services.ops.db_compat import connect_db
 
 # ── Config ──────────────────────────────────────────────────────────────────
 BASE_DIR             = os.path.dirname(os.path.abspath(__file__))
-DB_FILE              = os.path.join(BASE_DIR, 'davs.db')
+DATABASE_URL         = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs')
 PASSWORD             = 'test123'
 STUDENTS_PER_SECTION = 30
 MIN_SESSIONS_PER_SECTION = 10
 
 # ── DB helpers ───────────────────────────────────────────────────────────────
 def get_db():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    return connect_db(DATABASE_URL)
 
 def hash_pw(pw): return hashlib.sha256(pw.encode()).hexdigest()
 def ts(dt=None): return (dt or datetime.now()).strftime('%Y-%m-%d %H:%M:%S')
@@ -333,11 +330,14 @@ def dt_older():
 
 # ── Core seed functions ───────────────────────────────────────────────────────
 def check_db():
-    if not os.path.exists(DB_FILE):
-        print(f"\n  [ERR] davs.db not found: {DB_FILE}")
-        print("  Run Flask once first to create the database.\n")
+    try:
+        with get_db() as conn:
+            conn.execute("SELECT 1")
+        print("  [OK]  Connected to PostgreSQL")
+    except Exception as e:
+        print(f"\n  [ERR] PostgreSQL connection failed: {e}")
+        print("  Set DATABASE_URL in .env and ensure PostgreSQL is running.\n")
         sys.exit(1)
-    print(f"  [OK]  Found davs.db  ({os.path.getsize(DB_FILE)//1024} KB)")
 
 def clear_data():
     print("\n  Clearing existing data…")

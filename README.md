@@ -28,6 +28,7 @@ An innovative attendance tracking system that combines **blockchain technology**
 
 - Python 3.8+
 - Node.js & npm
+- PostgreSQL 14+
 - Ethereum wallet (MetaMask or similar)
 - NFC Reader/Writer compatible hardware
 - Web browser (Chrome, Firefox, Safari, Edge)
@@ -47,15 +48,36 @@ cd Attendance_System_Using_Blockchain_With_NFC_Integration
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Configure blockchain connection
-# Update your Ethereum RPC endpoint in config.py
+# Required for PostgreSQL driver
+pip install psycopg2-binary
+```
+
+Create a `.env` file in the project root:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/davs
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID
+BLOCKCHAIN_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID
+ADMIN_PRIVATE_KEY=0xYOUR_WALLET_PRIVATE_KEY
 ```
 
 ### 3. Smart Contracts (Solidity)
 
 ```bash
-# Install Hardhat (for compilation and deployment)
-npm install -g hardhat
+# Install project dependencies
+npm install
+
+# Compile contract
+npx hardhat compile
+
+# Deploy to Sepolia and generate attendance-contract.json
+npx hardhat run scripts/deploy.js --network sepolia
+```
+
+### 4. Start the App
+
+```bash
+python app.py
 ```
 
 ## Usage
@@ -100,13 +122,16 @@ NFC Reader → Python Backend → Smart Contract → Blockchain
 
 ## Configuration
 
-Edit `config.py` or `config.json` to configure:
+Configure the environment variables in `.env`:
 
 ```python
-# Ethereum network settings
-BLOCKCHAIN_RPC = "http://localhost:8545"
-CONTRACT_ADDRESS = "0x..."
-PRIVATE_KEY = "0x..."
+# PostgreSQL
+DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/davs"
+
+# Ethereum Sepolia
+SEPOLIA_RPC_URL = "https://sepolia.infura.io/v3/..."
+BLOCKCHAIN_RPC_URL = "https://sepolia.infura.io/v3/..."
+ADMIN_PRIVATE_KEY = "0x..."
 
 # NFC Reader settings
 NFC_PORT = "/dev/ttyUSB0"
@@ -114,7 +139,7 @@ NFC_BAUDRATE = 9600
 
 # System settings
 INSTITUTION_NAME = "Your Institution"
-BLOCKCHAIN_NETWORK = "ethereum"
+BLOCKCHAIN_NETWORK = "sepolia"
 ```
 
 ### Railway PostgreSQL

@@ -1,4 +1,5 @@
-﻿const sessionsData = {{ sessions_json | tojson }};
+const sessionsData = {{ sessions_json | tojson }};
+sData = sessionsData; // alias for convenience
   let currentSessId = null;
   let currentStudNfc = null;
   let currentStudName = null;
@@ -211,8 +212,8 @@
       });
   }
 
-  function renderSessModal(sessId, data) {
-    const s = sessionsData[sessId];
+function renderSessModal(sessId, data) {
+    const s = sData[sessId];
     const sts = data.students || [];
     const classType = String(s.class_type || data.class_type || 'lecture').toLowerCase();
     const teachersInvolved = (data.teachers_involved || []).join(', ') || (s.teacher_name || '-');
@@ -221,13 +222,28 @@
     sts.forEach(st => { if (cnt[st.status] !== undefined) cnt[st.status]++; });
 
     // Info tab — readable dates
-    document.getElementById('sm_info_grid').innerHTML = `
+    let sessTxHtml = '';
+  if (s.session_tx_hash) {
+    sessTxHtml = `
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-blockchain"></i> Session TX</div>
+      <div class="sm-info-val">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <a href="https://sepolia.etherscan.io/tx/${s.session_tx_hash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:underline; word-break: break-all;">
+            ${s.session_tx_hash}
+          </a>
+        </div>
+        ${s.session_block_number ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Block #${s.session_block_number}</div>` : ''}
+      </div>
+    </div>`;
+  }
+  document.getElementById('sm_info_grid').innerHTML = `${sessTxHtml}
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-book"></i> Subject</div>
       <div class="sm-info-val">${s.subject_name}${s.course_code ? ' <code style="font-size:10px;">[' + s.course_code + ']</code>' : ''}</div></div>
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-collection"></i> Class Type</div>
       <div class="sm-info-val">${classTypeLabel(s.class_type || data.class_type || 'lecture')}</div></div>
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-grid"></i> Section</div>
-      <div class="sm-info-val">${(s.section_key || '').replace(/\|/g, ' · ')}</div></div>
+      <div class="sm-info-val">${(s.section_key || '').replace(/\|/g, ' · ')}${s.semester ? ' · ' + s.semester : ''}</div></div>
     ${classType === 'school_event' ? `
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-people"></i> Teachers Involved</div>
       <div class="sm-info-val">${teachersInvolved}</div></div>
@@ -235,7 +251,7 @@
       <div class="sm-info-val">${sectionsInvolved}</div></div>
     ` : ''}
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-clock"></i> Time Slot</div>
-      <div class="sm-info-val">${s.time_slot || '—'}</div></div>
+      <div class="sm-info-val">${normalizeTimeSlot(s.time_slot) || '—'}</div></div>
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-people"></i> Total Enrolled</div>
       <div class="sm-info-val">${sts.length} students</div></div>
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-play-circle"></i> Started</div>
@@ -274,12 +290,9 @@
         <th>Student ID</th>
         <th>${classType === 'school_event' ? 'Program-Year-Section' : 'Class Type'}</th>
         <th>Status</th>
-        <th>Date</th>
-        <th>Time</th>
+        <th>Tapped Time</th>
         <th>Excused Reason</th>
         <th>Document</th>
-        <th>Transaction Number (TX)</th>
-        <th>Block Number</th>
       </tr></thead>
       <tbody>
         ${sts.map((st, i) => {
@@ -302,12 +315,9 @@
               ? `<span style="font-size:11px;color:var(--muted);">${st.section_origin || '—'}</span>`
               : `<span class="att-status st-excused">${classTypeLabel(st.class_type || s.class_type || data.class_type || 'lecture')}</span>`}</td>
             <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || '—'}</span></td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.date}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
             <td style="font-size:11px;">${reasonHtml}</td>
             <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-            <td>${st.tx_hash ? `<button type="button" class="att-tx-copy" title="Copy to clipboard" data-tx="${st.tx_hash}">${st.tx_hash}</button>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.block || '—'}</td>
           </tr>`;
     }).join('')}
       </tbody>
@@ -366,47 +376,90 @@
       document.getElementById('stud_hist').innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);font-size:12px;"><i class="bi bi-journal-x" style="font-size:28px;display:block;opacity:.2;margin-bottom:8px;"></i>No session records yet.</div>';
       return;
     }
-    document.getElementById('stud_hist').innerHTML = `
-    <table class="hist-table">
-      <thead><tr>
-        <th>#</th>
-        <th>Course Code</th>
-        <th>Subject Name</th>
-        <th>Class Type</th>
-        <th>Status</th>
-        <th>Tap Time</th>
-        <th>Date</th>
-        <th>Time Slot</th>
-        <th>Excused Reason</th>
-        <th>Document</th>
-        <th>Transaction Number (TX)</th>
-        <th>Block Number</th>
-      </tr></thead>
-      <tbody>
-        ${sessions.map((s, i) => {
-      const isExcused = s.status === 'excused';
-      const reasonKey = s.excuse_note || '';
-      const reasonLabel = RLABELS[reasonKey] || (reasonKey || '—');
-      const docHtml = s.attachment_url
-        ? `<a href="${s.attachment_url}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);border-radius:5px;padding:2px 7px;white-space:nowrap;"><i class="bi bi-paperclip"></i> View</a>`
-        : '<span style="color:var(--muted);font-size:11px;">—</span>';
-      return `<tr>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${i + 1}</td>
-            <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-            <td><span style="font-weight:600;">${s.subject_name || '—'}</span></td>
-            <td><span class="att-status st-excused">${classTypeLabel(s.class_type || 'lecture')}</span></td>
-            <td><span class="att-status ${stCls[s.status] || 'st-absent'}">${stLbl[s.status] || '—'}</span></td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? normalizeTimeToAmPm(s.tap_time) : '—'}</td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${pickHistoryDate(s)}</td>
-            <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || s.tap_time || '')}</td>
-            <td style="font-size:11px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>
-            <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-            <td>${s.tx_hash ? `<button type="button" class="att-tx-copy" title="Copy to clipboard" data-tx="${s.tx_hash}">${s.tx_hash}</button>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '—'}</td>
-          </tr>`;
-    }).join('')}
-      </tbody>
-    </table>`;
+    const bySem = {};
+    sessions.forEach(s => {
+      const sem = s.semester || '1st Year 1st Sem';
+      if (!bySem[sem]) bySem[sem] = [];
+      bySem[sem].push(s);
+    });
+
+    const SEM_ORDER = [
+      '1st Year 1st Sem', '1st Year 2nd Sem', '1st Year Summer',
+      '2nd Year 1st Sem', '2nd Year 2nd Sem', '2nd Year Summer',
+      '3rd Year 1st Sem', '3rd Year 2nd Sem', '3rd Year Summer',
+      '4th Year 1st Sem', '4th Year 2nd Sem', '4th Year Summer'
+    ];
+
+    const sortedSems = Object.keys(bySem).sort((a, b) => {
+      let ia = SEM_ORDER.indexOf(a);
+      let ib = SEM_ORDER.indexOf(b);
+      if (ia === -1) ia = 99;
+      if (ib === -1) ib = 99;
+      if (ia !== ib) return ia - ib;
+      return a.localeCompare(b);
+    });
+
+    let html = '';
+    sortedSems.forEach((sem, sIdx) => {
+      const semSessions = bySem[sem];
+      html += `
+        <div class="sem-accordion" style="margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface);">
+          <div class="sem-accordion-header" style="padding: 12px 16px; background: rgba(45,106,39,.05); display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
+            <div style="cursor: pointer; flex: 1;" onclick="const b=this.parentElement.nextElementSibling; const i=this.querySelector('i'); if(b.style.display==='none'){b.style.display='block';i.classList.replace('bi-chevron-down','bi-chevron-up');}else{b.style.display='none';i.classList.replace('bi-chevron-up','bi-chevron-down');}">
+              <span>${sem} <span style="font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 8px;">(${semSessions.length} sessions)</span></span>
+              <i class="bi bi-chevron-${sIdx === 0 ? 'up' : 'down'}" style="margin-left: 8px;"></i>
+            </div>
+            <button class="btn-export-xl" style="padding: 4px 10px; font-size: 11px; margin-left: 12px; border-radius: 4px;" onclick="exportStudentSemester('${sem}')">
+              <i class="bi bi-file-earmark-excel"></i> Export
+            </button>
+          </div>
+          <div class="sem-accordion-body" style="display: ${sIdx === 0 ? 'block' : 'none'}; padding: 0; overflow-x: auto;">
+            <table class="hist-table" style="margin: 0; border: none; border-radius: 0; width: 100%; min-width: 800px;">
+              <thead><tr>
+                <th>#</th>
+                <th>Course Code</th>
+                <th>Subject Name</th>
+                <th>Class Type</th>
+                <th>Status</th>
+                <th>Tapped Time</th>
+                <th>Date</th>
+                <th>Time Slot</th>
+                <th>Excused Reason</th>
+                <th>Document</th>
+                <th>Transaction Number (TX)</th>
+                <th>Block Number</th>
+              </tr></thead>
+              <tbody>
+                ${semSessions.map((s, i) => {
+                  const isExcused = s.status === 'excused';
+                  const reasonKey = s.excuse_note || '';
+                  const reasonLabel = RLABELS[reasonKey] || (reasonKey || '—');
+                  const docHtml = s.attachment_url
+                    ? `<a href="${s.attachment_url}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);border-radius:5px;padding:2px 7px;white-space:nowrap;"><i class="bi bi-paperclip"></i> View</a>`
+                    : '<span style="color:var(--muted);font-size:11px;">—</span>';
+                  return `<tr>
+                    <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${i + 1}</td>
+                    <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+                    <td><span style="font-weight:600;">${s.subject_name || '—'}</span></td>
+                    <td><span class="att-status st-excused">${classTypeLabel(s.class_type || 'lecture')}</span></td>
+                    <td><span class="att-status ${stCls[s.status] || 'st-absent'}">${stLbl[s.status] || '—'}</span></td>
+                    <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? parseTapDateTime(s.tap_time).time : '—'}</td>
+                    <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${pickHistoryDate(s)}</td>
+                    <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || s.tap_time || '')}</td>
+                    <td style="font-size:11px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>
+                    <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+                    <td>${s.tx_hash ? `<a href="https://sepolia.etherscan.io/tx/${s.tx_hash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:none; word-break: break-all;">${s.tx_hash.slice(0, 16)}...</a>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+                    <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '—'}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    });
+
+    document.getElementById('stud_hist').innerHTML = html;
     bindTxCopyHandlers(document.getElementById('stud_hist'));
 }
 
@@ -415,14 +468,14 @@ function closeStudModal() {
   currentStudNfc = null; currentStudName = null;
 }
 
-function exportCurrentStudent() {
+function exportStudentSemester(sem) {
   if (!currentStudNfc || !currentStudName) return;
   const p    = currentStudName.split(' ');
   const last = (p[p.length-1]||'student').toLowerCase().replace(/[^a-z0-9]/g,'');
   const fst  = (p[0]||'').toLowerCase().replace(/[^a-z0-9]/g,'');
   const now  = new Date();
-  const fname= `${ last }_${ fst }_attendance_${ now.getFullYear() }${ String(now.getMonth() + 1).padStart(2, '0') }.xlsx`;
-  window.location.href = '/export/student_sessions/' + currentStudNfc + '?name=' + encodeURIComponent(currentStudName) + '&filename=' + encodeURIComponent(fname);
+  const fname= `${ last }_${ fst }_${sem.replace(/[^a-z0-9]/gi, '_')}_${ now.getFullYear() }${ String(now.getMonth() + 1).padStart(2, '0') }.xlsx`;
+  window.location.href = '/export/student_sessions/' + currentStudNfc + '?name=' + encodeURIComponent(currentStudName) + '&semester=' + encodeURIComponent(sem) + '&filename=' + encodeURIComponent(fname);
 }
 
 // ── Filters ──

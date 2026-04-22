@@ -1,4 +1,4 @@
-﻿    const CURRENT_TEACHER = "{{ (session.get('username','') or '')|lower }}";
+    const CURRENT_TEACHER = "{{ (session.get('username','') or '')|lower }}";
     const ALL_SCHEDULES_RAW = {{ schedules | tojson }};
     const ALL_SCHEDULES = (ALL_SCHEDULES_RAW || []).filter((s) => {
         const owner = String((s || {}).teacher_username || '').trim().toLowerCase();
@@ -100,7 +100,17 @@
     }
 
     function normalizeSectionKeyJs(v) {
-        return String(v || '').trim().toUpperCase().replace(/\s+/g, '');
+        if (!v) return "";
+        // Standardize separator (handles | and -)
+        const key = String(v).replace(/-/g, '|');
+        const parts = key.split('|').map(p => p.trim());
+        if (parts.length >= 3) {
+            const course = parts[0];
+            const year = parts[1];
+            const section = parts[2].toUpperCase();
+            return `${course}|${year}|${section}`.toUpperCase();
+        }
+        return String(v).trim().toUpperCase();
     }
 
     function findActiveSessionIdForSchedule(s) {
@@ -583,14 +593,24 @@
         document.getElementById('infoGrace').textContent = (s.grace_minutes || 15) + ' minutes';
         document.getElementById('infoLiveIndicator').style.display = isLive(s) ? 'block' : 'none';
         const monitorBtn = document.getElementById('monitorLiveBtn');
+        const endForm = document.getElementById('endSessionForm');
         const activeSessId = findActiveSessionIdForSchedule(s);
+        
         if (monitorBtn) {
             if (activeSessId) {
                 monitorBtn.href = '/teacher/session/' + encodeURIComponent(activeSessId);
                 monitorBtn.style.display = 'inline-flex';
             } else {
-                monitorBtn.href = '#';
                 monitorBtn.style.display = 'none';
+            }
+        }
+        
+        if (endForm) {
+            if (activeSessId) {
+                endForm.action = '/teacher/session/' + encodeURIComponent(activeSessId) + '/end';
+                endForm.style.display = 'block';
+            } else {
+                endForm.style.display = 'none';
             }
         }
 

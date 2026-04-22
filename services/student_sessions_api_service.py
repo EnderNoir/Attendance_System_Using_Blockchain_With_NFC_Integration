@@ -1,3 +1,12 @@
+def _format_sem(sec_key, raw_sem):
+    parts = str(sec_key or '').split('|')
+    year = parts[1].strip() if len(parts) >= 2 else ''
+    s_map = {'First': '1st Sem', 'Second': '2nd Sem', 'Summer': 'Summer'}
+    sem = s_map.get(str(raw_sem or '').strip(), str(raw_sem or '').strip())
+    if not sem: sem = '1st Sem'
+    if year: return f"{year} {sem}".strip()
+    return sem
+
 def student_sessions_api_impl(
     *,
     nfc_id,
@@ -15,7 +24,7 @@ def student_sessions_api_impl(
             "SELECT al.nfc_id, al.status, al.tx_hash, al.block_number, "
             "al.tap_time, al.excuse_note, al.excuse_request_id, "
             "s.sess_id, s.subject_name, s.course_code, s.section_key, "
-            "s.teacher_name, s.class_type, s.time_slot, s.started_at "
+            "s.teacher_name, s.class_type, s.time_slot, s.started_at, s.semester "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "WHERE al.nfc_id = ? "
@@ -34,16 +43,15 @@ def student_sessions_api_impl(
                 try:
                     with get_db() as conn:
                         pk_col = excuse_pk_column(conn)
-                        pk_expr = pk_col if pk_col != 'rowid' else 'rowid'
                         ex_row = conn.execute(
-                            f"SELECT {pk_expr} AS id, rowid AS rid "
+                            f"SELECT {pk_col} AS id "
                             "FROM excuse_requests "
                             "WHERE sess_id=? AND nfc_id=? AND status='approved' "
                             "ORDER BY COALESCE(created_at, submitted_at, '') DESC LIMIT 1",
                             (row['sess_id'], row['nfc_id'])
                         ).fetchone()
                     if ex_row:
-                        resolved_excuse_id = ex_row['id'] if ex_row['id'] not in (None, '') else ex_row['rid']
+                        resolved_excuse_id = ex_row['id']
                 except Exception:
                     resolved_excuse_id = None
             if resolved_excuse_id:
@@ -64,6 +72,7 @@ def student_sessions_api_impl(
             'block': str(row['block_number']) if row['block_number'] else '',
             'excuse_note': row['excuse_note'] or '',
             'attachment_url': attachment_url,
+            'semester': _format_sem(row['section_key'], row['semester']),
         })
 
     if not result:
@@ -111,6 +120,7 @@ def student_sessions_api_impl(
                 'block': str(tx_info.get('block', '')),
                 'excuse_note': '',
                 'attachment_url': '',
+                'semester': _format_sem(sess.get('section_key'), sess.get('semester')),
             })
 
     result.sort(key=lambda x: x['date'], reverse=True)

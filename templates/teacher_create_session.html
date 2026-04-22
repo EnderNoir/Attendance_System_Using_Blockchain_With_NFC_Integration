@@ -1,0 +1,768 @@
+{% extends "base.html" %} {% block title %}Create Session — DAVS{% endblock %}
+{% block page_title %}CREATE SESSION{% endblock %} {% block content %}
+<style>
+  .sess-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+  }
+  .sess-card:hover {
+    border-color: rgba(45, 106, 39, 0.3);
+  }
+  .sess-card.live {
+    border-color: rgba(45, 106, 39, 0.4);
+    background: rgba(45, 106, 39, 0.03);
+  }
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--success);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.2;
+    }
+  }
+  .filter-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 14px;
+  }
+  .fg {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 120px;
+  }
+  .fl {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .fs {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-family: "DM Sans", sans-serif;
+    appearance: none;
+    width: 100%;
+  }
+  .fs:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .btn-rst {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 7px;
+    padding: 7px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    align-self: flex-end;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-rst:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .add-subj-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr auto;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  @media (max-width: 860px) {
+    .add-subj-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (max-width: 540px) {
+    .add-subj-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .add-subj-grid .btn-primary {
+    height: 40px;
+    white-space: nowrap;
+  }
+
+  /* Start session form — now 3 fields + button */
+  .start-form {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .start-form > .sf-field {
+    flex: 1;
+    min-width: 140px;
+  }
+  .start-form > .sf-field-sm {
+    flex: 0 0 110px;
+  }
+  .start-form > button {
+    flex-shrink: 0;
+    height: 40px;
+  }
+  @media (max-width: 540px) {
+    .start-form > button {
+      width: 100%;
+      justify-content: center;
+    }
+    .start-form > .sf-field-sm {
+      flex: 1;
+    }
+  }
+
+  .sec-mono {
+    font-family: "Space Mono", monospace;
+    font-size: 9px;
+    color: var(--accent);
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+  .slot-past {
+    color: var(--muted) !important;
+    font-style: italic;
+  }
+  .grace-hint {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+</style>
+
+<div style="margin-bottom: 18px">
+  <div class="sec-mono">// SESSION MANAGEMENT</div>
+  <h2 style="font-size: 20px; font-weight: 600; margin: 0">Create Session</h2>
+  <p style="font-size: 12px; color: var(--muted); margin-top: 3px">
+    Add subjects to your schedule, then start a classroom session.
+  </p>
+</div>
+
+<!-- ADD SUBJECT TO SCHEDULE -->
+<div class="sec-mono">// ADD SUBJECT TO SCHEDULE</div>
+<div
+  style="
+    background: rgba(45, 106, 39, 0.04);
+    border: 1px dashed rgba(45, 106, 39, 0.2);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 24px;
+  "
+>
+  {% if subjects_db %}
+  <p style="font-size: 12px; color: var(--muted); margin-bottom: 14px">
+    Select a subject, program, year level, and section to add to your schedule.
+  </p>
+  <form
+    method="POST"
+    action="{{ url_for('teacher_add_subject') }}"
+    class="add-subj-grid"
+  >
+    <div>
+      <label
+        style="
+          display: block;
+          font-size: 10px;
+          font-weight: 700;
+          color: var(--muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 5px;
+        "
+        ><i class="bi bi-book"></i> Subject</label
+      >
+      <select name="subject_id" class="fs" required>
+        <option value="" disabled selected>— Select subject —</option>
+        {% for sid, subj in subjects_db.items() %}
+        <option value="{{ sid }}">
+          {{ subj.name }}{% if subj.course_code %} [{{ subj.course_code }}]{%
+          endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label
+        style="
+          display: block;
+          font-size: 10px;
+          font-weight: 700;
+          color: var(--muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 5px;
+        "
+        ><i class="bi bi-mortarboard"></i> Program</label
+      >
+      <select
+        class="fs"
+        id="add_program"
+        onchange="updateAddSectionKey()"
+        required
+      >
+        <option value="" disabled selected>— Select program —</option>
+        <option value="BS Computer Science">BS Computer Science</option>
+        <option value="BS Information Technology">
+          BS Information Technology
+        </option>
+      </select>
+    </div>
+    <div>
+      <label
+        style="
+          display: block;
+          font-size: 10px;
+          font-weight: 700;
+          color: var(--muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 5px;
+        "
+        ><i class="bi bi-layers"></i> Year Level</label
+      >
+      <select
+        class="fs"
+        id="add_year"
+        onchange="updateAddSectionKey()"
+        required
+      >
+        <option value="" disabled selected>— Select year —</option>
+        <option value="1st Year">1st Year</option>
+        <option value="2nd Year">2nd Year</option>
+        <option value="3rd Year">3rd Year</option>
+        <option value="4th Year">4th Year</option>
+      </select>
+    </div>
+    <div>
+      <label
+        style="
+          display: block;
+          font-size: 10px;
+          font-weight: 700;
+          color: var(--muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 5px;
+        "
+        ><i class="bi bi-grid"></i> Section</label
+      >
+      <select
+        class="fs"
+        id="add_section"
+        onchange="updateAddSectionKey()"
+        required
+      >
+        <option value="" disabled selected>— Select section —</option>
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+        <option value="D">D</option>
+      </select>
+      <input type="hidden" name="section_key" id="add_section_key" />
+    </div>
+    <button type="submit" class="btn-primary" id="addBtn" disabled>
+      <i class="bi bi-plus-lg"></i> Add
+    </button>
+  </form>
+  {% else %}
+  <p style="font-size: 13px; color: var(--muted)">
+    <i class="bi bi-info-circle"></i> No subjects in the catalogue yet. Ask your
+    admin to add subjects first.
+  </p>
+  {% endif %}
+</div>
+
+<!-- YOUR SUBJECTS / START SESSION -->
+<div class="sec-mono">// YOUR SUBJECTS — START A CLASS SESSION</div>
+
+{% if my_subjects %}
+<div class="filter-bar">
+  <div class="fg" style="flex: 2; min-width: 160px">
+    <span class="fl"><i class="bi bi-search"></i> Search subject</span>
+    <input
+      type="text"
+      class="fs"
+      id="sf_q"
+      placeholder="Subject name…"
+      oninput="filterCards()"
+    />
+  </div>
+  <div class="fg">
+    <span class="fl">Program</span>
+    <select class="fs" id="sf_program" onchange="filterCards()">
+      <option value="">All Programs</option>
+      <option value="bs computer science">BS Computer Science</option>
+      <option value="bs information technology">
+        BS Information Technology
+      </option>
+    </select>
+  </div>
+  <div class="fg">
+    <span class="fl">Year Level</span>
+    <select class="fs" id="sf_year" onchange="filterCards()">
+      <option value="">All Years</option>
+      <option value="1st year">1st Year</option>
+      <option value="2nd year">2nd Year</option>
+      <option value="3rd year">3rd Year</option>
+      <option value="4th year">4th Year</option>
+    </select>
+  </div>
+  <div class="fg">
+    <span class="fl">Section</span>
+    <select class="fs" id="sf_section" onchange="filterCards()">
+      <option value="">All Sections</option>
+      <option value="a">Section A</option>
+      <option value="b">Section B</option>
+      <option value="c">Section C</option>
+      <option value="d">Section D</option>
+    </select>
+  </div>
+  <div class="fg">
+    <span class="fl">Status</span>
+    <select class="fs" id="sf_status" onchange="filterCards()">
+      <option value="">All</option>
+      <option value="live">Live Only</option>
+      <option value="idle">No Session</option>
+    </select>
+  </div>
+  <button class="btn-rst" onclick="resetFilter()">
+    <i class="bi bi-x-circle"></i> Reset
+  </button>
+</div>
+
+<div id="subjectCardList">
+  {% for ms in my_subjects %} {% set parts = ms.section_key.split('|') %} {% set
+  prog = parts[0] if parts|length > 0 else '' %} {% set yr = parts[1] if
+  parts|length > 1 else '' %} {% set sec = parts[2] if parts|length > 2 else ''
+  %}
+  <div
+    class="sess-card {% if ms.active_session_id %}live{% endif %}"
+    data-subj="{{ ms.subject_name|lower }}"
+    data-program="{{ prog|lower }}"
+    data-year="{{ yr|lower }}"
+    data-section="{{ sec|lower }}"
+    data-status="{{ 'live' if ms.active_session_id else 'idle' }}"
+  >
+    <div
+      style="
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      "
+    >
+      <div style="flex: 1; min-width: 0">
+        <div style="font-size: 15px; font-weight: 700; margin-bottom: 4px">
+          {% if ms.course_code %}<code style="font-size: 10px"
+            >[{{ ms.course_code }}]</code
+          >
+          {% endif %}{{ ms.subject_name }}
+        </div>
+        <div
+          style="
+            font-size: 12px;
+            color: var(--muted);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+          "
+        >
+          <span><i class="bi bi-mortarboard"></i> {{ prog }}</span>
+          <span><i class="bi bi-layers"></i> {{ yr }}</span>
+          <span><i class="bi bi-grid"></i> Section {{ sec }}</span>
+          <span
+            ><i class="bi bi-people"></i> {{ ms.student_count }} students</span
+          >
+          <span><i class="bi bi-journal"></i> {{ ms.units }} units</span>
+        </div>
+      </div>
+      <form
+        method="POST"
+        action="{{ url_for('teacher_remove_subject', subject_id=ms.subject_id, section_key=ms.section_key) }}"
+        onsubmit="return confirm('Remove {{ ms.subject_name }} from your schedule?')"
+      >
+        <button
+          type="submit"
+          style="
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 5px;
+            transition: all 0.2s;
+          "
+          title="Remove from schedule"
+        >
+          <i class="bi bi-trash3"></i> Remove
+        </button>
+      </form>
+    </div>
+
+    {% if ms.active_session_id %}
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+      <span
+        style="
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          color: var(--success);
+          font-weight: 600;
+          font-size: 13px;
+        "
+      >
+        <div class="live-dot"></div>
+        Session is live
+      </span>
+      <a
+        href="{{ url_for('live_session', sess_id=ms.active_session_id) }}"
+        class="btn-success-custom"
+      >
+        <i class="bi bi-broadcast"></i> Monitor Session
+      </a>
+    </div>
+    {% else %}
+    <!--
+      Start Session Form — 3 fields:
+        1. Time Slot    — slots before current time are disabled (greyed out)
+        2. Grace Period — minutes before latecomers are marked Late (default 15)
+        3. Start button
+    -->
+    <form
+      method="POST"
+      action="{{ url_for('start_session') }}"
+      class="start-form"
+      onsubmit="return validateStartForm(this)"
+    >
+      <input type="hidden" name="subject_id" value="{{ ms.subject_id }}" />
+      <input type="hidden" name="section_key" value="{{ ms.section_key }}" />
+
+      <!-- Time Slot — JS disables slots whose END time has already passed -->
+      <div class="sf-field">
+        <label
+          style="
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+          "
+        >
+          <i class="bi bi-clock"></i> Time Slot
+        </label>
+        <select
+          name="time_slot"
+          required
+          class="fs slot-select"
+          data-units="{{ ms.units|default(3)|string }}"
+        >
+          <option value="" disabled selected>— Select time slot —</option>
+          {% set units=ms.units|default(3)|string %} {% if units=='2' %}
+          <option value="7:00 AM – 8:00 AM">7:00 AM – 8:00 AM</option>
+          <option value="8:00 AM – 9:00 AM">8:00 AM – 9:00 AM</option>
+          <option value="9:00 AM – 10:00 AM">9:00 AM – 10:00 AM</option>
+          <option value="10:00 AM – 11:00 AM">10:00 AM – 11:00 AM</option>
+          <option value="11:00 AM – 12:00 PM">11:00 AM – 12:00 PM</option>
+          <option value="12:00 PM – 1:00 PM">12:00 PM – 1:00 PM</option>
+          <option value="1:00 PM – 2:00 PM">1:00 PM – 2:00 PM</option>
+          <option value="2:00 PM – 3:00 PM">2:00 PM – 3:00 PM</option>
+          <option value="3:00 PM – 4:00 PM">3:00 PM – 4:00 PM</option>
+          <option value="4:00 PM – 5:00 PM">4:00 PM – 5:00 PM</option>
+          {% else %}
+          <option value="7:00 AM – 9:00 AM">7:00 AM – 9:00 AM</option>
+          <option value="8:00 AM – 10:00 AM">8:00 AM – 10:00 AM</option>
+          <option value="9:00 AM – 11:00 AM">9:00 AM – 11:00 AM</option>
+          <option value="10:00 AM – 12:00 PM">10:00 AM – 12:00 PM</option>
+          <option value="11:00 AM – 1:00 PM">11:00 AM – 1:00 PM</option>
+          <option value="12:00 PM – 2:00 PM">12:00 PM – 2:00 PM</option>
+          <option value="1:00 PM – 3:00 PM">1:00 PM – 3:00 PM</option>
+          <option value="2:00 PM – 4:00 PM">2:00 PM – 4:00 PM</option>
+          <option value="3:00 PM – 5:00 PM">3:00 PM – 5:00 PM</option>
+          <option value="4:00 PM – 6:00 PM">4:00 PM – 6:00 PM</option>
+          {% endif %}
+        </select>
+      </div>
+
+      <!-- Grace Period — minutes until latecomers are marked Late -->
+      <div class="sf-field-sm">
+        <label
+          style="
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+          "
+        >
+          <i class="bi bi-hourglass-split"></i> Grace (min)
+        </label>
+        <input
+          type="number"
+          name="grace_period"
+          class="fs"
+          value="15"
+          min="1"
+          max="120"
+          step="1"
+          title="Minutes after session start before latecomers are marked Late"
+        />
+        <div class="grace-hint">Late cutoff</div>
+      </div>
+
+      <button type="submit" class="btn-primary">
+        <i class="bi bi-play-fill"></i> Start Session
+      </button>
+      <div
+        style="
+          font-size: 11px;
+          color: var(--muted);
+          margin-top: 8px;
+          margin-left: 0;
+          line-height: 1.4;
+        "
+      >
+        <i class="bi bi-info-circle"></i> Session will auto-start at scheduled
+        time
+      </div>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+  <div
+    id="sf_empty"
+    style="
+      display: none;
+      text-align: center;
+      padding: 32px;
+      color: var(--muted);
+    "
+  >
+    <i
+      class="bi bi-search"
+      style="font-size: 32px; opacity: 0.2; display: block; margin-bottom: 8px"
+    ></i>
+    No subjects match your filters.
+  </div>
+</div>
+
+{% else %}
+<div class="card" style="text-align: center; padding: 48px 20px">
+  <i
+    class="bi bi-book"
+    style="font-size: 40px; opacity: 0.2; display: block; margin-bottom: 12px"
+  ></i>
+  <div style="color: var(--muted); font-size: 14px; margin-bottom: 6px">
+    No subjects in your schedule yet.
+  </div>
+  <div style="font-size: 12px; color: var(--muted)">
+    Use the form above to add a subject from the catalogue.
+  </div>
+</div>
+{% endif %}
+
+<script>
+  // Build section_key from separate dropdowns
+  function updateAddSectionKey() {
+    const prog = document.getElementById("add_program").value;
+    const year = document.getElementById("add_year").value;
+    const sec = document.getElementById("add_section").value;
+    const btn = document.getElementById("addBtn");
+    const key = document.getElementById("add_section_key");
+    if (prog && year && sec) {
+      key.value = `${prog}|${year}|${sec}`;
+      btn.disabled = false;
+    } else {
+      key.value = "";
+      btn.disabled = true;
+    }
+  }
+
+  // Filter subject cards
+  function filterCards() {
+    const q = document.getElementById("sf_q").value.toLowerCase();
+    const prog = document.getElementById("sf_program").value;
+    const yr = document.getElementById("sf_year").value;
+    const sec = document.getElementById("sf_section").value;
+    const st = document.getElementById("sf_status").value;
+    let shown = 0;
+    document.querySelectorAll("#subjectCardList .sess-card").forEach((c) => {
+      const ok =
+        (!q || c.dataset.subj.includes(q)) &&
+        (!prog || c.dataset.program === prog) &&
+        (!yr || c.dataset.year === yr) &&
+        (!sec || c.dataset.section === sec) &&
+        (!st || c.dataset.status === st);
+      c.style.display = ok ? "" : "none";
+      if (ok) shown++;
+    });
+    const emp = document.getElementById("sf_empty");
+    if (emp) emp.style.display = shown === 0 ? "block" : "none";
+  }
+  function resetFilter() {
+    ["sf_q", "sf_program", "sf_year", "sf_section", "sf_status"].forEach(
+      (id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      },
+    );
+    filterCards();
+  }
+
+  // ── Time slot filtering ────────────────────────────────────────────────────
+  // Parse "10:00 AM" → minutes since midnight
+  function parseTimeToMinutes(timeStr) {
+    const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    const ampm = m[3].toUpperCase();
+    if (ampm === "PM" && h !== 12) h += 12;
+    if (ampm === "AM" && h === 12) h = 0;
+    return h * 60 + min;
+  }
+
+  // For each time slot option, disable it only if the slot END time is already past.
+  // Slots that are currently active (started but not ended) remain available for starting.
+  function filterPastTimeSlots() {
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    document.querySelectorAll(".slot-select").forEach((sel) => {
+      let firstAvailable = null;
+      Array.from(sel.options).forEach((opt) => {
+        if (!opt.value) return; // skip placeholder
+        const sep = opt.value.includes("–") ? "–" : "-";
+        const parts = opt.value.split(sep);
+        if (parts.length < 2) return;
+
+        const startMins = parseTimeToMinutes(parts[0].trim());
+        const endMins = parseTimeToMinutes(parts[1].trim());
+        if (endMins === null) return;
+
+        // Disable only if end time is past. Allow slots that have started but not ended.
+        const isPast = endMins < nowMinutes;
+        opt.disabled = isPast;
+        if (isPast) {
+          opt.textContent = opt.value + " (past)";
+          opt.classList.add("slot-past");
+        } else {
+          if (!firstAvailable) firstAvailable = opt;
+        }
+      });
+      // Auto-select the first available slot
+      if (firstAvailable && !sel.value) {
+        sel.value = firstAvailable.value;
+      }
+    });
+  }
+
+  // Validate before submitting — ensure a non-disabled slot is selected
+  function validateStartForm(form) {
+    const sel = form.querySelector(".slot-select");
+    if (!sel.value) {
+      alert("Please select a time slot.");
+      return false;
+    }
+    const selected = Array.from(sel.options).find((o) => o.value === sel.value);
+    if (selected && selected.disabled) {
+      alert(
+        "That time slot has already ended. Please select a current or future slot.",
+      );
+      return false;
+    }
+    const grace = parseInt(
+      form.querySelector('[name="grace_period"]').value,
+      10,
+    );
+    if (isNaN(grace) || grace < 1 || grace > 120) {
+      alert("Grace period must be between 1 and 120 minutes.");
+      return false;
+    }
+    return true;
+  }
+
+  // ── Auto-start sessions when time slot arrives ────────────────────────────
+  // Check if current time matches any available time slot's START time.
+  // If a match is found and the session is not already live, auto-submit the form.
+  function autoStartSessionsAtScheduledTime() {
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    document.querySelectorAll(".sess-card").forEach((card) => {
+      // Skip if session is already live
+      if (card.classList.contains("live")) return;
+
+      const form = card.querySelector(".start-form");
+      if (!form) return;
+
+      const slotSelect = form.querySelector(".slot-select");
+      if (!slotSelect || !slotSelect.value) return;
+
+      const slotValue = slotSelect.value;
+      const sep = slotValue.includes("–") ? "–" : "-";
+      const parts = slotValue.split(sep);
+      if (parts.length < 2) return;
+
+      const startMins = parseTimeToMinutes(parts[0].trim());
+      if (startMins === null) return;
+
+      // Auto-start if current time is within 2 minutes of slot start
+      // This gives a small window to capture the exact start time
+      const timeDiff = Math.abs(nowMinutes - startMins);
+      if (timeDiff <= 2) {
+        console.log(
+          `[Auto-Start] Starting session at scheduled time: ${slotValue}`,
+        );
+        // Auto-submit the form with a slight delay to ensure UI is ready
+        setTimeout(() => {
+          if (validateStartForm(form)) {
+            form.submit();
+          }
+        }, 500);
+      }
+    });
+  }
+
+  // Run slot filtering on page load and refresh every minute
+  filterPastTimeSlots();
+  setInterval(filterPastTimeSlots, 60000);
+
+  // Check for auto-start every 30 seconds (more frequent to catch exact time)
+  autoStartSessionsAtScheduledTime();
+  setInterval(autoStartSessionsAtScheduledTime, 30000);
+</script>
+{% endblock %}

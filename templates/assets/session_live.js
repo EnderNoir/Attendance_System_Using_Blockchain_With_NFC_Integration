@@ -22,6 +22,7 @@ function updateNFCStrip(uid, colorClass, statusText, iconEmoji) {
   const uidEl = document.getElementById('nfcStripUid');
   const statEl = document.getElementById('nfcStripStatus');
   const iconEl = document.getElementById('nfcStripIcon');
+  if (!strip || !uidEl) return;
   strip.classList.remove('active', 'warning', 'error');
   uidEl.classList.remove('flash-green', 'flash-yellow', 'flash-red');
   strip.classList.add(colorClass);
@@ -44,6 +45,7 @@ function updateNFCStrip(uid, colorClass, statusText, iconEmoji) {
 // ── Toast ─────────────────────────────────────────────────────────────────
 function showToast(title, sub, colorClass, iconEmoji, duration = 4000) {
   const c = document.getElementById('toastContainer');
+  if (!c) return;
   const t = document.createElement('div');
   t.className = `toast ${colorClass}`;
   t.innerHTML = `<span class="toast-icon">${iconEmoji}</span>
@@ -69,6 +71,8 @@ function showModal(type, name, studentId, message, time) {
   const mId = document.getElementById('modalStudentId');
   const mMsg = document.getElementById('modalMessage');
   const mTime = document.getElementById('modalTime');
+  if (!overlay || !modal) return;
+
   ['green', 'yellow', 'orange', 'red'].forEach(c => {
     modal.classList.remove(c); icon.classList.remove(c);
     status.classList.remove(c); mMsg.classList.remove(c);
@@ -91,9 +95,12 @@ function showModal(type, name, studentId, message, time) {
   modalTimer = setTimeout(() => overlay.classList.remove('show'), 3500);
 }
 
-document.getElementById('tapModalOverlay').addEventListener('click', function (e) {
-  if (e.target === this) this.classList.remove('show');
-});
+const tapModalOverlay = document.getElementById('tapModalOverlay');
+if (tapModalOverlay) {
+  tapModalOverlay.addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+}
 
 // ── Status update (used by both HID handler and poll) ─────────────────────
 function updateStudentStatus(nfc_id, status, reason = '') {
@@ -115,7 +122,6 @@ function updateStudentStatus(nfc_id, status, reason = '') {
   if (avt) { ['av-green', 'av-yellow', 'av-blue', 'av-red', 'av-gray'].forEach(c => avt.classList.remove(c)); avt.classList.add(s.avCls); }
   if (badge) { badge.className = 'status-badge ' + s.badgeCls; badge.textContent = s.label; }
   if (excBtn) {
-    // Show excuse button for absent, present, late — hide if already excused
     const showExcuse = status !== 'excused';
     excBtn.classList.toggle('show-excuse', showExcuse);
     excBtn.style.display = showExcuse ? '' : 'none';
@@ -150,16 +156,15 @@ function updateCounts() {
   if (excusedEl) excusedEl.textContent = excused;
   const pCount = IS_SCHOOL_EVENT ? present : (present + late);
   const rate = totalStudents > 0 ? ((pCount / totalStudents) * 100).toFixed(1) : 0;
-  document.getElementById('presentLabel').textContent = pCount + ' students present';
-  document.getElementById('progressFill').style.width = rate + '%';
-  document.getElementById('rateLabel').textContent = rate + '%';
+  const presentLabel = document.getElementById('presentLabel');
+  const progressFill = document.getElementById('progressFill');
+  const rateLabel = document.getElementById('rateLabel');
+  if (presentLabel) presentLabel.textContent = pCount + ' students present';
+  if (progressFill) progressFill.style.width = rate + '%';
+  if (rateLabel) rateLabel.textContent = rate + '%';
 }
 
 // ── HID Keyboard NFC reader ───────────────────────────────────────────────
-// The USB reader types the UID as keystrokes + Enter (like a barcode scanner).
-// We keep a hidden input focused at all times to capture those keystrokes.
-// On Enter (or 300ms idle): sends to /mark_pico, shows ONE popup, blocks
-// further popups until the next physical tap via the popupAllowed gate.
 const nfcInput = document.getElementById('nfcHidInput');
 let nfcBuffer = '';
 let nfcTimer = null;
@@ -167,23 +172,20 @@ const NFC_TIMEOUT = 300;
 
 function refocusNFC() {
   const tag = document.activeElement ? document.activeElement.tagName : '';
-  const isModal = document.getElementById('excuseOverlay').classList.contains('show') ||
-    document.getElementById('endSessionModal').classList.contains('show');
-  // Don't steal focus from search boxes or open modals
+  const excuseOverlay = document.getElementById('excuseOverlay');
+  const endSessionModal = document.getElementById('endSessionModal');
+  const isModal = (excuseOverlay && excuseOverlay.classList.contains('show')) ||
+    (endSessionModal && endSessionModal.classList.contains('show'));
   if (!isModal && tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
-    nfcInput.focus();
+    if (nfcInput) nfcInput.focus();
   }
 }
 
 async function processNFCUid(uid) {
   uid = uid.trim().toUpperCase();
   if (!uid || uid.length < 4) return;
-
-  // Open the popup gate — exactly one popup will fire for this tap
   openPopupGate();
-
   updateNFCStrip(uid, 'active', 'Reading…', '📡');
-
   try {
     const resp = await fetch('/mark_pico', {
       method: 'POST',
@@ -192,8 +194,6 @@ async function processNFCUid(uid) {
     });
     const data = await resp.json();
     const status = data.status || '';
-
-    // consumePopupGate() returns true once then false — ensures single popup
     if (status === 'ok') {
       const isLate = !IS_SCHOOL_EVENT && data.is_late;
       const label = isLate ? 'LATE' : 'PRESENT';
@@ -204,12 +204,7 @@ async function processNFCUid(uid) {
       updateCounts();
       if (consumePopupGate()) {
         showModal(isLate ? 'late' : 'present', data.name, data.student_id, '', data.time);
-        showToast(
-          data.name || uid,
-          isLate ? `⏱ Marked LATE · ${data.time || ''}` : `✔ Marked PRESENT · ${data.time || ''}`,
-          isLate ? 't-yellow' : 't-green',
-          isLate ? '⏱' : '✔'
-        );
+        showToast(data.name || uid, isLate ? `⏱ Marked LATE · ${data.time || ''}` : `✔ Marked PRESENT · ${data.time || ''}`, isLate ? 't-yellow' : 't-green', isLate ? '⏱' : '✔');
       }
     } else if (status === 'already_marked') {
       updateNFCStrip(uid, 'warning', `DUPLICATE — ${data.name || uid}`, '⚠');
@@ -243,32 +238,109 @@ async function processNFCUid(uid) {
     }
   } catch (e) {
     updateNFCStrip(uid, 'error', 'Server error', '⚠');
-    consumePopupGate(); // consume gate even on error
+    consumePopupGate();
     console.warn('NFC error:', e);
   }
 }
 
-nfcInput.addEventListener('keydown', function (e) {
-  clearTimeout(nfcTimer);
-  if (e.key === 'Enter') {
-    const uid = nfcBuffer.trim();
-    nfcBuffer = ''; nfcInput.value = '';
-    if (uid) processNFCUid(uid);
-    return;
-  }
-  if (e.key.length === 1) { nfcBuffer += e.key; nfcInput.value = nfcBuffer; }
-  nfcTimer = setTimeout(() => {
-    const uid = nfcBuffer.trim();
-    nfcBuffer = ''; nfcInput.value = '';
-    if (uid) processNFCUid(uid);
-  }, NFC_TIMEOUT);
-});
+if (nfcInput) {
+  nfcInput.addEventListener('keydown', function (e) {
+    clearTimeout(nfcTimer);
+    if (e.key === 'Enter') {
+      const uid = nfcBuffer.trim();
+      nfcBuffer = ''; nfcInput.value = '';
+      if (uid) processNFCUid(uid);
+      return;
+    }
+    if (e.key.length === 1) { nfcBuffer += e.key; nfcInput.value = nfcBuffer; }
+    nfcTimer = setTimeout(() => {
+      const uid = nfcBuffer.trim();
+      nfcBuffer = ''; nfcInput.value = '';
+      if (uid) processNFCUid(uid);
+    }, NFC_TIMEOUT);
+  });
+  nfcInput.addEventListener('blur', () => setTimeout(refocusNFC, 150));
+}
 
 document.addEventListener('click', refocusNFC);
 document.addEventListener('keyup', refocusNFC);
-nfcInput.addEventListener('blur', () => setTimeout(refocusNFC, 150));
-window.addEventListener('load', () => nfcInput.focus());
-nfcInput.focus();
+window.addEventListener('load', () => { if (nfcInput) nfcInput.focus(); });
+
+// ── Phone Web NFC integration ─────────────────────────────────────────────
+async function startMobileSessionNfc() {
+  const btn = document.getElementById('mobileNfcSessionBtn');
+  if (!btn) return;
+  if (btn.dataset.scanning === '1') {
+    btn.dataset.scanning = '0';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-phone"></i> Use Phone NFC Reader';
+    updateNFCStrip('', 'warning', 'Phone NFC stopped', '📱');
+    return;
+  }
+
+  const decodeRecordPayload = (record) => {
+    try {
+      const decoder = new TextDecoder();
+      const bytes = new Uint8Array(record.data.buffer || record.data);
+      if (!bytes.length) return '';
+      if (record.recordType === 'text') {
+        const langLen = bytes[0] & 0x3f;
+        return decoder.decode(bytes.slice(1 + langLen)).trim();
+      }
+      if (record.recordType === 'url') {
+        const prefixes = ['', 'http://www.', 'https://www.', 'http://', 'https://'];
+        const prefix = prefixes[bytes[0]] || '';
+        return (prefix + decoder.decode(bytes.slice(1))).trim();
+      }
+      return decoder.decode(bytes).trim();
+    } catch (_) { return ''; }
+  };
+
+  const extractUid = (event) => {
+    const fromSerial = String(event.serialNumber || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (fromSerial) return fromSerial;
+    const records = (event.message && event.message.records) ? Array.from(event.message.records) : [];
+    for (const rec of records) {
+      const raw = decodeRecordPayload(rec);
+      const normalized = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      if (normalized.length >= 4) return normalized;
+    }
+    return '';
+  };
+
+  if (!('NDEFReader' in window)) {
+    updateNFCStrip('', 'error', 'Phone NFC unavailable on this browser', '✕');
+    return;
+  }
+  try {
+    btn.disabled = true;
+    btn.dataset.scanning = '1';
+    const ndef = new NDEFReader();
+    await ndef.scan();
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-stop-circle"></i> Stop Phone NFC';
+    updateNFCStrip('', 'active', 'Phone NFC active - tap card on phone', '📱');
+    ndef.addEventListener('readingerror', () => {
+      updateNFCStrip('', 'warning', 'Read failed - try tapping again', '⚠');
+    });
+    ndef.addEventListener('reading', (event) => {
+      if (btn.dataset.scanning !== '1') return;
+      const uid = extractUid(event);
+      if (!uid) return;
+      processNFCUid(uid);
+    });
+  } catch (e) {
+    btn.dataset.scanning = '0';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-phone"></i> Use Phone NFC Reader';
+    updateNFCStrip('', 'error', 'Unable to start phone NFC scanner', '✕');
+  }
+}
+
+const mobileNfcBtn = document.getElementById('mobileNfcSessionBtn');
+if (mobileNfcBtn) {
+  mobileNfcBtn.addEventListener('click', startMobileSessionNfc);
+}
 
 // ── Poll loop — ONLY updates status list, NEVER shows popups ─────────────
 async function poll() {
@@ -281,7 +353,6 @@ async function poll() {
       return;
     }
 
-    // First poll — sync existing statuses from server state
     if (!pollInitialized) {
       pollInitialized = true;
       const presentSet = new Set(data.present_ids || []);
@@ -299,7 +370,6 @@ async function poll() {
       return;
     }
 
-    // Subsequent polls — silently update status rows, NO popups at all
     if (data.new_taps && data.new_taps.length > 0) {
       let gotNew = false;
       data.new_taps.forEach(tap => {
@@ -309,14 +379,12 @@ async function poll() {
         gotNew = true;
         const isLate = !IS_SCHOOL_EVENT && (data.late_ids || []).includes(tap.nfc_id);
         updateStudentStatus(tap.nfc_id, isLate ? 'late' : 'present');
-        // No showModal / showToast here — HID handler already did it
         if (tap.timestamp && tap.timestamp > lastTimestamp)
           lastTimestamp = tap.timestamp + 0.001;
       });
       if (gotNew) updateCounts();
     }
 
-    // Advance server timestamp even with no new events
     if ((!data.new_taps || !data.new_taps.length) &&
       (!data.new_warnings || !data.new_warnings.length) &&
       (!data.new_invalids || !data.new_invalids.length)) {
@@ -343,9 +411,11 @@ function openExcuse(nfc_id, name) {
   document.getElementById('excuseOverlay').classList.add('show');
 }
 function closeExcuse() {
-  document.getElementById('excuseOverlay').classList.remove('show');
+  const overlay = document.getElementById('excuseOverlay');
+  if (overlay) overlay.classList.remove('show');
   setTimeout(refocusNFC, 150);
 }
+
 document.addEventListener('DOMContentLoaded', function () {
   const reasonSelect = document.getElementById('excuseReason');
   const detailInput = document.getElementById('excuseDetail');
@@ -357,7 +427,6 @@ document.addEventListener('DOMContentLoaded', function () {
       const isOthers = this.value === 'others';
       detailInput.style.display = isOthers ? 'block' : 'none';
       if (!isOthers) detailInput.value = '';
-      // Always show file upload for any excuse
       if (filesWrap) filesWrap.style.display = this.value ? 'block' : 'none';
     });
   }
@@ -393,7 +462,6 @@ async function submitExcuse() {
   };
   const reasonDisplay = reasonLabels[reason_type] || reason_type;
 
-  // Build FormData — file is optional
   const formData = new FormData();
   formData.append('nfc_id', nfc_id);
   formData.append('reason_type', reason_type);
@@ -415,8 +483,6 @@ async function submitExcuse() {
       showToast('Server Warning', d.error || d.message || 'Failed to mark student as excused.', 't-red', '✕');
       return;
     }
-
-    // Apply UI update only after server confirms success
     updateStudentStatus(nfc_id, 'excused', d.reason || reasonDisplay);
     updateCounts();
     closeExcuse();
@@ -444,4 +510,3 @@ function filterByStatus() {
   });
 }
 function filterStatus() { filterByStatus(); }
-

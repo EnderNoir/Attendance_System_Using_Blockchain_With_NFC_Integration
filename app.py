@@ -5,16 +5,29 @@ from functools import wraps
 from threading import Thread, Lock
 import json, os, secrets, time, hashlib, uuid, re
 from collections import deque
+from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
 import secrets as _sec
 import psycopg2
+
 from dotenv import load_dotenv
 # pdfminer is imported inside parse_registration_pdf() so a startup
 # import glitch can never permanently disable PDF parsing for the session.
 
-app = Flask(__name__)
-app.secret_key = 'davs-super-secret-2024'
+# Load environment variables from .env file
 load_dotenv()
+
+app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'davs-super-secret-2024')
+APP_TIMEZONE = os.getenv('APP_TIMEZONE', 'Asia/Manila')
+
+
+def _now_local():
+    try:
+        return datetime.now(ZoneInfo(APP_TIMEZONE)).replace(tzinfo=None)
+    except Exception:
+        return datetime.now()
+
 
 # ── Jinja2 custom filters ─────────────────────────────────────────────────────
 import json as _json_mod
@@ -373,9 +386,16 @@ if ADMIN_PRIVATE_KEY and not ADMIN_PRIVATE_KEY.startswith('0x'):
     ADMIN_PRIVATE_KEY = '0x' + ADMIN_PRIVATE_KEY
 
 try:
+    # Read address from .env
+    contract_address = os.getenv('ATTENDANCE_CONTRACT_ADDRESS')
+    if not contract_address:
+        raise ValueError("ATTENDANCE_CONTRACT_ADDRESS not found in .env")
+    
+    # Read ABI from JSON file
     with open(contract_data_path) as f:
         contract_data = json.load(f)
-    contract      = web3.eth.contract(address=contract_data['address'], abi=contract_data['abi'])
+    
+    contract      = web3.eth.contract(address=contract_address, abi=contract_data['abi'])
     admin_account = None
     if BLOCKCHAIN_ONLINE:
         if ADMIN_PRIVATE_KEY:
@@ -386,6 +406,7 @@ try:
                 admin_account = accounts[0] if accounts else None
             except Exception:
                 admin_account = None
+
 except Exception as _ce:
     print(f"[WARNING] Could not load contract: {_ce}")
     contract      = None
@@ -395,7 +416,15 @@ except Exception as _ce:
 
 BLOCKCHAIN_LOCK = Lock()
 BASE_DIR      = os.path.dirname(__file__)
-DATABASE_URL  = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs')
+DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
+DATABASE_URL  = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs').strip()
+_DB_URL_LOWER = DATABASE_URL.lower()
+DB_BACKEND    = 'postgres' if _DB_URL_LOWER.startswith(('postgres://', 'postgresql://')) else 'sqlite'
+if _DB_URL_LOWER.startswith('sqlite:///'):
+    _sqlite_target = DATABASE_URL[10:]
+    if _sqlite_target:
+        DB_FILE = _sqlite_target if os.path.isabs(_sqlite_target) else os.path.join(BASE_DIR, _sqlite_target)
+
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 UPLOAD_FOLDER_EXCUSES = os.path.join(BASE_DIR, 'static', 'uploads', 'excuses')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -496,205 +525,327 @@ def generate_cvsu_email(name, provided_email=''):
     return ''
 
 
-def get_db():
-    class _CompatRow(dict):
-        def __init__(self, keys, values):
-            super().__init__(zip(keys, values))
-            self._keys = list(keys)
-            self._values = list(values)
+class _PgRowCompat(dict):
+    """
+    psycopg RealDictRow compatibility shim that supports both:
+    - mapping access: row['name']
+    - positional access: row[0], row[1]
+    """
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            values = list(self.values())
+            return values[key]
+        return super().__getitem__(key)
 
-        def __getitem__(self, key):
-            if isinstance(key, int):
-                return self._values[key]
-            return super().__getitem__(key)
 
-    class _CompatCursor:
-        def __init__(self, cursor):
-            self._cursor = cursor
-            self._keys = []
+class _PgCursorCompat:
+    def __init__(self, cursor):
+        self._cursor = cursor
 
-        def _rewrite_insert_or_replace(self, stmt):
-            match = re.match(
-                r'^INSERT\s+OR\s+REPLACE\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)\s*;?$',
-                stmt,
-                flags=re.IGNORECASE | re.DOTALL,
+    @staticmethod
+    def _wrap_row(row):
+        if row is None:
+            return None
+        if isinstance(row, dict):
+            return _PgRowCompat(row)
+        return row
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        return self._wrap_row(row)
+
+    def fetchall(self):
+        return [self._wrap_row(r) for r in self._cursor.fetchall()]
+
+    @property
+    def lastrowid(self):
+        try:
+            return self._cursor.lastrowid
+        except Exception:
+            return None
+
+    def __iter__(self):
+        for row in self._cursor:
+            yield self._wrap_row(row)
+
+
+class _PgConnCompat:
+    def __init__(self, conn):
+        self._conn = conn
+
+    def _convert_sql(self, sql: str):
+        s = sql
+        s = re.sub(
+            r"\bid\s+INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b",
+            "id BIGSERIAL PRIMARY KEY",
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(r"\bPRAGMA\s+journal_mode\s*=\s*WAL\b", "SELECT 1", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bPRAGMA\s+foreign_keys\s*=\s*ON\b", "SELECT 1", s, flags=re.IGNORECASE)
+        s = re.sub(
+            r"PRAGMA\s+table_info\((\w+)\)",
+            r"SELECT column_name AS name FROM information_schema.columns WHERE table_schema='public' AND table_name='\1' ORDER BY ordinal_position",
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(
+            r"SELECT\s+name\s+FROM\s+sqlite_master\s+WHERE\s+type='table'",
+            "SELECT table_name AS name FROM information_schema.tables WHERE table_schema='public'",
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(r"\browid\b", "id", s, flags=re.IGNORECASE)
+        s = s.replace("AUTOINCREMENT", "")
+        if re.search(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", s, flags=re.IGNORECASE):
+            s = re.sub(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", "INSERT INTO ", s, flags=re.IGNORECASE)
+            s = s.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+        if re.search(r"^\s*INSERT\s+OR\s+REPLACE\s+INTO\s+nfc_scanner\s+", s, flags=re.IGNORECASE):
+            s = re.sub(r"^\s*INSERT\s+OR\s+REPLACE\s+INTO\s+", "INSERT INTO ", s, flags=re.IGNORECASE)
+            s = s.rstrip().rstrip(";") + (
+                " ON CONFLICT (id) DO UPDATE SET "
+                "waiting=EXCLUDED.waiting, scanned_uid=EXCLUDED.scanned_uid, "
+                "requested_by=EXCLUDED.requested_by, requested_at=EXCLUDED.requested_at"
             )
-            if not match:
-                return None
+        return s.replace("?", "%s")
 
-            table_name = match.group(1)
-            columns = [column.strip().strip('"') for column in match.group(2).split(',')]
-            values_clause = match.group(3).strip()
-            conflict_column = 'id' if 'id' in columns else columns[0]
-            update_columns = [column for column in columns if column != conflict_column]
+    def execute(self, sql, params=()):
+        converted = self._convert_sql(sql)
+        from psycopg2.extras import RealDictCursor  # pyright: ignore[reportMissingModuleSource]
+        cur = self._conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(converted, params or ())
+        return _PgCursorCompat(cur)
 
-            if update_columns:
-                updates = ', '.join(f'{column}=EXCLUDED.{column}' for column in update_columns)
+    def executescript(self, script):
+        statements = [s.strip() for s in script.split(";") if s.strip()]
+        for statement in statements:
+            self.execute(statement)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            self._conn.commit()
+        else:
+            self._conn.rollback()
+        self._conn.close()
+
+
+def get_db():
+    if DB_BACKEND == 'postgres':
+        class _CompatRow(dict):
+            def __init__(self, keys, values):
+                super().__init__(zip(keys, values))
+                self._keys = list(keys)
+                self._values = list(values)
+
+            def __getitem__(self, key):
+                if isinstance(key, int):
+                    return self._values[key]
+                return super().__getitem__(key)
+
+        class _CompatCursor:
+            def __init__(self, cursor):
+                self._cursor = cursor
+                self._keys = []
+
+            def _rewrite_insert_or_replace(self, stmt):
+                match = re.match(
+                    r'^INSERT\s+OR\s+REPLACE\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)\s*;?$',
+                    stmt,
+                    flags=re.IGNORECASE | re.DOTALL,
+                )
+                if not match:
+                    return None
+
+                table_name = match.group(1)
+                columns = [column.strip().strip('"') for column in match.group(2).split(',')]
+                values_clause = match.group(3).strip()
+                conflict_column = 'id' if 'id' in columns else columns[0]
+                update_columns = [column for column in columns if column != conflict_column]
+
+                if update_columns:
+                    updates = ', '.join(f'{column}=EXCLUDED.{column}' for column in update_columns)
+                    return (
+                        f'INSERT INTO {table_name} ({", ".join(columns)}) '
+                        f'VALUES ({values_clause}) '
+                        f'ON CONFLICT ({conflict_column}) DO UPDATE SET {updates}'
+                    )
+
                 return (
                     f'INSERT INTO {table_name} ({", ".join(columns)}) '
                     f'VALUES ({values_clause}) '
-                    f'ON CONFLICT ({conflict_column}) DO UPDATE SET {updates}'
+                    f'ON CONFLICT ({conflict_column}) DO NOTHING'
                 )
 
-            return (
-                f'INSERT INTO {table_name} ({", ".join(columns)}) '
-                f'VALUES ({values_clause}) '
-                f'ON CONFLICT ({conflict_column}) DO NOTHING'
-            )
+            def _rewrite_sql(self, sql):
+                stmt = (sql or '').strip()
+                if not stmt:
+                    return stmt, None
 
-        def _rewrite_sql(self, sql):
-            stmt = (sql or '').strip()
-            if not stmt:
+                up = stmt.upper()
+                if up.startswith('PRAGMA JOURNAL_MODE') or up.startswith('PRAGMA FOREIGN_KEYS'):
+                    return None, []
+
+                m = re.match(r'^PRAGMA\s+TABLE_INFO\(([^\)]+)\)\s*$', stmt, flags=re.IGNORECASE)
+                if m:
+                    table_name = m.group(1).strip().strip('"\'')
+                    qry = (
+                        "SELECT (ordinal_position - 1) AS cid, "
+                        "column_name AS name, data_type AS type, "
+                        "0 AS notnull, column_default AS dflt_value, 0 AS pk "
+                        "FROM information_schema.columns "
+                        "WHERE table_schema='public' AND table_name=%s "
+                        "ORDER BY ordinal_position"
+                    )
+                    return qry, (table_name,)
+
+                if "FROM SQLITE_MASTER" in up:
+                    return (
+                        "SELECT table_name AS name "
+                        "FROM information_schema.tables "
+                        "WHERE table_schema='public' AND table_type='BASE TABLE'"
+                    ), None
+
+                stmt = re.sub(
+                    r'INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT',
+                    'BIGSERIAL PRIMARY KEY',
+                    stmt,
+                    flags=re.IGNORECASE,
+                )
+                if re.search(r'INSERT\s+OR\s+REPLACE\s+INTO', stmt, flags=re.IGNORECASE):
+                    rewritten = self._rewrite_insert_or_replace(stmt)
+                    if rewritten:
+                        stmt = rewritten
+                    else:
+                        stmt = re.sub(r'INSERT\s+OR\s+REPLACE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
+                if re.search(r'INSERT\s+OR\s+IGNORE\s+INTO', stmt, flags=re.IGNORECASE):
+                    stmt = re.sub(r'INSERT\s+OR\s+IGNORE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
+                    if 'ON CONFLICT' not in stmt.upper():
+                        stmt = stmt.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+
+                stmt = stmt.replace('?', '%s')
                 return stmt, None
 
-            up = stmt.upper()
-            if up.startswith('PRAGMA JOURNAL_MODE') or up.startswith('PRAGMA FOREIGN_KEYS'):
-                return None, []
+            def execute(self, sql, params=None):
+                rewritten, forced_params = self._rewrite_sql(sql)
+                if rewritten is None:
+                    self._keys = []
+                    self._empty = forced_params or []
+                    return self
 
-            m = re.match(r'^PRAGMA\s+TABLE_INFO\(([^\)]+)\)\s*$', stmt, flags=re.IGNORECASE)
-            if m:
-                table_name = m.group(1).strip().strip('"\'')
-                qry = (
-                    "SELECT (ordinal_position - 1) AS cid, "
-                    "column_name AS name, data_type AS type, "
-                    "0 AS notnull, column_default AS dflt_value, 0 AS pk "
-                    "FROM information_schema.columns "
-                    "WHERE table_schema='public' AND table_name=%s "
-                    "ORDER BY ordinal_position"
-                )
-                return qry, (table_name,)
-
-            if "FROM SQLITE_MASTER" in up:
-                return (
-                    "SELECT table_name AS name "
-                    "FROM information_schema.tables "
-                    "WHERE table_schema='public' AND table_type='BASE TABLE'"
-                ), None
-
-            stmt = re.sub(
-                r'INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT',
-                'BIGSERIAL PRIMARY KEY',
-                stmt,
-                flags=re.IGNORECASE,
-            )
-            if re.search(r'INSERT\s+OR\s+REPLACE\s+INTO', stmt, flags=re.IGNORECASE):
-                rewritten = self._rewrite_insert_or_replace(stmt)
-                if rewritten:
-                    stmt = rewritten
+                run_params = forced_params if forced_params is not None else params
+                if run_params is None:
+                    self._cursor.execute(rewritten)
                 else:
-                    stmt = re.sub(r'INSERT\s+OR\s+REPLACE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
-            if re.search(r'INSERT\s+OR\s+IGNORE\s+INTO', stmt, flags=re.IGNORECASE):
-                stmt = re.sub(r'INSERT\s+OR\s+IGNORE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
-                if 'ON CONFLICT' not in stmt.upper():
-                    stmt = stmt.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
-
-            stmt = stmt.replace('?', '%s')
-            return stmt, None
-
-        def execute(self, sql, params=None):
-            rewritten, forced_params = self._rewrite_sql(sql)
-            if rewritten is None:
-                self._keys = []
-                self._empty = forced_params or []
+                    self._cursor.execute(rewritten, run_params)
+                self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
+                self._empty = None
                 return self
 
-            run_params = forced_params if forced_params is not None else params
-            if run_params is None:
-                self._cursor.execute(rewritten)
-            else:
-                self._cursor.execute(rewritten, run_params)
-            self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
-            self._empty = None
-            return self
-
-        def executemany(self, sql, seq_of_params):
-            rewritten, forced_params = self._rewrite_sql(sql)
-            if rewritten is None:
-                self._keys = []
-                self._empty = []
+            def executemany(self, sql, seq_of_params):
+                rewritten, forced_params = self._rewrite_sql(sql)
+                if rewritten is None:
+                    self._keys = []
+                    self._empty = []
+                    return self
+                if forced_params is not None:
+                    raise RuntimeError('Forced SQL params are not supported with executemany')
+                self._cursor.executemany(rewritten, seq_of_params)
+                self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
+                self._empty = None
                 return self
-            if forced_params is not None:
-                raise RuntimeError('Forced SQL params are not supported with executemany')
-            self._cursor.executemany(rewritten, seq_of_params)
-            self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
-            self._empty = None
-            return self
 
-        def fetchone(self):
-            if self._empty is not None:
-                return None
-            row = self._cursor.fetchone()
-            if row is None:
-                return None
-            return _CompatRow(self._keys, row)
+            def fetchone(self):
+                if self._empty is not None:
+                    return None
+                row = self._cursor.fetchone()
+                if row is None:
+                    return None
+                return _CompatRow(self._keys, row)
 
-        def fetchall(self):
-            if self._empty is not None:
-                return []
-            rows = self._cursor.fetchall()
-            return [_CompatRow(self._keys, r) for r in rows]
+            def fetchall(self):
+                if self._empty is not None:
+                    return []
+                rows = self._cursor.fetchall()
+                return [_CompatRow(self._keys, r) for r in rows]
 
-        @property
-        def rowcount(self):
-            return self._cursor.rowcount
+            @property
+            def rowcount(self):
+                return self._cursor.rowcount
 
-        @property
-        def lastrowid(self):
-            """Emulate SQLite's lastrowid for PostgreSQL via the underlying cursor."""
-            try:
-                return self._cursor.fetchone()[0]
-            except Exception:
-                return None
+            @property
+            def lastrowid(self):
+                """Emulate SQLite's lastrowid for PostgreSQL via the underlying cursor."""
+                try:
+                    return self._cursor.fetchone()[0]
+                except Exception:
+                    return None
 
-        @property
-        def description(self):
-            return self._cursor.description
+            @property
+            def description(self):
+                return self._cursor.description
 
-        def close(self):
-            self._cursor.close()
+            def close(self):
+                self._cursor.close()
 
-    class _CompatConnection:
-        def __init__(self, dsn):
-            self._conn = psycopg2.connect(dsn)
-            self.row_factory = None
+        class _CompatConnection:
+            def __init__(self, dsn):
+                self._conn = psycopg2.connect(dsn)
+                self.row_factory = None
 
-        def __enter__(self):
-            return self
+            def __enter__(self):
+                return self
 
-        def __exit__(self, exc_type, exc, tb):
-            try:
-                if exc_type is None:
-                    self._conn.commit()
-                else:
-                    self._conn.rollback()
-            finally:
+            def __exit__(self, exc_type, exc, tb):
+                try:
+                    if exc_type is None:
+                        self._conn.commit()
+                    else:
+                        self._conn.rollback()
+                finally:
+                    self._conn.close()
+
+            def cursor(self):
+                return _CompatCursor(self._conn.cursor())
+
+            def execute(self, sql, params=None):
+                cur = self.cursor()
+                return cur.execute(sql, params)
+
+            def executemany(self, sql, seq_of_params):
+                cur = self.cursor()
+                return cur.executemany(sql, seq_of_params)
+
+            def executescript(self, sql_script):
+                for part in [p.strip() for p in (sql_script or '').split(';') if p.strip()]:
+                    self.execute(part)
+
+            def commit(self):
+                self._conn.commit()
+
+            def rollback(self):
+                self._conn.rollback()
+
+            def close(self):
                 self._conn.close()
 
-        def cursor(self):
-            return _CompatCursor(self._conn.cursor())
+        return _CompatConnection(DATABASE_URL)
+    
+    import sqlite3
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA foreign_keys=ON')
+    return conn
 
-        def execute(self, sql, params=None):
-            cur = self.cursor()
-            return cur.execute(sql, params)
-
-        def executemany(self, sql, seq_of_params):
-            cur = self.cursor()
-            return cur.executemany(sql, seq_of_params)
-
-        def executescript(self, sql_script):
-            for part in [p.strip() for p in (sql_script or '').split(';') if p.strip()]:
-                self.execute(part)
-
-        def commit(self):
-            self._conn.commit()
-
-        def rollback(self):
-            self._conn.rollback()
-
-        def close(self):
-            self._conn.close()
-
-    return _CompatConnection(DATABASE_URL)
 
 
 def init_db():
@@ -1966,9 +2117,20 @@ def db_get_event_schedule_by_id(event_id):
 
 def db_save_event_schedule(e: dict) -> str:
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    event_id = e.get('event_id') or str(uuid.uuid4())
-    teacher_usernames = [str(u).strip() for u in e.get('teacher_usernames', []) if str(u).strip()]
-    section_keys = [normalize_section_key(s) for s in e.get('section_keys', []) if str(s).strip()]
+    event_id = str(e.get('event_id') or str(uuid.uuid4())).strip()
+    teacher_usernames = list(dict.fromkeys(
+        str(u).strip() for u in e.get('teacher_usernames', []) if str(u).strip()
+    ))
+    section_keys = list(dict.fromkeys(
+        normalize_section_key(s) for s in e.get('section_keys', []) if str(s).strip()
+    ))
+    title = str(e.get('title', '')).strip()
+    description = str(e.get('description', '')).strip()
+    start_at = str(e.get('start_at', '')).strip()
+    end_at = str(e.get('end_at', '')).strip()
+    created_by = str(e.get('created_by', '')).strip()
+    if not event_id or not title or not start_at or not end_at or not teacher_usernames or not section_keys:
+        raise ValueError('Missing required event schedule fields.')
     with get_db() as conn:
         conn.execute(
             "INSERT INTO event_schedules "
@@ -1981,17 +2143,23 @@ def db_save_event_schedule(e: dict) -> str:
             "start_at=excluded.start_at, end_at=excluded.end_at, updated_at=excluded.updated_at",
             (
                 event_id,
-                str(e.get('title', '')).strip(),
-                str(e.get('description', '')).strip(),
+                title,
+                description,
                 json.dumps(teacher_usernames),
                 json.dumps(section_keys),
-                str(e.get('start_at', '')).strip(),
-                str(e.get('end_at', '')).strip(),
-                str(e.get('created_by', '')).strip(),
+                start_at,
+                end_at,
+                created_by,
                 now,
                 now,
             ),
         )
+        saved = conn.execute(
+            "SELECT event_id FROM event_schedules WHERE event_id=? LIMIT 1",
+            (event_id,),
+        ).fetchone()
+        if not saved:
+            raise RuntimeError('Event schedule insert did not persist.')
     return event_id
 
 
@@ -2068,7 +2236,7 @@ def db_delete_no_class_day(no_class_day_id: int) -> None:
 
 def get_todays_schedules(username=None):
     """Return schedules that fall on today's weekday (0=Mon). If username provided, filter by it."""
-    today_dow = datetime.now().weekday()
+    today_dow = _now_local().weekday()
     if username:
         return [s for s in db_get_schedules_for_teacher(username)
                 if int(s['day_of_week']) == today_dow]
@@ -2161,7 +2329,7 @@ def check_and_start_scheduled_sessions():
     1. Check for schedules that should have started but don't have an active session.
     2. Check for active sessions that should have ended.
     """
-    now_dt = datetime.now()
+    now_dt = _now_local()
     today_dow = now_dt.weekday()
     current_time_str = now_dt.strftime('%H:%M')
     today_ymd = now_dt.strftime('%Y-%m-%d')
@@ -2174,6 +2342,9 @@ def check_and_start_scheduled_sessions():
         # Get all active schedules for today
         schedules = [s for s in db_get_all_schedules() if int(s['day_of_week']) == today_dow]
         active_sessions = get_active_sessions()
+        
+        if schedules:
+            print(f"[AUTO] Checking {len(schedules)} schedule(s) for today ({now_dt.strftime('%A %Y-%m-%d %H:%M:%S')})")
         
         for s in schedules:
             start_time = s['start_time']
@@ -2335,7 +2506,7 @@ def check_and_start_scheduled_sessions():
 
 def check_and_end_expired_sessions():
     """System-wide safety check to end sessions after their own configured end time."""
-    now_dt = datetime.now()
+    now_dt = _now_local()
     now_str = now_dt.strftime('%Y-%m-%d %H:%M:%S')
 
     with get_db() as conn:
@@ -2397,12 +2568,23 @@ def automation_loop():
     after the trigger time while still being lightweight.
     """
     poll_seconds = 5
+    last_log_time = 0
     while True:
         try:
+            current_time = time.time()
+            # Log status every 60 seconds
+            if current_time - last_log_time > 60:
+                now_dt = _now_local()
+                active_count = len(get_active_sessions())
+                print(f"[AUTO] Heartbeat: {now_dt.strftime('%Y-%m-%d %H:%M:%S')} | Active sessions: {active_count}")
+                last_log_time = current_time
+            
             check_and_start_scheduled_sessions()
             check_and_end_expired_sessions()
         except Exception as e:
+            import traceback
             print(f"[AUTO ERROR] {e}")
+            print(f"[AUTO ERROR] Traceback: {traceback.format_exc()}")
         time.sleep(poll_seconds)
 
 def ensure_automation_thread_running():
@@ -2413,7 +2595,7 @@ def ensure_automation_thread_running():
             return
         AUTO_THREAD = Thread(target=automation_loop, daemon=True, name='davs-automation-loop')
         AUTO_THREAD.start()
-        print('[AUTO] Automation loop started.')
+        print(f'[AUTO] Automation loop started at {_now_local().strftime("%Y-%m-%d %H:%M:%S")} ({APP_TIMEZONE})')
 
 @app.before_request
 def _ensure_automation_thread_running():
@@ -5255,6 +5437,75 @@ def blockchain_status():
         'message': 'Blockchain online' if BLOCKCHAIN_ONLINE else f'Offline — {student_count} students loaded from cache'
     })
 
+@app.route('/api/diagnostics')
+@login_required
+def diagnostics():
+    """
+    Debug endpoint: shows server state and session information.
+    Helps diagnose why sessions might not be starting on Railway.
+    """
+    now_dt = datetime.now()
+    active = get_active_sessions()
+    
+    with get_db() as conn:
+        schedules_today = conn.execute(
+            "SELECT schedule_id, subject_name, teacher_username, start_time, end_time "
+            "FROM schedules WHERE day_of_week=? AND is_active=1",
+            (now_dt.weekday(),)
+        ).fetchall()
+        
+        all_sessions = conn.execute(
+            "SELECT sess_id, subject_name, teacher_username, started_at, ended_at "
+            "FROM sessions WHERE started_at LIKE ? ORDER BY started_at DESC LIMIT 20",
+            (f"{now_dt.strftime('%Y-%m-%d')}%",)
+        ).fetchall()
+    
+    automation_running = AUTO_THREAD and AUTO_THREAD.is_alive()
+    
+    return jsonify({
+        'server_time': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+        'server_weekday': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][now_dt.weekday()],
+        'active_sessions_count': len(active),
+        'active_sessions': [
+            {
+                'sess_id': sid,
+                'subject': s.get('subject_name'),
+                'teacher': s.get('teacher'),
+                'section': s.get('section_key'),
+                'started_at': s.get('started_at'),
+                'auto_end_at': s.get('auto_end_at'),
+            }
+            for sid, s in list(active.items())[:10]
+        ],
+        'schedules_today': [dict(s) for s in schedules_today],
+        'sessions_today': [dict(s) for s in all_sessions],
+        'automation_running': automation_running,
+        'automation_thread_name': AUTO_THREAD.name if AUTO_THREAD else 'None',
+    })
+
+@app.route('/api/active_sessions')
+def api_active_sessions():
+    """
+    Public endpoint: returns all active sessions (for monitoring dashboards).
+    Does NOT require login.
+    """
+    active = get_active_sessions()
+    return jsonify({
+        'active_count': len(active),
+        'sessions': [
+            {
+                'sess_id': sid,
+                'subject': s.get('subject_name'),
+                'teacher': s.get('teacher'),
+                'section': s.get('section_key'),
+                'started_at': s.get('started_at'),
+                'students_present': len(s.get('present', [])),
+                'students_late': len(s.get('late', [])),
+            }
+            for sid, s in active.items()
+        ]
+    })
+
 def _is_my_session(sess):
     """
     Return True if the current logged-in user owns this session.
@@ -6483,12 +6734,26 @@ def admin_schedule_create():
 @admin_required
 def admin_event_schedule_create():
     try:
+        def _parse_csv_or_json(field_name: str) -> list[str]:
+            raw = request.form.get(field_name, '')
+            raw = (raw or '').strip()
+            if not raw:
+                return []
+            if raw.startswith('['):
+                try:
+                    data = json.loads(raw)
+                    if isinstance(data, list):
+                        return [str(x).strip() for x in data if str(x).strip()]
+                except Exception:
+                    pass
+            return [x.strip() for x in raw.split(',') if x.strip()]
+
         title = request.form.get('title', '').strip()
         description = request.form.get('description', '').strip()
         start_dt_local = request.form.get('start_at', '').strip()
         end_dt_local = request.form.get('end_at', '').strip()
-        teachers_csv = request.form.get('selected_teachers', '').strip()
-        sections_csv = request.form.get('selected_sections', '').strip()
+        teacher_usernames = _parse_csv_or_json('selected_teachers')
+        section_keys_raw = _parse_csv_or_json('selected_sections')
 
         if not title:
             flash('Event title is required.', 'danger')
@@ -6508,8 +6773,10 @@ def admin_event_schedule_create():
             flash('Event end time must be later than start time.', 'danger')
             return redirect(url_for('admin_schedules'))
 
-        teacher_usernames = [u.strip() for u in teachers_csv.split(',') if u.strip()]
-        section_keys = [normalize_section_key(s.strip()) for s in sections_csv.split(',') if s.strip()]
+        teacher_usernames = list(dict.fromkeys(teacher_usernames))
+        section_keys = list(dict.fromkeys(
+            normalize_section_key(s.strip()) for s in section_keys_raw if s.strip()
+        ))
         if not teacher_usernames:
             flash('Please add at least one teacher for the event.', 'danger')
             return redirect(url_for('admin_schedules'))
@@ -6530,6 +6797,7 @@ def admin_event_schedule_create():
         )
         flash('School event schedule created successfully.', 'success')
     except Exception as exc:
+        print(f"[EVENT] create failed: {exc}")
         flash(f'Error creating event schedule: {exc}', 'danger')
     return redirect(url_for('admin_schedules'))
 
@@ -6874,9 +7142,28 @@ def _launch_nfc_listener():
     print(f"[NFC] Listener started in background (PID {proc.pid})")
     print("[NFC] Check nfc_listener.log for tap activity.")
 
+# Ensure automation loop runs under WSGI servers (e.g., Gunicorn on Railway),
+# not only after the first request.
+if os.getenv('DISABLE_AUTO_THREAD', '0') != '1':
+    try:
+        ensure_automation_thread_running()
+    except Exception as _auto_boot_err:
+        print(f"[AUTO] Startup thread init failed: {_auto_boot_err}")
+
 if __name__ == '__main__':
+<<<<<<< HEAD
     ensure_automation_thread_running()
     _launch_nfc_listener()
     port = int(_os.getenv('PORT', '5000'))
     debug = _env_flag('FLASK_DEBUG', default=False)
+=======
+    # Only launch NFC listener in development
+    if os.getenv('FLASK_ENV') != 'production':
+        _launch_nfc_listener()
+    
+    # Get port from environment variable (for Heroku compatibility)
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_ENV') != 'production'
+    
+>>>>>>> f13d5a841978eb919749960909e93c6aa8bfd820
     app.run(debug=debug, host='0.0.0.0', port=port, use_reloader=False)

@@ -142,6 +142,14 @@ INSTITUTION_NAME = "Your Institution"
 BLOCKCHAIN_NETWORK = "sepolia"
 ```
 
+### Railway PostgreSQL
+
+The app now supports PostgreSQL automatically when `DATABASE_URL` is set (Railway provides this variable by default for PostgreSQL services).
+
+- Local/dev fallback: if `DATABASE_URL` is missing, the app still uses `davs.db` (SQLite).
+- Railway/prod: set `DATABASE_URL` to your Railway Postgres connection string.
+- Optional: set `PGSSLMODE=require` in Railway if your connection requires SSL mode explicitly.
+
 ## API Endpoints
 
 ### Check-in Endpoint

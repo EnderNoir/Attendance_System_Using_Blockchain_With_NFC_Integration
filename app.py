@@ -7151,19 +7151,12 @@ if os.getenv('DISABLE_AUTO_THREAD', '0') != '1':
         print(f"[AUTO] Startup thread init failed: {_auto_boot_err}")
 
 if __name__ == '__main__':
-<<<<<<< HEAD
-    ensure_automation_thread_running()
-    _launch_nfc_listener()
-    port = int(_os.getenv('PORT', '5000'))
-    debug = _env_flag('FLASK_DEBUG', default=False)
-=======
     # Only launch NFC listener in development
     if os.getenv('FLASK_ENV') != 'production':
         _launch_nfc_listener()
     
-    # Get port from environment variable (for Heroku compatibility)
+    # Get port from environment variable
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_ENV') != 'production'
-    
->>>>>>> f13d5a841978eb919749960909e93c6aa8bfd820
+
     app.run(debug=debug, host='0.0.0.0', port=port, use_reloader=False)

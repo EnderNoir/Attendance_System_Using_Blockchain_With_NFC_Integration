@@ -378,6 +378,8 @@ except Exception as _ce:
 
 BASE_DIR      = os.path.dirname(__file__)
 DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
+DATABASE_URL  = os.getenv('DATABASE_URL', '').strip()
+DB_BACKEND    = 'postgres' if DATABASE_URL else 'sqlite'
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 UPLOAD_FOLDER_EXCUSES = os.path.join(BASE_DIR, 'static', 'uploads', 'excuses')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -462,7 +464,102 @@ def generate_cvsu_email(name, provided_email=''):
     return ''
 
 
+class _PgCursorCompat:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        return row
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    @property
+    def lastrowid(self):
+        try:
+            return self._cursor.lastrowid
+        except Exception:
+            return None
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+
+class _PgConnCompat:
+    def __init__(self, conn):
+        self._conn = conn
+
+    def _convert_sql(self, sql: str):
+        s = sql
+        s = re.sub(
+            r"\bid\s+INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b",
+            "id BIGSERIAL PRIMARY KEY",
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(r"\bPRAGMA\s+journal_mode\s*=\s*WAL\b", "SELECT 1", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bPRAGMA\s+foreign_keys\s*=\s*ON\b", "SELECT 1", s, flags=re.IGNORECASE)
+        s = re.sub(
+            r"PRAGMA\s+table_info\((\w+)\)",
+            r"SELECT column_name AS name FROM information_schema.columns WHERE table_schema='public' AND table_name='\1' ORDER BY ordinal_position",
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(
+            r"SELECT\s+name\s+FROM\s+sqlite_master\s+WHERE\s+type='table'",
+            "SELECT table_name AS name FROM information_schema.tables WHERE table_schema='public'",
+            s,
+            flags=re.IGNORECASE,
+        )
+        s = re.sub(r"\browid\b", "id", s, flags=re.IGNORECASE)
+        s = s.replace("AUTOINCREMENT", "")
+        if re.search(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", s, flags=re.IGNORECASE):
+            s = re.sub(r"^\s*INSERT\s+OR\s+IGNORE\s+INTO\s+", "INSERT INTO ", s, flags=re.IGNORECASE)
+            s = s.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+        if re.search(r"^\s*INSERT\s+OR\s+REPLACE\s+INTO\s+nfc_scanner\s+", s, flags=re.IGNORECASE):
+            s = re.sub(r"^\s*INSERT\s+OR\s+REPLACE\s+INTO\s+", "INSERT INTO ", s, flags=re.IGNORECASE)
+            s = s.rstrip().rstrip(";") + (
+                " ON CONFLICT (id) DO UPDATE SET "
+                "waiting=EXCLUDED.waiting, scanned_uid=EXCLUDED.scanned_uid, "
+                "requested_by=EXCLUDED.requested_by, requested_at=EXCLUDED.requested_at"
+            )
+        return s.replace("?", "%s")
+
+    def execute(self, sql, params=()):
+        converted = self._convert_sql(sql)
+        from psycopg2.extras import RealDictCursor  # pyright: ignore[reportMissingModuleSource]
+        cur = self._conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(converted, params or ())
+        return _PgCursorCompat(cur)
+
+    def executescript(self, script):
+        statements = [s.strip() for s in script.split(";") if s.strip()]
+        for statement in statements:
+            self.execute(statement)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            self._conn.commit()
+        else:
+            self._conn.rollback()
+        self._conn.close()
+
+
 def get_db():
+    if DB_BACKEND == 'postgres':
+        import psycopg2  # pyright: ignore[reportMissingModuleSource]
+        raw = psycopg2.connect(DATABASE_URL)
+        return _PgConnCompat(raw)
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA journal_mode=WAL')

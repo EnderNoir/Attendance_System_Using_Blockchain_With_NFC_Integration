@@ -6284,8 +6284,15 @@ def _launch_nfc_listener():
     print(f"[NFC] Listener started in background (PID {proc.pid})")
     print("[NFC] Check nfc_listener.log for tap activity.")
 
+# Ensure automation loop runs under WSGI servers (e.g., Gunicorn on Railway),
+# not only after the first request.
+if os.getenv('DISABLE_AUTO_THREAD', '0') != '1':
+    try:
+        ensure_automation_thread_running()
+    except Exception as _auto_boot_err:
+        print(f"[AUTO] Startup thread init failed: {_auto_boot_err}")
+
 if __name__ == '__main__':
-    ensure_automation_thread_running()
     # Only launch NFC listener in development
     if os.getenv('FLASK_ENV') != 'production':
         _launch_nfc_listener()

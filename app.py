@@ -469,16 +469,37 @@ def generate_cvsu_email(name, provided_email=''):
     return ''
 
 
+class _PgRowCompat(dict):
+    """
+    psycopg RealDictRow compatibility shim that supports both:
+    - mapping access: row['name']
+    - positional access: row[0], row[1]
+    """
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            values = list(self.values())
+            return values[key]
+        return super().__getitem__(key)
+
+
 class _PgCursorCompat:
     def __init__(self, cursor):
         self._cursor = cursor
 
-    def fetchone(self):
-        row = self._cursor.fetchone()
+    @staticmethod
+    def _wrap_row(row):
+        if row is None:
+            return None
+        if isinstance(row, dict):
+            return _PgRowCompat(row)
         return row
 
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        return self._wrap_row(row)
+
     def fetchall(self):
-        return self._cursor.fetchall()
+        return [self._wrap_row(r) for r in self._cursor.fetchall()]
 
     @property
     def lastrowid(self):
@@ -488,7 +509,8 @@ class _PgCursorCompat:
             return None
 
     def __iter__(self):
-        return iter(self._cursor)
+        for row in self._cursor:
+            yield self._wrap_row(row)
 
 
 class _PgConnCompat:

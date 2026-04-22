@@ -359,11 +359,12 @@ def inject_globals():
         fmt_time_short= fmt_time_short,
     )
 
-BLOCKCHAIN_RPC_URL = os.getenv('BLOCKCHAIN_RPC_URL', '').strip() or os.getenv('SEPOLIA_RPC_URL', '').strip()
-if not BLOCKCHAIN_RPC_URL:
-    BLOCKCHAIN_RPC_URL = 'http://127.0.0.1:8545'
-
-web3 = Web3(Web3.HTTPProvider(BLOCKCHAIN_RPC_URL, request_kwargs={'timeout': 30}))
+BLOCKCHAIN_RPC_URL = (
+    os.getenv('SEPOLIA_RPC_URL', '').strip()
+    or os.getenv('WEB3_PROVIDER_URI', '').strip()
+    or "http://127.0.0.1:8545"
+)
+web3 = Web3(Web3.HTTPProvider(BLOCKCHAIN_RPC_URL))
 
 BLOCKCHAIN_ONLINE = web3.is_connected()
 if BLOCKCHAIN_ONLINE:
@@ -412,7 +413,7 @@ except Exception as _ce:
     contract      = None
     admin_account = None
     BLOCKCHAIN_ONLINE = False
-    print("[INFO] Offline mode active: contract file missing or unreadable.")
+    print("[INFO] Offline mode active: contract/RPC unavailable.")
 
 BLOCKCHAIN_LOCK = Lock()
 BASE_DIR      = os.path.dirname(__file__)

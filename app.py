@@ -5,6 +5,7 @@ from functools import wraps
 from threading import Thread, Lock
 import json, os, secrets, time, hashlib, uuid, re, sqlite3
 from collections import deque
+from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
 import secrets as _sec
 from dotenv import load_dotenv
@@ -16,6 +17,14 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'davs-super-secret-2024')
+APP_TIMEZONE = os.getenv('APP_TIMEZONE', 'Asia/Manila')
+
+
+def _now_local():
+    try:
+        return datetime.now(ZoneInfo(APP_TIMEZONE)).replace(tzinfo=None)
+    except Exception:
+        return datetime.now()
 
 # ── Jinja2 custom filters ─────────────────────────────────────────────────────
 import json as _json_mod
@@ -1917,7 +1926,7 @@ def db_delete_no_class_day(no_class_day_id: int) -> None:
 
 def get_todays_schedules(username=None):
     """Return schedules that fall on today's weekday (0=Mon). If username provided, filter by it."""
-    today_dow = datetime.now().weekday()
+    today_dow = _now_local().weekday()
     if username:
         return [s for s in db_get_schedules_for_teacher(username)
                 if int(s['day_of_week']) == today_dow]
@@ -2010,7 +2019,7 @@ def check_and_start_scheduled_sessions():
     1. Check for schedules that should have started but don't have an active session.
     2. Check for active sessions that should have ended.
     """
-    now_dt = datetime.now()
+    now_dt = _now_local()
     today_dow = now_dt.weekday()
     current_time_str = now_dt.strftime('%H:%M')
     today_ymd = now_dt.strftime('%Y-%m-%d')
@@ -2185,7 +2194,7 @@ def check_and_start_scheduled_sessions():
 
 def check_and_end_expired_sessions():
     """System-wide safety check to end sessions after their own configured end time."""
-    now_dt = datetime.now()
+    now_dt = _now_local()
     now_str = now_dt.strftime('%Y-%m-%d %H:%M:%S')
 
     with get_db() as conn:
@@ -2253,7 +2262,7 @@ def automation_loop():
             current_time = time.time()
             # Log status every 60 seconds
             if current_time - last_log_time > 60:
-                now_dt = datetime.now()
+                now_dt = _now_local()
                 active_count = len(get_active_sessions())
                 print(f"[AUTO] Heartbeat: {now_dt.strftime('%Y-%m-%d %H:%M:%S')} | Active sessions: {active_count}")
                 last_log_time = current_time
@@ -2274,7 +2283,7 @@ def ensure_automation_thread_running():
             return
         AUTO_THREAD = Thread(target=automation_loop, daemon=True, name='davs-automation-loop')
         AUTO_THREAD.start()
-        print(f'[AUTO] Automation loop started at {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+        print(f'[AUTO] Automation loop started at {_now_local().strftime("%Y-%m-%d %H:%M:%S")} ({APP_TIMEZONE})')
 
 @app.before_request
 def _ensure_automation_thread_running():

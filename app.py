@@ -1798,9 +1798,20 @@ def db_get_event_schedule_by_id(event_id):
 
 def db_save_event_schedule(e: dict) -> str:
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    event_id = e.get('event_id') or str(uuid.uuid4())
-    teacher_usernames = [str(u).strip() for u in e.get('teacher_usernames', []) if str(u).strip()]
-    section_keys = [normalize_section_key(s) for s in e.get('section_keys', []) if str(s).strip()]
+    event_id = str(e.get('event_id') or str(uuid.uuid4())).strip()
+    teacher_usernames = list(dict.fromkeys(
+        str(u).strip() for u in e.get('teacher_usernames', []) if str(u).strip()
+    ))
+    section_keys = list(dict.fromkeys(
+        normalize_section_key(s) for s in e.get('section_keys', []) if str(s).strip()
+    ))
+    title = str(e.get('title', '')).strip()
+    description = str(e.get('description', '')).strip()
+    start_at = str(e.get('start_at', '')).strip()
+    end_at = str(e.get('end_at', '')).strip()
+    created_by = str(e.get('created_by', '')).strip()
+    if not event_id or not title or not start_at or not end_at or not teacher_usernames or not section_keys:
+        raise ValueError('Missing required event schedule fields.')
     with get_db() as conn:
         conn.execute(
             "INSERT INTO event_schedules "
@@ -1813,17 +1824,23 @@ def db_save_event_schedule(e: dict) -> str:
             "start_at=excluded.start_at, end_at=excluded.end_at, updated_at=excluded.updated_at",
             (
                 event_id,
-                str(e.get('title', '')).strip(),
-                str(e.get('description', '')).strip(),
+                title,
+                description,
                 json.dumps(teacher_usernames),
                 json.dumps(section_keys),
-                str(e.get('start_at', '')).strip(),
-                str(e.get('end_at', '')).strip(),
-                str(e.get('created_by', '')).strip(),
+                start_at,
+                end_at,
+                created_by,
                 now,
                 now,
             ),
         )
+        saved = conn.execute(
+            "SELECT event_id FROM event_schedules WHERE event_id=? LIMIT 1",
+            (event_id,),
+        ).fetchone()
+        if not saved:
+            raise RuntimeError('Event schedule insert did not persist.')
     return event_id
 
 
@@ -5869,12 +5886,26 @@ def admin_schedule_create():
 @admin_required
 def admin_event_schedule_create():
     try:
+        def _parse_csv_or_json(field_name: str) -> list[str]:
+            raw = request.form.get(field_name, '')
+            raw = (raw or '').strip()
+            if not raw:
+                return []
+            if raw.startswith('['):
+                try:
+                    data = json.loads(raw)
+                    if isinstance(data, list):
+                        return [str(x).strip() for x in data if str(x).strip()]
+                except Exception:
+                    pass
+            return [x.strip() for x in raw.split(',') if x.strip()]
+
         title = request.form.get('title', '').strip()
         description = request.form.get('description', '').strip()
         start_dt_local = request.form.get('start_at', '').strip()
         end_dt_local = request.form.get('end_at', '').strip()
-        teachers_csv = request.form.get('selected_teachers', '').strip()
-        sections_csv = request.form.get('selected_sections', '').strip()
+        teacher_usernames = _parse_csv_or_json('selected_teachers')
+        section_keys_raw = _parse_csv_or_json('selected_sections')
 
         if not title:
             flash('Event title is required.', 'danger')
@@ -5894,8 +5925,10 @@ def admin_event_schedule_create():
             flash('Event end time must be later than start time.', 'danger')
             return redirect(url_for('admin_schedules'))
 
-        teacher_usernames = [u.strip() for u in teachers_csv.split(',') if u.strip()]
-        section_keys = [normalize_section_key(s.strip()) for s in sections_csv.split(',') if s.strip()]
+        teacher_usernames = list(dict.fromkeys(teacher_usernames))
+        section_keys = list(dict.fromkeys(
+            normalize_section_key(s.strip()) for s in section_keys_raw if s.strip()
+        ))
         if not teacher_usernames:
             flash('Please add at least one teacher for the event.', 'danger')
             return redirect(url_for('admin_schedules'))
@@ -5916,6 +5949,7 @@ def admin_event_schedule_create():
         )
         flash('School event schedule created successfully.', 'success')
     except Exception as exc:
+        print(f"[EVENT] create failed: {exc}")
         flash(f'Error creating event schedule: {exc}', 'danger')
     return redirect(url_for('admin_schedules'))
 

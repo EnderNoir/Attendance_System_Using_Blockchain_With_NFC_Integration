@@ -1,20 +1,8 @@
-﻿.session-header {
+.session-header {
     background: var(--surface);
 
-    border:1px solid {
-      % if is_active %
-    }
-
-    var(--success) {
-      % else %
-    }
-
-    var(--border) {
-      % endif %
-    }
-
-    ;
-    border-radius:14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
     padding:22px 26px;
     margin-bottom:24px;
   }

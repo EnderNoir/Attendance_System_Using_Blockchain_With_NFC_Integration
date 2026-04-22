@@ -92,7 +92,7 @@
   }
   .add-subj-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr auto;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
     gap: 10px;
     align-items: flex-end;
   }
@@ -287,6 +287,26 @@
       </select>
       <input type="hidden" name="section_key" id="add_section_key" />
     </div>
+    <div>
+      <label
+        style="
+          display: block;
+          font-size: 10px;
+          font-weight: 700;
+          color: var(--muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 5px;
+        "
+        ><i class="bi bi-calendar3"></i> Semester</label
+      >
+      <select name="semester" class="fs" required>
+        <option value="" disabled selected>— Semester —</option>
+        <option value="First">First Semester</option>
+        <option value="Second">Second Semester</option>
+        <option value="Summer">Summer</option>
+      </select>
+    </div>
     <button type="submit" class="btn-primary" id="addBtn" disabled>
       <i class="bi bi-plus-lg"></i> Add
     </button>
@@ -399,6 +419,7 @@
           <span><i class="bi bi-mortarboard"></i> {{ prog }}</span>
           <span><i class="bi bi-layers"></i> {{ yr }}</span>
           <span><i class="bi bi-grid"></i> Section {{ sec }}</span>
+          <span><i class="bi bi-calendar3"></i> {{ ms.semester or 'Any Semester' }}</span>
           <span
             ><i class="bi bi-people"></i> {{ ms.student_count }} students</span
           >
@@ -466,6 +487,28 @@
     >
       <input type="hidden" name="subject_id" value="{{ ms.subject_id }}" />
       <input type="hidden" name="section_key" value="{{ ms.section_key }}" />
+
+      <!-- Semester -->
+      <div class="sf-field-sm" style="flex: 0 0 130px;">
+        <label
+          style="
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+          "
+        >
+          <i class="bi bi-calendar3"></i> Semester
+        </label>
+        <select name="semester" class="fs" required>
+           <option value="First" {% if ms.semester == 'First' %}selected{% endif %}>First</option>
+           <option value="Second" {% if ms.semester == 'Second' %}selected{% endif %}>Second</option>
+           <option value="Summer" {% if ms.semester == 'Summer' %}selected{% endif %}>Summer</option>
+        </select>
+      </div>
 
       <!-- Time Slot — JS disables slots whose END time has already passed -->
       <div class="sf-field">

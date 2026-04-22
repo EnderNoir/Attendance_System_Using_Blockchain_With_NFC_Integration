@@ -33,6 +33,7 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs')
+DB_BACKEND     = 'sqlite' if DATABASE_URL.lower().startswith('sqlite:///') else 'postgres'
 CONTRACT_FILE  = os.path.join(BASE_DIR, 'attendance-contract.json')
 UPLOAD_FOLDER  = os.path.join(BASE_DIR, 'static', 'uploads')
 
@@ -50,14 +51,29 @@ def warn(msg): print(f"  [WARN] {msg}")
 def err(msg):  print(f"  [ERR]  {msg}")
 def sep():     print("  " + "─" * 50)
 
+
+def _table_exists(conn, table_name):
+    if DB_BACKEND == 'sqlite':
+        row = conn.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
+            (table_name,),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM information_schema.tables "
+            "WHERE table_schema='public' AND table_name=?",
+            (table_name,),
+        ).fetchone()
+    return bool(row and row[0])
+
 # ── STEP 1: Verify DB exists ──────────────────────────────────────────────────
 def check_db():
     try:
         with connect_db(DATABASE_URL) as conn:
             conn.execute("SELECT 1")
-        ok("Connected to PostgreSQL")
+        ok(f"Connected to {DB_BACKEND}")
     except Exception as e:
-        err(f"Could not connect to PostgreSQL: {e}")
+        err(f"Could not connect to {DB_BACKEND}: {e}")
         print("  Set DATABASE_URL in .env, then re-run this script.")
         sys.exit(1)
 
@@ -88,11 +104,7 @@ def reset_postgres():
     for table in data_tables:
         try:
             # Check if table exists first
-            exists = conn.execute(
-                "SELECT COUNT(*) FROM information_schema.tables "
-                "WHERE table_schema='public' AND table_name=?",
-                (table,)
-            ).fetchone()[0]
+            exists = _table_exists(conn, table)
             if not exists:
                 warn(f"Table not found, skipping: {table}")
                 continue
@@ -105,11 +117,7 @@ def reset_postgres():
     # ── Reset NFC scanner rows (must keep id=1) ───────────────────────────────
     for table in ['nfc_scanner', 'nfc_registration']:
         try:
-            exists = conn.execute(
-                "SELECT COUNT(*) FROM information_schema.tables "
-                "WHERE table_schema='public' AND table_name=?",
-                (table,)
-            ).fetchone()[0]
+            exists = _table_exists(conn, table)
             if not exists:
                 warn(f"Table not found, skipping: {table}")
                 continue

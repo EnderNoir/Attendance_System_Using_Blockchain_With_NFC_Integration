@@ -1,5 +1,6 @@
 import os
 import re
+import sqlite3
 import psycopg2
 
 
@@ -197,4 +198,16 @@ class CompatConnection:
 
 def connect_db(database_url=None):
     dsn = (database_url or os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@localhost:5432/davs").strip()
+    dsn_lower = dsn.lower()
+
+    if dsn_lower.startswith("sqlite:///"):
+        sqlite_target = dsn[10:]
+        if not sqlite_target:
+            sqlite_target = "davs.db"
+        db_path = sqlite_target if os.path.isabs(sqlite_target) else os.path.abspath(sqlite_target)
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys=ON")
+        return conn
+
     return CompatConnection(dsn)

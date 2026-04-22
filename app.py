@@ -1105,12 +1105,19 @@ def _migrate_add_missing_columns():
         ('schedules', 'updated_at', "TEXT NOT NULL DEFAULT ''"),
     ]
     with get_db() as conn:
-        existing_tables = [
-            r[0] for r in conn.execute(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema='public' AND table_type='BASE TABLE'"
-            ).fetchall()
-        ]
+        if DB_BACKEND == 'postgres':
+            existing_tables = [
+                r[0] for r in conn.execute(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema='public' AND table_type='BASE TABLE'"
+                ).fetchall()
+            ]
+        else:
+            existing_tables = [
+                r[0] for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            ]
 
         if 'schedules' not in existing_tables:
             conn.execute(

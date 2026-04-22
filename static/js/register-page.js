@@ -208,6 +208,41 @@ nfcHid.addEventListener('blur', () => setTimeout(refocusNFC, 150));
 window.addEventListener('load', () => nfcHid.focus());
 nfcHid.focus();
 
+async function startMobileRegistrationNfc() {
+  const btn = document.getElementById('mobileNfcRegisterBtn');
+  const sub = document.getElementById('nfcStripSub');
+  const title = document.getElementById('nfcStripTitle');
+  if (!('NDEFReader' in window)) {
+    title.textContent = 'Phone NFC not supported here';
+    sub.textContent = 'Use Android Chrome with NFC enabled, then try again.';
+    return;
+  }
+  try {
+    btn.disabled = true;
+    const ndef = new NDEFReader();
+    await ndef.scan();
+    title.textContent = 'Phone NFC active';
+    sub.textContent = 'Tap the student card on your phone.';
+    ndef.addEventListener('readingerror', () => {
+      sub.textContent = 'Read error. Tap the card again.';
+    });
+    ndef.addEventListener('reading', ({ serialNumber }) => {
+      const uid = (serialNumber || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      if (!uid) return;
+      applyUID(uid);
+    });
+  } catch (err) {
+    title.textContent = 'Could not start phone NFC';
+    sub.textContent = 'Check browser permission and NFC setting, then retry.';
+    btn.disabled = false;
+  }
+}
+
+const mobileNfcRegisterBtn = document.getElementById('mobileNfcRegisterBtn');
+if (mobileNfcRegisterBtn) {
+  mobileNfcRegisterBtn.addEventListener('click', startMobileRegistrationNfc);
+}
+
 function previewStudentPhoto(input) {
   if (!input.files || !input.files[0]) return;
   const reader = new FileReader();

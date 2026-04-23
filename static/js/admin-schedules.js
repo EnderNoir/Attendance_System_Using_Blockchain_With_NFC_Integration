@@ -416,6 +416,7 @@
     } else {
       document.getElementById('infoTeacherName').textContent = s.teacher_name || '-';
       document.getElementById('infoSectionName').textContent = (s.section_key || '').split('|').join(' - ');
+      document.getElementById('infoSemester').textContent = s.semester || 'Any Semester';
     }
     if (isSchoolEvent(s)) {
       document.getElementById('infoDayTime').textContent = (fmtEventDate(s.event_date) || DOW_NAMES[dayIdx]) + ' @ ' + fmtTime(to24h(s.start_time)) + ' - ' + fmtTime(to24h(s.end_time));
@@ -438,14 +439,21 @@
     const liveBadge = document.getElementById('infoLiveBadge');
     if (liveBadge) liveBadge.style.display = isLive(s) ? 'block' : 'none';
     const monitorBtn = document.getElementById('infoMonitorBtn');
+    const monitorSem = document.getElementById('infoMonitorSemester');
+    const monitorSemVal = document.getElementById('infoMonitorSemesterVal');
     const liveSession = getSessionForSchedule(s);
     if (monitorBtn) {
       if (liveSession && liveSession.sess_id) {
         monitorBtn.href = '/teacher/session/' + liveSession.sess_id;
         monitorBtn.style.display = 'inline-flex';
+        if (monitorSem && monitorSemVal) {
+          monitorSem.style.display = 'block';
+          monitorSemVal.textContent = liveSession.semester || s.semester || 'Any Semester';
+        }
       } else {
         monitorBtn.href = '#';
         monitorBtn.style.display = 'none';
+        if (monitorSem) monitorSem.style.display = 'none';
       }
     }
 

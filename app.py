@@ -449,6 +449,14 @@ EXCUSE_REASONS = [
 def hash_password(pw):
     return hashlib.sha256(pw.encode()).hexdigest()
 
+def normalize_semester(sem):
+    if not sem: return ""
+    s = str(sem).strip().upper()
+    if 'FIRST' in s or '1ST' in s: return 'First'
+    if 'SECOND' in s or '2ND' in s: return 'Second'
+    if 'SUMMER' in s: return 'Summer'
+    return s.title()
+
 
 def _canonical_role(role_value):
     role_norm = (role_value or '').strip().lower().replace(' ', '_')
@@ -2073,6 +2081,20 @@ def db_save_schedule(s: dict) -> str:
 
 def db_delete_schedule(schedule_id):
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    schedule_id = str(schedule_id or '').strip()
+    
+    if schedule_id.startswith('event:'):
+        # Extract the real event_id from 'event:EVENT_ID' or 'event:EVENT_ID:...'
+        parts = schedule_id.split(':')
+        if len(parts) >= 2:
+            event_id = parts[1]
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE event_schedules SET is_active=0, updated_at=? WHERE event_id=?",
+                    (now, event_id)
+                )
+        return
+
     with get_db() as conn:
         conn.execute(
             "UPDATE schedules SET is_active=0, updated_at=? WHERE schedule_id=?",
@@ -3496,9 +3518,23 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     if sess.get('ended_at'):
         return {'already_ended': True, 'ended_at': sess.get('ended_at', '')}
 
-    all_students = get_all_students()
+    all_students_list = get_all_students()
     section_key = normalize_section_key(sess.get('section_key', ''))
-    section_students = [s for s in all_students if build_student_section_key(s) == section_key]
+    sess_semester = str(sess.get('semester') or '').strip().lower()
+    
+    # Filter students belonging to this section & semester
+    section_students = [
+        s for s in all_students_list 
+        if build_student_section_key(s) == section_key
+        and (not sess_semester or not s.get('semester') or str(s.get('semester')).strip().lower() == sess_semester)
+    ]
+    
+    if not section_students:
+        print(f"[DEBUG] _finalize_session {sess_id}: NO STUDENTS FOUND for section='{section_key}', sem='{sess_semester}'")
+        # Log a sample student to see why it doesn't match
+        if all_students_list:
+            s0 = all_students_list[0]
+            print(f"[DEBUG] Sample Student Key: '{build_student_section_key(s0)}', Sem: '{str(s0.get('semester') or '').strip().lower()}'")
 
     present_set = set(sess.get('present', []))
     late_set = set(sess.get('late', []))
@@ -3731,6 +3767,8 @@ def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
     student_key = build_student_section_key(student)
     if not student_key: return None, None
 
+    student_semester = normalize_semester(student.get('semester'))
+
     preferred = str(preferred_sess_id or '').strip()
     if preferred:
         with get_db() as conn:
@@ -3742,16 +3780,15 @@ def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
             if pref_row:
                 pref_dict = dict(pref_row)
                 pref_section = normalize_section_key(pref_dict.get('section_key', ''))
+                pref_semester = normalize_semester(pref_dict.get('semester'))
                 pref_class_type = str(pref_dict.get('class_type', 'lecture') or 'lecture').strip().lower()
 
-                # Normal schedules must match the student's section exactly.
-                if pref_section == student_key:
+                # Normal schedules must match both student's section AND semester.
+                if pref_section == student_key and (not pref_semester or not student_semester or pref_semester == student_semester):
                     s = _session_row_with_logs(get_db(), pref_row)
                     return pref_row['sess_id'], s
 
                 # School events can have sibling sessions (same event_id) for other sections.
-                # If monitor page sent one event session id, route tap to the event sibling
-                # matching the student's actual section.
                 if pref_class_type == 'school_event':
                     meta = _parse_event_schedule_id(pref_dict.get('schedule_id', ''))
                     if meta and meta.get('event_id'):
@@ -3763,24 +3800,34 @@ def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
                             (pattern,),
                         ).fetchone()
                         if sibling:
-                            s = _session_row_with_logs(get_db(), sibling)
-                            return sibling['sess_id'], s
+                            # For school events, we might be more lenient with semester, 
+                            # but let's check it anyway if it's available.
+                            sib_dict = dict(sibling)
+                            sib_semester = normalize_semester(sib_dict.get('semester'))
+                            if not student_semester or not sib_semester or student_semester == sib_semester:
+                                s = _session_row_with_logs(get_db(), sibling)
+                                return sibling['sess_id'], s
 
-                # Preferred session was explicitly provided but does not match this student's
-                # valid session context. Do not fall back to another active session, otherwise
-                # taps from event monitor can be routed into regular sessions (and vice versa).
+                # Preferred session provided but doesn't match this student's context.
                 return None, None
 
-        # Preferred session id was provided but not active/not found.
-        # Keep strict behavior and avoid cross-session fallback.
         return None, None
 
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM sessions WHERE ended_at IS NULL AND section_key=? "
-            "ORDER BY started_at DESC LIMIT 1",
-            (student_key,)
-        ).fetchone()
+        # Strict match: same section key AND same semester (with leniency for missing data)
+        if student_semester:
+            row = conn.execute(
+                "SELECT * FROM sessions WHERE ended_at IS NULL AND section_key=? "
+                "AND (semester IS NULL OR semester = '' OR lower(trim(semester)) = ?) "
+                "ORDER BY started_at DESC LIMIT 1",
+                (student_key, student_semester)
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT * FROM sessions WHERE ended_at IS NULL AND section_key=? "
+                "ORDER BY started_at DESC LIMIT 1",
+                (student_key,)
+            ).fetchone()
     if row:
         s = _session_row_with_logs(get_db(), row)
         return row['sess_id'], s
@@ -4973,18 +5020,23 @@ def _build_teacher_context(user):
         sid  = ms.get('subject_id')
         skey = normalize_section_key(ms.get('section_key',''))
         if not sid or sid not in all_subj: continue
-        active_sid = None
+        ms_sem = normalize_semester(ms.get('semester', ''))
         for sess_id, sess_obj in get_active_sessions().items():
             if (sess_obj.get('subject_id')==sid
                     and normalize_section_key(sess_obj.get('section_key',''))==skey
+                    and normalize_semester(sess_obj.get('semester'))==ms_sem
                     and sess_obj.get('teacher')==session['username']):
                 active_sid = sess_id; break
         parts = skey.split('|')
         subj_info = all_subj[sid]
         # Get student count from ALL students matching this section key
         # (not just from teacher.sections dict which may be empty)
-        all_stu_for_section = [s for s in db_get_all_students() if build_student_section_key(s) == skey]
-        sec_count = len(all_stu_for_section) if all_stu_for_section else (sections[skey]['count'] if skey in sections else 0)
+        all_stu_for_section = [
+            s for s in db_get_all_students() 
+            if build_student_section_key(s) == skey
+            and (not ms_sem or normalize_semester(s.get('semester')) == ms_sem)
+        ]
+        sec_count = len(all_stu_for_section)
         if skey in sections:
             sec_label = sections[skey]['label']
         else:
@@ -5000,7 +5052,8 @@ def _build_teacher_context(user):
             'year':         parts[1] if len(parts)>1 else '',
             'section':      parts[2] if len(parts)>2 else '',
             'active_session_id': active_sid,
-            'student_count':     sec_count
+            'student_count':     sec_count,
+            'semester':          ms_sem
         })
     return sections, my_subjects, all_subj
 
@@ -5185,23 +5238,34 @@ def api_session_attendance(sess_id):
         # Primary approach: use get_all_students() and match by section_key
         # This is more reliable as it handles both blockchain-sourced and database students
         all_students = get_all_students()
+        all_students = get_all_students()
+        sess_semester = normalize_semester(sess.get('semester') or '')
         if is_school_event:
-            enrolled = [s for s in all_students if build_student_section_key(s) in section_keys]
+            enrolled = [
+                s for s in all_students 
+                if build_student_section_key(s) in section_keys 
+                and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
+            ]
         else:
-            enrolled = [s for s in all_students if build_student_section_key(s) == section_key]
-            # Debugging if no students match
-            if not enrolled and all_students:
-                print(f"[ENROLL DEBUG] No match for section_key='{section_key}'")
-                sample_k = build_student_section_key(all_students[0])
-                print(f"[ENROLL DEBUG] Sample student key='{sample_k}'")
+            enrolled = [
+                s for s in all_students 
+                if build_student_section_key(s) == section_key 
+                and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
+            ]
 
         # Fallback: if no students found via section_key, try exact database query
         if (not is_school_event) and (not enrolled) and program and year_level and section_val:
             with get_db() as _conn:
-                _rows = _conn.execute(
-                    "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
-                    (program, year_level, section_val)
-                ).fetchall()
+                if sess_semester:
+                    _rows = _conn.execute(
+                        "SELECT * FROM students WHERE program=? AND year_level=? AND section=? AND lower(trim(semester))=?",
+                        (program, year_level, section_val, sess_semester)
+                    ).fetchall()
+                else:
+                    _rows = _conn.execute(
+                        "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
+                        (program, year_level, section_val)
+                    ).fetchall()
             enrolled = [_student_row(r) for r in _rows]
 
         for s in enrolled:
@@ -5257,14 +5321,15 @@ def teacher_add_subject():
     user       = get_current_user()
     subject_id = request.form.get('subject_id','').strip()
     section_key= normalize_section_key(request.form.get('section_key','').strip())
+    semester   = normalize_semester(request.form.get('semester', '').strip())
     if not subject_id or not section_key:
         flash('Please select both a subject and a section.'); return redirect(url_for('teacher_create_session'))
     subj = db_get_subject(subject_id)
     if not subj: flash('Subject not found.'); return redirect(url_for('teacher_create_session'))
     for ms in user.get('my_subjects',[]):
-        if ms['subject_id']==subject_id and normalize_section_key(ms['section_key'])==section_key:
-            flash('Already assigned.'); return redirect(url_for('teacher_create_session'))
-    user.setdefault('my_subjects',[]).append({'subject_id':subject_id,'section_key':section_key})
+        if ms['subject_id']==subject_id and normalize_section_key(ms['section_key'])==section_key and normalize_semester(ms.get('semester'))==semester:
+            flash('Already assigned with this semester.'); return redirect(url_for('teacher_create_session'))
+    user.setdefault('my_subjects',[]).append({'subject_id':subject_id,'section_key':section_key,'semester':semester})
     db_save_user(session['username'], user)
     flash(f'Subject "{subj["name"]}" added to your schedule.')
     return redirect(url_for('teacher_create_session'))
@@ -5365,6 +5430,21 @@ def start_session():
     if session.get('role') == 'admin': return redirect(url_for('index'))
     subject_id  = request.form.get('subject_id','').strip()
     section_key = normalize_section_key(request.form.get('section_key','').strip())
+    semester    = normalize_semester(request.form.get('semester', '').strip())
+    
+    if not semester:
+        # Fallback: try to find a semester from the teacher's schedules for this subject/section
+        try:
+            with get_db() as conn:
+                sched = conn.execute(
+                    "SELECT semester FROM schedules WHERE subject_id=? AND section_key=? AND teacher_username=? LIMIT 1",
+                    (subject_id, section_key, session['username'])
+                ).fetchone()
+                if sched:
+                    semester = normalize_semester(sched['semester'])
+        except:
+            pass
+    
     if not subject_id or not section_key:
         flash('Missing subject or section.'); return redirect(url_for('teacher_create_session'))
     for s in get_active_sessions().values():
@@ -5402,6 +5482,7 @@ def start_session():
         'units':         units,
         'time_slot':     time_slot,
         'section_key':   section_key,
+        'semester':      semester,
         'teacher':       session['username'],
         'teacher_name':  session['full_name'],
         'started_at':    now.strftime('%Y-%m-%d %H:%M:%S'),
@@ -5562,11 +5643,15 @@ def live_session(sess_id):
             if section_keys:
                 section_keys_for_view = set(section_keys)
 
+    sess_semester = normalize_semester(sess.get('semester') or '')
     section_students = [
         s for s in all_students
         if build_student_section_key(s) in section_keys_for_view
-        and (s.get('student_status') or 'active') != 'graduated'  # Exclude graduated students
+        and (s.get('student_status') or 'active') != 'graduated'
+        and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
     ]
+    
+    
 
     # Ensure live view always has a usable student display name.
     normalized_students = []

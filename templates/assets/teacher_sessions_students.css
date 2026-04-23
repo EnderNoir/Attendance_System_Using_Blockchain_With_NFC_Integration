@@ -1,4 +1,4 @@
-﻿/* ── Main tabs ── */
+/* ── Main tabs ── */
   .main-tabs {
     display: flex;
     gap: 4px;
@@ -817,6 +817,16 @@
     .stud-meta {
       padding-left: 12px;
       padding-right: 12px;
+    }
+
+    .att-tab-top {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .att-tab-top .btn-export-xl {
+      width: 100%;
+      justify-content: center;
     }
 
     .sm-itabs {

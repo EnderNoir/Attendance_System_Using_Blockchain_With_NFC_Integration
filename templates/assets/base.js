@@ -527,11 +527,86 @@ window.testNFC = function(uid) {
      if (hidInput) {
        hidInput.value = uid;
        hidInput.dispatchEvent(new Event('input', { bubbles: true }));
-       for(let i=0; i<uid.length; i++) {
+        for(let i=0; i<uid.length; i++) {
           hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: uid[i] }));
-       }
-       hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
-     }
-  }
+        }
+        hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
+      }
+   }
 };
 
+/* ══ DRAGGABLE + RESIZABLE MODALS (Desktop Only, ≥769px) ══ */
+(function() {
+  const MODAL_SELECTORS = '.modal-box, .sess-modal, .stud-modal, .pm-modal, .app-dialog-box, .app-dialog';
+  const HEADER_SELECTORS = '.modal-header-cs, .sm-bar, .stud-bar, .pm-modal-header, .app-dialog-head, .app-dialog-header, .modal-header, [class*="modal-header"], [class*="-bar"]';
+
+  function findDragHandle(modal) {
+    // Try known header selectors first
+    let header = modal.querySelector(HEADER_SELECTORS);
+    if (header) return header;
+    // Fallback: use the first direct child if it looks like a header
+    const first = modal.children[0];
+    if (first && (first.tagName === 'DIV' || first.tagName === 'HEADER')) return first;
+    return null;
+  }
+
+  function initDraggable(modal) {
+    if (modal.dataset.draggableInit) return;
+    const header = findDragHandle(modal);
+    if (!header) return;
+    modal.dataset.draggableInit = '1';
+    header.style.cursor = 'grab';
+    header.title = 'Drag to reposition';
+
+    let dragging = false, startX, startY, initX, initY;
+
+    header.addEventListener('mousedown', function(e) {
+      if (window.innerWidth <= 768) return;
+      if (e.target.closest('button, a, input, select')) return;
+      dragging = true;
+      header.style.cursor = 'grabbing';
+      modal.style.transition = 'none';
+
+      // Read current translate
+      let tx = 0, ty = 0;
+      const tr = window.getComputedStyle(modal).transform;
+      if (tr && tr !== 'none') {
+        try { const m = new DOMMatrixReadOnly(tr); tx = m.m41; ty = m.m42; } catch(_) {}
+      }
+      startX = e.clientX; startY = e.clientY;
+      initX = tx; initY = ty;
+
+      function onMove(e) {
+        if (!dragging) return;
+        modal.style.transform = `translate(${initX + e.clientX - startX}px, ${initY + e.clientY - startY}px)`;
+      }
+      function onUp() {
+        dragging = false;
+        header.style.cursor = 'grab';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  function makeDraggable() {
+    if (window.innerWidth <= 768) return;
+    document.querySelectorAll(MODAL_SELECTORS).forEach(initDraggable);
+  }
+
+  // Reset transforms on resize to mobile
+  window.addEventListener('resize', function() {
+    if (window.innerWidth <= 768) {
+      document.querySelectorAll(MODAL_SELECTORS).forEach(m => {
+        m.style.transform = '';
+        m.dataset.draggableInit = '';
+      });
+    }
+  });
+
+  window.addEventListener('load', makeDraggable);
+  // Re-scan whenever any element is clicked (catches dynamically shown modals)
+  document.addEventListener('click', () => setTimeout(makeDraggable, 120));
+})();

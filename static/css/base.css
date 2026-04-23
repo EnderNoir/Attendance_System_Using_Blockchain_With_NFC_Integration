@@ -468,6 +468,11 @@
         display: none;
       }
 
+      .dash-header h1 { font-size: 20px; }
+      .pm-modal { max-width: 95vw; height: 95vh; margin: auto; }
+      .flex-stack-mobile { flex-direction: column !important; align-items: flex-start !important; }
+      .flex-stack-mobile > button, .flex-stack-mobile > .btn-export-xl, .flex-stack-mobile > .btn { width: 100% !important; margin-left: 0 !important; }
+
       .topbar-title {
         font-size: 9px;
         max-width: 160px;
@@ -2106,5 +2111,22 @@
 }
 .app-dialog-body {
   padding: 24px;
+}
+
+/* Modal Overscroll Prevention */
+.modal-box, .sess-modal, .stud-modal, .pm-modal, .app-dialog, .app-dialog-box, .end-box, .excuse-box {
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 769px) {
+  .modal-box, .sess-modal, .stud-modal, .pm-modal, .app-dialog, .app-dialog-box {
+    resize: both;
+    overflow: auto; /* resize requires overflow auto/hidden/scroll */
+  }
+}
+
+@media (max-width: 768px) {
+  .flex-stack-mobile { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+  .flex-stack-mobile > button, .flex-stack-mobile > .btn-export-xl, .flex-stack-mobile > .btn { width: 100% !important; margin-left: 0 !important; }
 }
 

@@ -1,4 +1,4 @@
-﻿/* Session rows */
+/* Session rows */
   .sess-row {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -693,6 +693,13 @@
     .att-tab-top {
       padding-left: 12px;
       padding-right: 12px;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .att-tab-top .btn-export-xl {
+      width: 100%;
+      justify-content: center;
     }
 
     .sm-itabs {

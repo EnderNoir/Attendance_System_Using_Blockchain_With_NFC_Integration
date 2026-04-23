@@ -6,9 +6,9 @@ sData = sessionsData; // alias for convenience
   const sessCache = {};
 
   function classTypeLabel(v) {
-    const t = String(v || 'lecture').toLowerCase();
+    const t = String(v || 'lecture').toLowerCase().trim();
     if (t === 'laboratory') return 'Laboratory';
-    if (t === 'school_event') return 'School Event';
+    if (t === 'school_event' || t === 'school event') return 'School Event';
     return 'Lecture';
   }
 
@@ -404,7 +404,7 @@ function renderSessModal(sessId, data) {
       const semSessions = bySem[sem];
       html += `
         <div class="sem-accordion" style="margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface);">
-          <div class="sem-accordion-header" style="padding: 12px 16px; background: rgba(45,106,39,.05); display: flex; justify-content: space-between; align-items: center; font-weight: 600;">
+          <div class="sem-accordion-header flex-stack-mobile" style="padding: 12px 16px; background: rgba(45,106,39,.05); display: flex; justify-content: space-between; align-items: center; font-weight: 600; flex-wrap: wrap; gap: 8px;">
             <div style="cursor: pointer; flex: 1;" onclick="const b=this.parentElement.nextElementSibling; const i=this.querySelector('i'); if(b.style.display==='none'){b.style.display='block';i.classList.replace('bi-chevron-down','bi-chevron-up');}else{b.style.display='none';i.classList.replace('bi-chevron-up','bi-chevron-down');}">
               <span>${sem} <span style="font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 8px;">(${semSessions.length} sessions)</span></span>
               <i class="bi bi-chevron-${sIdx === 0 ? 'up' : 'down'}" style="margin-left: 8px;"></i>

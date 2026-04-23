@@ -32,23 +32,26 @@ function loadSessionRecords() {
       }
 
       list.innerHTML = sessions
-        .map((s, i) => `
+        .map((s, i) => {
+          const ct = String(s.class_type || 'lecture').toLowerCase().trim();
+          const ctLabel = (ct === 'school_event' || ct === 'school event') ? 'School Event' : (ct === 'laboratory' ? 'Laboratory' : 'Lecture');
+          return `
     <div class="sess-card ${s.status}" style="${i > 0 ? 'margin-top:8px' : ''}">
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;font-size:13px;">${s.subject_name}${s.course_code ? ' <span style="font-family:monospace;font-size:10px;color:var(--accent);">[' + s.course_code + ']</span>' : ''}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px;display:flex;flex-wrap:wrap;gap:12px;">
           <span><i class="bi bi-person-badge"></i> ${s.teacher_name}</span>
           <span><i class="bi bi-grid"></i> ${s.section_key.replace(/\|/g, ' · ')}</span>
-          <span><i class="bi bi-tags"></i> ${(String(s.class_type || 'lecture').toLowerCase() === 'laboratory' ? 'Laboratory' : 'Lecture')}</span>
+          <span><i class="bi bi-tags"></i> ${ctLabel}</span>
           <span><i class="bi bi-clock"></i> ${s.time_slot}</span>
           <span><i class="bi bi-calendar3"></i> ${s.date}</span>
-          ${s.units ? `<span><i class="bi bi-layers"></i> ${s.units} units</span>` : ''}
+          ${s.units ? \`<span><i class="bi bi-layers"></i> \${s.units} units</span>\` : ''}
         </div>
-        ${s.excuse_note ? `<div style="font-size:11px;color:var(--warning);margin-top:6px;"><i class="bi bi-info-circle"></i> Reason: <strong>${s.excuse_note}</strong></div>` : ''}
-        ${s.tx_hash ? `<div style="font-size:10px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:5px;">
-          <i class="bi bi-blockchain"></i> TX: <code style="color:var(--accent);">${s.tx_hash.slice(0, 20)}...</code>
-          <a href="https://sepolia.etherscan.io/tx/${s.tx_hash}" target="_blank" title="View on Etherscan" style="color:var(--muted);"><i class="bi bi-box-arrow-up-right"></i></a>
-        </div>` : ''}
+        ${s.excuse_note ? \`<div style="font-size:11px;color:var(--warning);margin-top:6px;"><i class="bi bi-info-circle"></i> Reason: <strong>\${s.excuse_note}</strong></div>\` : ''}
+        ${s.tx_hash ? \`<div style="font-size:10px;color:var(--muted);margin-top:6px;display:flex;align-items:center;gap:5px;">
+          <i class="bi bi-blockchain"></i> TX: <code style="color:var(--accent);">\${s.tx_hash.slice(0, 20)}...</code>
+          <a href="https://sepolia.etherscan.io/tx/\${s.tx_hash}" target="_blank" title="View on Etherscan" style="color:var(--muted);"><i class="bi bi-box-arrow-up-right"></i></a>
+        </div>\` : ''}
       </div>
       <span style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;flex-shrink:0;
         ${s.status === 'present'
@@ -61,7 +64,8 @@ function loadSessionRecords() {
         ${s.status.charAt(0).toUpperCase() + s.status.slice(1)}
       </span>
     </div>
-  `)
+  `;
+        })
         .join('');
     })
     .catch(() => {

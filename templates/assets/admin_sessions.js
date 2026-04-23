@@ -203,7 +203,7 @@ function renderSessModal(sessId, data) {
   const s = sessionsData[sessId];
   const sts = data.students || [];
   const classType = String(s.class_type || data.class_type || 'lecture').toLowerCase();
-  const classTypeLabel = classType === 'school_event' ? 'School Event' : (classType === 'laboratory' ? 'Laboratory' : 'Lecture');
+  const classTypeLabel = (classType === 'school_event' || classType === 'school event') ? 'School Event' : (classType === 'laboratory' ? 'Laboratory' : 'Lecture');
   const teachersInvolved = (data.teachers_involved || []).join(', ') || (s.teacher_name || '-');
   const sectionsInvolved = (data.sections_involved || []).map((x) => String(x || '').replace(/\|/g, ' | ')).join(', ') || ((s.section_key || '').replace(/\|/g, ' | '));
 

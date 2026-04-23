@@ -66,7 +66,7 @@
 .ctab.active{color:var(--accent);border-bottom-color:var(--accent);}
 .cpane{display:none;padding:16px 22px 20px;}
 .cpane.active{display:block;}
-.chart-wrap{position:relative;height:260px;min-height:100px;}
+.chart-wrap{position:relative;width:100%;height:260px;min-height:100px;}
 .chart-wrap.tall{height:220px;}
 .cscroll{height:100%;overflow-y:auto;scrollbar-width:thin;}
 .cloading{position:absolute;inset:0;background:var(--surface);display:flex;align-items:center;justify-content:center;z-index:10;font-size:12px;color:var(--muted);gap:8px;border-radius:8px;}
@@ -90,7 +90,8 @@
   .ctabs{overflow-x:auto;-webkit-overflow-scrolling:touch;}
   .ctab{flex:0 0 auto;padding:10px 12px;}
   #donutContent>div{display:block !important;}
-  #donutChart{display:block;margin:0 auto 12px;width:190px !important;height:190px !important;}
+  #donutContent>div>div:first-child{margin:0 auto 12px;}
+  #donutChart{display:block;margin:0 auto;width:190px !important;height:190px !important;}
   #donutContent>div>div:last-child{width:100%;min-width:0 !important;}
 }
 

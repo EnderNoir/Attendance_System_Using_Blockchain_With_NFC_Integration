@@ -73,7 +73,7 @@
 .ctab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .cpane { display: none; padding: 18px 22px 22px; }
 .cpane.active { display: block; }
-.chart-wrap { position: relative; height: 300px; }
+.chart-wrap { position: relative; width: 100%; height: 300px; }
 .chart-wrap.tall { height: 240px; }
 .cscroll { height: 100%; overflow-y: auto; scrollbar-width: thin; }
 .cloading { position: absolute; inset: 0; background: var(--surface); display: flex; align-items: center; justify-content: center; z-index: 10; font-size: 12px; color: var(--muted); gap: 8px; border-radius: 8px; }

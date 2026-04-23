@@ -87,8 +87,8 @@
     {{ sess.subject_name }}
   </h2>
 
-  <div style="border:1px solid var(--border); border-radius:10px; overflow:hidden;">
-    <table style="width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed;">
+  <div style="border:1px solid var(--border); border-radius:10px; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+    <table style="width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; min-width:320px;">
       <tbody>
         <tr>
           <td style="width:160px; background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Instructor</td>
@@ -108,7 +108,7 @@
         </tr>
         <tr>
           <td style="background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Class Type</td>
-          <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">{{ (sess.class_type or 'Lecture')|title }}</td>
+          <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">{% if sess.class_type == 'school_event' %}School Event{% elif sess.class_type == 'laboratory' %}Laboratory{% else %}Lecture{% endif %}</td>
         </tr>
         <tr>
           <td style="background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Started At</td>

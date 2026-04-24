@@ -266,6 +266,82 @@ document.addEventListener('click', refocusNFC);
 document.addEventListener('keyup', refocusNFC);
 window.addEventListener('load', () => { if (nfcInput) nfcInput.focus(); });
 
+// ── Phone Web NFC integration ─────────────────────────────────────────────
+async function startMobileSessionNfc() {
+  const btn = document.getElementById('mobileNfcSessionBtn');
+  if (!btn) return;
+  if (btn.dataset.scanning === '1') {
+    btn.dataset.scanning = '0';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-phone"></i> Use Phone NFC Reader';
+    updateNFCStrip('', 'warning', 'Phone NFC stopped', '📱');
+    return;
+  }
+
+  const decodeRecordPayload = (record) => {
+    try {
+      const decoder = new TextDecoder();
+      const bytes = new Uint8Array(record.data.buffer || record.data);
+      if (!bytes.length) return '';
+      if (record.recordType === 'text') {
+        const langLen = bytes[0] & 0x3f;
+        return decoder.decode(bytes.slice(1 + langLen)).trim();
+      }
+      if (record.recordType === 'url') {
+        const prefixes = ['', 'http://www.', 'https://www.', 'http://', 'https://'];
+        const prefix = prefixes[bytes[0]] || '';
+        return (prefix + decoder.decode(bytes.slice(1))).trim();
+      }
+      return decoder.decode(bytes).trim();
+    } catch (_) { return ''; }
+  };
+
+  const extractUid = (event) => {
+    const fromSerial = String(event.serialNumber || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (fromSerial) return fromSerial;
+    const records = (event.message && event.message.records) ? Array.from(event.message.records) : [];
+    for (const rec of records) {
+      const raw = decodeRecordPayload(rec);
+      const normalized = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      if (normalized.length >= 4) return normalized;
+    }
+    return '';
+  };
+
+  if (!('NDEFReader' in window)) {
+    updateNFCStrip('', 'error', 'Phone NFC unavailable on this browser', '✕');
+    return;
+  }
+  try {
+    btn.disabled = true;
+    btn.dataset.scanning = '1';
+    const ndef = new NDEFReader();
+    await ndef.scan();
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-stop-circle"></i> Stop Phone NFC';
+    updateNFCStrip('', 'active', 'Phone NFC active - tap card on phone', '📱');
+    ndef.addEventListener('readingerror', () => {
+      updateNFCStrip('', 'warning', 'Read failed - try tapping again', '⚠');
+    });
+    ndef.addEventListener('reading', (event) => {
+      if (btn.dataset.scanning !== '1') return;
+      const uid = extractUid(event);
+      if (!uid) return;
+      processNFCUid(uid);
+    });
+  } catch (e) {
+    btn.dataset.scanning = '0';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-phone"></i> Use Phone NFC Reader';
+    updateNFCStrip('', 'error', 'Unable to start phone NFC scanner', '✕');
+  }
+}
+
+const mobileNfcBtn = document.getElementById('mobileNfcSessionBtn');
+if (mobileNfcBtn) {
+  mobileNfcBtn.addEventListener('click', startMobileSessionNfc);
+}
+
 // ── Poll loop — ONLY updates status list, NEVER shows popups ─────────────
 async function poll() {
   try {

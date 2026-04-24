@@ -65,10 +65,11 @@ COLUMNS_TO_ADD = [
     ("sessions", "grace_period",    "INTEGER NOT NULL DEFAULT 15"),
     ("sessions", "auto_end_at",     "TEXT"),
     ("sessions", "schedule_id",     "TEXT DEFAULT NULL"),
-    ('schedules', 'semester', "TEXT NOT NULL DEFAULT '1st Semester'"),
-    ('sessions', 'semester', "TEXT NOT NULL DEFAULT '1st Semester'"),
-    ('sessions', 'session_tx_hash', "TEXT NOT NULL DEFAULT ''"),
-    ('sessions', 'session_block_number', "INTEGER NOT NULL DEFAULT 0"),
+    ('schedules', 'semester',              "TEXT NOT NULL DEFAULT '1st Semester'"),
+    ('schedules', 'class_type',             "TEXT NOT NULL DEFAULT 'lecture'"),
+    ('sessions', 'semester',               "TEXT NOT NULL DEFAULT '1st Semester'"),
+    ('sessions', 'session_tx_hash',        "TEXT NOT NULL DEFAULT ''"),
+    ('sessions', 'session_block_number',   "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 # Tables that must exist (created if missing)
@@ -125,6 +126,7 @@ TABLES_TO_CREATE = [
             start_time       TEXT NOT NULL DEFAULT '',
             end_time         TEXT NOT NULL DEFAULT '',
             semester         TEXT NOT NULL DEFAULT '',
+            class_type       TEXT NOT NULL DEFAULT 'lecture',
             grace_minutes    INTEGER NOT NULL DEFAULT 15,
             is_active        INTEGER NOT NULL DEFAULT 1,
             created_by       TEXT NOT NULL DEFAULT '',
@@ -201,7 +203,8 @@ def get_existing_tables(conn):
 
 
 def migrate():
-    print("[MIGRATE] Opening PostgreSQL connection")
+    backend = 'SQLite' if DATABASE_URL.lower().startswith('sqlite:///') else 'PostgreSQL'
+    print(f"[MIGRATE] Opening {backend} connection")
     conn = connect_db(DATABASE_URL)
 
     existing_tables = get_existing_tables(conn)

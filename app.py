@@ -105,6 +105,7 @@ from services.teacher_portal_routes_service import (
     teacher_records_page_impl as _teacher_records_page_impl,
     teacher_sessions_students_page_impl as _teacher_sessions_students_page_impl,
 )
+from services.ops.migrate_db import migrate as _auto_migrate
 
 AUTO_THREAD = None
 AUTO_THREAD_LOCK = Lock()
@@ -425,6 +426,14 @@ if _DB_URL_LOWER.startswith('sqlite:///'):
     _sqlite_target = DATABASE_URL[10:]
     if _sqlite_target:
         DB_FILE = _sqlite_target if os.path.isabs(_sqlite_target) else os.path.join(BASE_DIR, _sqlite_target)
+
+# --- AUTO MIGRATION ---
+try:
+    print(f"[STARTUP] Checking {DB_BACKEND} database schema...")
+    _auto_migrate()
+except Exception as _mig_err:
+    print(f"[STARTUP] Auto-migration skipped/failed: {_mig_err}")
+# ----------------------
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 UPLOAD_FOLDER_EXCUSES = os.path.join(BASE_DIR, 'static', 'uploads', 'excuses')

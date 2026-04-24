@@ -196,7 +196,9 @@
             <!-- Readable date format -->
             <span><i class="bi bi-calendar3"></i> {{ fmt_time(s.started_at) }}</span>
             {% if s.session_tx_hash %}
-            <span style="color:var(--accent);"><i class="bi bi-blockchain"></i> TX: {{ s.session_tx_hash[:10] }}...</span>
+            <a href="https://sepolia.etherscan.io/tx/{{ s.session_tx_hash }}" target="_blank" style="text-decoration:none;color:inherit;">
+              <span style="color:var(--accent);"><i class="bi bi-blockchain"></i> TX: {{ s.session_tx_hash[:10] }}...</span>
+            </a>
             {% endif %}
           </div>
           <div class="sc-badges">

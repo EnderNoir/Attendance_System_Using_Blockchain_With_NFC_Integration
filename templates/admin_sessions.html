@@ -222,7 +222,9 @@
         <div class="sr-sub">
           {{ (s.section_key or '').replace('|',' | ') }} | {{ s.semester or 'Any Semester' }} | {{ s.teacher_name }} | {{ s.get('class_type','lecture')|title }} | {{ fmt_time(s.ended_at) }}
           {% if s.session_tx_hash %}
-          | <span style="color:var(--accent);font-weight:600;"><i class="bi bi-blockchain"></i> TX: {{ s.session_tx_hash[:10] }}...</span>
+          | <a href="https://sepolia.etherscan.io/tx/{{ s.session_tx_hash }}" target="_blank" style="text-decoration:none;color:inherit;">
+              <span style="color:var(--accent);font-weight:600;"><i class="bi bi-blockchain"></i> TX: {{ s.session_tx_hash[:10] }}...</span>
+            </a>
           {% endif %}
         </div>
       </div>

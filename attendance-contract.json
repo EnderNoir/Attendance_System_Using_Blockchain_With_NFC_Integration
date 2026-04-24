@@ -1,0 +1,520 @@
+{
+  "abi": [
+    {
+      "type": "constructor",
+      "payable": false,
+      "inputs": []
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "AttendanceMarked",
+      "inputs": [
+        {
+          "type": "string",
+          "name": "nfcId",
+          "indexed": true
+        },
+        {
+          "type": "uint256",
+          "name": "timestamp",
+          "indexed": false
+        },
+        {
+          "type": "uint8",
+          "name": "status",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "statusLabel",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "SessionRecorded",
+      "inputs": [
+        {
+          "type": "string",
+          "name": "sessionId",
+          "indexed": true
+        },
+        {
+          "type": "string",
+          "name": "subjectName",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "teacherName",
+          "indexed": false
+        },
+        {
+          "type": "uint256",
+          "name": "startTime",
+          "indexed": false
+        },
+        {
+          "type": "uint256",
+          "name": "endTime",
+          "indexed": false
+        },
+        {
+          "type": "uint256",
+          "name": "studentCount",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "logData",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "StudentRegistered",
+      "inputs": [
+        {
+          "type": "address",
+          "name": "studentAddr",
+          "indexed": true
+        },
+        {
+          "type": "string",
+          "name": "nfcId",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "name",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "STATUS_ABSENT",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "STATUS_EXCUSED",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "STATUS_LATE",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "STATUS_PRESENT",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint8"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "admin",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "address"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "attendance",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256",
+          "name": "timestamp"
+        },
+        {
+          "type": "uint8",
+          "name": "status"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getAllSessionIds",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "string[]"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getAttendance",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_nfcId"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256[]"
+        },
+        {
+          "type": "uint8[]"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getSession",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_sessionId"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "tuple",
+          "components": [
+            {
+              "type": "string",
+              "name": "sessionId"
+            },
+            {
+              "type": "string",
+              "name": "subjectName"
+            },
+            {
+              "type": "string",
+              "name": "teacherName"
+            },
+            {
+              "type": "uint256",
+              "name": "startTime"
+            },
+            {
+              "type": "uint256",
+              "name": "endTime"
+            },
+            {
+              "type": "string[]",
+              "name": "studentNfcIds"
+            },
+            {
+              "type": "uint8[]",
+              "name": "studentStatuses"
+            },
+            {
+              "type": "uint256",
+              "name": "totalPresent"
+            },
+            {
+              "type": "uint256",
+              "name": "totalLate"
+            },
+            {
+              "type": "uint256",
+              "name": "totalAbsent"
+            },
+            {
+              "type": "uint256",
+              "name": "totalExcused"
+            },
+            {
+              "type": "string",
+              "name": "logData"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getSessionCount",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [],
+      "outputs": [
+        {
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "markAttendance",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_nfcId"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "markAttendanceWithStatus",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_nfcId"
+        },
+        {
+          "type": "uint8",
+          "name": "_status"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "recordSession",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_sessionId"
+        },
+        {
+          "type": "string",
+          "name": "_subjectName"
+        },
+        {
+          "type": "string",
+          "name": "_teacherName"
+        },
+        {
+          "type": "uint256",
+          "name": "_startTime"
+        },
+        {
+          "type": "uint256",
+          "name": "_endTime"
+        },
+        {
+          "type": "string[]",
+          "name": "_studentNfcIds"
+        },
+        {
+          "type": "uint8[]",
+          "name": "_studentStatuses"
+        },
+        {
+          "type": "string",
+          "name": "_logData"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "registerStudent",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "address",
+          "name": "_studentAddress"
+        },
+        {
+          "type": "string",
+          "name": "_nfcId"
+        },
+        {
+          "type": "string",
+          "name": "_name"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "sessionIds",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "sessionRecords",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "string",
+          "name": "sessionId"
+        },
+        {
+          "type": "string",
+          "name": "subjectName"
+        },
+        {
+          "type": "string",
+          "name": "teacherName"
+        },
+        {
+          "type": "uint256",
+          "name": "startTime"
+        },
+        {
+          "type": "uint256",
+          "name": "endTime"
+        },
+        {
+          "type": "uint256",
+          "name": "totalPresent"
+        },
+        {
+          "type": "uint256",
+          "name": "totalLate"
+        },
+        {
+          "type": "uint256",
+          "name": "totalAbsent"
+        },
+        {
+          "type": "uint256",
+          "name": "totalExcused"
+        },
+        {
+          "type": "string",
+          "name": "logData"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "studentsByAddr",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "string",
+          "name": "name"
+        },
+        {
+          "type": "string",
+          "name": "nfcId"
+        },
+        {
+          "type": "bool",
+          "name": "isRegistered"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "studentsByNfc",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "string",
+          "name": "name"
+        },
+        {
+          "type": "string",
+          "name": "nfcId"
+        },
+        {
+          "type": "bool",
+          "name": "isRegistered"
+        }
+      ]
+    }
+  ]
+}

@@ -293,6 +293,7 @@ function renderSessModal(sessId, data) {
         <th>Tapped Time</th>
         <th>Excused Reason</th>
         <th>Document</th>
+        <th>Blockchain TX</th>
       </tr></thead>
       <tbody>
         ${sts.map((st, i) => {
@@ -307,6 +308,11 @@ function renderSessModal(sessId, data) {
         ? `<span style="color:#60a5fa;font-weight:600;font-size:11px;">${reasonLabel}</span>${reasonDetail}`
         : '<span style="color:var(--muted);font-size:11px;">—</span>';
       const tap = parseTapDateTime(st.time || st.tap_time || s.started_at || '', s.started_at || '');
+      const txHash = st.tx_hash || '';
+      const txDisplay = txHash 
+        ? `<a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:none; word-break: break-all;">${txHash.slice(0, 10)}...</a>`
+        : '<span style="color:var(--muted);font-size:11px;">—</span>';
+
       return `<tr>
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '—'}</td>
@@ -318,6 +324,7 @@ function renderSessModal(sessId, data) {
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
             <td style="font-size:11px;">${reasonHtml}</td>
             <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
+            <td>${txDisplay}</td>
           </tr>`;
     }).join('')}
       </tbody>

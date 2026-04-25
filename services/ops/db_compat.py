@@ -105,6 +105,11 @@ class CompatCursor:
                 rewritten = rewritten.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
             stmt = rewritten
 
+        # Handle GLOB (SQLite specific) -> replace with ~ (PostgreSQL regex)
+        if " GLOB " in up:
+            stmt = re.sub(r"GLOB\s+'\[([^\]]+)\]\*'", r"~ '^[\1].*'", stmt, flags=re.IGNORECASE)
+            stmt = stmt.replace(" GLOB ", " ~ ")
+
         stmt = stmt.replace("?", "%s")
         return stmt, None
 

@@ -110,6 +110,17 @@ class CompatCursor:
             stmt = re.sub(r"GLOB\s+'\[([^\]]+)\]\*'", r"~ '^[\1].*'", stmt, flags=re.IGNORECASE)
             stmt = stmt.replace(" GLOB ", " ~ ")
 
+        # For PostgreSQL, append RETURNING id to INSERT statements to emulate lastrowid
+        id_tables = ["no_class_days", "attendance_logs", "excuse_requests", "nfc_scanner", "nfc_registration"]
+        if up.startswith("INSERT INTO") and "RETURNING" not in up:
+            target_table = None
+            for t in id_tables:
+                if t.upper() in up:
+                    target_table = t
+                    break
+            if target_table:
+                stmt = stmt.rstrip().rstrip(";") + " RETURNING id"
+
         stmt = stmt.replace("?", "%s")
         return stmt, None
 
@@ -141,6 +152,15 @@ class CompatCursor:
         self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
         self._empty_result = None
         return self
+
+    @property
+    def lastrowid(self):
+        """Emulate SQLite's lastrowid for PostgreSQL via the underlying cursor."""
+        try:
+            row = self._cursor.fetchone()
+            return row[0] if row else None
+        except Exception:
+            return None
 
     def fetchone(self):
         if self._empty_result is not None:

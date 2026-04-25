@@ -764,6 +764,19 @@ def get_db():
                 stmt = re.sub(r"GLOB\s+'\[([^\]]+)\]\*'", r"~ '^[\1].*'", stmt, flags=re.IGNORECASE)
                 stmt = stmt.replace(' GLOB ', ' ~ ')
 
+            # For PostgreSQL, append RETURNING id to INSERT statements to emulate lastrowid
+            # Only for tables that actually use 'id' as their primary key
+            id_tables = ['no_class_days', 'attendance_logs', 'excuse_requests', 'nfc_scanner', 'nfc_registration']
+            if up.startswith('INSERT INTO') and 'RETURNING' not in up:
+                target_table = None
+                for t in id_tables:
+                    if t.upper() in up:
+                        target_table = t
+                        break
+                
+                if target_table:
+                    stmt = stmt.rstrip().rstrip(';') + ' RETURNING id'
+
             stmt = stmt.replace('?', '%s')
             return stmt, None
 
@@ -818,7 +831,12 @@ def get_db():
         def lastrowid(self):
             """Emulate SQLite's lastrowid for PostgreSQL via the underlying cursor."""
             try:
-                return self._cursor.fetchone()[0]
+                # If we appended RETURNING id, it's available via fetchone
+                # Note: This row was already fetched if execute() called it, 
+                # but psycopg2 cursors don't cache fetch results like that.
+                # Actually, our execute() doesn't fetch it yet.
+                row = self._cursor.fetchone()
+                return row[0] if row else None
             except Exception:
                 return None
 
@@ -2270,7 +2288,7 @@ def db_save_no_class_day(item: dict) -> int:
                 now,
             ),
         )
-        return int(cur.lastrowid)
+        return int(cur.lastrowid or 0)
 
 
 def db_delete_no_class_day(no_class_day_id: int) -> None:

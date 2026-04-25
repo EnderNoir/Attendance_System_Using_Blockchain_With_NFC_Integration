@@ -758,6 +758,12 @@ def get_db():
                 if 'ON CONFLICT' not in stmt.upper():
                     stmt = stmt.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
 
+            # Handle GLOB (SQLite specific) -> replace with ~ (PostgreSQL regex)
+            # Example: GLOB '[0-9]*' -> ~ '^[0-9].*'
+            if ' GLOB ' in up:
+                stmt = re.sub(r"GLOB\s+'\[([^\]]+)\]\*'", r"~ '^[\1].*'", stmt, flags=re.IGNORECASE)
+                stmt = stmt.replace(' GLOB ', ' ~ ')
+
             stmt = stmt.replace('?', '%s')
             return stmt, None
 

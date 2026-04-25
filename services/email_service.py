@@ -38,6 +38,7 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
         try:
             import smtplib
             import ssl
+            import socket
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
 
@@ -61,10 +62,23 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
             port = int(cfg.get('smtp_port', 587))
             host = cfg.get('smtp_host', 'smtp.gmail.com')
 
+            # Force IPv4 resolution
+            try:
+                addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+                target_ip = addr_info[0][4][0]
+            except:
+                target_ip = host
+
             if port == 465:
-                srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=15)
+                try:
+                    srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=15)
+                except:
+                    srv = smtplib.SMTP_SSL(target_ip, port, context=ctx, timeout=15)
             else:
-                srv = smtplib.SMTP(host, port, timeout=15)
+                try:
+                    srv = smtplib.SMTP(host, port, timeout=15)
+                except:
+                    srv = smtplib.SMTP(target_ip, port, timeout=15)
                 srv.ehlo()
                 srv.starttls(context=ctx)
                 srv.ehlo()

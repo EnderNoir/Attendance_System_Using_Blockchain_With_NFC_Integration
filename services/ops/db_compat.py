@@ -1,6 +1,5 @@
 import os
 import re
-import sqlite3
 import psycopg2
 
 
@@ -101,9 +100,10 @@ class CompatCursor:
                 stmt = re.sub(r"INSERT\s+OR\s+REPLACE\s+INTO", "INSERT INTO", stmt, flags=re.IGNORECASE)
 
         if re.search(r"INSERT\s+OR\s+IGNORE\s+INTO", stmt, flags=re.IGNORECASE):
-            stmt = re.sub(r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT INTO", stmt, flags=re.IGNORECASE)
-            if "ON CONFLICT" not in stmt.upper():
-                stmt = stmt.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+            rewritten = re.sub(r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT INTO", stmt, flags=re.IGNORECASE)
+            if "ON CONFLICT" not in rewritten.upper():
+                rewritten = rewritten.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+            stmt = rewritten
 
         stmt = stmt.replace("?", "%s")
         return stmt, None
@@ -198,16 +198,9 @@ class CompatConnection:
 
 def connect_db(database_url=None):
     dsn = (database_url or os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@localhost:5432/davs").strip()
-    dsn_lower = dsn.lower()
-
-    if dsn_lower.startswith("sqlite:///"):
-        sqlite_target = dsn[10:]
-        if not sqlite_target:
-            sqlite_target = "davs.db"
-        db_path = sqlite_target if os.path.isabs(sqlite_target) else os.path.abspath(sqlite_target)
-        conn = sqlite3.connect(db_path)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys=ON")
-        return conn
+    
+    # Handle Railway/Heroku postgres:// prefix
+    if dsn.startswith('postgres://'):
+        dsn = dsn.replace('postgres://', 'postgresql://', 1)
 
     return CompatConnection(dsn)

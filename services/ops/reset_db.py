@@ -32,8 +32,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # ── Config ────────────────────────────────────────────────────────────────────
-DATABASE_URL   = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs')
-DB_BACKEND     = 'sqlite' if DATABASE_URL.lower().startswith('sqlite:///') else 'postgres'
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs').strip()
+
+# Handle Railway/Heroku postgres:// prefix
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+DB_BACKEND = 'postgres'
 CONTRACT_FILE  = os.path.join(BASE_DIR, 'attendance-contract.json')
 UPLOAD_FOLDER  = os.path.join(BASE_DIR, 'static', 'uploads')
 
@@ -53,17 +58,11 @@ def sep():     print("  " + "─" * 50)
 
 
 def _table_exists(conn, table_name):
-    if DB_BACKEND == 'sqlite':
-        row = conn.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
-            (table_name,),
-        ).fetchone()
-    else:
-        row = conn.execute(
-            "SELECT COUNT(*) FROM information_schema.tables "
-            "WHERE table_schema='public' AND table_name=?",
-            (table_name,),
-        ).fetchone()
+    row = conn.execute(
+        "SELECT COUNT(*) FROM information_schema.tables "
+        "WHERE table_schema='public' AND table_name=?",
+        (table_name,),
+    ).fetchone()
     return bool(row and row[0])
 
 # ── STEP 1: Verify DB exists ──────────────────────────────────────────────────

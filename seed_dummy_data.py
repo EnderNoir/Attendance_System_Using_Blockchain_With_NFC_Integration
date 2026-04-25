@@ -58,7 +58,11 @@ from services.ops.db_compat import connect_db
 
 # ── Config ──────────────────────────────────────────────────────────────────
 BASE_DIR             = os.path.dirname(os.path.abspath(__file__))
-DATABASE_URL         = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs').strip()
+
+# Handle Railway/Heroku postgres:// prefix
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 PASSWORD             = 'test123'
 STUDENTS_PER_SECTION = 30
 MIN_SESSIONS_PER_SECTION = 10

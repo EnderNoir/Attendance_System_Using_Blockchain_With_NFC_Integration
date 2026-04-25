@@ -8,7 +8,7 @@ from collections import deque
 from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
 import secrets as _sec
-import psycopg2
+import psycopg2, socket
 
 from dotenv import load_dotenv
 # pdfminer is imported inside parse_registration_pdf() so a startup
@@ -4066,13 +4066,30 @@ def admin_settings_test():
         </div>''', 'html'))
         ctx  = ssl.create_default_context()
         port = int(cfg.get('smtp_port', 587))
-        with smtplib.SMTP(cfg['smtp_host'], port, timeout=10) as srv:
-            srv.ehlo(); srv.starttls(context=ctx)
-            srv.login(cfg['smtp_user'], cfg['smtp_password'])
-            srv.sendmail(msg['From'], [test_to], msg.as_string())
-        return jsonify({'ok': True, 'message': f'Test email sent to {test_to}'})
+        host = cfg.get('smtp_host', 'smtp.gmail.com')
+        
+        try:
+            if port == 465:
+                # SSL Connection (typically for Port 465)
+                srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=15)
+            else:
+                # Standard Connection with STARTTLS (typically for Port 587)
+                srv = smtplib.SMTP(host, port, timeout=15)
+                srv.ehlo()
+                srv.starttls(context=ctx)
+                srv.ehlo()
+            
+            with srv:
+                srv.login(cfg['smtp_user'], cfg['smtp_password'])
+                srv.sendmail(msg['From'], [test_to], msg.as_string())
+            return jsonify({'ok': True, 'message': f'Test email sent to {test_to}'})
+        except (socket.error, smtplib.SMTPException) as e:
+            err_msg = str(e)
+            if "101" in err_msg or "unreachable" in err_msg.lower():
+                return jsonify({'ok': False, 'message': f'Network Error: Port {port} appears to be blocked by your host (Railway). Try switching to Port 587 or 465, or verify your SMTP Host.'})
+            return jsonify({'ok': False, 'message': f'SMTP Error: {err_msg}'})
     except Exception as e:
-        return jsonify({'ok': False, 'message': str(e)})
+        return jsonify({'ok': False, 'message': f'Error: {str(e)}'})
 
 
 # ═══════════════════════════════════════════════════════════════════════════

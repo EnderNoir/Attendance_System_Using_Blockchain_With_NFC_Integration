@@ -59,9 +59,17 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
 
             ctx = ssl.create_default_context()
             port = int(cfg.get('smtp_port', 587))
-            with smtplib.SMTP(cfg['smtp_host'], port, timeout=10) as srv:
+            host = cfg.get('smtp_host', 'smtp.gmail.com')
+
+            if port == 465:
+                srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=15)
+            else:
+                srv = smtplib.SMTP(host, port, timeout=15)
                 srv.ehlo()
                 srv.starttls(context=ctx)
+                srv.ehlo()
+
+            with srv:
                 srv.login(cfg['smtp_user'], cfg['smtp_password'])
                 srv.sendmail(msg['From'], recipients, msg.as_string())
             print(f'[EMAIL] Sent "{subject}" to {recipients}')

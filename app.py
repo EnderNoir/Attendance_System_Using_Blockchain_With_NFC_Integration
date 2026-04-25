@@ -418,11 +418,26 @@ except Exception as _ce:
 
 BLOCKCHAIN_LOCK = Lock()
 BASE_DIR      = os.path.dirname(__file__)
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs').strip()
+DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
+
+# Detect environment
+IS_RAILWAY = os.getenv('RAILWAY_ENVIRONMENT_ID') is not None or os.getenv('RAILWAY_STATIC_URL') is not None
+IS_PROD = IS_RAILWAY or os.getenv('NODE_ENV') == 'production'
 
 # Handle Railway/Heroku postgres:// prefix
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+# Default to localhost ONLY if not in production/Railway
+if not DATABASE_URL:
+    if IS_RAILWAY:
+        print("\n" + "!"*80)
+        print("CRITICAL ERROR: DATABASE_URL is NOT set in Railway environment variables!")
+        print("Please add a PostgreSQL service and link it to this project.")
+        print("!"*80 + "\n")
+    else:
+        # Fallback for local development
+        DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/davs'
 
 DB_BACKEND = 'postgres'
 
@@ -2842,7 +2857,22 @@ def load_student_names():
     if student_name_map:
         print(f"[INFO] Loaded {len(student_name_map)} student names from PostgreSQL.")
 
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print("\n" + "="*80)
+    print(f"DATABASE INITIALIZATION FAILED: {e}")
+    if IS_RAILWAY:
+        print("\nDIAGNOSTIC FOR RAILWAY:")
+        print("1. Ensure you have added a PostgreSQL service to your project.")
+        print("2. Ensure DATABASE_URL is present in your app's Variables tab.")
+        print("3. If using Railway's default PostgreSQL, it should be auto-injected.")
+        print("4. Check if the PostgreSQL service is 'Healthy' in the Railway dashboard.")
+    print("="*80 + "\n")
+    # If we are in production, we should probably exit so Railway knows it failed
+    if IS_PROD:
+        import sys
+        sys.exit(3)
 migrate_json_to_postgres()
 sessions_db = load_sessions()
 

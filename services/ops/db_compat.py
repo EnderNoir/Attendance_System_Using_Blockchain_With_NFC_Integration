@@ -197,10 +197,22 @@ class CompatConnection:
 
 
 def connect_db(database_url=None):
-    dsn = (database_url or os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@localhost:5432/davs").strip()
+    dsn = (database_url or os.getenv("DATABASE_URL") or "").strip()
+    
+    # Detect environment
+    is_railway = os.getenv('RAILWAY_ENVIRONMENT_ID') is not None or os.getenv('RAILWAY_STATIC_URL') is not None
     
     # Handle Railway/Heroku postgres:// prefix
     if dsn.startswith('postgres://'):
         dsn = dsn.replace('postgres://', 'postgresql://', 1)
+
+    # Default logic
+    if not dsn:
+        if is_railway:
+            # We are on Railway but DATABASE_URL is missing
+            raise RuntimeError("CRITICAL: DATABASE_URL is missing in Railway environment!")
+        else:
+            # Local development fallback
+            dsn = "postgresql://postgres:postgres@localhost:5432/davs"
 
     return CompatConnection(dsn)

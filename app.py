@@ -442,11 +442,7 @@ if not DATABASE_URL:
 DB_BACKEND = 'postgres'
 
 # --- AUTO MIGRATION ---
-try:
-    print(f"[STARTUP] Checking {DB_BACKEND} database schema...")
-    _auto_migrate()
-except Exception as _mig_err:
-    print(f"[STARTUP] Auto-migration skipped/failed: {_mig_err}")
+# Moved to the end of the script (after init_db) to ensure base tables exist.
 # ----------------------
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')

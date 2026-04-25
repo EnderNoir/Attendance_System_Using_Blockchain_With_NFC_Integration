@@ -9,6 +9,7 @@ def attendance_stats_impl(
     get_db_fn,
     normalize_section_key_fn,
     jsonify_fn,
+    now_local_fn,
 ):
     period = request_obj.args.get('period', 'today')
     f_month = request_obj.args.get('month', '').strip()
@@ -23,7 +24,7 @@ def attendance_stats_impl(
     f_class_type = request_obj.args.get('class_type', '').strip().lower()
     role = session_obj.get('role')
     username = session_obj.get('username')
-    now = datetime.now()
+    now = now_local_fn()
 
     if not f_year_num:
         # Backward compatibility for older clients still using `year`.
@@ -45,10 +46,13 @@ def attendance_stats_impl(
         start_dt = datetime(2000, 1, 1)
         end_dt = None
 
-    where = ['s.started_at::date >= ?']
+    # PostgreSQL strict casting for TEXT timestamps
+    ts_cast = "TO_TIMESTAMP(s.started_at, 'YYYY-MM-DD HH24:MI:SS')"
+    
+    where = [f"{ts_cast}::date >= ?"]
     params = [start_dt.strftime('%Y-%m-%d')]
     if end_dt:
-        where.append('s.started_at::date <= ?')
+        where.append(f"{ts_cast}::date <= ?")
         params.append(end_dt.strftime('%Y-%m-%d'))
     if role == 'teacher':
         where.append('s.teacher_username = ?')
@@ -75,9 +79,9 @@ def attendance_stats_impl(
         where.append('LOWER(COALESCE(s.class_type,\'lecture\')) = ?')
         params.append(f_class_type)
     if f_tod == 'morning':
-        where.append('EXTRACT(HOUR FROM s.started_at::timestamp) < 12')
+        where.append(f"EXTRACT(HOUR FROM {ts_cast}) < 12")
     elif f_tod == 'afternoon':
-        where.append('EXTRACT(HOUR FROM s.started_at::timestamp) >= 12')
+        where.append(f"EXTRACT(HOUR FROM {ts_cast}) >= 12")
     elif f_tod and ':' in f_tod:
         where.append('s.time_slot = ?')
         params.append(f_tod)
@@ -85,13 +89,13 @@ def attendance_stats_impl(
     wsql = ' AND '.join(where)
 
     if period == 'today':
-        tkey_expr = "TO_CHAR(s.started_at::timestamp, 'HH24:00')"
+        tkey_expr = f"TO_CHAR({ts_cast}, 'HH24:00')"
     elif period == 'month':
-        tkey_expr = "TO_CHAR(s.started_at::date, 'MM/DD')"
+        tkey_expr = f"TO_CHAR({ts_cast}, 'MM/DD')"
     elif period == 'year':
-        tkey_expr = "TO_CHAR(s.started_at::date, 'MM')"
+        tkey_expr = f"TO_CHAR({ts_cast}, 'MM')"
     else:
-        tkey_expr = "TO_CHAR(s.started_at::date, 'YYYY')"
+        tkey_expr = f"TO_CHAR({ts_cast}, 'YYYY')"
 
     params = tuple(params)
 

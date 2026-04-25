@@ -4069,6 +4069,12 @@ def admin_settings_test():
         host = cfg.get('smtp_host', 'smtp.gmail.com')
         
         try:
+            # DNS Check
+            try:
+                ip = socket.gethostbyname(host)
+            except Exception as dns_e:
+                return jsonify({'ok': False, 'message': f'DNS Error: Could not resolve {host}. Check your internet connection or SMTP Host setting. ({str(dns_e)})'})
+            
             if port == 465:
                 # SSL Connection (typically for Port 465)
                 srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=15)
@@ -4086,7 +4092,7 @@ def admin_settings_test():
         except (socket.error, smtplib.SMTPException) as e:
             err_msg = str(e)
             if "101" in err_msg or "unreachable" in err_msg.lower():
-                return jsonify({'ok': False, 'message': f'Network Error: Port {port} appears to be blocked by your host (Railway). Try switching to Port 587 or 465, or verify your SMTP Host.'})
+                return jsonify({'ok': False, 'message': f'Network Error (Port {port}): {err_msg}. This usually means {host}:{port} is blocked or unreachable from this server.'})
             return jsonify({'ok': False, 'message': f'SMTP Error: {err_msg}'})
     except Exception as e:
         return jsonify({'ok': False, 'message': f'Error: {str(e)}'})
@@ -6186,6 +6192,7 @@ def attendance_stats():
         get_db_fn=get_db,
         normalize_section_key_fn=normalize_section_key,
         jsonify_fn=jsonify,
+        now_local_fn=_now_local,
     )
 
 @app.route('/api/block_number')
@@ -6676,6 +6683,7 @@ def export_stats_xlsx():
         db_get_session_attendance_fn=db_get_session_attendance,
         get_db_fn=get_db,
         xl_helpers_fn=_xl_helpers,
+        now=_now_local(),
     )
 
 

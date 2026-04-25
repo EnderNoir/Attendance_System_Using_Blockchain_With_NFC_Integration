@@ -18,6 +18,7 @@ def export_stats_xlsx_impl(
     db_get_session_attendance_fn,
     get_db_fn,
     xl_helpers_fn,
+    now=None,
 ):
     """Unified analytics export - GET or POST. Produces rich multi-sheet workbook."""
     try:
@@ -69,7 +70,8 @@ def export_stats_xlsx_impl(
 
         role = session_obj.get('role')
         username = session_obj.get('username')
-        now = datetime.now()
+        if now is None:
+            now = datetime.now()
         if not f_year_num:
             f_year_num = (
                 qp('year') if request_obj.method == 'POST' else request_obj.args.get('year', '').strip()

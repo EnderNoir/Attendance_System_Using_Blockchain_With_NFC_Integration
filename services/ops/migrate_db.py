@@ -15,7 +15,11 @@ from services.ops.db_compat import connect_db
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs')
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs').strip()
+
+# Handle Railway/Heroku postgres:// prefix
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
 # All columns that should exist across all tables.
 # Format: (table, column_name, definition)
@@ -203,8 +207,7 @@ def get_existing_tables(conn):
 
 
 def migrate():
-    backend = 'SQLite' if DATABASE_URL.lower().startswith('sqlite:///') else 'PostgreSQL'
-    print(f"[MIGRATE] Opening {backend} connection")
+    print(f"[MIGRATE] Opening PostgreSQL connection")
     conn = connect_db(DATABASE_URL)
 
     existing_tables = get_existing_tables(conn)

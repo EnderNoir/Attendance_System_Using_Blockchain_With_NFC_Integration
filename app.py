@@ -418,14 +418,13 @@ except Exception as _ce:
 
 BLOCKCHAIN_LOCK = Lock()
 BASE_DIR      = os.path.dirname(__file__)
-DB_FILE       = os.path.join(BASE_DIR, 'davs.db')
-DATABASE_URL  = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs').strip()
-_DB_URL_LOWER = DATABASE_URL.lower()
-DB_BACKEND    = 'postgres' if _DB_URL_LOWER.startswith(('postgres://', 'postgresql://')) else 'sqlite'
-if _DB_URL_LOWER.startswith('sqlite:///'):
-    _sqlite_target = DATABASE_URL[10:]
-    if _sqlite_target:
-        DB_FILE = _sqlite_target if os.path.isabs(_sqlite_target) else os.path.join(BASE_DIR, _sqlite_target)
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/davs').strip()
+
+# Handle Railway/Heroku postgres:// prefix
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+DB_BACKEND = 'postgres'
 
 # --- AUTO MIGRATION ---
 try:
@@ -657,212 +656,204 @@ class _PgConnCompat:
 
 
 def get_db():
-    if DB_BACKEND == 'postgres':
-        class _CompatRow(dict):
-            def __init__(self, keys, values):
-                super().__init__(zip(keys, values))
-                self._keys = list(keys)
-                self._values = list(values)
+    class _CompatRow(dict):
+        def __init__(self, keys, values):
+            super().__init__(zip(keys, values))
+            self._keys = list(keys)
+            self._values = list(values)
 
-            def __getitem__(self, key):
-                if isinstance(key, int):
-                    return self._values[key]
-                return super().__getitem__(key)
+        def __getitem__(self, key):
+            if isinstance(key, int):
+                return self._values[key]
+            return super().__getitem__(key)
 
-        class _CompatCursor:
-            def __init__(self, cursor):
-                self._cursor = cursor
-                self._keys = []
+    class _CompatCursor:
+        def __init__(self, cursor):
+            self._cursor = cursor
+            self._keys = []
 
-            def _rewrite_insert_or_replace(self, stmt):
-                match = re.match(
-                    r'^INSERT\s+OR\s+REPLACE\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)\s*;?$',
-                    stmt,
-                    flags=re.IGNORECASE | re.DOTALL,
-                )
-                if not match:
-                    return None
+        def _rewrite_insert_or_replace(self, stmt):
+            match = re.match(
+                r'^INSERT\s+OR\s+REPLACE\s+INTO\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)\s*;?$',
+                stmt,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if not match:
+                return None
 
-                table_name = match.group(1)
-                columns = [column.strip().strip('"') for column in match.group(2).split(',')]
-                values_clause = match.group(3).strip()
-                conflict_column = 'id' if 'id' in columns else columns[0]
-                update_columns = [column for column in columns if column != conflict_column]
+            table_name = match.group(1)
+            columns = [column.strip().strip('"') for column in match.group(2).split(',')]
+            values_clause = match.group(3).strip()
+            conflict_column = 'id' if 'id' in columns else columns[0]
+            update_columns = [column for column in columns if column != conflict_column]
 
-                if update_columns:
-                    updates = ', '.join(f'{column}=EXCLUDED.{column}' for column in update_columns)
-                    return (
-                        f'INSERT INTO {table_name} ({", ".join(columns)}) '
-                        f'VALUES ({values_clause}) '
-                        f'ON CONFLICT ({conflict_column}) DO UPDATE SET {updates}'
-                    )
-
+            if update_columns:
+                updates = ', '.join(f'{column}=EXCLUDED.{column}' for column in update_columns)
                 return (
                     f'INSERT INTO {table_name} ({", ".join(columns)}) '
                     f'VALUES ({values_clause}) '
-                    f'ON CONFLICT ({conflict_column}) DO NOTHING'
+                    f'ON CONFLICT ({conflict_column}) DO UPDATE SET {updates}'
                 )
 
-            def _rewrite_sql(self, sql):
-                stmt = (sql or '').strip()
-                if not stmt:
-                    return stmt, None
+            return (
+                f'INSERT INTO {table_name} ({", ".join(columns)}) '
+                f'VALUES ({values_clause}) '
+                f'ON CONFLICT ({conflict_column}) DO NOTHING'
+            )
 
-                up = stmt.upper()
-                if up.startswith('PRAGMA JOURNAL_MODE') or up.startswith('PRAGMA FOREIGN_KEYS'):
-                    return None, []
-
-                m = re.match(r'^PRAGMA\s+TABLE_INFO\(([^\)]+)\)\s*$', stmt, flags=re.IGNORECASE)
-                if m:
-                    table_name = m.group(1).strip().strip('"\'')
-                    qry = (
-                        "SELECT (ordinal_position - 1) AS cid, "
-                        "column_name AS name, data_type AS type, "
-                        "0 AS notnull, column_default AS dflt_value, 0 AS pk "
-                        "FROM information_schema.columns "
-                        "WHERE table_schema='public' AND table_name=%s "
-                        "ORDER BY ordinal_position"
-                    )
-                    return qry, (table_name,)
-
-                if "FROM SQLITE_MASTER" in up:
-                    return (
-                        "SELECT table_name AS name "
-                        "FROM information_schema.tables "
-                        "WHERE table_schema='public' AND table_type='BASE TABLE'"
-                    ), None
-
-                stmt = re.sub(
-                    r'INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT',
-                    'BIGSERIAL PRIMARY KEY',
-                    stmt,
-                    flags=re.IGNORECASE,
-                )
-                if re.search(r'INSERT\s+OR\s+REPLACE\s+INTO', stmt, flags=re.IGNORECASE):
-                    rewritten = self._rewrite_insert_or_replace(stmt)
-                    if rewritten:
-                        stmt = rewritten
-                    else:
-                        stmt = re.sub(r'INSERT\s+OR\s+REPLACE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
-                if re.search(r'INSERT\s+OR\s+IGNORE\s+INTO', stmt, flags=re.IGNORECASE):
-                    stmt = re.sub(r'INSERT\s+OR\s+IGNORE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
-                    if 'ON CONFLICT' not in stmt.upper():
-                        stmt = stmt.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
-
-                stmt = stmt.replace('?', '%s')
+        def _rewrite_sql(self, sql):
+            stmt = (sql or '').strip()
+            if not stmt:
                 return stmt, None
 
-            def execute(self, sql, params=None):
-                rewritten, forced_params = self._rewrite_sql(sql)
-                if rewritten is None:
-                    self._keys = []
-                    self._empty = forced_params or []
-                    return self
+            up = stmt.upper()
+            if up.startswith('PRAGMA JOURNAL_MODE') or up.startswith('PRAGMA FOREIGN_KEYS'):
+                return None, []
 
-                run_params = forced_params if forced_params is not None else params
-                if run_params is None:
-                    self._cursor.execute(rewritten)
+            m = re.match(r'^PRAGMA\s+TABLE_INFO\(([^\)]+)\)\s*$', stmt, flags=re.IGNORECASE)
+            if m:
+                table_name = m.group(1).strip().strip('"\'')
+                qry = (
+                    "SELECT (ordinal_position - 1) AS cid, "
+                    "column_name AS name, data_type AS type, "
+                    "0 AS notnull, column_default AS dflt_value, 0 AS pk "
+                    "FROM information_schema.columns "
+                    "WHERE table_schema='public' AND table_name=%s "
+                    "ORDER BY ordinal_position"
+                )
+                return qry, (table_name,)
+
+            if "FROM SQLITE_MASTER" in up:
+                return (
+                    "SELECT table_name AS name "
+                    "FROM information_schema.tables "
+                    "WHERE table_schema='public' AND table_type='BASE TABLE'"
+                ), None
+
+            stmt = re.sub(
+                r'INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT',
+                'BIGSERIAL PRIMARY KEY',
+                stmt,
+                flags=re.IGNORECASE,
+            )
+            if re.search(r'INSERT\s+OR\s+REPLACE\s+INTO', stmt, flags=re.IGNORECASE):
+                rewritten = self._rewrite_insert_or_replace(stmt)
+                if rewritten:
+                    stmt = rewritten
                 else:
-                    self._cursor.execute(rewritten, run_params)
-                self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
-                self._empty = None
+                    stmt = re.sub(r'INSERT\s+OR\s+REPLACE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
+            if re.search(r'INSERT\s+OR\s+IGNORE\s+INTO', stmt, flags=re.IGNORECASE):
+                stmt = re.sub(r'INSERT\s+OR\s+IGNORE\s+INTO', 'INSERT INTO', stmt, flags=re.IGNORECASE)
+                if 'ON CONFLICT' not in stmt.upper():
+                    stmt = stmt.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+
+            stmt = stmt.replace('?', '%s')
+            return stmt, None
+
+        def execute(self, sql, params=None):
+            rewritten, forced_params = self._rewrite_sql(sql)
+            if rewritten is None:
+                self._keys = []
+                self._empty = forced_params or []
                 return self
 
-            def executemany(self, sql, seq_of_params):
-                rewritten, forced_params = self._rewrite_sql(sql)
-                if rewritten is None:
-                    self._keys = []
-                    self._empty = []
-                    return self
-                if forced_params is not None:
-                    raise RuntimeError('Forced SQL params are not supported with executemany')
-                self._cursor.executemany(rewritten, seq_of_params)
-                self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
-                self._empty = None
+            run_params = forced_params if forced_params is not None else params
+            if run_params is None:
+                self._cursor.execute(rewritten)
+            else:
+                self._cursor.execute(rewritten, run_params)
+            self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
+            self._empty = None
+            return self
+
+        def executemany(self, sql, seq_of_params):
+            rewritten, forced_params = self._rewrite_sql(sql)
+            if rewritten is None:
+                self._keys = []
+                self._empty = []
                 return self
+            if forced_params is not None:
+                raise RuntimeError('Forced SQL params are not supported with executemany')
+            self._cursor.executemany(rewritten, seq_of_params)
+            self._keys = [d[0] for d in self._cursor.description] if self._cursor.description else []
+            self._empty = None
+            return self
 
-            def fetchone(self):
-                if self._empty is not None:
-                    return None
-                row = self._cursor.fetchone()
-                if row is None:
-                    return None
-                return _CompatRow(self._keys, row)
+        def fetchone(self):
+            if self._empty is not None:
+                return None
+            row = self._cursor.fetchone()
+            if row is None:
+                return None
+            return _CompatRow(self._keys, row)
 
-            def fetchall(self):
-                if self._empty is not None:
-                    return []
-                rows = self._cursor.fetchall()
-                return [_CompatRow(self._keys, r) for r in rows]
+        def fetchall(self):
+            if self._empty is not None:
+                return []
+            rows = self._cursor.fetchall()
+            return [_CompatRow(self._keys, r) for r in rows]
 
-            @property
-            def rowcount(self):
-                return self._cursor.rowcount
+        @property
+        def rowcount(self):
+            return self._cursor.rowcount
 
-            @property
-            def lastrowid(self):
-                """Emulate SQLite's lastrowid for PostgreSQL via the underlying cursor."""
-                try:
-                    return self._cursor.fetchone()[0]
-                except Exception:
-                    return None
+        @property
+        def lastrowid(self):
+            """Emulate SQLite's lastrowid for PostgreSQL via the underlying cursor."""
+            try:
+                return self._cursor.fetchone()[0]
+            except Exception:
+                return None
 
-            @property
-            def description(self):
-                return self._cursor.description
+        @property
+        def description(self):
+            return self._cursor.description
 
-            def close(self):
-                self._cursor.close()
+        def close(self):
+            self._cursor.close()
 
-        class _CompatConnection:
-            def __init__(self, dsn):
-                self._conn = psycopg2.connect(dsn)
-                self.row_factory = None
+    class _CompatConnection:
+        def __init__(self, dsn):
+            self._conn = psycopg2.connect(dsn)
+            self.row_factory = None
 
-            def __enter__(self):
-                return self
+        def __enter__(self):
+            return self
 
-            def __exit__(self, exc_type, exc, tb):
-                try:
-                    if exc_type is None:
-                        self._conn.commit()
-                    else:
-                        self._conn.rollback()
-                finally:
-                    self._conn.close()
-
-            def cursor(self):
-                return _CompatCursor(self._conn.cursor())
-
-            def execute(self, sql, params=None):
-                cur = self.cursor()
-                return cur.execute(sql, params)
-
-            def executemany(self, sql, seq_of_params):
-                cur = self.cursor()
-                return cur.executemany(sql, seq_of_params)
-
-            def executescript(self, sql_script):
-                for part in [p.strip() for p in (sql_script or '').split(';') if p.strip()]:
-                    self.execute(part)
-
-            def commit(self):
-                self._conn.commit()
-
-            def rollback(self):
-                self._conn.rollback()
-
-            def close(self):
+        def __exit__(self, exc_type, exc, tb):
+            try:
+                if exc_type is None:
+                    self._conn.commit()
+                else:
+                    self._conn.rollback()
+            finally:
                 self._conn.close()
 
-        return _CompatConnection(DATABASE_URL)
-    
-    import sqlite3
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA foreign_keys=ON')
-    return conn
+        def cursor(self):
+            return _CompatCursor(self._conn.cursor())
+
+        def execute(self, sql, params=None):
+            cur = self.cursor()
+            return cur.execute(sql, params)
+
+        def executemany(self, sql, seq_of_params):
+            cur = self.cursor()
+            return cur.executemany(sql, seq_of_params)
+
+        def executescript(self, sql_script):
+            for part in [p.strip() for p in (sql_script or '').split(';') if p.strip()]:
+                self.execute(part)
+
+        def commit(self):
+            self._conn.commit()
+
+        def rollback(self):
+            self._conn.rollback()
+
+        def close(self):
+            self._conn.close()
+
+    return _CompatConnection(DATABASE_URL)
 
 
 

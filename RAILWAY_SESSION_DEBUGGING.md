@@ -4,7 +4,7 @@
 
 ### Why This Happens
 
-**Session Storage:** Sessions ARE properly stored in SQLite and persist across container restarts. ✅
+**Session Storage:** Sessions ARE properly stored in PostgreSQL and persist across container restarts. ✅
 
 **Issue Identified:** Timezone mismatch between your browser local time and Railway server time.
 

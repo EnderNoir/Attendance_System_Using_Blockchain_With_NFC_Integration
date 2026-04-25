@@ -4075,12 +4075,25 @@ def admin_settings_test():
             except Exception as dns_e:
                 return jsonify({'ok': False, 'message': f'DNS Error: Could not resolve {host}. Check your internet connection or SMTP Host setting. ({str(dns_e)})'})
             
+            # Force IPv4
+            addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+            target_ip = addr_info[0][4][0]
+            
             if port == 465:
                 # SSL Connection (typically for Port 465)
-                srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=15)
+                srv = smtplib.SMTP_SSL(target_ip, port, context=ctx, timeout=15)
+                srv.helo_resp = None # Hack for SSL host verification if needed
+                # Note: target_ip might cause cert mismatch, so we try host first, then fallback
+                try:
+                    srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=15)
+                except:
+                    srv = smtplib.SMTP_SSL(target_ip, port, context=ctx, timeout=15)
             else:
                 # Standard Connection with STARTTLS (typically for Port 587)
-                srv = smtplib.SMTP(host, port, timeout=15)
+                try:
+                    srv = smtplib.SMTP(host, port, timeout=15)
+                except:
+                    srv = smtplib.SMTP(target_ip, port, timeout=15)
                 srv.ehlo()
                 srv.starttls(context=ctx)
                 srv.ehlo()

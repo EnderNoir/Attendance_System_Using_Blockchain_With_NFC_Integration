@@ -69,7 +69,7 @@
 </div>
 
 <!-- BLOCKCHAIN LOADING MODAL -->
-<div class="end-overlay" id="blockchainLoadingModal" style="z-index: 10000; align-items: center; justify-content: center; display: none;">
+<div class="end-overlay" id="blockchainLoadingModal" style="z-index: 10000; align-items: center; justify-content: center;">
   <div style="background: var(--surface); padding: 32px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; border: 1px solid rgba(45, 106, 39, 0.2); box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
     <div style="display:inline-block;width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite; margin-bottom: 16px;"></div>
     <h3 style="color: var(--accent); margin-bottom: 8px; font-size: 18px; font-weight: 700;"><i class="bi bi-cloud-arrow-up"></i> Uploading to Blockchain</h3>
@@ -80,8 +80,8 @@
 </div>
 <script>
   function showBlockchainLoading() {
-    document.getElementById('endSessionModal').style.display = 'none';
-    document.getElementById('blockchainLoadingModal').style.display = 'flex';
+    document.getElementById('endSessionModal').classList.remove('show');
+    document.getElementById('blockchainLoadingModal').classList.add('show');
     // Disable the button to prevent double-clicks
     setTimeout(() => {
       document.getElementById('btnRealEndSession').disabled = true;

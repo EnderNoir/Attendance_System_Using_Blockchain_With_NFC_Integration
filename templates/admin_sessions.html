@@ -63,6 +63,20 @@
   </div>
 </div>
 
+<!-- DELETE CONFIRMATION MODAL -->
+<div class="sess-overlay" id="deleteConfirmModal" onclick="if(event.target===this)closeDeleteModal()" style="z-index: 10000; align-items: center; justify-content: center;">
+  <div style="background: var(--surface); padding: 24px; border-radius: 12px; width: 90%; max-width: 400px; border: 1px solid var(--danger);">
+    <h3 style="color: var(--danger); margin-bottom: 12px; font-size: 18px;"><i class="bi bi-exclamation-triangle-fill"></i> Delete Session</h3>
+    <p style="font-size: 14px; color: var(--muted); margin-bottom: 24px;">
+      Are you sure you want to completely delete this session? This action cannot be undone and will permanently remove all attendance records.
+    </p>
+    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+      <button class="btn-rst" style="padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); cursor: pointer;" onclick="closeDeleteModal()">Cancel</button>
+      <button id="btnExecuteDelete" class="btn-rst" style="padding: 8px 16px; border: none; border-radius: 6px; background: var(--danger); color: white; font-weight: 600; cursor: pointer;" onclick="executeDeleteSession()">Yes, Delete Permanently</button>
+    </div>
+  </div>
+</div>
+
 <!-- Page header -->
 <div style="margin-bottom:18px;">
   <div

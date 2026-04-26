@@ -386,13 +386,23 @@ function renderSessModal(sessId, data) {
 
   function confirmDeleteSession() {
     if (!currentSessId) return;
-    if (confirm("WARNING: Are you sure you want to completely delete this session? This action cannot be undone and will permanently remove all attendance records.")) {
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '/admin/session/' + currentSessId + '/delete';
-      document.body.appendChild(form);
-      form.submit();
-    }
+    document.getElementById('deleteConfirmModal').classList.add('show');
+  }
+
+  function executeDeleteSession() {
+    if (!currentSessId) return;
+    const btn = document.getElementById('btnExecuteDelete');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass"></i> Deleting...';
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/session/' + currentSessId + '/delete';
+    document.body.appendChild(form);
+    form.submit();
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('deleteConfirmModal').classList.remove('show');
   }
 
 function exportCurrentSession() {

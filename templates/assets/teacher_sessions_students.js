@@ -227,14 +227,17 @@ function renderSessModal(sessId, data) {
       <div class="sm-info-lbl"><i class="bi bi-blockchain"></i> Session TX</div>
       <div class="sm-info-val">`;
 
-    if (s.session_tx_hash) {
+    const displayTxHash = data.session_tx_hash || s.session_tx_hash || '';
+    const displayBlockNum = data.session_block_number || s.session_block_number || '';
+
+    if (displayTxHash) {
       sessTxHtml += `
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <a href="https://sepolia.etherscan.io/tx/${s.session_tx_hash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:underline; word-break: break-all;">
-            ${s.session_tx_hash}
+          <a href="https://sepolia.etherscan.io/tx/${displayTxHash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:underline; word-break: break-all;">
+            ${displayTxHash}
           </a>
         </div>
-        ${s.session_block_number ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Block #${s.session_block_number}</div>` : ''}
+        ${displayBlockNum ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Block #${displayBlockNum}</div>` : ''}
       `;
     } else {
       sessTxHtml += `
@@ -342,13 +345,23 @@ function renderSessModal(sessId, data) {
 
   function confirmDeleteSession() {
     if (!currentSessId) return;
-    if (confirm("WARNING: Are you sure you want to completely delete this session? This action cannot be undone and will permanently remove all attendance records.")) {
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '/teacher/session/' + currentSessId + '/delete';
-      document.body.appendChild(form);
-      form.submit();
-    }
+    document.getElementById('deleteConfirmModal').classList.add('show');
+  }
+
+  function executeDeleteSession() {
+    if (!currentSessId) return;
+    const btn = document.getElementById('btnExecuteDelete');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass"></i> Deleting...';
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/teacher/session/' + currentSessId + '/delete';
+    document.body.appendChild(form);
+    form.submit();
+  }
+
+  function closeDeleteModal() {
+    document.getElementById('deleteConfirmModal').classList.remove('show');
   }
 
   function exportCurrentSession() {

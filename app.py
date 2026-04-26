@@ -3582,13 +3582,13 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
 
     all_students_list = get_all_students()
     section_key = normalize_section_key(sess.get('section_key', ''))
-    sess_semester = str(sess.get('semester') or '').strip().lower()
+    sess_semester = normalize_semester(sess.get('semester') or '')
     
     # Filter students belonging to this section & semester
     section_students = [
         s for s in all_students_list 
         if build_student_section_key(s) == section_key
-        and (not sess_semester or not s.get('semester') or str(s.get('semester')).strip().lower() == sess_semester)
+        and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
     ]
     
     if not section_students:

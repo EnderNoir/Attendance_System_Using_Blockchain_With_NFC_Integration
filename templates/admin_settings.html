@@ -39,103 +39,113 @@
   </div>
   <div class="settings-body">
 
-    <div class="info-box" style="padding:0;overflow:hidden;border:1px solid rgba(96,165,250,.2);background:rgba(96,165,250,.02);">
-      <div style="background:rgba(96,165,250,.08);padding:12px 16px;border-bottom:1px solid rgba(96,165,250,.15);
+    <div class="info-box" style="padding:0;overflow:hidden;border:1px solid rgba(96,165,250,.2);background:rgba(96,165,250,.02);border-radius:12px;">
+      <div style="background:rgba(96,165,250,.08);padding:14px 18px;border-bottom:1px solid rgba(96,165,250,.15);
                   display:flex;align-items:center;justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <i class="bi bi-rocket-takeoff-fill" style="color:#60a5fa;font-size:16px;"></i>
-          <strong style="color:var(--text);font-size:13px;">Recommended: SendGrid Setup (Most Reliable for Live Sites)</strong>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <i class="bi bi-shield-check" style="color:#60a5fa;font-size:18px;"></i>
+          <strong style="color:var(--text);font-size:14px;">SENDGRID SETUP GUIDE — STEP-BY-STEP</strong>
         </div>
-        <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;background:#60a5fa;color:#fff;padding:2px 8px;border-radius:20px;font-weight:700;">Live Ready</span>
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;background:#60a5fa;color:#fff;padding:3px 10px;border-radius:20px;font-weight:800;">RELIABLE</span>
       </div>
-      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px;">
+      <div style="padding:18px;display:flex;flex-direction:column;gap:16px;">
 
-        <div style="display:flex;gap:12px;align-items:flex-start;">
-          <div style="width:26px;height:26px;border-radius:50%;background:#60a5fa;color:#fff;
-                      display:flex;align-items:center;justify-content:center;font-size:12px;
-                      font-weight:700;flex-shrink:0;margin-top:1px;">1</div>
+        <div style="display:flex;gap:15px;align-items:flex-start;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#60a5fa;color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:13px;
+                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(96,165,250,.3);">1</div>
           <div>
-            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
-              Create a SendGrid Account
-            </div>
-            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
-              Sign up at <a href="https://sendgrid.com" target="_blank" style="color:#60a5fa;font-weight:600;">sendgrid.com</a>. 
-              The Free plan allows 100 emails/day, which is perfect for this system.
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Create your SendGrid Account</div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
+              Sign up for a free account at <a href="https://signup.sendgrid.com" target="_blank" style="color:#60a5fa;font-weight:600;text-decoration:underline;">signup.sendgrid.com</a>. 
+              The Free plan includes 100 emails per day forever.
             </div>
           </div>
         </div>
 
-        <div style="display:flex;gap:12px;align-items:flex-start;">
-          <div style="width:26px;height:26px;border-radius:50%;background:#60a5fa;color:#fff;
-                      display:flex;align-items:center;justify-content:center;font-size:12px;
-                      font-weight:700;flex-shrink:0;margin-top:1px;">2</div>
+        <div style="display:flex;gap:15px;align-items:flex-start;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#60a5fa;color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:13px;
+                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(96,165,250,.3);">2</div>
           <div>
-            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
-              Verify a Sender Identity
-            </div>
-            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
-              Go to <strong style="color:var(--text);">Settings → Sender Authentication</strong>. 
-              Complete "Single Sender Verification" by clicking the link in the email they send you.
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Verify Your "From" Email Address</div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
+              In SendGrid, go to <strong style="color:var(--text);">Settings → Sender Authentication</strong>. 
+              Click <strong style="color:var(--text);">"Verify a Single Sender"</strong>. 
+              Fill in your details (use the email you want the students to see).
               <br>
-              <span style="background:rgba(192,57,43,.08);color:var(--danger);border:1px solid rgba(192,57,43,.2);
-                           border-radius:5px;padding:2px 8px;font-size:11px;display:inline-block;margin-top:4px;">
-                ⚠ Emails will fail until your sender email is verified by SendGrid
-              </span>
+              <div style="margin-top:8px;background:rgba(239,68,68,.08);color:#ef4444;border:1px solid rgba(239,68,68,.2);
+                           border-radius:6px;padding:8px 10px;font-size:11.5px;display:inline-block;font-weight:600;">
+                <i class="bi bi-exclamation-triangle-fill"></i> CRITICAL: You must click the verification link in the email SendGrid sends you, or your emails will be blocked.
+              </div>
             </div>
           </div>
         </div>
 
-        <div style="display:flex;gap:12px;align-items:flex-start;">
-          <div style="width:26px;height:26px;border-radius:50%;background:#60a5fa;color:#fff;
-                      display:flex;align-items:center;justify-content:center;font-size:12px;
-                      font-weight:700;flex-shrink:0;margin-top:1px;">3</div>
+        <div style="display:flex;gap:15px;align-items:flex-start;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#60a5fa;color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:13px;
+                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(96,165,250,.3);">3</div>
           <div>
-            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
-              Generate API Key
-            </div>
-            <div style="font-size:12px;color:var(--muted);line-height:1.6;">
-              Go to <strong style="color:var(--text);">Settings → API Keys</strong> → Create API Key. 
-              Give it "Full Access" or "Mail Send" permissions. Copy the key (starts with <code>SG.</code>).
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Generate your API Key</div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
+              Go to <strong style="color:var(--text);">Settings → API Keys</strong>. 
+              Click <strong style="color:#60a5fa;">"Create API Key"</strong>. 
+              Name it "DAVS Attendance" and choose <strong style="color:var(--text);">"Full Access"</strong>. 
+              Copy the key (starts with <code>SG.</code>) — you won't see it again!
             </div>
           </div>
         </div>
 
-        <div style="display:flex;gap:12px;align-items:flex-start;">
-          <div style="width:26px;height:26px;border-radius:50%;background:#60a5fa;color:#fff;
-                      display:flex;align-items:center;justify-content:center;font-size:12px;
-                      font-weight:700;flex-shrink:0;margin-top:1px;">4</div>
+        <div style="display:flex;gap:15px;align-items:flex-start;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#60a5fa;color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:13px;
+                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(96,165,250,.3);">4</div>
           <div>
-            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;">
-              Enter Credentials Below
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Update Settings Below</div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px;">
+              Copy-paste these exact values into the form fields below:
             </div>
-            <table style="margin-top:8px;border-collapse:collapse;width:100%;font-size:12px;">
-              <tr style="background:rgba(96,165,250,.06);">
-                <td style="padding:6px 10px;font-weight:700;color:var(--text);border:1px solid var(--border);width:120px;">SMTP Host</td>
-                <td style="padding:6px 10px;border:1px solid var(--border);"><code>smtp.sendgrid.net</code></td>
-              </tr>
-              <tr>
-                <td style="padding:6px 10px;font-weight:700;color:var(--text);border:1px solid var(--border);">SMTP Port</td>
-                <td style="padding:6px 10px;border:1px solid var(--border);"><code>587</code></td>
-              </tr>
-              <tr style="background:rgba(96,165,250,.06);">
-                <td style="padding:6px 10px;font-weight:700;color:var(--text);border:1px solid var(--border);">SMTP Username</td>
-                <td style="padding:6px 10px;border:1px solid var(--border);"><code>apikey</code> (literally use this word)</td>
-              </tr>
-              <tr>
-                <td style="padding:6px 10px;font-weight:700;color:var(--text);border:1px solid var(--border);">Password</td>
-                <td style="padding:6px 10px;border:1px solid var(--border);">Your SendGrid API Key (SG.xxxx)</td>
-              </tr>
-            </table>
+            <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+              <table style="border-collapse:collapse;width:100%;font-size:12px;">
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:10px;font-weight:700;color:var(--text);width:140px;background:rgba(96,165,250,.04);">SMTP Host</td>
+                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">smtp.sendgrid.net</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(96,165,250,.04);">SMTP Port</td>
+                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">587</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(96,165,250,.04);">SMTP Username</td>
+                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">apikey</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(96,165,250,.04);">Password</td>
+                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">(Your SG. API Key)</td>
+                </tr>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div style="padding:10px 12px;background:rgba(245,197,24,.06);border:1px dashed rgba(245,197,24,.4);border-radius:8px;font-size:11px;">
-           <i class="bi bi-lightbulb-fill" style="color:var(--warning);"></i> 
-           <strong>Why SendGrid?</strong> Gmail often blocks connections from cloud servers like Railway to prevent spam. SendGrid is designed for apps and is much more reliable for live deployments.
+        <div style="display:flex;gap:15px;align-items:flex-start;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#10b981;color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:13px;
+                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">5</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Save and Test</div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
+              Click <strong style="color:var(--accent);">Save Settings</strong> first. 
+              Then scroll to the bottom, enter your personal email in "Send Test Email", and click 
+              <strong style="color:#60a5fa;">Send Test</strong>.
+            </div>
+          </div>
         </div>
 
       </div>
     </div>
+
 
 
     <form method="POST" action="{{ url_for('admin_settings_save') }}" id="settingsForm">

@@ -121,7 +121,7 @@ async function loadStats() {
   const prog = ssdValues.gf_program || '';
   const yr = ssdValues.gf_year || '';
   const sec = ssdValues.gf_section || '';
-  const tod = ssdValues.gf_timeofday || '';
+  const sem = ssdValues.gf_semester || '';
   const subj = ssdValues.gf_subject || '';
   const instr = ssdValues.gf_instructor || '';
   const classType = ssdValues.gf_class_type || '';
@@ -136,7 +136,7 @@ async function loadStats() {
   if (subj) params.append('subject', subj);
   if (instr) params.append('instructor', instr);
   if (classType) params.append('class_type', classType);
-  if (tod) params.append('time_of_day', tod);
+  if (sem) params.append('semester', sem);
 
   const expLink = document.getElementById('exportBtn');
   expLink.href = `/export/stats.xlsx?${params.toString()}&filename=${encodeURIComponent(buildExportFilename())}`;
@@ -161,12 +161,14 @@ function buildExportFilename() {
   const subj = ssdValues.gf_subject || '';
   const instr = ssdValues.gf_instructor || '';
   const classType = ssdValues.gf_class_type || '';
+  const sem = ssdValues.gf_semester || '';
   if (prog) parts.push(prog.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().substring(0, 10));
   if (yr) parts.push(yr.replace(' ', '').toLowerCase());
   if (sec) parts.push('sec' + sec.toLowerCase());
   if (subj) parts.push(subj.replace(/[^a-z0-9]/gi, '').toLowerCase().substring(0, 12));
   if (instr) parts.push(instr.split(' ')[0].toLowerCase());
   if (classType) parts.push(classType);
+  if (sem) parts.push(sem.replace(' ', '').toLowerCase());
   const now = new Date();
   parts.push(`exported_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`);
   return parts.join('_') + '.xlsx';
@@ -198,14 +200,14 @@ function renderAll(data) {
   const subj = ssdValues.gf_subject || '';
   const instr = ssdValues.gf_instructor || '';
   const classType = ssdValues.gf_class_type || '';
-  const tod = ssdValues.gf_timeofday || '';
+  const sem = ssdValues.gf_semester || '';
   if (prog) parts.push('Program: ' + prog);
   if (yr) parts.push(yr);
   if (sec) parts.push('Section ' + sec);
   if (subj) parts.push('Subject: ' + subj);
   if (instr) parts.push('Instructor: ' + instr);
   if (classType) parts.push('Class Type: ' + fmtClassTypeLabel(classType));
-  if (tod) parts.push(tod.charAt(0).toUpperCase() + tod.slice(1));
+  if (sem) parts.push('Semester: ' + sem);
   document.getElementById('showingDetail').textContent = parts.length ? parts.join(' - ') : 'Showing all data across every subject, section, and instructor.';
 
   const badge = document.getElementById('activeFilterBadge');
@@ -283,15 +285,15 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  ['gf_program', 'gf_year', 'gf_section', 'gf_subject', 'gf_instructor', 'gf_class_type', 'gf_timeofday'].forEach((id) => {
+  ['gf_program', 'gf_year', 'gf_semester', 'gf_section', 'gf_subject', 'gf_instructor', 'gf_class_type'].forEach((id) => {
     const defaults = {
       gf_program: 'All Programs',
       gf_year: 'All Years',
+      gf_semester: 'All Semesters',
       gf_section: 'All Sections',
       gf_subject: 'All Subjects',
       gf_instructor: 'All Instructors',
       gf_class_type: 'All Types',
-      gf_timeofday: 'Any Time',
     };
     selectSSD(id, '', defaults[id]);
   });

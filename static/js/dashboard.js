@@ -268,11 +268,21 @@ function openStudentRecord(idx){
   if (classTypeSel) classTypeSel.value = '';
 
   // Show sessions tab for students
-  if (document.getElementById('mtab_action')) document.getElementById('mtab_action').style.display='none';
+  if (document.getElementById('mtab_action')) document.getElementById('mtab_action').style.display='';
   document.querySelectorAll('.mtab')[2].style.display='';
   document.getElementById('mpane-sessions').style.display='';
-  document.getElementById('mpane-action').style.display='none';
-  document.getElementById('actionContent').innerHTML='';
+  document.getElementById('mpane-action').style.display='';
+
+  const canDelete = CURRENT_ROLE === 'super_admin' || CURRENT_ROLE === 'admin';
+  document.getElementById('actionContent').innerHTML = canDelete
+    ? `<div style="border:1px dashed rgba(239,68,68,.35);border-radius:12px;padding:16px;background:rgba(239,68,68,.06);">
+        <div style="font-size:14px;font-weight:700;color:var(--danger);margin-bottom:8px;"><i class="bi bi-exclamation-triangle"></i> Danger Zone</div>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">Deleting this student permanently removes all their attendance records and enrollment data.</p>
+        <button class="btn-rst" style="border-color:var(--danger);color:var(--danger);background:#fff;" onclick="deleteStudent('${s.nfc}','${(s.name || '').replace(/'/g, "\\'")}')">
+          <i class="bi bi-trash"></i> Delete Student
+        </button>
+      </div>`
+    : '<div style="font-size:12px;color:var(--muted);">No actions available for this student.</div>';
 
   // Reset to Info tab
   document.querySelectorAll('.mpane').forEach(p=>p.classList.remove('active'));
@@ -798,16 +808,18 @@ function filterStudents(){
   const crs=document.getElementById('st_course').value;
   const yr=document.getElementById('st_year').value;
   const sec=document.getElementById('st_section').value;
+  const sem=document.getElementById('st_semester').value;
   let shown=0;
   document.querySelectorAll('#studentList .person-row').forEach(r=>{
     const m=(!q||r.dataset.name.includes(q)||r.dataset.id.includes(q))&&
-            (!crs||r.dataset.course===crs)&&(!yr||r.dataset.year===yr)&&(!sec||r.dataset.section===sec);
+            (!crs||r.dataset.course===crs)&&(!yr||r.dataset.year===yr)&&(!sec||r.dataset.section===sec)&&
+            (!sem||r.dataset.semester.toLowerCase().includes(sem.toLowerCase()));
     r.style.display=m?'':'none'; if(m)shown++;
   });
   document.getElementById('st_count').textContent=`${shown} of ${totalSt} students`;
 }
 function resetStudentFilters(){
-  ['st_search','st_course','st_year','st_section'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['st_search','st_course','st_year','st_section','st_semester'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   filterStudents();
 }
 
@@ -826,6 +838,29 @@ function filterTeachers(){
 function resetTeacherFilters(){
   ['tc_search','tc_role'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   filterTeachers();
+}
+
+async function deleteStudent(nfcId, fullName) {
+  if (!nfcId) return;
+  const ok = await showAppConfirm(
+    `Delete all records for student ${fullName || nfcId}? This will permanently remove their attendance history and account. This action cannot be undone.`,
+    'Delete Student Record',
+    'Delete Permanently',
+    'Cancel'
+  );
+  if (!ok) return;
+
+  try {
+    const r = await fetch(`/api/students/delete/${nfcId}`, { method: 'POST', credentials: 'same-origin' });
+    const d = await r.json();
+    if (d.success) {
+      location.reload();
+    } else {
+      alert(d.message || 'Error deleting student.');
+    }
+  } catch (e) {
+    alert('Network error.');
+  }
 }
 
 async function deleteFacultyAccount(username, fullName) {

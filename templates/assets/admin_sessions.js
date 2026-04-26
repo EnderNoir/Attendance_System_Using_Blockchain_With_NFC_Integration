@@ -426,10 +426,12 @@ function exportCurrentSession() {
 function filterLive() {
   const q = document.getElementById('lf_search').value.toLowerCase();
   const classType = (document.getElementById('lf_class_type')?.value || '').toLowerCase();
+  const sem = (document.getElementById('lf_semester')?.value || '').toLowerCase();
   let shown = 0;
   document.querySelectorAll('#liveList .sess-row').forEach((r) => {
     const m = (!q || r.dataset.subject.includes(q) || r.dataset.teacher.includes(q))
-      && (!classType || (r.dataset.classtype || 'lecture') === classType);
+      && (!classType || (r.dataset.classtype || 'lecture') === classType)
+      && (!sem || (r.dataset.semester || '').includes(sem));
     r.style.display = m ? '' : 'none';
     if (m) shown++;
   });
@@ -440,6 +442,8 @@ function resetLive() {
   document.getElementById('lf_search').value = '';
   const classTypeSel = document.getElementById('lf_class_type');
   if (classTypeSel) classTypeSel.value = '';
+  const semSel = document.getElementById('lf_semester');
+  if (semSel) semSel.value = '';
   filterLive();
 }
 
@@ -451,6 +455,7 @@ function filterEnded() {
   const sec = document.getElementById('ef_secletter').value;
   const subj = document.getElementById('ef_subject').value;
   const classType = (document.getElementById('ef_class_type')?.value || '').toLowerCase();
+  const sem = (document.getElementById('ef_semester')?.value || '').toLowerCase();
   let shown = 0;
   document.querySelectorAll('#endedList .sess-row').forEach((r) => {
     const m = (!q || r.dataset.subject.includes(q) || r.dataset.teacher.includes(q))
@@ -459,7 +464,8 @@ function filterEnded() {
       && (!yr || r.dataset.year === yr)
       && (!sec || r.dataset.secletter === sec)
       && (!subj || r.dataset.subject === subj)
-      && (!classType || (r.dataset.classtype || 'lecture') === classType);
+      && (!classType || (r.dataset.classtype || 'lecture') === classType)
+      && (!sem || (r.dataset.semester || '').includes(sem));
     r.style.display = m ? '' : 'none';
     if (m) shown++;
   });
@@ -469,7 +475,7 @@ function filterEnded() {
 }
 
 function resetEnded() {
-  ['ef_search', 'ef_teacher', 'ef_program', 'ef_year', 'ef_secletter', 'ef_subject', 'ef_class_type'].forEach((id) => {
+  ['ef_search', 'ef_teacher', 'ef_program', 'ef_year', 'ef_secletter', 'ef_subject', 'ef_class_type', 'ef_semester'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });

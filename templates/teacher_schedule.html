@@ -31,6 +31,12 @@
             <datalist id="programOptions"></datalist>
             <input list="yearOptions" type="text" id="tfYear" class="sched-mini-input" placeholder="Year" oninput="applyTeacherFilters()">
             <datalist id="yearOptions"></datalist>
+            <input list="semesterOptions" type="text" id="tfSemester" class="sched-mini-input" placeholder="Semester" oninput="applyTeacherFilters()">
+            <datalist id="semesterOptions">
+                <option value="First">
+                <option value="Second">
+                <option value="Summer">
+            </datalist>
             <input list="sectionOptions" type="text" id="tfSection" class="sched-mini-input" placeholder="Section" oninput="applyTeacherFilters()">
             <datalist id="sectionOptions"></datalist>
             <button type="button" class="btn-outline" onclick="resetTeacherFilters()" style="height:36px;">Reset</button>

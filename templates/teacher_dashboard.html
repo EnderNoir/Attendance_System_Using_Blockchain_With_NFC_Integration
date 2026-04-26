@@ -180,39 +180,18 @@
       </div>
     </div>
     <div class="fg">
-      <span class="fl">Time Slot</span>
-      <div class="search-select-wrap" id="wrap_f_tod">
-        <div class="search-select-display" id="disp_f_tod" onclick="toggleSSD('f_tod')">
-          <span class="ssd-label" id="label_f_tod">Any Time</span><span class="ssd-arrow">▼</span>
+      <span class="fl">Semester</span>
+      <div class="search-select-wrap" id="wrap_f_semester">
+        <div class="search-select-display" id="disp_f_semester" onclick="toggleSSD('f_semester')">
+          <span class="ssd-label" id="label_f_semester">All Semesters</span><span class="ssd-arrow">▼</span>
         </div>
-        <div class="search-select-dropdown" id="drop_f_tod">
-          <input class="ssd-input" type="text" placeholder="Search time slot…" oninput="filterSSDOpts('f_tod',this.value)" autocomplete="off"/>
-          <div class="ssd-opts" id="opts_f_tod">
-            <div class="ssd-opt selected" data-value="" onclick="selectSSD('f_tod','','Any Time')">Any Time</div>
-            <div class="ssd-opt" data-value="morning" onclick="selectSSD('f_tod','morning','Morning')">🌅 Morning (before 12PM)</div>
-            <div class="ssd-opt" data-value="afternoon" onclick="selectSSD('f_tod','afternoon','Afternoon')">🌇 Afternoon (12PM+)</div>
-            <div class="ssd-opt" style="padding:4px 11px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);cursor:default;">— 2-unit slots —</div>
-            <div class="ssd-opt" data-value="7:00 AM – 8:00 AM" onclick="selectSSD('f_tod','7:00 AM – 8:00 AM','7:00 – 8:00 AM')">7:00 AM – 8:00 AM</div>
-            <div class="ssd-opt" data-value="8:00 AM – 9:00 AM" onclick="selectSSD('f_tod','8:00 AM – 9:00 AM','8:00 – 9:00 AM')">8:00 AM – 9:00 AM</div>
-            <div class="ssd-opt" data-value="9:00 AM – 10:00 AM" onclick="selectSSD('f_tod','9:00 AM – 10:00 AM','9:00 – 10:00 AM')">9:00 AM – 10:00 AM</div>
-            <div class="ssd-opt" data-value="10:00 AM – 11:00 AM" onclick="selectSSD('f_tod','10:00 AM – 11:00 AM','10:00 – 11:00 AM')">10:00 AM – 11:00 AM</div>
-            <div class="ssd-opt" data-value="11:00 AM – 12:00 PM" onclick="selectSSD('f_tod','11:00 AM – 12:00 PM','11:00 AM – 12:00 PM')">11:00 AM – 12:00 PM</div>
-            <div class="ssd-opt" data-value="12:00 PM – 1:00 PM" onclick="selectSSD('f_tod','12:00 PM – 1:00 PM','12:00 – 1:00 PM')">12:00 PM – 1:00 PM</div>
-            <div class="ssd-opt" data-value="1:00 PM – 2:00 PM" onclick="selectSSD('f_tod','1:00 PM – 2:00 PM','1:00 – 2:00 PM')">1:00 PM – 2:00 PM</div>
-            <div class="ssd-opt" data-value="2:00 PM – 3:00 PM" onclick="selectSSD('f_tod','2:00 PM – 3:00 PM','2:00 – 3:00 PM')">2:00 PM – 3:00 PM</div>
-            <div class="ssd-opt" data-value="3:00 PM – 4:00 PM" onclick="selectSSD('f_tod','3:00 PM – 4:00 PM','3:00 – 4:00 PM')">3:00 PM – 4:00 PM</div>
-            <div class="ssd-opt" data-value="4:00 PM – 5:00 PM" onclick="selectSSD('f_tod','4:00 PM – 5:00 PM','4:00 – 5:00 PM')">4:00 PM – 5:00 PM</div>
-            <div class="ssd-opt" style="padding:4px 11px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);cursor:default;">— 3-unit slots —</div>
-            <div class="ssd-opt" data-value="7:00 AM – 9:00 AM" onclick="selectSSD('f_tod','7:00 AM – 9:00 AM','7:00 – 9:00 AM')">7:00 AM – 9:00 AM</div>
-            <div class="ssd-opt" data-value="8:00 AM – 10:00 AM" onclick="selectSSD('f_tod','8:00 AM – 10:00 AM','8:00 – 10:00 AM')">8:00 AM – 10:00 AM</div>
-            <div class="ssd-opt" data-value="9:00 AM – 11:00 AM" onclick="selectSSD('f_tod','9:00 AM – 11:00 AM','9:00 – 11:00 AM')">9:00 AM – 11:00 AM</div>
-            <div class="ssd-opt" data-value="10:00 AM – 12:00 PM" onclick="selectSSD('f_tod','10:00 AM – 12:00 PM','10:00 AM – 12:00 PM')">10:00 AM – 12:00 PM</div>
-            <div class="ssd-opt" data-value="11:00 AM – 1:00 PM" onclick="selectSSD('f_tod','11:00 AM – 1:00 PM','11:00 AM – 1:00 PM')">11:00 AM – 1:00 PM</div>
-            <div class="ssd-opt" data-value="12:00 PM – 2:00 PM" onclick="selectSSD('f_tod','12:00 PM – 2:00 PM','12:00 – 2:00 PM')">12:00 PM – 2:00 PM</div>
-            <div class="ssd-opt" data-value="1:00 PM – 3:00 PM" onclick="selectSSD('f_tod','1:00 PM – 3:00 PM','1:00 – 3:00 PM')">1:00 PM – 3:00 PM</div>
-            <div class="ssd-opt" data-value="2:00 PM – 4:00 PM" onclick="selectSSD('f_tod','2:00 PM – 4:00 PM','2:00 – 4:00 PM')">2:00 PM – 4:00 PM</div>
-            <div class="ssd-opt" data-value="3:00 PM – 5:00 PM" onclick="selectSSD('f_tod','3:00 PM – 5:00 PM','3:00 – 5:00 PM')">3:00 PM – 5:00 PM</div>
-            <div class="ssd-opt" data-value="4:00 PM – 6:00 PM" onclick="selectSSD('f_tod','4:00 PM – 6:00 PM','4:00 – 6:00 PM')">4:00 PM – 6:00 PM</div>
+        <div class="search-select-dropdown" id="drop_f_semester">
+          <input class="ssd-input" type="text" placeholder="Search semester…" oninput="filterSSDOpts('f_semester',this.value)" autocomplete="off"/>
+          <div class="ssd-opts" id="opts_f_semester">
+            <div class="ssd-opt selected" data-value="" onclick="selectSSD('f_semester','','All Semesters')">All Semesters</div>
+            <div class="ssd-opt" data-value="First" onclick="selectSSD('f_semester','First','First Semester')">First Semester</div>
+            <div class="ssd-opt" data-value="Second" onclick="selectSSD('f_semester','Second','Second Semester')">Second Semester</div>
+            <div class="ssd-opt" data-value="Summer" onclick="selectSSD('f_semester','Summer','Summer')">Summer</div>
           </div>
         </div>
       </div>

@@ -130,6 +130,15 @@
         <option value="school_event">School Event</option>
       </select>
     </div>
+    <div class="fg">
+      <span class="fl">Semester</span>
+      <select class="fs" id="lf_semester" onchange="filterLive()">
+        <option value="">All Semesters</option>
+        <option value="First">First Semester</option>
+        <option value="Second">Second Semester</option>
+        <option value="Summer">Summer</option>
+      </select>
+    </div>
     <button class="btn-rst" onclick="resetLive()"><i class="bi bi-x-circle"></i> Reset</button>
     <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="lf_count">{{ active|length }} shown</span>
   </div>
@@ -139,6 +148,7 @@
     <div class="sess-row live-row" id="lrow_{{ sid }}" data-subject="{{ s.subject_name|lower }}"
       data-teacher="{{ s.teacher_name|lower }}" data-section="{{ (s.section_key or '')|lower }}"
       data-classtype="{{ s.get('class_type', 'lecture')|lower }}"
+      data-semester="{{ (s.semester or '')|lower }}"
       data-program="{{ ((s.section_key or '').split('|')[0] if '|' in (s.section_key or '') else '')|lower }}"
       data-year="{{ ((s.section_key or '').split('|')[1] if (s.section_key or '').count('|') >= 1 else '')|lower }}"
       data-secletter="{{ ((s.section_key or '').split('|')[2] if (s.section_key or '').count('|') >= 2 else '')|lower }}"
@@ -229,6 +239,15 @@
         <option value="school_event">School Event</option>
       </select>
     </div>
+    <div class="fg">
+      <span class="fl">Semester</span>
+      <select class="fs" id="ef_semester" onchange="filterEnded()">
+        <option value="">All Semesters</option>
+        <option value="First">First Semester</option>
+        <option value="Second">Second Semester</option>
+        <option value="Summer">Summer</option>
+      </select>
+    </div>
     <button class="btn-rst" onclick="resetEnded()"><i class="bi bi-x-circle"></i> Reset</button>
     <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="ef_count">{{ ended|length }} shown</span>
   </div>
@@ -239,9 +258,10 @@
     <div class="sess-row" id="erow_{{ sid }}" data-subject="{{ s.subject_name|lower }}"
       data-teacher="{{ s.teacher_name|lower }}" data-section="{{ (s.section_key or '')|lower }}"
       data-classtype="{{ s.get('class_type', 'lecture')|lower }}"
-      data-program="{{ (sparts[0] if sparts|length > 0 else '')|lower }}"
-      data-year="{{ (sparts[1] if sparts|length > 1 else '')|lower }}"
-      data-secletter="{{ (sparts[2] if sparts|length > 2 else '')|lower }}" onclick="openSessModal('{{ sid }}')">
+      data-semester="{{ (s.semester or '')|lower }}"
+      data-program="{{ (sparts[0]|default('') if sparts|length > 0 else '')|lower }}"
+      data-year="{{ (sparts[1]|default('') if sparts|length > 1 else '')|lower }}"
+      data-secletter="{{ (sparts[2]|default('') if sparts|length > 2 else '')|lower }}" onclick="openSessModal('{{ sid }}')">
       <div style="flex:1;min-width:0;">
         <div class="sr-name">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {% endif
           %}{{ s.subject_name }}</div>

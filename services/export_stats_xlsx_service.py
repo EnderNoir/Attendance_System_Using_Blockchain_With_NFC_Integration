@@ -54,6 +54,7 @@ def export_stats_xlsx_impl(
             f_program = qp('program')
             f_sec_ltr = qp('section_letter')
             f_tod = qp('time_of_day')
+            f_semester = qp('semester')
         else:
             qp = lambda _k: ''
             period = request_obj.args.get('period', 'all')
@@ -67,6 +68,7 @@ def export_stats_xlsx_impl(
             f_program = request_obj.args.get('program', '').strip()
             f_sec_ltr = request_obj.args.get('section_letter', '').strip()
             f_tod = request_obj.args.get('time_of_day', '').strip()
+            f_semester = request_obj.args.get('semester', '').strip()
 
         role = session_obj.get('role')
         username = session_obj.get('username')
@@ -89,6 +91,7 @@ def export_stats_xlsx_impl(
             f_program=f_program,
             f_sec_ltr=f_sec_ltr,
             f_tod=f_tod,
+            f_semester=f_semester,
             role=role,
             username=username,
             now=now,
@@ -553,6 +556,8 @@ def export_stats_xlsx_impl(
             parts.append(re.sub(r'[^A-Za-z0-9]', '_', f_subject)[:20])
         if f_instr:
             parts.append(f_instr.split()[0])
+        if f_semester:
+            parts.append(f_semester.replace(' ', '_'))
         fname = request_obj.args.get('filename') or ('_'.join(parts) + f'_{now.strftime("%Y-%m-%d")}.xlsx')
         fname = re.sub(r'_+', '_', fname)
         fname = fname.replace('\u2014', '-').replace('\u2013', '-')

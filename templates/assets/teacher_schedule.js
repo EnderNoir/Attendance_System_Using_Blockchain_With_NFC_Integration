@@ -251,6 +251,7 @@
                     div.dataset.program = String(sk[0] || '').toLowerCase();
                     div.dataset.year = String(sk[1] || '').toLowerCase();
                     div.dataset.section = String(sk[2] || '').toLowerCase();
+                    div.dataset.semester = String(sample.semester || '').toLowerCase();
                     if (currentItems.some((s) => isLive(s))) div.classList.add('live-now');
                     else if (currentItems.some((s) => isUpcoming(s))) div.classList.add('upcoming-session');
                     div.onclick = () => openSlotModal(bucket, sample);
@@ -294,14 +295,16 @@
         const sf = Object.values(activeFilters).filter(f => f.type === 'subject').map(f => f.value);
         const pf = (document.getElementById('tfProgram')?.value || '').trim().toLowerCase();
         const yf = (document.getElementById('tfYear')?.value || '').trim().toLowerCase();
+        const semf = (document.getElementById('tfSemester')?.value || '').trim().toLowerCase();
         const secf = (document.getElementById('tfSection')?.value || '').trim().toLowerCase();
-        const hasTeacherFilter = !!(pf || yf || secf);
+        const hasTeacherFilter = !!(pf || yf || semf || secf);
         document.querySelectorAll('.sched-block').forEach(b => {
             const mSubject = sf.length === 0 || sf.includes(b.dataset.subject);
             const mProgram = !pf || b.dataset.program === pf;
             const mYear = !yf || b.dataset.year === yf;
             const mSection = !secf || b.dataset.section === secf;
-            const isMatch = mSubject && mProgram && mYear && mSection;
+            const mSemester = !semf || (b.dataset.semester || '').toLowerCase().includes(semf);
+            const isMatch = mSubject && mProgram && mYear && mSection && mSemester;
             b.classList.toggle('filtered-out', !isMatch);
             b.classList.toggle('filter-hit', hasTeacherFilter && isMatch);
         });
@@ -311,9 +314,11 @@
     function resetTeacherFilters() {
         const p = document.getElementById('tfProgram');
         const y = document.getElementById('tfYear');
+        const sem = document.getElementById('tfSemester');
         const s = document.getElementById('tfSection');
         if (p) p.value = '';
         if (y) y.value = '';
+        if (sem) sem.value = '';
         if (s) s.value = '';
         applyFilter();
     }

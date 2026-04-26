@@ -363,6 +363,7 @@ def inject_globals():
 
 BLOCKCHAIN_RPC_URL = (
     os.getenv('SEPOLIA_RPC_URL', '').strip()
+    or os.getenv('BLOCKCHAIN_RPC_URL', '').strip()
     or os.getenv('WEB3_PROVIDER_URI', '').strip()
     or "http://127.0.0.1:8545"
 )
@@ -392,26 +393,42 @@ try:
     # Read address from .env
     contract_address = os.getenv('ATTENDANCE_CONTRACT_ADDRESS')
     if not contract_address:
+        print("[BLOCKCHAIN ERROR] ATTENDANCE_CONTRACT_ADDRESS not found in .env")
         raise ValueError("ATTENDANCE_CONTRACT_ADDRESS not found in .env")
     
     # Read ABI from JSON file
+    if not os.path.exists(contract_data_path):
+        print(f"[BLOCKCHAIN ERROR] Contract ABI file not found at {contract_data_path}")
+        raise FileNotFoundError(f"Contract ABI file not found at {contract_data_path}")
+        
     with open(contract_data_path) as f:
         contract_data = json.load(f)
     
+    if not contract_data.get('abi'):
+        print("[BLOCKCHAIN ERROR] Invalid contract JSON: 'abi' field missing")
+        raise KeyError("'abi' field missing in contract JSON")
+        
     contract      = web3.eth.contract(address=contract_address, abi=contract_data['abi'])
     admin_account = None
     if BLOCKCHAIN_ONLINE:
         if ADMIN_PRIVATE_KEY:
-            admin_account = web3.eth.account.from_key(ADMIN_PRIVATE_KEY).address
+            try:
+                admin_account = web3.eth.account.from_key(ADMIN_PRIVATE_KEY).address
+                print(f"[BLOCKCHAIN] Admin account loaded: {admin_account}")
+            except Exception as e:
+                print(f"[BLOCKCHAIN ERROR] Invalid ADMIN_PRIVATE_KEY: {e}")
+                admin_account = None
         else:
             try:
                 accounts = web3.eth.accounts
                 admin_account = accounts[0] if accounts else None
-            except Exception:
+                print(f"[BLOCKCHAIN] Using default node account: {admin_account}")
+            except Exception as e:
+                print(f"[BLOCKCHAIN ERROR] Could not get accounts from node: {e}")
                 admin_account = None
 
 except Exception as _ce:
-    print(f"[WARNING] Could not load contract: {_ce}")
+    print(f"[WARNING] Blockchain system initialization failed: {_ce}")
     contract      = None
     admin_account = None
     BLOCKCHAIN_ONLINE = False
@@ -3281,7 +3298,11 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
     Returns (tx_hash, block_number, error_msg)
     """
     if not (BLOCKCHAIN_ONLINE and contract and admin_account):
-        return None, None, "Blockchain offline or contract not loaded"
+        reason = []
+        if not BLOCKCHAIN_ONLINE: reason.append("RPC Offline")
+        if not contract: reason.append("Contract NULL")
+        if not admin_account: reason.append("Admin Account NULL")
+        return None, None, f"Blockchain unavailable: {', '.join(reason)}"
         
     try:
         # Parse timestamps → Unix

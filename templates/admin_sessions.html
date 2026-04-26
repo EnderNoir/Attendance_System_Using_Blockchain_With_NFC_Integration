@@ -22,6 +22,9 @@
       <button class="sm-itab" id="smtab_att" onclick="switchSMTab('att',this)">
         <i class="bi bi-list-check"></i> Attendance Records
       </button>
+      <button class="sm-itab" id="smtab_action" onclick="switchSMTab('action',this)">
+        <i class="bi bi-gear"></i> Action
+      </button>
     </div>
     <div class="sm-ipane active" id="smpane_info" style="flex-direction:column;">
       <div class="sm-info-grid" id="sm_info_grid">
@@ -47,6 +50,15 @@
           <div style="margin-top:8px;">Loading attendance...</div>
         </div>
       </div>
+    </div>
+    <div class="sm-ipane" id="smpane_action" style="flex-direction:column; padding: 20px; display: none;">
+      <h4 style="color:var(--danger); margin-bottom: 12px;"><i class="bi bi-exclamation-triangle"></i> Danger Zone</h4>
+      <p style="font-size:12px; color:var(--muted); margin-bottom: 20px;">
+        Deleting this session will permanently remove all associated attendance records. This action cannot be undone.
+      </p>
+      <button class="btn-rst" style="background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; padding:8px 16px; border-radius:6px; font-weight:600; cursor:pointer;" onclick="confirmDeleteSession()">
+        <i class="bi bi-trash"></i> Delete Session
+      </button>
     </div>
   </div>
 </div>

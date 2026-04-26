@@ -2115,6 +2115,14 @@ def db_save_schedule(s: dict) -> str:
         )
     return sid
 
+def db_delete_session(sess_id):
+    with get_db() as conn:
+        conn.execute("DELETE FROM attendance_logs WHERE sess_id=?", (sess_id,))
+        conn.execute("DELETE FROM excuse_requests WHERE sess_id=?", (sess_id,))
+        conn.execute("DELETE FROM sessions WHERE sess_id=?", (sess_id,))
+    if sess_id in sessions_db:
+        del sessions_db[sess_id]
+
 def db_delete_schedule(schedule_id):
     now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     schedule_id = str(schedule_id or '').strip()
@@ -5110,6 +5118,17 @@ def admin_sessions():
         fmt_time=fmt_time,
     )
 
+@app.route('/admin/session/<sess_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_session(sess_id):
+    sess = load_session(sess_id)
+    if sess is None:
+        flash('Session not found.', 'danger'); return redirect(url_for('admin_sessions'))
+    
+    db_delete_session(sess_id)
+    flash('Session deleted successfully.', 'success')
+    return redirect(url_for('admin_sessions'))
+
 def _build_teacher_context(user):
     if not user: return {}, [], []
     students = teacher_students(user)
@@ -5418,6 +5437,8 @@ def api_session_attendance(sess_id):
             'students_involved_count': len(students_out),
             'time_slot':    sess.get('time_slot', ''),
             'started_at':   sess.get('started_at', ''),
+            'session_tx_hash': sess.get('session_tx_hash', ''),
+            'session_block_number': sess.get('session_block_number', ''),
             'ended_at':     sess.get('ended_at', ''),
         })
     except Exception as e:
@@ -5939,6 +5960,19 @@ def end_session(sess_id):
         f"Session ended. {result.get('present_count', 0)} present, "
         f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
     return redirect(url_for('teacher_dashboard'))
+
+@app.route('/teacher/session/<sess_id>/delete', methods=['POST'])
+@login_required
+def teacher_delete_session(sess_id):
+    sess = load_session(sess_id)
+    if sess is None:
+        flash('Session not found.'); return redirect(url_for('teacher_sessions'))
+    if not _is_my_session(sess):
+        flash('Access denied.'); return redirect(url_for('teacher_sessions'))
+    
+    db_delete_session(sess_id)
+    flash('Session deleted successfully.', 'success')
+    return redirect(url_for('teacher_sessions'))
 
 @app.route('/teacher/session/<sess_id>/excuse', methods=['POST'])
 @login_required

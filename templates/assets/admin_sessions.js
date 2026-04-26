@@ -213,21 +213,28 @@ function renderSessModal(sessId, data) {
     if (cnt[status] !== undefined) cnt[status]++;
   });
 
-  let sessTxHtml = '';
-  if (s.session_tx_hash) {
-    sessTxHtml = `
-    <div class="sm-info-box">
-      <div class="sm-info-lbl"><i class="bi bi-blockchain"></i> Session TX</div>
-      <div class="sm-info-val">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <a href="https://sepolia.etherscan.io/tx/${s.session_tx_hash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:underline; word-break: break-all;">
-            ${s.session_tx_hash}
-          </a>
+    const sessTx = data.session_tx_hash || s.session_tx_hash;
+    const sessBlock = data.session_block_number || s.session_block_number;
+    if (sessTx) {
+      sessTxHtml = `
+      <div class="sm-info-box">
+        <div class="sm-info-lbl"><i class="bi bi-blockchain"></i> Session TX</div>
+        <div class="sm-info-val">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <a href="https://sepolia.etherscan.io/tx/${sessTx}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:underline; word-break: break-all;">
+              ${sessTx}
+            </a>
+          </div>
+          ${sessBlock ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Block #${sessBlock}</div>` : ''}
         </div>
-        ${s.session_block_number ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Block #${s.session_block_number}</div>` : ''}
-      </div>
-    </div>`;
-  }
+      </div>`;
+    } else {
+      sessTxHtml = `
+      <div class="sm-info-box">
+        <div class="sm-info-lbl"><i class="bi bi-blockchain"></i> Session TX</div>
+        <div class="sm-info-val"><span style="font-size:11px; color:var(--muted); font-style:italic;">Pending or Not Recorded</span></div>
+      </div>`;
+    }
 
   document.getElementById('sm_info_grid').innerHTML = `
     ${sessTxHtml}
@@ -338,7 +345,6 @@ function renderSessModal(sessId, data) {
         <th>Tapped Time</th>
         <th>Excused Reason</th>
         <th>Document</th>
-        <th>Blockchain TX</th>
       </tr></thead>
       <tbody>
         ${sts.map((st, i) => {
@@ -365,7 +371,6 @@ function renderSessModal(sessId, data) {
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
             <td style="font-size:11px;">${status === 'excused' ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>${reasonDetail}` : '<span style="color:var(--muted);">-</span>'}</td>
             <td>${status === 'excused' ? docLink : '<span style="color:var(--muted);font-size:11px;">-</span>'}</td>
-            <td>${txDisplay}</td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -374,10 +379,21 @@ function renderSessModal(sessId, data) {
   bindTxCopyHandlers();
 }
 
-function closeSessModal() {
-  document.getElementById('sessModal').classList.remove('show');
-  currentSessId = null;
-}
+  function closeSessModal() {
+    document.getElementById('sessModal').classList.remove('show');
+    currentSessId = null;
+  }
+
+  function confirmDeleteSession() {
+    if (!currentSessId) return;
+    if (confirm("WARNING: Are you sure you want to completely delete this session? This action cannot be undone and will permanently remove all attendance records.")) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/admin/session/' + currentSessId + '/delete';
+      document.body.appendChild(form);
+      form.submit();
+    }
+  }
 
 function exportCurrentSession() {
   if (!currentSessId) return;

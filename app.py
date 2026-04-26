@@ -4043,10 +4043,14 @@ def index():
         merged['present'] = sorted(bucket['present_ids'])
         unified_active[bucket['sid']] = merged
 
+    all_students = get_all_students()
+    active_students = [s for s in all_students if s.get('student_status', 'active').lower() == 'active']
+
     return render_template('index.html',
                            active_sessions=unified_active,
                            subjects_db=db_get_all_subjects(),
-                           users_db=db_get_all_users())
+                           users_db=db_get_all_users(),
+                           active_student_count=len(active_students))
 
 def _register_save_pending_subjects(req, sess):
     import json as _json
@@ -4287,6 +4291,21 @@ def api_update_student_status(nfc_id):
         print(f"[ERROR] Failed to update student status: {e}")
         return jsonify({'ok': False, 'message': str(e)}), 500
 
+
+@app.route('/api/students/delete/<nfc_id>', methods=['POST'])
+@admin_required
+def api_delete_student(nfc_id):
+    try:
+        with get_db() as conn:
+            # Delete attendance records first
+            conn.execute("DELETE FROM attendance_logs WHERE nfc_id = ?", (nfc_id,))
+            # Delete photos
+            conn.execute("DELETE FROM photos WHERE person_id = ?", (nfc_id,))
+            # Delete student
+            conn.execute("DELETE FROM students WHERE nfc_id = ?", (nfc_id,))
+        return jsonify({'success': True, 'message': 'Student and all associated records deleted successfully.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/student/move-semester/<nfc_id>', methods=['POST'])
 @admin_required

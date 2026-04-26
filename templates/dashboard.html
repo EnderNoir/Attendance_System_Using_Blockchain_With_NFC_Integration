@@ -272,6 +272,15 @@
       </select>
     </div>
     <div class="fg">
+      <span class="fl">Semester</span>
+      <select class="fs" id="st_semester" onchange="filterStudents()">
+        <option value="">All Semesters</option>
+        <option value="First">First Semester</option>
+        <option value="Second">Second Semester</option>
+        <option value="Summer">Summer</option>
+      </select>
+    </div>
+    <div class="fg">
       <span class="fl">Status</span>
       <select class="fs" id="st_status" onchange="filterStudents()">
         <option value="">All Statuses</option>
@@ -294,12 +303,14 @@
   <div style="max-height:600px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="studentList">
     {% for s in students %}
     <div class="person-row" id="strow_{{ loop.index0 }}"
-         data-name="{{ s.name|lower }}"
+         onclick="openStudentRecord({{ loop.index0 }})"
+         data-nfc="{{ s.nfc_id }}"
          data-id="{{ (s.student_id or '')|lower }}"
-         data-course="{{ s.course or '' }}"
-         data-year="{{ s.year_level or '' }}"
-         data-section="{{ s.section or '' }}"
-         data-nfc-id="{{ s.nfcId or '' }}"
+         data-name="{{ s.name|lower }}"
+         data-course="{{ s.course or s.program }}"
+         data-year="{{ s.year_level }}"
+         data-section="{{ s.section }}"
+         data-semester="{{ s.semester or '' }}"
          data-status="{{ s.student_status or 'active' }}"
          style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border-color);">
       <div style="flex:1;min-width:0;">

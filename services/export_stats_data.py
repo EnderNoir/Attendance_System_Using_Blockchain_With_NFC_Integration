@@ -15,6 +15,7 @@ def build_stats_export_dataset(
     f_program,
     f_sec_ltr,
     f_tod,
+    f_semester=None,
     role,
     username,
     now,
@@ -108,6 +109,8 @@ def build_stats_export_dataset(
                         continue
                 except Exception:
                     pass
+        if f_semester and (s.get('semester') or '').lower() != f_semester.lower():
+            continue
         filtered[sid] = s
 
     af = []
@@ -127,6 +130,8 @@ def build_stats_export_dataset(
         af.append('Class Type: ' + ('School Event' if f_class_type == 'school_event' else f_class_type.capitalize()))
     if f_tod:
         af.append('Time: ' + f_tod)
+    if f_semester:
+        af.append('Semester: ' + f_semester)
     filter_label = ' | '.join(af) if af else 'All data'
 
     donut = {'Present': 0, 'Late': 0, 'Absent': 0, 'Excused': 0}

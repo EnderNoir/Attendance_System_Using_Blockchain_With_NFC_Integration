@@ -20,8 +20,8 @@
       <div><div class="value">{{ active_sessions|length }}</div><div class="label">Live Sessions</div></div></div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="stat-chip"><div class="card-icon purple"><i class="bi bi-person-badge"></i></div>
-      <div><div class="value">{{ users_db.values()|selectattr('status','equalto','pending')|list|length }}</div><div class="label">Pending Faculty</div></div></div>
+    <div class="stat-chip"><div class="card-icon purple"><i class="bi bi-people"></i></div>
+      <div><div class="value">{{ active_student_count|default(0) }}</div><div class="label">Active Students</div></div></div>
   </div>
   <div class="col-6 col-md-3">
     <div class="stat-chip"><div class="card-icon green"><i class="bi bi-book"></i></div>
@@ -34,26 +34,6 @@
 </div>
 
 <!-- Live sessions -->
-{% if active_sessions %}
-<div class="section-mono">// LIVE NOW</div>
-<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px;">
-  {% for sid, s in active_sessions.items() %}
-  <div style="background:var(--surface);border:1px solid rgba(45,106,39,.3);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <div style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;flex-shrink:0;"></div>
-      <div>
-        <div style="font-weight:600;font-size:13px;">{{ s.subject_name }}{% if s.course_code %} <span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);">[{{ s.course_code }}]</span>{% endif %}</div>
-        <div style="font-size:11px;color:var(--muted);">{{ (s.section_key or '').replace('|',' · ') }} · {{ s.teacher_name }}</div>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;">
-      <span style="font-family:'Space Mono',monospace;font-size:12px;color:var(--success);">{{ s.present|length }} present</span>
-      <a href="{{ url_for('live_session', sess_id=sid) }}" class="btn-exp" style="border-color:rgba(45,106,39,.3);color:var(--success);"><i class="bi bi-eye"></i> Monitor</a>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% endif %}
 
 <!-- ══ ANALYTICS PANEL ══ -->
 <div class="section-mono">// ATTENDANCE ANALYTICS</div>
@@ -154,6 +134,26 @@
           </div>
         </div>
 
+        <!-- Semester -->
+        <div class="fg-item">
+          <span class="fg-label">Semester</span>
+          <div class="search-select-wrap" id="wrap_gf_semester">
+            <div class="search-select-display" id="disp_gf_semester" onclick="toggleSSD('gf_semester')">
+              <span class="ssd-label" id="label_gf_semester">All Semesters</span>
+              <span class="ssd-arrow"><i class="bi bi-chevron-down"></i></span>
+            </div>
+            <div class="search-select-dropdown" id="drop_gf_semester">
+              <input class="ssd-input" type="text" placeholder="Search semester…" oninput="filterSSDOpts('gf_semester',this.value)" autocomplete="off"/>
+              <div class="ssd-opts" id="opts_gf_semester">
+                <div class="ssd-opt selected" data-value="" onclick="selectSSD('gf_semester','','All Semesters')">All Semesters</div>
+                <div class="ssd-opt" data-value="First" onclick="selectSSD('gf_semester','First','First Semester')">First Semester</div>
+                <div class="ssd-opt" data-value="Second" onclick="selectSSD('gf_semester','Second','Second Semester')">Second Semester</div>
+                <div class="ssd-opt" data-value="Summer" onclick="selectSSD('gf_semester','Summer','Summer')">Summer</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Section (A-D, filtered by program) -->
         <div class="fg-item">
           <span class="fg-label">Section</span>
@@ -237,26 +237,6 @@
           </div>
         </div>
 
-        <!-- Time Slot filter -->
-        <div class="fg-item">
-          <span class="fg-label">Time Slot</span>
-          <div class="search-select-wrap" id="wrap_gf_timeofday">
-            <div class="search-select-display" id="disp_gf_timeofday" onclick="toggleSSD('gf_timeofday')">
-              <span class="ssd-label" id="label_gf_timeofday">Any Time</span>
-              <span class="ssd-arrow"><i class="bi bi-chevron-down"></i></span>
-            </div>
-            <div class="search-select-dropdown" id="drop_gf_timeofday">
-              <input class="ssd-input" type="text" placeholder="Search time slot…" oninput="filterSSDOpts('gf_timeofday',this.value)" autocomplete="off"/>
-              <div class="ssd-opts" id="opts_gf_timeofday">
-                <div class="ssd-opt selected" data-value="" onclick="selectSSD('gf_timeofday','','Any Time')">Any Time</div>
-                <div class="ssd-opt" data-value="morning" onclick="selectSSD('gf_timeofday','morning','Morning (before 12PM)')">🌅 Morning (before 12PM)</div>
-                <div class="ssd-opt" data-value="afternoon" onclick="selectSSD('gf_timeofday','afternoon','Afternoon (12PM+)')">🌇 Afternoon (12PM+)</div>
-                <div class="ssd-opt" style="padding:4px 12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);cursor:default;">— 2-unit slots —</div>
-                <div class="ssd-opt" data-value="7:00 AM – 8:00 AM" onclick="selectSSD('gf_timeofday','7:00 AM – 8:00 AM','7:00 – 8:00 AM')">7:00 AM – 8:00 AM</div>
-                <div class="ssd-opt" data-value="8:00 AM – 9:00 AM" onclick="selectSSD('gf_timeofday','8:00 AM – 9:00 AM','8:00 – 9:00 AM')">8:00 AM – 9:00 AM</div>
-                <div class="ssd-opt" data-value="9:00 AM – 10:00 AM" onclick="selectSSD('gf_timeofday','9:00 AM – 10:00 AM','9:00 – 10:00 AM')">9:00 AM – 10:00 AM</div>
-                <div class="ssd-opt" data-value="10:00 AM – 11:00 AM" onclick="selectSSD('gf_timeofday','10:00 AM – 11:00 AM','10:00 – 11:00 AM')">10:00 AM – 11:00 AM</div>
-                <div class="ssd-opt" data-value="11:00 AM – 12:00 PM" onclick="selectSSD('gf_timeofday','11:00 AM – 12:00 PM','11:00 AM – 12:00 PM')">11:00 AM – 12:00 PM</div>
                 <div class="ssd-opt" data-value="12:00 PM – 1:00 PM" onclick="selectSSD('gf_timeofday','12:00 PM – 1:00 PM','12:00 – 1:00 PM')">12:00 PM – 1:00 PM</div>
                 <div class="ssd-opt" data-value="1:00 PM – 2:00 PM" onclick="selectSSD('gf_timeofday','1:00 PM – 2:00 PM','1:00 – 2:00 PM')">1:00 PM – 2:00 PM</div>
                 <div class="ssd-opt" data-value="2:00 PM – 3:00 PM" onclick="selectSSD('gf_timeofday','2:00 PM – 3:00 PM','2:00 – 3:00 PM')">2:00 PM – 3:00 PM</div>

@@ -439,6 +439,9 @@
 
 
 {% block extra_scripts %}
+<script>
+  const USER_ROLE = "{{ session.get('role', 'teacher') }}";
+</script>
 <script>{% include 'assets/session_live.js' %}</script>
 {% endblock %}
 {% endblock %}

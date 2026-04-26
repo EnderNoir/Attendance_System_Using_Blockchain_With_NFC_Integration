@@ -239,12 +239,12 @@ async function applyFilters() {
   const yr = ssdValues.f_year || '';
   const sec = ssdValues.f_section || '';
   const subj = ssdValues.f_subject || '';
-  const tod = ssdValues.f_tod || '';
+  const sem = ssdValues.f_semester || '';
   if (prog) params.append('program', prog);
   if (yr) params.append('year', yr);
   if (sec) params.append('section_letter', sec);
   if (subj) params.append('subject', subj);
-  if (tod) params.append('time_of_day', tod);
+  if (sem) params.append('semester', sem);
 
   lastAppliedParams = params.toString();
 
@@ -274,7 +274,7 @@ async function applyFilters() {
 }
 
 function resetFilters() {
-  ['f_program', 'f_year', 'f_section', 'f_subject', 'f_tod'].forEach((id) => {
+  ['f_program', 'f_year', 'f_section', 'f_subject', 'f_semester'].forEach((id) => {
     ssdValues[id] = '';
     const lbl = document.getElementById('label_' + id);
     if (lbl) {
@@ -283,7 +283,7 @@ function resetFilters() {
         f_year: 'All Years',
         f_section: 'All Sections',
         f_subject: 'All Subjects',
-        f_tod: 'Any Time'
+        f_semester: 'All Semesters'
       }[id];
     }
     document.querySelectorAll('#opts_' + id + ' .ssd-opt').forEach((o) => o.classList.toggle('selected', o.dataset.value === ''));
@@ -303,12 +303,12 @@ function exportDashboard() {
     const yr = ssdValues.f_year || '';
     const sec = ssdValues.f_section || '';
     const subj = ssdValues.f_subject || '';
-    const tod = ssdValues.f_tod || '';
+    const sem = ssdValues.f_semester || '';
     if (prog) p.append('program', prog);
     if (yr) p.append('year', yr);
     if (sec) p.append('section_letter', sec);
     if (subj) p.append('subject', subj);
-    if (tod) p.append('time_of_day', tod);
+    if (sem) p.append('semester', sem);
     return p.toString();
   })();
 
@@ -341,7 +341,7 @@ function renderAll(data, subj, sec, tod) {
   const parts = [];
   if (subj) parts.push('Subject: ' + subj);
   if (sec) parts.push('Section: ' + sec.split('|').pop());
-  if (tod) parts.push(tod.charAt(0).toUpperCase() + tod.slice(1));
+  if (tod) parts.push('Semester: ' + tod);
   document.getElementById('sb_main').textContent = (periods[curPeriod] || curPeriod) + (parts.length ? ' — Filtered' : '');
   document.getElementById('sb_sub').textContent = parts.length ? parts.join(' · ') : 'Showing all your sessions';
   document.getElementById('showingBar').style.display = 'flex';

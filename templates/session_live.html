@@ -57,8 +57,8 @@
           style="flex:1;min-width:120px;background:none;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px;">
           <i class="bi bi-arrow-left"></i> Keep Live
         </button>
-        <form method="POST" action="{{ url_for('end_session', sess_id=sess_id) }}" style="flex:1;min-width:140px;">
-          <button type="submit"
+        <form method="POST" action="{{ url_for('end_session', sess_id=sess_id) }}" style="flex:1;min-width:140px;" onsubmit="showBlockchainLoading()">
+          <button type="submit" id="btnRealEndSession"
             style="width:100%;background:var(--danger);border:none;color:#fff;font-weight:700;border-radius:8px;padding:11px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .2s;">
             <i class="bi bi-stop-fill"></i> Yes, End Session
           </button>
@@ -67,6 +67,27 @@
     </div>
   </div>
 </div>
+
+<!-- BLOCKCHAIN LOADING MODAL -->
+<div class="end-overlay" id="blockchainLoadingModal" style="z-index: 10000; align-items: center; justify-content: center; display: none;">
+  <div style="background: var(--surface); padding: 32px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; border: 1px solid rgba(45, 106, 39, 0.2); box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+    <div style="display:inline-block;width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite; margin-bottom: 16px;"></div>
+    <h3 style="color: var(--accent); margin-bottom: 8px; font-size: 18px; font-weight: 700;"><i class="bi bi-cloud-arrow-up"></i> Uploading to Blockchain</h3>
+    <p style="font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0;">
+      Please wait while the attendance records are securely transmitted and recorded to the Sepolia Ethereum blockchain. This may take a few seconds...
+    </p>
+  </div>
+</div>
+<script>
+  function showBlockchainLoading() {
+    document.getElementById('endSessionModal').style.display = 'none';
+    document.getElementById('blockchainLoadingModal').style.display = 'flex';
+    // Disable the button to prevent double-clicks
+    setTimeout(() => {
+      document.getElementById('btnRealEndSession').disabled = true;
+    }, 10);
+  }
+</script>
 
 <!-- Unified Session Metadata Section -->
 <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:22px 26px; margin-bottom:24px;">

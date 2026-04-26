@@ -4067,7 +4067,7 @@ def admin_settings_test():
         ctx  = ssl.create_default_context()
         port = int(cfg.get('smtp_port', 587))
         host = cfg.get('smtp_host', 'smtp.gmail.com')
-        timeout = 10 # Reduced to 10s to stay within Gunicorn's 30s limit
+        timeout = 5 # Aggressive 5s timeout to prevent Gunicorn worker timeout
         
         try:
             # DNS Check & IPv4 resolution
@@ -4081,12 +4081,16 @@ def admin_settings_test():
                 # SSL Connection
                 try:
                     srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=timeout)
+                except (socket.timeout, TimeoutError):
+                    raise # Fast-fail on timeout
                 except Exception:
                     srv = smtplib.SMTP_SSL(target_ip, port, context=ctx, timeout=timeout)
             else:
                 # Standard Connection with STARTTLS
                 try:
                     srv = smtplib.SMTP(host, port, timeout=timeout)
+                except (socket.timeout, TimeoutError):
+                    raise # Fast-fail on timeout
                 except Exception:
                     srv = smtplib.SMTP(target_ip, port, timeout=timeout)
                 
@@ -4100,12 +4104,13 @@ def admin_settings_test():
                 srv.sendmail(msg['From'], [test_to], msg.as_string())
             return jsonify({'ok': True, 'message': f'Test email sent to {test_to}'})
         except (socket.timeout, TimeoutError):
-            return jsonify({'ok': False, 'message': f'Connection Timed Out (Port {port}). The server at {host} is not responding. This usually means the port is blocked by your hosting provider (e.g. Railway/Heroku). Try Port 465 or SendGrid.'})
+            return jsonify({'ok': False, 'message': f'Connection Timed Out (5s). {host}:{port} is not responding. This port is likely BLOCKED by Railway. Please try Port 465 instead.'})
         except (socket.error, smtplib.SMTPException) as e:
             err_msg = str(e)
             if "101" in err_msg or "unreachable" in err_msg.lower():
                 return jsonify({'ok': False, 'message': f'Network Error (Port {port}): {err_msg}. This usually means {host}:{port} is blocked or unreachable from this server.'})
             return jsonify({'ok': False, 'message': f'SMTP Error: {err_msg}'})
+
 
     except Exception as e:
         return jsonify({'ok': False, 'message': f'Error: {str(e)}'})

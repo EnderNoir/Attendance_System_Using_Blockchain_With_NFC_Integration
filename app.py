@@ -135,7 +135,7 @@ def send_student_attendance_receipt(
         student_name, student_email, student_id,
         subject_name, section_key, teacher_name,
         tap_time, status, tx_hash, block_num,
-        sess_id=None, nfc_id=None):
+        sess_id=None, nfc_id=None, semester=None, time_slot=None):
         """Send attendance receipt email to student."""
         _send_student_attendance_receipt_template(
                 student_name=student_name,
@@ -152,6 +152,8 @@ def send_student_attendance_receipt(
                 nfc_id=nfc_id,
                 send_email_fn=_send_email,
                 url_for_fn=url_for,
+                semester=semester,
+                time_slot=time_slot,
         )
  
 def send_teacher_session_summary(
@@ -159,7 +161,8 @@ def send_teacher_session_summary(
         subject_name, section_key, time_slot,
         started_at, ended_at,
         present_count, late_count, absent_count, excused_count,
-        student_rows, session_tx_hash=None, session_block_number=None):
+        student_rows, session_tx_hash=None, session_block_number=None,
+        course_code=None, semester=None):
         """Send session summary email to teacher when session ends."""
         _send_teacher_session_summary_template(
                 teacher_email=teacher_email,
@@ -177,6 +180,8 @@ def send_teacher_session_summary(
                 session_tx_hash=session_tx_hash,
                 session_block_number=session_block_number,
                 send_email_fn=_send_email,
+                course_code=course_code,
+                semester=semester,
         )
 
 
@@ -3753,6 +3758,8 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                         block_num=lg['block_number'] if lg else '',
                         sess_id=sess_id,
                         nfc_id=nid,
+                        semester=sess.get('semester'),
+                        time_slot=sess.get('time_slot'),
                     )
                 except Exception as e:
                     print(f"[EMAIL] Failed absence email for {nid}: {e}")
@@ -3782,6 +3789,8 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                             block_num=lg['block_number'] or block_num or 0,
                             sess_id=sess_id,
                             nfc_id=nid,
+                            semester=sess.get('semester'),
+                            time_slot=sess.get('time_slot'),
                         )
                 except Exception as e:
                     print(f"[EMAIL] Failed final receipt email for {nid}: {e}")
@@ -3835,6 +3844,8 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                         student_rows=rows,
                         session_tx_hash=session_tx_hash,
                         session_block_number=session_block_number,
+                        course_code=sess.get('course_code', ''),
+                        semester=sess.get('semester', ''),
                     )
             except Exception as e:
                 print(f"[EMAIL] Teacher summary error: {e}")
@@ -6705,10 +6716,14 @@ def mark_pico():
         subject_name   = sess.get('subject_name', ''),
         section_key    = sess.get('section_key', ''),
         teacher_name   = sess.get('teacher_name', ''),
-        tap_time       = _now_local().strftime('%B %d, %Y  %I:%M %p'),
+        tap_time       = tap_time_db,
         status         = status_label,
         tx_hash        = tx_hash or '',
         block_num      = block_num or '',
+        sess_id        = sess_id,
+        nfc_id         = nfc_id,
+        semester       = sess.get('semester'),
+        time_slot      = sess.get('time_slot'),
     )
 
     return jsonify({

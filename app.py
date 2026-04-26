@@ -6049,13 +6049,13 @@ def end_session(sess_id):
 def teacher_delete_session(sess_id):
     sess = load_session(sess_id)
     if sess is None:
-        flash('Session not found.'); return redirect(url_for('teacher_sessions'))
+        flash('Session not found.'); return redirect(url_for('teacher_sessions_students'))
     if not _is_my_session(sess):
-        flash('Access denied.'); return redirect(url_for('teacher_sessions'))
+        flash('Access denied.'); return redirect(url_for('teacher_sessions_students'))
     
     db_delete_session(sess_id)
     flash('Session deleted successfully.', 'success')
-    return redirect(url_for('teacher_sessions'))
+    return redirect(url_for('teacher_sessions_students'))
 
 @app.route('/teacher/session/<sess_id>/excuse', methods=['POST'])
 @login_required
@@ -6151,12 +6151,8 @@ def excuse_student(sess_id):
 @app.route('/teacher/sessions')
 @login_required
 def teacher_sessions():
-    if session.get('role') == 'admin': return redirect(url_for('index'))
-    with get_db() as _conn:
-        _rows = _conn.execute("SELECT * FROM sessions WHERE teacher_username=? ORDER BY started_at DESC",
-                              (session['username'],)).fetchall()
-    my_sessions = {r['sess_id']: _row_to_dict(r) for r in _rows}
-    return render_template('teacher_sessions.html', my_sessions=my_sessions, fmt_time=fmt_time)
+    # This route is deprecated — redirect to the unified sessions & students page
+    return redirect(url_for('teacher_sessions_students'))
 
 @app.route('/teacher/reports')
 @login_required

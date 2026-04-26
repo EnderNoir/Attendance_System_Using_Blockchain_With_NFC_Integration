@@ -842,6 +842,7 @@ function resetTeacherFilters(){
 
 async function deleteStudent(nfcId, fullName) {
   if (!nfcId) return;
+  closeUpdModal();
   const ok = await showAppConfirm(
     `Delete all records for student ${fullName || nfcId}? This will permanently remove their attendance history and account. This action cannot be undone.`,
     'Delete Student Record',
@@ -865,6 +866,7 @@ async function deleteStudent(nfcId, fullName) {
 
 async function deleteFacultyAccount(username, fullName) {
   if (!username) return;
+  closeUpdModal();
   const ok = await showAppConfirm(
     `Delete account for ${fullName || username}? This cannot be undone.`,
     'Delete Faculty Account',

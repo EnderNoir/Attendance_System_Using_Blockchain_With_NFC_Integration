@@ -56,7 +56,7 @@ sData = sessionsData; // alias for convenience
       if (Number.isNaN(d.getTime())) return { date: '—', time: '—' };
       return {
         date: d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).replace(',', ''),
-        time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+        time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase(),
       };
     } catch (e) {
       return { date: '—', time: '—' };
@@ -460,8 +460,6 @@ function renderSessModal(sessId, data) {
                 <th>Time Slot</th>
                 <th>Excused Reason</th>
                 <th>Document</th>
-                <th>Transaction Number (TX)</th>
-                <th>Block Number</th>
               </tr></thead>
               <tbody>
                 ${semSessions.map((s, i) => {
@@ -482,8 +480,6 @@ function renderSessModal(sessId, data) {
                     <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || s.tap_time || '')}</td>
                     <td style="font-size:11px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>
                     <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-                    <td>${s.tx_hash ? `<a href="https://sepolia.etherscan.io/tx/${s.tx_hash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:none; word-break: break-all;">${s.tx_hash.slice(0, 16)}...</a>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-                    <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '—'}</td>
                   </tr>`;
                 }).join('')}
               </tbody>

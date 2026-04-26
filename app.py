@@ -3610,6 +3610,22 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     sess = load_session(sess_id)
     if not sess:
         return None
+        
+    # Check if already has tx_hash in DB before anything else
+    with get_db() as conn:
+        db_sess = conn.execute("SELECT session_tx_hash, session_block_number, ended_at FROM sessions WHERE sess_id=?", (sess_id,)).fetchone()
+        if db_sess and db_sess['session_tx_hash']:
+            print(f"[FINALIZE] Session {sess_id} already has TX in DB: {db_sess['session_tx_hash']}")
+            return {
+                'already_ended': True,
+                'ended_at': db_sess['ended_at'],
+                'tx_hash': db_sess['session_tx_hash'],
+                'present_count': len(sess.get('present', [])),
+                'late_count': len(sess.get('late', [])),
+                'absent_count': len(sess.get('absent', [])),
+                'excused_count': len(sess.get('excused', [])),
+            }
+
     if sess.get('ended_at'):
         return {'already_ended': True, 'ended_at': sess.get('ended_at', '')}
 

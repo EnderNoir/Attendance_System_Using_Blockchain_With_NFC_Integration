@@ -5,10 +5,19 @@ def _fmt_time(t_str):
     """Format time string (e.g. '07:30:00' or '2024-04-26 07:30:00') to '7:00am'."""
     if not t_str or t_str == '—': return '—'
     try:
-        if ' ' in str(t_str):
-            dt = datetime.strptime(str(t_str), '%Y-%m-%d %H:%M:%S')
+        t_str = str(t_str)
+        if ' ' in t_str:
+            # Handle full ISO format
+            dt = datetime.strptime(t_str, '%Y-%m-%d %H:%M:%S')
+        elif ':' in t_str:
+            # Handle HH:MM:SS or HH:MM
+            parts = t_str.split(':')
+            if len(parts) == 3:
+                dt = datetime.strptime(t_str, '%H:%M:%S')
+            else:
+                dt = datetime.strptime(t_str, '%H:%M')
         else:
-            dt = datetime.strptime(str(t_str), '%H:%M:%S')
+            return t_str
         # Format as 7:00am (lowercase, no leading zero on hour)
         return dt.strftime('%I:%M%p').lower().lstrip('0')
     except:
@@ -18,7 +27,10 @@ def _fmt_date(d_str):
     """Format date string '2024-04-26 07:30:00' to 'April 26 2024'."""
     if not d_str or d_str == '—': return '—'
     try:
-        dt = datetime.strptime(str(d_str), '%Y-%m-%d %H:%M:%S')
+        if ' ' in str(d_str):
+            dt = datetime.strptime(str(d_str).split(' ')[0], '%Y-%m-%d')
+        else:
+            dt = datetime.strptime(str(d_str), '%Y-%m-%d')
         return dt.strftime('%B %d %Y')
     except:
         return str(d_str)
@@ -29,13 +41,26 @@ def _fmt_dt(dt_str):
     return f"{_fmt_date(dt_str)}, {_fmt_time(dt_str)}"
 
 def _fmt_slot(slot):
-    """Format '07:00 - 09:00' to '7:00am to 9:00am'."""
-    if not slot or ' - ' not in str(slot): return str(slot)
+    """Format '07:00 - 09:00' or '07:00 to 09:00' to '7:00am to 9:00am'."""
+    if not slot: return '—'
+    slot_str = str(slot)
+    
+    # Try different delimiters
+    delimiter = None
+    if ' - ' in slot_str:
+        delimiter = ' - '
+    elif ' to ' in slot_str:
+        delimiter = ' to '
+    
+    if not delimiter: return slot_str
+    
     try:
-        parts = str(slot).split(' - ')
-        return f"{_fmt_time(parts[0])} to {_fmt_time(parts[1])}"
+        parts = slot_str.split(delimiter)
+        if len(parts) == 2:
+            return f"{_fmt_time(parts[0].strip())} to {_fmt_time(parts[1].strip())}"
+        return slot_str
     except:
-        return str(slot)
+        return slot_str
 
 
 def send_student_attendance_receipt(
@@ -387,8 +412,10 @@ def send_teacher_session_summary(
                          border-bottom:1px solid #eee;">{_fmt_dt(started_at)}</td>
             </tr>
             <tr>
-              <td style="padding:8px 12px;font-size:12px;color:#666;">Ended</td>
-              <td style="padding:8px 12px;font-size:12px;color:#333;">{_fmt_dt(ended_at)}</td>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Ended</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{_fmt_dt(ended_at)}</td>
             </tr>
           </table>
           <!-- Stat boxes -->

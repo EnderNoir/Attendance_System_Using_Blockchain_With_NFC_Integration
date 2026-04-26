@@ -61,7 +61,7 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
             ctx = ssl.create_default_context()
             port = int(cfg.get('smtp_port', 587))
             host = cfg.get('smtp_host', 'smtp.gmail.com')
-            timeout = 25
+            timeout = 10
 
             # Force IPv4 resolution
             try:
@@ -93,5 +93,6 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
             print(f'[EMAIL] Sent "{subject}" to {recipients}')
         except Exception as _e:
             print(f'[EMAIL] Failed to send "{subject}": {_e}')
+
 
     _th.Thread(target=_worker, daemon=True).start()

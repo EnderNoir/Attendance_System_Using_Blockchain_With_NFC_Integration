@@ -4067,36 +4067,37 @@ def admin_settings_test():
         ctx  = ssl.create_default_context()
         port = int(cfg.get('smtp_port', 587))
         host = cfg.get('smtp_host', 'smtp.gmail.com')
+        timeout = 25 # Increased timeout
         
         try:
-            # DNS Check
+            # DNS Check & IPv4 resolution
             try:
-                ip = socket.gethostbyname(host)
+                # Use a shorter timeout for DNS resolution
+                addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+                target_ip = addr_info[0][4][0]
             except Exception as dns_e:
-                return jsonify({'ok': False, 'message': f'DNS Error: Could not resolve {host}. Check your internet connection or SMTP Host setting. ({str(dns_e)})'})
-            
-            # Force IPv4
-            addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
-            target_ip = addr_info[0][4][0]
+                return jsonify({'ok': False, 'message': f'DNS/Network Error: Could not resolve {host}. ({str(dns_e)})'})
             
             if port == 465:
-                # SSL Connection (typically for Port 465)
-                srv = smtplib.SMTP_SSL(target_ip, port, context=ctx, timeout=15)
-                srv.helo_resp = None # Hack for SSL host verification if needed
-                # Note: target_ip might cause cert mismatch, so we try host first, then fallback
+                # SSL Connection
                 try:
-                    srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=15)
-                except:
-                    srv = smtplib.SMTP_SSL(target_ip, port, context=ctx, timeout=15)
+                    # Try host first for SSL cert validation
+                    srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=timeout)
+                except Exception:
+                    # Fallback to IP if host fails (common in restricted environments)
+                    srv = smtplib.SMTP_SSL(target_ip, port, context=ctx, timeout=timeout)
             else:
-                # Standard Connection with STARTTLS (typically for Port 587)
+                # Standard Connection with STARTTLS
                 try:
-                    srv = smtplib.SMTP(host, port, timeout=15)
-                except:
-                    srv = smtplib.SMTP(target_ip, port, timeout=15)
+                    srv = smtplib.SMTP(host, port, timeout=timeout)
+                except Exception:
+                    srv = smtplib.SMTP(target_ip, port, timeout=timeout)
+                
                 srv.ehlo()
-                srv.starttls(context=ctx)
-                srv.ehlo()
+                if srv.has_ext('STARTTLS'):
+                    srv.starttls(context=ctx)
+                    srv.ehlo()
+
             
             with srv:
                 srv.login(cfg['smtp_user'], cfg['smtp_password'])

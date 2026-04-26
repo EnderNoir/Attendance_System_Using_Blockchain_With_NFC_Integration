@@ -61,7 +61,7 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
             ctx = ssl.create_default_context()
             port = int(cfg.get('smtp_port', 587))
             host = cfg.get('smtp_host', 'smtp.gmail.com')
-            timeout = 10
+            timeout = 5
 
             # Force IPv4 resolution
             try:
@@ -85,6 +85,7 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
                 if srv.has_ext('STARTTLS'):
                     srv.starttls(context=ctx)
                     srv.ehlo()
+
 
 
             with srv:

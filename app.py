@@ -3679,6 +3679,10 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
 
     
     if tx_hash:
+        sess['session_tx_hash'] = tx_hash
+        sess['session_block_number'] = block_num or 0
+        save_session(sess_id, sess)
+        sessions_db[sess_id] = sess
         with get_db() as conn:
             conn.execute(
                 "UPDATE sessions SET session_tx_hash=?, session_block_number=? WHERE sess_id=?",

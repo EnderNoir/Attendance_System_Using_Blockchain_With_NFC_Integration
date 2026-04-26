@@ -30,7 +30,7 @@ def save_email_config(cfg: dict, get_db_fn):
             )
 
 
-def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_config_fn):
+def send_email_async(to_addrs: list, subject: str, html_body: str, cfg: dict):
     """Send an HTML email via SMTP in a background thread."""
     import threading as _th
 
@@ -42,7 +42,6 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
 
-            cfg = get_email_config_fn()
             if cfg.get('enabled') != '1':
                 return
             if not cfg.get('smtp_user') or not cfg.get('smtp_password'):

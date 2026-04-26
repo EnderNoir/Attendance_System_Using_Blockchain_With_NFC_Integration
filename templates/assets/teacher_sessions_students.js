@@ -298,7 +298,6 @@ function renderSessModal(sessId, data) {
         <th>Tapped Time</th>
         <th>Excused Reason</th>
         <th>Document</th>
-        <th>Blockchain TX</th>
       </tr></thead>
       <tbody>
         ${sts.map((st, i) => {
@@ -329,7 +328,6 @@ function renderSessModal(sessId, data) {
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
             <td style="font-size:11px;">${reasonHtml}</td>
             <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
-            <td>${txDisplay}</td>
           </tr>`;
     }).join('')}
       </tbody>
@@ -340,6 +338,17 @@ function renderSessModal(sessId, data) {
   function closeSessModal() {
     document.getElementById('sessModal').classList.remove('show');
     currentSessId = null;
+  }
+
+  function confirmDeleteSession() {
+    if (!currentSessId) return;
+    if (confirm("WARNING: Are you sure you want to completely delete this session? This action cannot be undone and will permanently remove all attendance records.")) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/teacher/session/' + currentSessId + '/delete';
+      document.body.appendChild(form);
+      form.submit();
+    }
   }
 
   function exportCurrentSession() {

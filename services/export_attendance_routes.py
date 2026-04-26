@@ -202,6 +202,7 @@ def export_student_sessions_impl(
                     'teacher': lg['teacher_name'] or '',
                     'date_dash': _fmt_date_dash(lg['started_at'] or ''),
                     'date_colon': _fmt_date_colon(lg['started_at'] or ''),
+                    'tap_time': _fmt_time_hms_ampm(lg['tap_time'] or '') if lg.get('tap_time') else '—',
                     'time_slot': _normalize_time_slot(lg['time_slot'] or ''),
                     'status': status,
                     'tx_hash': lg['tx_hash'] or '—',
@@ -229,16 +230,15 @@ def export_student_sessions_impl(
                 'Class Type',
                 'Instructor Name',
                 'Date',
+                'Tapped Time',
                 'Time Slot',
                 'Transaction Number (TX)',
                 'Block Number',
                 'Status',
                 'Excused Reason',
-'Document',
-                'Session TX',
-                'Session Block',
+                'Document',
             ]
-            widths = [4, 12, 28, 12, 24, 16, 20, 56, 12, 12, 28, 22, 56, 12]
+            widths = [4, 12, 28, 12, 24, 16, 16, 20, 56, 12, 12, 28, 22]
         else:
             headers = [
                 '#',
@@ -246,13 +246,14 @@ def export_student_sessions_impl(
                 'Subject Name',
                 'Class Type',
                 'Date',
+                'Tapped Time',
                 'Time Slot',
                 'Excused Reason',
                 'Document',
                 'Transaction Number (TX)',
                 'Block Number',
             ]
-            widths = [4, 12, 30, 12, 16, 20, 30, 22, 56, 12]
+            widths = [4, 12, 30, 12, 16, 16, 20, 30, 22, 56, 12]
         subtitles = [
             'Cavite State University — DAVS Attendance Record',
             f'Student: {stud_name}  |  ID: {sid_}  |  NFC: {nfc_id}',
@@ -267,9 +268,9 @@ def export_student_sessions_impl(
         first_data += 1
         col_fmt = {}
         if is_admin_view:
-            col_fmt = {8: ('tx',), 9: ('num',), 10: ('status',)}
+            col_fmt = {9: ('tx',), 10: ('num',), 11: ('status',)}
         else:
-            col_fmt = {9: ('tx',), 10: ('num',)}
+            col_fmt = {10: ('tx',), 11: ('num',)}
         for ri, row in enumerate(rows, first_data):
             if is_admin_view:
                 vals = [
@@ -279,6 +280,7 @@ def export_student_sessions_impl(
                     row['class_type'],
                     row['teacher'],
                     row['date_dash'],
+                    row['tap_time'],
                     row['time_slot'],
                     row['tx_hash'],
                     row['block'],
@@ -293,6 +295,7 @@ def export_student_sessions_impl(
                     row['subject'],
                     row['class_type'],
                     row['date_colon'],
+                    row['tap_time'],
                     row['time_slot'],
                     row['excuse'],
                     row['document'],
@@ -620,7 +623,7 @@ def export_session_attendance_impl(
             (f'Event Scope: {section_scope}' if is_school_event else f'Section: {sec}  |  Instructor: {instr}'),
             (f'Teacher(s) Involved: {teacher_scope}' if is_school_event else ''),
             f'Time Slot: {slot}  |  Class Type: {class_type_label}  |  Started: {started}  |  Ended: {ended}',
-            f"Session TX: {session_tx_hash[:10]}...{'' if not session_tx_hash else ' (Sepolia)'}  |  Block: {session_block_number}" if session_tx_hash else '',
+            f"Session TX: {session_tx_hash}{'' if not session_tx_hash else ' (Sepolia)'}  |  Block: {session_block_number}" if session_tx_hash else '',
             f'Exported: {now.strftime("%B %d, %Y %I:%M %p")}',
         ]
         subtitles = [s for s in subtitles if s]
@@ -635,14 +638,10 @@ def export_session_attendance_impl(
             'Status',
             'Date',
             'Time',
-            'Transaction Number (TX)',
-            'Block Number',
             'Excuse Reason',
             'Document',
-            'Session TX',
-            'Session Block',
         ]
-        widths = [4, 24, 14, 24, 12, 12, 16, 14, 56, 12, 30, 24, 56, 12]
+        widths = [4, 24, 14, 24, 12, 12, 16, 14, 30, 24]
         H['make_header_row'](ws, first_data, headers, widths)
         first_data += 1
         col_fmt = {6: ('status',), 9: ('tx',), 10: ('num',)}
@@ -659,12 +658,8 @@ def export_session_attendance_impl(
                     row['status'],
                     row['tap_date'],
                     row['tap_time'],
-                    row['tx_hash'],
-                    row['block'],
                     row['excuse_reason'],
                     row['excuse_document'],
-                    session_tx_hash or '—',
-                    str(session_block_number) if session_block_number else '—',
                 ],
                 alt=(ri % 2 == 0),
                 col_formats=col_fmt,
@@ -675,10 +670,6 @@ def export_session_attendance_impl(
             f'{len(enrolled)} enrolled',
             '',
             f"{counts['Present']}P/{counts['Late']}L/{counts['Absent']}A/{counts['Excused']}E",
-            '',
-            '',
-            '',
-            '',
             '',
             '',
             '',

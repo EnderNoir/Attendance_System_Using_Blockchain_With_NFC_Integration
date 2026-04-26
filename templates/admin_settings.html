@@ -147,31 +147,35 @@
                 <td style="padding:6px 10px;font-weight:700;color:var(--text);
                            border:1px solid var(--border);width:120px;">SMTP Host</td>
                 <td style="padding:6px 10px;border:1px solid var(--border);">
-                  <code>smtp.gmail.com</code>
+                  <code>smtp.gmail.com</code> (Gmail) or <code>smtp.sendgrid.net</code> (SendGrid)
                 </td>
               </tr>
               <tr>
                 <td style="padding:6px 10px;font-weight:700;color:var(--text);
                            border:1px solid var(--border);">SMTP Port</td>
                 <td style="padding:6px 10px;border:1px solid var(--border);">
-                  <code>587</code>
+                  <code>587</code> or <code>465</code>
                 </td>
               </tr>
               <tr style="background:rgba(45,106,39,.06);">
                 <td style="padding:6px 10px;font-weight:700;color:var(--text);
-                           border:1px solid var(--border);">Gmail Address</td>
+                           border:1px solid var(--border);">SMTP Username</td>
                 <td style="padding:6px 10px;border:1px solid var(--border);color:var(--muted);">
-                  Your Gmail address e.g. <code>davs.cvsu@gmail.com</code>
+                  Your email e.g. <code>me@gmail.com</code> or <code>apikey</code> (SendGrid)
                 </td>
               </tr>
               <tr>
                 <td style="padding:6px 10px;font-weight:700;color:var(--text);
-                           border:1px solid var(--border);">App Password</td>
+                           border:1px solid var(--border);">Password</td>
                 <td style="padding:6px 10px;border:1px solid var(--border);color:var(--muted);">
-                  The 16-character password from Step 4
+                  Gmail <strong>App Password</strong> or <strong>SendGrid API Key</strong>
                 </td>
               </tr>
             </table>
+            <div style="margin-top:8px;font-size:11px;color:var(--muted);background:rgba(45,106,39,.04);padding:8px;border-radius:6px;border:1px dashed rgba(45,106,39,.3);">
+              <i class="bi bi-lightbulb-fill" style="color:var(--warning);"></i>
+              <strong>Tip for Railway users:</strong> If Gmail is blocked (Network Error), use <strong>SendGrid</strong>. Set Host to <code>smtp.sendgrid.net</code>, Port to <code>587</code>, and Username to <code>apikey</code>.
+            </div>
           </div>
         </div>
 
@@ -228,10 +232,10 @@
           <span class="field-hint">Use 587 for TLS (recommended)</span>
         </div>
         <div class="field-wrap">
-          <label class="field-label" for="smtp_user">Gmail Address <span style="color:var(--danger)">*</span></label>
-          <input class="field-input" type="email" name="smtp_user" id="smtp_user"
-                 value="{{ cfg.smtp_user }}" placeholder="yourschool@gmail.com"/>
-          <span class="field-hint">The Gmail account used to send emails</span>
+          <label class="field-label" for="smtp_user">SMTP Username / Email <span style="color:var(--danger)">*</span></label>
+          <input class="field-input" type="text" name="smtp_user" id="smtp_user"
+                 value="{{ cfg.smtp_user }}" placeholder="yourschool@gmail.com or 'apikey'"/>
+          <span class="field-hint">Use <code>apikey</code> if using SendGrid</span>
         </div>
         <div class="field-wrap">
           <label class="field-label" for="smtp_password">App Password <span style="color:var(--danger)">*</span></label>

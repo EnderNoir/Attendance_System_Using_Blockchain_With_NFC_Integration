@@ -3185,7 +3185,7 @@ def send_contract_tx(contract_fn):
                 try:
                     tx['gas'] = int(web3.eth.estimate_gas(tx) * 1.3)
                 except:
-                    tx['gas'] = 600000
+                    tx['gas'] = 1000000
 
                 # Set gas prices with extra padding for speed
                 try:
@@ -3278,11 +3278,10 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
     Record entire session attendance data to blockchain using recordSession().
     students_data = [(nfc_id1, 'present'), (nfc_id2, 'late'), ...]
     start_val/end_val can be ISO strings or Unix timestamps.
-    Returns (tx_hash, block_number) or (None, None)
+    Returns (tx_hash, block_number, error_msg)
     """
     if not (BLOCKCHAIN_ONLINE and contract and admin_account):
-        print("[BLOCKCHAIN] Offline - skipping session recording")
-        return None, None
+        return None, None, "Blockchain offline or contract not loaded"
         
     try:
         # Parse timestamps → Unix
@@ -3374,13 +3373,14 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         block_num = receipt['blockNumber']
         
         print(f"[BLOCKCHAIN] Session {session_id} recorded: TX={tx_hash[:16]}... Block={block_num}")
-        return tx_hash, block_num
+        return tx_hash, block_num, None
         
     except Exception as e:
-        print(f"[ERROR] record_session_on_chain {session_id}: {e}")
+        err = str(e)
+        print(f"[ERROR] record_session_on_chain {session_id}: {err}")
         import traceback
         traceback.print_exc()
-        return None, None
+        return None, None, err
 
 def get_student_by_nfc_cached(nfc_id: str):
     st = db_get_student(nfc_id)
@@ -3644,7 +3644,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
         students_data = [(row['nfc_id'], row['status']) for row in logs]
         
         start_iso = sess.get('started_at', ended_at)
-        tx_hash, block_num = record_session_on_chain(
+        tx_hash, block_num, bc_error = record_session_on_chain(
             session_id=sess_id,
             subject_name=sess.get('subject_name', 'Class Session'),
             teacher_name=sess.get('teacher_name', 'Teacher'),
@@ -3828,6 +3828,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
         'excused_count': len(excused_set),
         'total_enrolled': len(section_students),
         'tx_hash': tx_hash,
+        'bc_error': bc_error,
     }
 
 def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
@@ -5969,8 +5970,9 @@ def end_session(sess_id):
             f"Session ended. Blockchain TX: {result.get('tx_hash')[:10]}... | {result.get('present_count', 0)} present, "
             f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
     else:
+        err = result.get('bc_error') or "Skipped"
         flash(
-            f"Session ended, but Blockchain recording failed or was skipped. | {result.get('present_count', 0)} present, "
+            f"Session ended, but Blockchain recording failed ({err}). | {result.get('present_count', 0)} present, "
             f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
     return redirect(url_for('teacher_dashboard'))
 

@@ -4043,38 +4043,67 @@ def admin_settings_test():
     if not cfg.get('smtp_user') or not cfg.get('smtp_password'):
         return jsonify({'ok': False, 'message': 'SMTP credentials not configured.'})
     try:
-        import smtplib, ssl
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text      import MIMEText
-        msg            = MIMEMultipart('alternative')
-        msg['Subject'] = '[DAVS] Test Email — SMTP Configuration Verified'
-        msg['From']    = cfg.get('smtp_from') or cfg['smtp_user']
-        msg['To']      = test_to
-        msg.attach(MIMEText(f'''
+        host = cfg.get('smtp_host', 'smtp.gmail.com').lower().strip()
+        test_to = request.form.get('test_email', '').strip()
+        from_email = cfg.get('smtp_from') or cfg['smtp_user']
+        
+        html_content = f'''
         <div style="font-family:Arial,sans-serif;padding:24px;max-width:480px;">
           <div style="font-size:20px;font-weight:700;color:#1E4A1A;margin-bottom:8px;">
             ✓ DAVS Email Test Successful
           </div>
           <p style="color:#555;font-size:13px;">
-            Your SMTP configuration is working correctly.<br>
+            Your configuration is working correctly!<br>
             Email notifications will be sent from:
-            <strong>{cfg.get("smtp_from") or cfg["smtp_user"]}</strong>
+            <strong>{from_email}</strong>
           </p>
-          <p style="color:#94a3b8;font-size:11px;margin-top:16px;">
-            Cavite State University — DAVS System
-          </p>
-        </div>''', 'html'))
-        import threading
+        </div>'''
+
+        # ── SENDGRID HTTP API BYPASS ──
+        if 'sendgrid.net' in host or cfg.get('smtp_user') == 'apikey':
+            import urllib.request
+            import json
+            
+            url = "https://api.sendgrid.com/v3/mail/send"
+            headers = {
+                "Authorization": f"Bearer {cfg['smtp_password'].strip()}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "personalizations": [{"to": [{"email": test_to}]}],
+                "from": {"email": from_email},
+                "subject": "[DAVS] Test Email — SendGrid API Verified",
+                "content": [{"type": "text/html", "value": html_content}]
+            }
+            
+            req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+            try:
+                urllib.request.urlopen(req, timeout=10)
+                return jsonify({'ok': True, 'message': f'Test email sent instantly via SendGrid API (Port 443 Bypass).'})
+            except urllib.error.HTTPError as e:
+                err_body = e.read().decode('utf-8')
+                return jsonify({'ok': False, 'message': f'SendGrid API Error: {e.code} - {err_body}'})
+            except Exception as e:
+                return jsonify({'ok': False, 'message': f'API Network Error: {str(e)}'})
+
+        # ── STANDARD SMTP ROUTE (Gmail, etc.) ──
+        import smtplib, ssl, threading, socket
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text      import MIMEText
         
+        msg            = MIMEMultipart('alternative')
+        msg['Subject'] = '[DAVS] Test Email — SMTP Configuration Verified'
+        msg['From']    = from_email
+        msg['To']      = test_to
+        msg.attach(MIMEText(html_content, 'html'))
+
         result_box = {'ok': False, 'message': 'Test timed out.'}
         
         def _test_worker():
             try:
                 ctx  = ssl.create_default_context()
                 port = int(cfg.get('smtp_port', 587))
-                host = cfg.get('smtp_host', 'smtp.gmail.com')
                 
-                # Single IP resolution to avoid sequential connection delays
                 try:
                     addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
                     target_ip = addr_info[0][4][0]
@@ -4087,7 +4116,7 @@ def admin_settings_test():
                     srv = smtplib.SMTP(target_ip, port, timeout=10)
                     srv.ehlo()
                     if srv.has_ext('STARTTLS'):
-                        srv._host = host # Hack to ensure SSL cert validation matches hostname
+                        srv._host = host 
                         srv.starttls(context=ctx)
                         srv.ehlo()
 
@@ -4097,21 +4126,15 @@ def admin_settings_test():
                 
                 result_box['ok'] = True
                 result_box['message'] = f'Test email sent to {test_to}'
-            except (socket.timeout, TimeoutError):
-                result_box['message'] = f'Connection Timed Out. {host}:{port} is not responding. Port {port} is likely BLOCKED by Railway. Please try a different port or provider.'
             except Exception as e:
-                err_msg = str(e)
-                if "101" in err_msg or "unreachable" in err_msg.lower():
-                    result_box['message'] = f'Network Error: {host}:{port} is blocked or unreachable from this server.'
-                else:
-                    result_box['message'] = f'SMTP Error: {err_msg}'
+                result_box['message'] = f'Network Error: {str(e)}'
 
         t = threading.Thread(target=_test_worker, daemon=True)
         t.start()
-        t.join(timeout=15) # Hard limit, worker will never wait longer than 15s
+        t.join(timeout=15)
         
         if t.is_alive():
-             return jsonify({'ok': False, 'message': f'Connection Timed Out (15s). The SMTP server at {cfg.get("smtp_host")} is taking too long to respond. This usually means Port {cfg.get("smtp_port")} is completely blocked by your hosting provider.'})
+             return jsonify({'ok': False, 'message': f'Connection Timed Out. Port {cfg.get("smtp_port")} is completely blocked by your host.'})
         
         return jsonify(result_box)
     except Exception as e:

@@ -114,7 +114,7 @@
                 </tr>
                 <tr style="border-bottom:1px solid var(--border);">
                   <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(96,165,250,.04);">SMTP Port</td>
-                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">587</td>
+                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">2525 <span style="font-size:10px;color:var(--muted);">(Bypasses Railway blocks)</span></td>
                 </tr>
                 <tr style="border-bottom:1px solid var(--border);">
                   <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(96,165,250,.04);">SMTP Username</td>
@@ -176,8 +176,8 @@
         <div class="field-wrap">
           <label class="field-label" for="smtp_port">SMTP Port</label>
           <input class="field-input" type="number" name="smtp_port" id="smtp_port"
-                 value="{{ cfg.smtp_port }}" placeholder="587"/>
-          <span class="field-hint">Use 587 for SendGrid</span>
+                 value="{{ cfg.smtp_port }}" placeholder="2525"/>
+          <span class="field-hint">Use <strong>2525</strong> for Railway to bypass blocked ports</span>
         </div>
         <div class="field-wrap">
           <label class="field-label" for="smtp_user">SMTP Username <span style="color:var(--danger)">*</span></label>

@@ -58,12 +58,42 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
             msg['To'] = ', '.join(recipients)
             msg.attach(MIMEText(html_body, 'html'))
 
+            host = cfg.get('smtp_host', '').lower().strip()
+            
+            # ── SENDGRID HTTP API BYPASS ──
+            if 'sendgrid.net' in host or cfg.get('smtp_user') == 'apikey':
+                import urllib.request
+                import json
+                
+                url = "https://api.sendgrid.com/v3/mail/send"
+                headers = {
+                    "Authorization": f"Bearer {cfg['smtp_password'].strip()}",
+                    "Content-Type": "application/json"
+                }
+                
+                # Get the HTML part from the MIMEMultipart
+                html_body = msg.get_payload()[0].get_payload() if msg.is_multipart() else msg.get_payload()
+                
+                # Prepare personalizations for multiple recipients
+                personalizations = [{"to": [{"email": r}]} for r in recipients]
+                
+                data = {
+                    "personalizations": personalizations,
+                    "from": {"email": msg['From']},
+                    "subject": msg['Subject'],
+                    "content": [{"type": "text/html", "value": html_body}]
+                }
+                
+                req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+                urllib.request.urlopen(req, timeout=10)
+                print(f'[EMAIL] Sent "{subject}" to {recipients} via SendGrid API')
+                return
+
+            # ── STANDARD SMTP ROUTE ──
             ctx = ssl.create_default_context()
             port = int(cfg.get('smtp_port', 587))
-            host = cfg.get('smtp_host', 'smtp.gmail.com')
             timeout = 5
 
-            # Force IPv4 resolution
             try:
                 addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
                 target_ip = addr_info[0][4][0]
@@ -85,8 +115,6 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, get_email_con
                 if srv.has_ext('STARTTLS'):
                     srv.starttls(context=ctx)
                     srv.ehlo()
-
-
 
             with srv:
                 srv.login(cfg['smtp_user'], cfg['smtp_password'])

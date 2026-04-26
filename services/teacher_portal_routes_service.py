@@ -107,6 +107,14 @@ def teacher_dashboard_page_impl(
             "WHERE (teacher_username=? OR teacher_name=?) AND ended_at IS NOT NULL",
             (session_obj['username'], session_obj.get('full_name', '')),
         ).fetchone()[0]
+        
+        # Get all distinct subjects this teacher has ever had sessions for
+        rows = conn.execute(
+            "SELECT DISTINCT subject_name FROM sessions "
+            "WHERE (teacher_username=? OR teacher_name=?) AND subject_name IS NOT NULL",
+            (session_obj['username'], session_obj.get('full_name', '')),
+        ).fetchall()
+        subjects_from_sessions = sorted([r['subject_name'] for r in rows])
 
     total_students = len(teacher_students(user))
 
@@ -115,6 +123,7 @@ def teacher_dashboard_page_impl(
         user=user,
         sections=sections,
         my_subjects=my_subjects,
+        subjects=subjects_from_sessions,
         live_sessions=live_sessions,
         total_sessions=total_sessions,
         total_students=total_students,
@@ -186,7 +195,9 @@ def teacher_sessions_students_page_impl(
     )
 
     report = []
-    for student in teacher_students(user):
+    adviser_students = teacher_students(user)
+    is_adviser = len(adviser_students) > 0
+    for student in adviser_students:
         stats = get_student_attendance_stats(student['nfcId'])
         report.append({**student, **stats})
     students = sorted(report, key=lambda item: -item['rate'])
@@ -219,6 +230,7 @@ def teacher_sessions_students_page_impl(
         sessions_json=sessions_json,
         subjects=subjects,
         students=students,
+        is_adviser=is_adviser,
         now=str(datetime_cls.now().year),
         fmt_time=fmt_time,
         fmt_time_short=fmt_time_short,

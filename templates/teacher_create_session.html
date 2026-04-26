@@ -384,7 +384,7 @@
   %}
   <div
     class="sess-card {% if ms.active_session_id %}live{% endif %}"
-    data-subj="{{ ms.subject_name|lower }}"
+    data-subj="{{ (ms.subject_name ~ ' ' ~ (ms.course_code or ''))|lower }}"
     data-program="{{ prog|lower }}"
     data-year="{{ yr|lower }}"
     data-section="{{ sec|lower }}"

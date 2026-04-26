@@ -70,9 +70,7 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, cfg: dict):
                     "Content-Type": "application/json"
                 }
                 
-                # Get the HTML part from the MIMEMultipart
-                html_body = msg.get_payload()[0].get_payload() if msg.is_multipart() else msg.get_payload()
-                
+                # We use the raw html_body argument directly instead of extracting from MIME
                 # Prepare personalizations for multiple recipients
                 personalizations = [{"to": [{"email": r}]} for r in recipients]
                 

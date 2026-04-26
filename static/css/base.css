@@ -316,21 +316,6 @@
       letter-spacing: .5px;
       font-weight: 600;
     }
-
-    .s-avatar-init {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #2D6A27, #F5C518);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 700;
-      color: #000;
-      flex-shrink: 0;
-    }
-
     /* ══ MAIN ══ */
     .main-content {
       margin-left: var(--sidebar-w);
@@ -349,11 +334,11 @@
       border-bottom: 3px solid var(--accent2);
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
       padding: 0 20px;
       position: sticky;
       top: 0;
-      z-index: 50;
+      z-index: 100;
       box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
     }
 
@@ -361,8 +346,23 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      min-width: 0;
       flex: 1;
+      min-width: 0;
+    }
+
+    .topbar-center {
+      flex: 2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .topbar-right {
+      flex: 1;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
     }
 
     .hamburger {
@@ -393,13 +393,6 @@
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 300px;
-    }
-
-    .topbar-right {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
     }
 
     .topbar-time {
@@ -2077,6 +2070,10 @@
 @keyframes modalPop {
   from { transform: scale(0.9); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+@keyframes sp {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 .app-dialog-header {
   padding: 16px 20px;

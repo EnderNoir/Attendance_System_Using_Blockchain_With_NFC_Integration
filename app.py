@@ -2605,6 +2605,12 @@ def check_and_start_scheduled_sessions():
                     pass
 
 def check_and_end_expired_sessions():
+    """Wrapper — always runs inside an app context so DB helpers work from the background thread."""
+    with app.app_context():
+        _check_and_end_expired_sessions_impl()
+
+
+def _check_and_end_expired_sessions_impl():
     """System-wide safety check to end sessions after their own configured end time."""
     now_dt = _now_local()
     now_str = now_dt.strftime('%Y-%m-%d %H:%M:%S')
@@ -3668,14 +3674,33 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
         )
         absent_ids.append(nid)
 
-    # Record entire session to blockchain (1 session = 1 TX)
+    # ── Step 1: Mark session as ended in DB immediately ─────────────────────
+    # IMPORTANT: This MUST run before the blockchain call so that sessions are
+    # always marked as ended even if the blockchain call fails or times out.
     with get_db() as conn:
-        logs = conn.execute(
-            "SELECT nfc_id, status FROM attendance_logs WHERE sess_id=?",
-            (sess_id,)
-        ).fetchall()
+        conn.execute(
+            "UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
+            (len(section_students), ended_at, sess_id)
+        )
+
+    sess['ended_at'] = ended_at
+    sess['absent'] = absent_ids
+    sessions_db[sess_id] = sess
+    print(f"[FINALIZE] Session {sess_id} marked ended_at={ended_at} in DB.")
+
+    # ── Step 2: Fetch logs and record to blockchain ───────────────────────────
+    # Blockchain call is now outside the DB context manager to avoid holding
+    # a connection open during a potentially slow/blocking blockchain operation.
+    tx_hash = None
+    block_num = None
+    bc_error = None
+    try:
+        with get_db() as conn:
+            logs = conn.execute(
+                "SELECT nfc_id, status FROM attendance_logs WHERE sess_id=?",
+                (sess_id,)
+            ).fetchall()
         students_data = [(row['nfc_id'], row['status']) for row in logs]
-        
         start_iso = sess.get('started_at', ended_at)
         tx_hash, block_num, bc_error = record_session_on_chain(
             session_id=sess_id,
@@ -3689,36 +3714,16 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
             section_key=sess.get('section_key', ''),
             semester=sess.get('semester', '')
         )
-        
-        # Store session TX hash in DB (queryable for UI/export/email)
         if tx_hash:
-            conn.execute(
-                "UPDATE sessions SET session_tx_hash=?, session_block_number=? WHERE sess_id=?",
-                (tx_hash, block_num or 0, sess_id)
-            )
-            print(f"[✅ BLOCKCHAIN] Session {sess_id} TX={tx_hash[:16]}...")
+            print(f"[\u2705 BLOCKCHAIN] Session {sess_id} TX={tx_hash[:16]}...")
         else:
-            print(f"[⚠️ ] Session {sess_id} blockchain record failed")
+            print(f"[\u26a0\ufe0f ] Session {sess_id} blockchain record skipped/failed: {bc_error}")
+    except Exception as _bc_err:
+        bc_error = str(_bc_err)
+        print(f"[\u26a0\ufe0f BLOCKCHAIN] Session {sess_id} blockchain call raised: {_bc_err}")
 
-    with get_db() as conn:
-        conn.execute(
-            "UPDATE sessions SET total_enrolled=?, ended_at=? WHERE sess_id=?",
-            (len(section_students), ended_at, sess_id)
-        )
-
-    sess['ended_at'] = ended_at
-    sess['absent'] = absent_ids
-    # Reload with TX hash
-    sess = load_session(sess_id)
-    save_session(sess_id, sess)
-    sessions_db[sess_id] = sess
-
-    
+    # ── Step 3: Persist TX hash and sync attendance logs ─────────────────────
     if tx_hash:
-        sess['session_tx_hash'] = tx_hash
-        sess['session_block_number'] = block_num or 0
-        save_session(sess_id, sess)
-        sessions_db[sess_id] = sess
         with get_db() as conn:
             conn.execute(
                 "UPDATE sessions SET session_tx_hash=?, session_block_number=? WHERE sess_id=?",
@@ -3731,7 +3736,12 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
             )
         print(f"[✅ BLOCKCHAIN] Session {sess_id} synced with TX={tx_hash[:16]}...")
     else:
-        print(f"[⚠️] Session {sess_id} blockchain FAILED")
+        print(f"[⚠️] Session {sess_id} blockchain skipped/failed: {bc_error}")
+
+    # Reload to get latest state (including TX hash if blockchain succeeded)
+    sess = load_session(sess_id)
+    save_session(sess_id, sess)
+    sessions_db[sess_id] = sess
 
     def _post_finalize_worker():
         with app.app_context():

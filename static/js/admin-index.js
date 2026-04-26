@@ -1,5 +1,5 @@
 const COLORS = { present: '#10b981', late: '#f59e0b', absent: '#ef4444', excused: '#60a5fa' };
-let curPeriod = 'today';
+let curPeriod = 'all';
 let curFilters = {};
 let rawData = null;
 const ssdValues = {};

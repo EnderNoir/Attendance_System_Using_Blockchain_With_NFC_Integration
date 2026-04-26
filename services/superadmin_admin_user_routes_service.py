@@ -66,6 +66,25 @@ def superadmin_create_user_impl(
                 'created_at': datetime_now().strftime('%Y-%m-%d %H:%M:%S'),
             },
         )
+        
+        try:
+            from services.welcome_email_templates import send_staff_welcome_email
+            from services.email_service import send_email_async, get_email_config
+            def send_email_fn(to_addrs, subject, html_body):
+                send_email_async(to_addrs, subject, html_body, get_email_config(get_db))
+            
+            send_staff_welcome_email(
+                full_name=fullname,
+                email=email,
+                username=username,
+                role=role,
+                initial_password=password,
+                login_url=request.host_url.rstrip('/') + url_for('login'),
+                send_email_fn=send_email_fn
+            )
+        except Exception as e:
+            print(f"[EMAIL] Error sending staff welcome email: {e}")
+            
         flash(f'Account "{username}" ({role}) created successfully.', 'success')
         return redirect(url_for('superadmin_users'))
 
@@ -158,6 +177,25 @@ def admin_create_instructor_impl(
                 'created_at': datetime_now().strftime('%Y-%m-%d %H:%M:%S'),
             },
         )
+        
+        try:
+            from services.welcome_email_templates import send_staff_welcome_email
+            from services.email_service import send_email_async, get_email_config
+            def send_email_fn(to_addrs, subject, html_body):
+                send_email_async(to_addrs, subject, html_body, get_email_config(get_db))
+            
+            send_staff_welcome_email(
+                full_name=fullname,
+                email=email,
+                username=username,
+                role='teacher',
+                initial_password=password,
+                login_url=request.host_url.rstrip('/') + url_for('login'),
+                send_email_fn=send_email_fn
+            )
+        except Exception as e:
+            print(f"[EMAIL] Error sending staff welcome email: {e}")
+            
         flash(f'Instructor account "{username}" created successfully.', 'success')
         return redirect(url_for('manage_users'))
 

@@ -26,7 +26,7 @@ def _now_local():
     try:
         return datetime.now(ZoneInfo(APP_TIMEZONE)).replace(tzinfo=None)
     except Exception:
-        return datetime.now()
+        return _now_local()
 
 
 # ── Jinja2 custom filters ─────────────────────────────────────────────────────
@@ -1560,7 +1560,7 @@ def migrate_json_to_postgres():
             'username':'admin','password':hash_password('admin123'),'role':'admin',
             'full_name':'System Administrator','email':'admin@davs.edu',
             'status':'approved','sections':[],'my_subjects':[],
-            'created_at':datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'created_at':_now_local().strftime('%Y-%m-%d %H:%M:%S')
         })
     if db_get_user('superadmin') is None:
         db_save_user('superadmin', {
@@ -1568,7 +1568,7 @@ def migrate_json_to_postgres():
             'role':'super_admin','full_name':'Super Administrator',
             'email':'superadmin@davs.edu',
             'status':'approved','sections':[],'my_subjects':[],
-            'created_at':datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'created_at':_now_local().strftime('%Y-%m-%d %H:%M:%S')
         })
         print('[DB] Default superadmin account created (change password immediately!)')
     else:
@@ -1606,7 +1606,7 @@ def db_get_user(username):
 
 def db_save_user(username, u):
     sections = [normalize_section_key(s) for s in u.get('sections', [])]
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     pw  = u.get('password', u.get('password_hash', ''))
     role = _canonical_role(u.get('role', 'teacher'))
     with get_db() as conn:
@@ -1662,7 +1662,7 @@ def _student_row(row):
     return d
 
 def db_save_student(s):
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     with get_db() as conn:
         conn.execute(
             "INSERT INTO students "
@@ -1717,7 +1717,7 @@ def db_delete_student(nfc_id):
 def db_save_attendance_log(sess_id, nfc_id, student_name, student_id,
                             status, tap_time, tx_hash='', block_number=0,
                             excuse_note='', class_type=''):
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     class_type_norm = str(class_type or '').strip().lower()
     if class_type_norm not in ('lecture', 'laboratory', 'school_event'):
         class_type_norm = ''
@@ -1776,7 +1776,7 @@ def nfc_is_waiting():
     return bool(row and row['waiting'])
 
 def nfc_set_waiting(flag, requested_by=''):
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     with get_db() as conn:
         conn.execute(
             "UPDATE nfc_scanner SET waiting=?, scanned_uid='', "
@@ -2079,7 +2079,7 @@ def db_get_schedule(schedule_id):
     return dict(row) if row else None
 
 def db_save_schedule(s: dict) -> str:
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     sid = s.get('schedule_id') or str(uuid.uuid4())
     class_type = str(s.get('class_type', 'lecture')).strip().lower()
     if class_type not in ('lecture', 'laboratory', 'school_event'):
@@ -2116,7 +2116,7 @@ def db_save_schedule(s: dict) -> str:
     return sid
 
 def db_delete_schedule(schedule_id):
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     schedule_id = str(schedule_id or '').strip()
     
     if schedule_id.startswith('event:'):
@@ -2182,7 +2182,7 @@ def db_get_event_schedule_by_id(event_id):
 
 
 def db_save_event_schedule(e: dict) -> str:
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     event_id = str(e.get('event_id') or str(uuid.uuid4())).strip()
     teacher_usernames = list(dict.fromkeys(
         str(u).strip() for u in e.get('teacher_usernames', []) if str(u).strip()
@@ -2269,7 +2269,7 @@ def db_get_no_class_days_for_date(date_ymd, teacher_username=''):
 
 
 def db_save_no_class_day(item: dict) -> int:
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     teacher_usernames = [str(u).strip() for u in list(item.get('teacher_usernames', []) or []) if str(u).strip()]
     apply_all_teachers = 1 if item.get('apply_all_teachers') else 0
     with get_db() as conn:
@@ -2293,7 +2293,7 @@ def db_save_no_class_day(item: dict) -> int:
 
 
 def db_delete_no_class_day(no_class_day_id: int) -> None:
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     with get_db() as conn:
         conn.execute(
             "UPDATE no_class_days SET is_active=0, updated_at=? WHERE id=?",
@@ -2588,13 +2588,14 @@ def check_and_end_expired_sessions():
         auto_end_at = (s['auto_end_at'] or '').strip()
         if auto_end_at:
             try:
-                end_dt = datetime.strptime(auto_end_at, '%Y-%m-%d %H:%M:%S')
+                end_dt_naive = datetime.strptime(auto_end_at, '%Y-%m-%d %H:%M:%S')
+                end_dt = end_dt_naive.replace(tzinfo=timezone(APP_TIMEZONE))
                 if now_dt >= end_dt:
                     result = _finalize_session(sess_id, ended_time=now_str, async_chain_and_email=True)
                     if result and not result.get('already_ended'):
                         print(f"[AUTO] Ended session {sess_id} (Auto End Reached)")
                 continue
-            except Exception:
+            except Exception as e:
                 # If stored timestamp is malformed, fall back to schedule lookup below.
                 pass
 
@@ -2688,7 +2689,7 @@ def _excuse_order_expr(conn) -> str:
     return "''"
 
 def db_save_excuse_request(data: dict) -> int:
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     with get_db() as conn:
         cols = [r['name'] for r in conn.execute("PRAGMA table_info(excuse_requests)").fetchall()]
         insert_cols = [
@@ -2780,7 +2781,7 @@ def db_get_excuse_request(excuse_id):
     return dict(row)
 
 def db_resolve_excuse(excuse_id: int, resolution: str, reviewed_by: str) -> dict | None:
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     session_sync = None
     with get_db() as conn:
         pk_col = _excuse_pk_column(conn)
@@ -2909,7 +2910,8 @@ def fmt_time(dt_str):
     if not dt_str: return '—'
     try:
         dt = datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
-        return dt.strftime('%b %d, %Y · %I:%M %p')
+        res = dt.strftime('%b %d, %Y · %I:%M %p')
+        return res.replace(' · 0', ' · ').replace(' 0', ' ')
     except:
         return dt_str
 
@@ -2917,7 +2919,8 @@ def fmt_time_short(dt_str):
     if not dt_str: return '—'
     try:
         dt = datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
-        return dt.strftime('%I:%M %p').lower().lstrip('0')
+        res = dt.strftime('%I:%M %p')
+        return res.lstrip('0')
     except:
         return dt_str
 
@@ -2929,8 +2932,8 @@ def fmt_timeslot(slot):
         res = []
         for p in parts:
             dt = datetime.strptime(p.strip(), '%H:%M')
-            res.append(dt.strftime('%I:%M %p').lower().lstrip('0'))
-        return " to ".join(res)
+            res.append(dt.strftime('%I:%M %p').lstrip('0'))
+        return " - ".join(res)
     except:
         return slot
 
@@ -3298,7 +3301,7 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
                 dt = datetime.fromtimestamp(start_val)
                 log_date = dt.strftime('%B %d %Y')
         except:
-            log_date = datetime.now().strftime('%B %d %Y')
+            log_date = _now_local().strftime('%B %d %Y')
 
         # Include course code and subject in the first line of logData
         # Instructor Name: J***s N****o,
@@ -3603,7 +3606,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     excused_set.update([row['nfc_id'] for row in excused_from_db])
     excused_set.update([row['nfc_id'] for row in approved_excuse_requests])
 
-    ended_at = ended_time or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    ended_at = ended_time or _now_local().strftime('%Y-%m-%d %H:%M:%S')
     absent_ids = []
     for st in section_students:
         nid = st['nfcId']
@@ -4594,7 +4597,7 @@ def batch_register():
                 'course_code': subj.get('course_code', ''),
                 'units':       str(subj.get('units', '3')),
                 'created_by':  session.get('username', 'admin'),
-                'created_at':  datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'created_at':  _now_local().strftime('%Y-%m-%d %H:%M:%S'),
             })
             if code_upper:
                 existing_codes[code_upper] = new_id
@@ -4808,7 +4811,7 @@ def mark():
         if sess_id:
             db_save_attendance_log(
                 sess_id, nfc_id, name, '',
-                status='present', tap_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                status='present', tap_time=_now_local().strftime('%Y-%m-%d %H:%M:%S'),
                 tx_hash='', block_number=0
             )
         
@@ -4997,19 +5000,7 @@ def export_csv_single(nfc_id):
 @app.route('/admin/users')
 @admin_required
 def manage_users():
-    all_u = db_get_all_users()
-    users = {u: d for u, d in all_u.items() if d.get('role') in ('admin', 'teacher')}
-    super_admin_count = sum(1 for d in all_u.values() if d.get('role') == 'super_admin')
-    return render_template(
-        'superadmin_users.html',
-        users=users,
-        ADMIN_ROLES=ADMIN_ROLES,
-        super_admin_count=super_admin_count,
-        is_super_admin=False,
-        can_change_role=False,
-        create_user_url=url_for('admin_create_instructor'),
-        create_button_label='Create Teacher Account',
-    )
+    return redirect(url_for('index', tab='faculty'))
 
 
 @app.route('/admin/approve/<username>', methods=['POST'])
@@ -5034,8 +5025,11 @@ def reject_user(username):
 def delete_user(username):
     user = db_get_user(username)
     if user and username != 'admin':
-        db_delete_user(username); flash(f'{user["full_name"]} deleted.')
-    return redirect(url_for('manage_users'))
+        role = user.get('role')
+        db_delete_user(username); flash(f'{user["full_name"]} deleted.', 'success')
+        if role == 'teacher':
+            return redirect(url_for('index', tab='faculty'))
+    return redirect(url_for('index'))
 
 @app.route('/admin/subjects')
 @admin_required
@@ -5056,7 +5050,7 @@ def add_subject():
     sid = str(uuid.uuid4())[:8]
     db_save_subject(sid, {'name':name,'course_code':course_code,'units':units,
                           'created_by':session.get('username',''),
-                          'created_at':datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+                          'created_at':_now_local().strftime('%Y-%m-%d %H:%M:%S')})
     flash(f'Subject "{name}" added.')
     return redirect(url_for('manage_subjects'))
 
@@ -5516,7 +5510,7 @@ def _auto_end_session_thread(sess_id, auto_end_at_str, app_context):
     import threading as _th
     try:
         auto_end_dt = datetime.strptime(auto_end_at_str, '%Y-%m-%d %H:%M:%S')
-        wait_secs   = (auto_end_dt - datetime.now()).total_seconds()
+        wait_secs   = (auto_end_dt - _now_local()).total_seconds()
         if wait_secs > 0:
             print(f"[AUTO-END] Session {sess_id} will auto-end in {int(wait_secs)}s at {auto_end_at_str}")
             _th.Event().wait(timeout=wait_secs)
@@ -5531,7 +5525,7 @@ def _auto_end_session_thread(sess_id, auto_end_at_str, app_context):
             print(f"[AUTO-END] Auto-ending session {sess_id}...")
             result = _finalize_session(
                 sess_id,
-                ended_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                ended_time=_now_local().strftime('%Y-%m-%d %H:%M:%S'),
                 async_chain_and_email=True,
             )
             if result and not result.get('already_ended'):
@@ -5576,7 +5570,7 @@ def start_session():
  
     subj_data = db_get_subject(subject_id) or {}
     units     = int(subj_data.get('units', 3))
-    now       = datetime.now()
+    now       = _now_local()
     from datetime import timedelta
  
     # ── Late cutoff: based on actual session start + grace period ─────────────
@@ -5650,7 +5644,7 @@ def diagnostics():
     Debug endpoint: shows server state and session information.
     Helps diagnose why sessions might not be starting on Railway.
     """
-    now_dt = datetime.now()
+    now_dt = _now_local()
     active = get_active_sessions()
     
     with get_db() as conn:
@@ -5935,7 +5929,7 @@ def end_session(sess_id):
         return redirect(url_for('live_session', sess_id=sess_id))
     result = _finalize_session(
         sess_id,
-        ended_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        ended_time=_now_local().strftime('%Y-%m-%d %H:%M:%S'),
         async_chain_and_email=True,
     )
     if not result:
@@ -6011,7 +6005,7 @@ def excuse_student(sess_id):
         student_name=student.get('name', nfc_id),
         student_id=student.get('student_id', ''),
         status='excused',
-        tap_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        tap_time=_now_local().strftime('%Y-%m-%d %H:%M:%S'),
         tx_hash=exc_tx, block_number=exc_block,
         excuse_note=f"{reason_label}{' — ' + reason_detail if reason_detail else ''}"
     )
@@ -6028,7 +6022,7 @@ def excuse_student(sess_id):
         subject_name=sess.get('subject_name', ''),
         section_key=sess.get('section_key', ''),
         teacher_name=sess.get('teacher_name', ''),
-        tap_time=datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+        tap_time=_now_local().strftime('%B %d, %Y  %I:%M %p'),
         status='excused',
         tx_hash=exc_tx,
         block_num=exc_block,
@@ -6509,7 +6503,7 @@ def mark_pico():
                         'message':f'{name} is already marked present.'})
 
     # Determine late status
-    now_dt       = datetime.now()
+    now_dt       = _now_local()
     late_cutoff  = sess.get('late_cutoff','')
     is_late      = False
     is_school_event = str(sess.get('class_type', 'lecture')).strip().lower() == 'school_event'
@@ -6521,8 +6515,8 @@ def mark_pico():
             is_late = False
 
     # Record attendance to database immediately (blockchain write happens in background)
-    tap_time_db   = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    tap_time      = datetime.now().strftime('%H:%M:%S')
+    tap_time_db   = _now_local().strftime('%Y-%m-%d %H:%M:%S')
+    tap_time      = _now_local().strftime('%H:%M:%S')
     tap_timestamp = time.time()
     status_label  = 'late' if is_late else 'present'
     if is_school_event:
@@ -6637,7 +6631,7 @@ def mark_pico():
         subject_name   = sess.get('subject_name', ''),
         section_key    = sess.get('section_key', ''),
         teacher_name   = sess.get('teacher_name', ''),
-        tap_time       = datetime.now().strftime('%B %d, %Y  %I:%M %p'),
+        tap_time       = _now_local().strftime('%B %d, %Y  %I:%M %p'),
         status         = status_label,
         tx_hash        = tx_hash or '',
         block_num      = block_num or '',
@@ -6823,7 +6817,7 @@ def superadmin_create_user():
             'username': username, 'password': hash_password(password),
             'role': role, 'full_name': fullname, 'email': email,
             'status': 'approved', 'sections': [], 'my_subjects': [],
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'created_at': _now_local().strftime('%Y-%m-%d %H:%M:%S')
         })
         send_staff_welcome_email(
             full_name=fullname,
@@ -6893,7 +6887,7 @@ def admin_create_instructor():
             'username': username, 'password': hash_password(password),
             'role': 'teacher', 'full_name': fullname, 'email': email,
             'status': 'approved', 'sections': [], 'my_subjects': [],
-            'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'created_at': _now_local().strftime('%Y-%m-%d %H:%M:%S')
         })
         send_staff_welcome_email(
             full_name=fullname,
@@ -7304,7 +7298,7 @@ def api_schedules_upcoming():
         return jsonify({'upcoming': []})
     return _api_schedules_upcoming_impl(
         username=session.get('username'),
-        now_dt=datetime.now(),
+        now_dt=_now_local(),
         db_get_schedules_for_teacher=db_get_schedules_for_teacher,
         jsonify=jsonify,
         timedelta=timedelta,

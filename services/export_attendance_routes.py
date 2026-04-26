@@ -47,7 +47,7 @@ def _fmt_time_hms_ampm(value):
     dt = _parse_dt(value)
     if not dt:
         return '—'
-    return dt.strftime('%I:%M:%S %p')
+    return dt.strftime('%I:%M %p').lstrip('0')
 
 
 def _normalize_time_token(value, with_seconds=False):
@@ -57,6 +57,10 @@ def _normalize_time_token(value, with_seconds=False):
     if not raw:
         return '—'
     if 'AM' in raw.upper() or 'PM' in raw.upper():
+        # Remove seconds and leading zeros if present
+        import re
+        raw = re.sub(r'^0+', '', raw)
+        raw = re.sub(r':00\s+(AM|PM)', r' \1', raw, flags=re.I)
         return raw.upper()
     m = None
     try:
@@ -71,9 +75,9 @@ def _normalize_time_token(value, with_seconds=False):
     ss = m.group(3)
     period = 'PM' if h >= 12 else 'AM'
     hh = 12 if h % 12 == 0 else (h % 12)
-    if with_seconds:
-        return f"{hh:02d}:{mm}:{(ss or '00')} {period}"
-    return f"{hh:02d}:{mm} {period}"
+    if with_seconds and ss:
+        return f"{hh}:{mm}:{ss} {period}"
+    return f"{hh}:{mm} {period}"
 
 
 def _normalize_time_slot(value):

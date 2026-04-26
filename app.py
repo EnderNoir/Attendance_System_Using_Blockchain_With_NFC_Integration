@@ -3297,6 +3297,9 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
             end_ts = int(end_dt.timestamp())
         else:
             end_ts = int(end_val)
+            
+        if end_ts <= start_ts:
+            end_ts = start_ts + 1
         
         # ── Build logData for blockchain event ─────────────────────────
         m_teacher = mask_teacher_name(teacher_name)

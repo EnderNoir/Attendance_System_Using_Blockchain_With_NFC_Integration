@@ -385,9 +385,13 @@ else:
     print('[WARNING] Blockchain RPC unreachable — students will load from database cache.')
 
 contract_data_path = os.path.join(os.path.dirname(__file__), 'attendance-contract.json')
-ADMIN_PRIVATE_KEY = (os.getenv('ADMIN_PRIVATE_KEY') or '').strip()
+ADMIN_PRIVATE_KEY = (os.getenv('ADMIN_PRIVATE_KEY') or os.getenv('PRIVATE_KEY') or '').strip().replace('"', '').replace("'", "")
 if ADMIN_PRIVATE_KEY and not ADMIN_PRIVATE_KEY.startswith('0x'):
-    ADMIN_PRIVATE_KEY = '0x' + ADMIN_PRIVATE_KEY
+    if len(ADMIN_PRIVATE_KEY) == 64:
+        ADMIN_PRIVATE_KEY = '0x' + ADMIN_PRIVATE_KEY
+
+if not ADMIN_PRIVATE_KEY:
+    print("[BLOCKCHAIN WARNING] No ADMIN_PRIVATE_KEY found. Transactions will fail.")
 
 try:
     # Read address from .env

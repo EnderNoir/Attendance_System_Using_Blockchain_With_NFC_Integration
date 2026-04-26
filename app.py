@@ -2622,8 +2622,8 @@ def check_and_end_expired_sessions():
         auto_end_at = (s['auto_end_at'] or '').strip()
         if auto_end_at:
             try:
-                end_dt_naive = datetime.strptime(auto_end_at, '%Y-%m-%d %H:%M:%S')
-                end_dt = end_dt_naive.replace(tzinfo=timezone(APP_TIMEZONE))
+                end_dt = datetime.strptime(auto_end_at, '%Y-%m-%d %H:%M:%S')
+                # now_dt and end_dt are both naive, safe to compare
                 if now_dt >= end_dt:
                     result = _finalize_session(sess_id, ended_time=now_str, async_chain_and_email=True)
                     if result and not result.get('already_ended'):
@@ -3394,7 +3394,7 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         )
         
         if not tx_hash_obj:
-            return None, None
+            return None, None, "Transaction submission failed (send_contract_tx returned None)"
             
         receipt = web3.eth.wait_for_transaction_receipt(tx_hash_obj)
         tx_hash = receipt['transactionHash'].hex()
@@ -3465,28 +3465,15 @@ def student_matches_section(student, allowed_keys: set) -> bool:
 
 def teacher_students(user):
     if not user: return []
-    allowed = set()
-    # Support legacy 'sections' assigned via direct user modal
-    for s in user.get('sections', []):
-        allowed.add(normalize_section_key(s))
-    # Support 'my_subjects' assigned via Teacher Dashboard Add Subject
-    for ms in user.get('my_subjects', []):
-        allowed.add(normalize_section_key(ms.get('section_key', '')))
-    # Support dynamic schedules created via Admin Schedules
-    username = user.get('username', '')
-    if username:
-        schedules = db_get_schedules_for_teacher(username)
-        for sched in schedules:
-            allowed.add(normalize_section_key(sched.get('section_key', '')))
+    full_name = str(user.get('full_name', '')).strip().lower()
+    if not full_name: return []
     
-    allowed = {k for k in allowed if k}
-    if not allowed:
-        return []
-    
-    all_cached = db_get_all_students()
-    if all_cached:
-        return [s for s in all_cached if student_matches_section(s, allowed)]
-    return [s for s in get_all_students() if student_matches_section(s, allowed)]
+    all_students = db_get_all_students() or get_all_students()
+    # Filter students where the 'adviser' field matches the teacher's full name
+    return [
+        s for s in all_students 
+        if str(s.get('adviser') or '').strip().lower() == full_name
+    ]
 
 def get_active_sessions():
     with get_db() as conn:

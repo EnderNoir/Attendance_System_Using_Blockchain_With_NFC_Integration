@@ -110,10 +110,12 @@
     <i class="bi bi-journal-text"></i> My Sessions
     <span class="tab-count">{{ sessions_data|length }}</span>
   </button>
+  {% if is_adviser %}
   <button class="main-tab" id="tab_students" onclick="switchTab('students',this)">
     <i class="bi bi-people"></i> My Students
     <span class="tab-count">{{ students|length }}</span>
   </button>
+  {% endif %}
 </div>
 
 <!-- ══ SESSIONS TAB ══ -->
@@ -256,6 +258,7 @@
   {% endif %}
 </div>
 
+{% if is_adviser %}
 <!-- ══ STUDENTS TAB ══ -->
 <div class="main-pane" id="pane_students">
   {% if students %}
@@ -317,9 +320,10 @@
       filters.</div>
   </div>
   {% else %}
-  <div class="empty-state"><i class="bi bi-people"></i>No students in your sections yet.</div>
+  <div class="empty-state"><i class="bi bi-people"></i>No advisory students found.</div>
   {% endif %}
 </div>
+{% endif %}
 
 
 

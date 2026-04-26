@@ -1033,9 +1033,23 @@
   }
 
   @media(max-width:768px) {
-    .sched-page-header,
-    .sched-search-bar {
+    .sched-page-header {
+      flex-direction: column;
+      align-items: stretch;
       width: 100%;
+    }
+
+    .sched-search-bar {
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+      gap: 8px;
+    }
+
+    .sched-search-bar .btn-primary,
+    .sched-search-bar .btn-outline {
+      width: 100%;
+      justify-content: center;
     }
 
     .sched-search-wrap {

@@ -128,7 +128,8 @@ def _send_email(to_addrs: list, subject: str, html_body: str):
     Send an HTML email via Gmail SMTP in a background thread.
     Silently logs errors — never crashes the main request.
     """
-    _send_email_async_service(to_addrs, subject, html_body, get_email_config)
+    cfg = get_email_config()
+    _send_email_async_service(to_addrs, subject, html_body, cfg)
  
 def send_student_attendance_receipt(
         student_name, student_email, student_id,

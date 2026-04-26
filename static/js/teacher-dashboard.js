@@ -126,7 +126,7 @@ const subjChart = new Chart(document.getElementById('subjChart'), {
 });
 
 // Period / filter state
-let curPeriod = 'today';
+let curPeriod = 'all';
 
 // Stores exact params from the most recent apply, so export matches the current view.
 let lastAppliedParams = null;

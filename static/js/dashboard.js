@@ -348,7 +348,7 @@ function formatTimeSlot(slot) {
   if (/^\d{4}-\d{2}-\d{2}[ T]/.test(raw)) {
     const d = new Date(raw.replace(' ', 'T').replace(/\.(\d{3})\d+/, '.$1'));
     if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     }
   }
   const parts = raw.split(/\s*[\-–]\s*/);

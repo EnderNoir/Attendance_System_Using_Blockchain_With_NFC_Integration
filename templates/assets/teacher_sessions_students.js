@@ -56,7 +56,7 @@ sData = sessionsData; // alias for convenience
       if (Number.isNaN(d.getTime())) return { date: '—', time: '—' };
       return {
         date: d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' }).replace(',', ''),
-        time: d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }),
+        time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
       };
     } catch (e) {
       return { date: '—', time: '—' };
@@ -113,7 +113,7 @@ sData = sessionsData; // alias for convenience
     if (/^\d{4}-\d{2}-\d{2}[ T]/.test(raw)) {
       const d = new Date(raw.replace(' ', 'T').replace(/\.(\d{3})\d+/, '.$1'));
       if (!Number.isNaN(d.getTime())) {
-        return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       }
     }
     const parts = raw.split(/\s*[\-–]\s*/);
@@ -222,21 +222,26 @@ function renderSessModal(sessId, data) {
     sts.forEach(st => { if (cnt[st.status] !== undefined) cnt[st.status]++; });
 
     // Info tab — readable dates
-    let sessTxHtml = '';
-  if (s.session_tx_hash) {
-    sessTxHtml = `
+    let sessTxHtml = `
     <div class="sm-info-box">
       <div class="sm-info-lbl"><i class="bi bi-blockchain"></i> Session TX</div>
-      <div class="sm-info-val">
+      <div class="sm-info-val">`;
+
+    if (s.session_tx_hash) {
+      sessTxHtml += `
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <a href="https://sepolia.etherscan.io/tx/${s.session_tx_hash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:underline; word-break: break-all;">
             ${s.session_tx_hash}
           </a>
         </div>
         ${s.session_block_number ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Block #${s.session_block_number}</div>` : ''}
-      </div>
-    </div>`;
-  }
+      `;
+    } else {
+      sessTxHtml += `
+        <span style="font-size:11px; color:var(--muted); font-style:italic;">Pending or Not Recorded</span>
+      `;
+    }
+    sessTxHtml += `</div></div>`;
   document.getElementById('sm_info_grid').innerHTML = `${sessTxHtml}
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-book"></i> Subject</div>
       <div class="sm-info-val">${s.subject_name}${s.course_code ? ' <code style="font-size:10px;">[' + s.course_code + ']</code>' : ''}</div></div>

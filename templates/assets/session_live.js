@@ -366,7 +366,12 @@ async function poll() {
     const data = await r.json();
 
     if (!data.active) {
-      if (pollInitialized) window.location.reload();
+      if (pollInitialized) {
+        // Show blockchain upload overlay and redirect to teacher dashboard
+        const loadingEl = document.getElementById('blockchainLoadingModal');
+        if (loadingEl) loadingEl.classList.add('show');
+        setTimeout(() => { window.location.href = '/teacher/dashboard'; }, 1200);
+      }
       return;
     }
 

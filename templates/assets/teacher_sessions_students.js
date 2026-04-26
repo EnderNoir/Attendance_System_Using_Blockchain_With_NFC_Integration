@@ -199,6 +199,11 @@ sData = sessionsData; // alias for convenience
       ? '<span style="background:rgba(100,116,139,.08);color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:2px 10px;font-size:10px;">Completed</span>'
       : '<span style="background:rgba(45,106,39,.12);color:var(--success);border:1px solid rgba(45,106,39,.25);border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;">● LIVE</span>';
     document.getElementById('sessModal').classList.add('show');
+    // Always fetch fresh data for ended sessions (to get latest TX hash)
+    // For live sessions, use cache if available to reduce flicker
+    if (s.ended_at) {
+      delete sessCache[sessId]; // force fresh fetch so TX hash is always up-to-date
+    }
     if (sessCache[sessId]) { renderSessModal(sessId, sessCache[sessId]); return; }
     document.getElementById('sm_info_grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--muted);"><span style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;"></span></div>';
     document.getElementById('sm_stat_grid').innerHTML = '';

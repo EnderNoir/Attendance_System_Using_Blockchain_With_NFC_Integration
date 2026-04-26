@@ -3824,6 +3824,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
         'absent_count': len(absent_ids),
         'excused_count': len(excused_set),
         'total_enrolled': len(section_students),
+        'tx_hash': tx_hash,
     }
 
 def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
@@ -5960,9 +5961,14 @@ def end_session(sess_id):
     if not result:
         flash('Session not found.'); return redirect(url_for('teacher_dashboard'))
 
-    flash(
-        f"Session ended. {result.get('present_count', 0)} present, "
-        f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
+    if result.get('tx_hash'):
+        flash(
+            f"Session ended. Blockchain TX: {result.get('tx_hash')[:10]}... | {result.get('present_count', 0)} present, "
+            f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
+    else:
+        flash(
+            f"Session ended, but Blockchain recording failed or was skipped. | {result.get('present_count', 0)} present, "
+            f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
     return redirect(url_for('teacher_dashboard'))
 
 @app.route('/teacher/session/<sess_id>/delete', methods=['POST'])

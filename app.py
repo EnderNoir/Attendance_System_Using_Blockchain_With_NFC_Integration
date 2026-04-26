@@ -4064,56 +4064,58 @@ def admin_settings_test():
             Cavite State University — DAVS System
           </p>
         </div>''', 'html'))
-        ctx  = ssl.create_default_context()
-        port = int(cfg.get('smtp_port', 587))
-        host = cfg.get('smtp_host', 'smtp.gmail.com')
-        timeout = 5 # Aggressive 5s timeout to prevent Gunicorn worker timeout
+        import threading
         
-        try:
-            # DNS Check & IPv4 resolution
+        result_box = {'ok': False, 'message': 'Test timed out.'}
+        
+        def _test_worker():
             try:
-                addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
-                target_ip = addr_info[0][4][0]
-            except Exception as dns_e:
-                return jsonify({'ok': False, 'message': f'DNS/Network Error: Could not resolve {host}. ({str(dns_e)})'})
-            
-            if port == 465:
-                # SSL Connection
-                try:
-                    srv = smtplib.SMTP_SSL(host, port, context=ctx, timeout=timeout)
-                except (socket.timeout, TimeoutError):
-                    raise # Fast-fail on timeout
-                except Exception:
-                    srv = smtplib.SMTP_SSL(target_ip, port, context=ctx, timeout=timeout)
-            else:
-                # Standard Connection with STARTTLS
-                try:
-                    srv = smtplib.SMTP(host, port, timeout=timeout)
-                except (socket.timeout, TimeoutError):
-                    raise # Fast-fail on timeout
-                except Exception:
-                    srv = smtplib.SMTP(target_ip, port, timeout=timeout)
+                ctx  = ssl.create_default_context()
+                port = int(cfg.get('smtp_port', 587))
+                host = cfg.get('smtp_host', 'smtp.gmail.com')
                 
-                srv.ehlo()
-                if srv.has_ext('STARTTLS'):
-                    srv.starttls(context=ctx)
+                # Single IP resolution to avoid sequential connection delays
+                try:
+                    addr_info = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+                    target_ip = addr_info[0][4][0]
+                except Exception:
+                    target_ip = host
+
+                if port == 465:
+                    srv = smtplib.SMTP_SSL(target_ip, port, context=ctx, timeout=10)
+                else:
+                    srv = smtplib.SMTP(target_ip, port, timeout=10)
                     srv.ehlo()
+                    if srv.has_ext('STARTTLS'):
+                        srv._host = host # Hack to ensure SSL cert validation matches hostname
+                        srv.starttls(context=ctx)
+                        srv.ehlo()
 
-            with srv:
-                srv.login(cfg['smtp_user'], cfg['smtp_password'])
-                srv.sendmail(msg['From'], [test_to], msg.as_string())
-            return jsonify({'ok': True, 'message': f'Test email sent to {test_to}'})
-        except (socket.timeout, TimeoutError):
-            return jsonify({'ok': False, 'message': f'Connection Timed Out (5s). {host}:{port} is not responding. This port is likely BLOCKED by Railway. Please try Port 465 instead.'})
-        except (socket.error, smtplib.SMTPException) as e:
-            err_msg = str(e)
-            if "101" in err_msg or "unreachable" in err_msg.lower():
-                return jsonify({'ok': False, 'message': f'Network Error (Port {port}): {err_msg}. This usually means {host}:{port} is blocked or unreachable from this server.'})
-            return jsonify({'ok': False, 'message': f'SMTP Error: {err_msg}'})
+                with srv:
+                    srv.login(cfg['smtp_user'], cfg['smtp_password'])
+                    srv.sendmail(msg['From'], [test_to], msg.as_string())
+                
+                result_box['ok'] = True
+                result_box['message'] = f'Test email sent to {test_to}'
+            except (socket.timeout, TimeoutError):
+                result_box['message'] = f'Connection Timed Out. {host}:{port} is not responding. Port {port} is likely BLOCKED by Railway. Please try a different port or provider.'
+            except Exception as e:
+                err_msg = str(e)
+                if "101" in err_msg or "unreachable" in err_msg.lower():
+                    result_box['message'] = f'Network Error: {host}:{port} is blocked or unreachable from this server.'
+                else:
+                    result_box['message'] = f'SMTP Error: {err_msg}'
 
-
+        t = threading.Thread(target=_test_worker, daemon=True)
+        t.start()
+        t.join(timeout=15) # Hard limit, worker will never wait longer than 15s
+        
+        if t.is_alive():
+             return jsonify({'ok': False, 'message': f'Connection Timed Out (15s). The SMTP server at {cfg.get("smtp_host")} is taking too long to respond. This usually means Port {cfg.get("smtp_port")} is completely blocked by your hosting provider.'})
+        
+        return jsonify(result_box)
     except Exception as e:
-        return jsonify({'ok': False, 'message': f'Error: {str(e)}'})
+        return jsonify({'ok': False, 'message': f'System Error: {str(e)}'})
 
 
 # ═══════════════════════════════════════════════════════════════════════════

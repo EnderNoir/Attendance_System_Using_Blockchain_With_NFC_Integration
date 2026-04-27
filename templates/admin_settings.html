@@ -45,9 +45,9 @@
                   display:flex;align-items:center;justify-content:space-between;">
         <div style="display:flex;align-items:center;gap:10px;">
           <i class="bi bi-lightning-charge-fill" style="color:#10b981;font-size:18px;"></i>
-          <strong style="color:var(--text);font-size:14px;">BREVO SETUP GUIDE (RECOMMENDED)</strong>
+          <strong style="color:var(--text);font-size:14px;">NEW BREVO SETUP GUIDE (RECOMMENDED)</strong>
         </div>
-        <span style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;background:#10b981;color:#fff;padding:3px 10px;border-radius:20px;font-weight:800;">300 FREE EMAILS / DAY</span>
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;background:#10b981;color:#fff;padding:3px 10px;border-radius:20px;font-weight:800;">LATEST UI v3</span>
       </div>
       <div style="padding:18px;display:flex;flex-direction:column;gap:16px;">
         
@@ -56,10 +56,9 @@
                       display:flex;align-items:center;justify-content:center;font-size:13px;
                       font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">1</div>
           <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Sign up for Brevo</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Access SMTP & API</div>
             <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
-              Create a free account at <a href="https://www.brevo.com" target="_blank" style="color:#10b981;font-weight:600;text-decoration:underline;">brevo.com</a>. 
-              The Free plan includes 300 emails per day without requiring a credit card.
+              Log in to Brevo. Click on your <strong>Profile Name (Top Right)</strong> and select <strong>"SMTP & API"</strong>.
             </div>
           </div>
         </div>
@@ -69,11 +68,11 @@
                       display:flex;align-items:center;justify-content:center;font-size:13px;
                       font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">2</div>
           <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Verify your Sender Email</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Generate v3 API Key</div>
             <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
-              Go to <strong style="color:var(--text);">Senders, Domains & IPs → Senders</strong>. Click <strong>Add a Sender</strong> and verify your email. 
-              <br>
-              <span style="color:#10b981;font-weight:600;">Check your inbox and click the verification link.</span>
+              Go to the <strong>"API Keys"</strong> tab. Click <strong>"Generate a new API key"</strong>. 
+              Name it "DAVS" and copy the key (starts with <code>xkeysib-</code>).
+              <br><i style="font-size:11px;">Note: Do NOT use the SMTP password, use the <b>API Key</b> for bypass.</i>
             </div>
           </div>
         </div>
@@ -83,39 +82,26 @@
                       display:flex;align-items:center;justify-content:center;font-size:13px;
                       font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">3</div>
           <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Get your API Key</div>
-            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
-              Go to <strong style="color:var(--text);">SMTP & API → API Keys</strong>. Click <strong>Generate a new API key</strong>. 
-              Copy the key (starts with <code>xkeysib-</code>).
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:15px;align-items:flex-start;">
-          <div style="width:28px;height:28px;border-radius:50%;background:#10b981;color:#fff;
-                      display:flex;align-items:center;justify-content:center;font-size:13px;
-                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">4</div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Configure DAVS Settings</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Enter Details Below</div>
             <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:8px;">
               <table style="border-collapse:collapse;width:100%;font-size:12px;">
                 <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:10px;font-weight:700;color:var(--text);width:140px;background:rgba(16,185,129,.04);">SMTP Host</td>
+                  <td style="padding:10px;font-weight:700;color:var(--text);width:140px;background:rgba(16,185,129,.04);">Host</td>
                   <td style="padding:10px;font-family:monospace;color:#10b981;">smtp-relay.brevo.com</td>
                 </tr>
                 <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(16,185,129,.04);">SMTP Username</td>
-                  <td style="padding:10px;font-family:monospace;color:#10b981;">(Your Brevo Email)</td>
+                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(16,185,129,.04);">User / Email</td>
+                  <td style="padding:10px;font-family:monospace;color:#10b981;">(Your Brevo Account Email)</td>
                 </tr>
                 <tr>
                   <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(16,185,129,.04);">Password</td>
-                  <td style="padding:10px;font-family:monospace;color:#10b981;">(Your API Key)</td>
+                  <td style="padding:10px;font-family:monospace;color:#10b981;">(Your xkeysib- API Key)</td>
                 </tr>
               </table>
             </div>
             <div style="margin-top:10px;background:rgba(16,185,129,.08);color:#10b981;border:1px solid rgba(16,185,129,.2);
                          border-radius:6px;padding:8px 10px;font-size:11.5px;font-weight:600;">
-              <i class="bi bi-info-circle-fill"></i> AUTO-BYPASS ACTIVE: Your app will automatically use the Brevo API (Port 443) to bypass Railway port blocks.
+              <i class="bi bi-info-circle-fill"></i> RAILWAY BYPASS: Using <b>brevo.com</b> as host tells the app to use the API (Port 443) instead of SMTP.
             </div>
           </div>
         </div>
@@ -155,10 +141,10 @@
           <span class="field-hint">Use <strong>2525</strong> for Railway to bypass blocked ports</span>
         </div>
         <div class="field-wrap">
-          <label class="field-label" for="smtp_user">SMTP Username / Email <span style="color:var(--danger)">*</span></label>
+          <label class="field-label" for="smtp_user">Login Email (Username) <span style="color:var(--danger)">*</span></label>
           <input class="field-input" type="text" name="smtp_user" id="smtp_user"
-                 value="{{ cfg.smtp_user }}" placeholder="your-email@brevo.com"/>
-          <span class="field-hint">For Brevo, use your login email. For SendGrid, use <code>apikey</code></span>
+                 value="{{ cfg.smtp_user }}" placeholder="your-email@example.com"/>
+          <span class="field-hint">Your Brevo account email</span>
         </div>
         <div class="field-wrap">
           <label class="field-label" for="smtp_password">API Key / Password <span style="color:var(--danger)">*</span></label>

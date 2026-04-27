@@ -352,7 +352,7 @@
         <span class="topbar-time" id="clock"></span>
       </div>
     </div>
-    <div class="page-body">
+    <div class="{% block page_body_class %}page-body{% endblock %}">
         {% with messages = get_flashed_messages() %}
         {% if messages %}
         <div class="flash-wrap">

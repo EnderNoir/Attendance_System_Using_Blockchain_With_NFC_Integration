@@ -168,6 +168,15 @@
       <input type="text" class="fi" id="sf_q" placeholder="Subject name…" oninput="filterSessions()" />
     </div>
     <div class="fg">
+      <span class="fl">Semester</span>
+      <select class="fi" id="sf_sem" onchange="filterSessions()">
+        <option value="">All Semesters</option>
+        <option>1st Semester</option>
+        <option>2nd Semester</option>
+        <option>Summer</option>
+      </select>
+    </div>
+    <div class="fg">
       <span class="fl">Program</span>
       <select class="fi" id="sf_program" onchange="filterSessions()">
         <option value="">All Programs</option>
@@ -213,7 +222,10 @@
     <div class="session-card" id="sc_{{ sid }}" data-subj="{{ s.subject_name|lower }}"
       data-section="{{ s.section_key|lower }}" data-program="{{ (sparts[0] if sparts|length > 0 else '')|lower }}"
       data-year="{{ (sparts[1] if sparts|length > 1 else '')|lower }}"
-      data-sec="{{ ('|' ~ sparts[2]|lower) if sparts|length > 2 else '' }}" data-classtype="{{ s.get('class_type','lecture')|lower }}" onclick="openSessModal('{{ sid }}')">
+      data-sec="{{ ('|' ~ sparts[2]|lower) if sparts|length > 2 else '' }}"
+      data-classtype="{{ s.get('class_type','lecture')|lower }}"
+      data-sem="{{ (s.semester or '')|lower }}"
+      onclick="openSessModal('{{ sid }}')">
       <div class="sc-top">
         <div class="sc-info">
           <div class="sc-title">{% if s.course_code %}<code style="font-size:10px;">[{{ s.course_code }}]</code> {%
@@ -251,7 +263,7 @@
       search.</div>
   </div>
   {% elif not live %}
-  <div class="empty-state">
+  <div class="empty-state" style="padding:24px 20px;">
     <i class="bi bi-journal-x"></i>No sessions yet.
     <a href="{{ url_for('teacher_schedule') }}" style="color:var(--accent);display:block;margin-top:8px;">Check your schedule for the next class →</a>
   </div>
@@ -262,10 +274,27 @@
 <!-- ══ STUDENTS TAB ══ -->
 <div class="main-pane" id="pane_students">
   {% if students %}
+  <!-- Filter bar -->
   <div class="filter-bar">
     <div class="fg" style="flex:2;min-width:160px;">
       <span class="fl"><i class="bi bi-search"></i> Search</span>
       <input type="text" class="fi" id="stf_q" placeholder="Name or student ID…" oninput="filterStudents()" />
+    </div>
+    <div class="fg">
+      <span class="fl">Program</span>
+      <select class="fi" id="stf_prog" onchange="filterStudents()">
+        <option value="">All Programs</option>
+        {% set progs = students|map(attribute='course')|select|unique|list|sort %}
+        {% for p in progs %}<option value="{{ p|lower }}">{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="fg">
+      <span class="fl">Semester</span>
+      <select class="fi" id="stf_sem" onchange="filterStudents()">
+        <option value="">All Semesters</option>
+        {% set sems = students|map(attribute='semester')|select|unique|list|sort %}
+        {% for sm in sems %}<option value="{{ sm|lower }}">{{ sm }}</option>{% endfor %}
+      </select>
     </div>
     <div class="fg">
       <span class="fl">Year Level</span>
@@ -288,39 +317,76 @@
       </select>
     </div>
     <button class="btn-rst" onclick="resetStudentFilters()"><i class="bi bi-x-circle"></i> Reset</button>
-    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="stf_count">{{ students|length }}
-      students</span>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="stf_count">{{ students|length }} students</span>
   </div>
   <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
     <i class="bi bi-hand-index"></i> Click a student to view their full session history.
   </div>
-  <div style="max-height:640px;overflow-y:auto;padding-right:4px;" id="students_list">
-    {% for s in students %}
-    {% set standing = 'good' if s.rate >= 75 else ('at-risk' if s.rate >= 50 else 'critical') %}
-    <!-- No rate percentage shown on card, no accordion -->
-    <div class="student-card" id="stcard_{{ loop.index0 }}" data-name="{{ s.name|lower }}"
-      data-nfc="{{ s.nfcId|lower }}" data-sid="{{ (s.student_id or '')|lower }}"
-      data-year="{{ s.year_level|default('') }}" data-section="{{ s.section|default('') }}"
-      onclick="openStudModal('{{ s.nfcId }}','{{ s.name|e }}','{{ s.course|default('')|e }}','{{ s.year_level|default('') }}','{{ s.section|default('') }}','{{ s.student_id|default('')|e }}')">
-      <div class="sc-st-top">
-        <div style="flex:1;min-width:0;">
-          <div class="sc-st-name">{{ s.name }}</div>
-          <div class="sc-st-sub">
-            {{ s.course.replace('BS ','') if s.course else '—' }}
-            &nbsp;·&nbsp; {{ s.year_level if s.year_level else '—' }}
-            &nbsp;·&nbsp; Section {{ s.section }}
-            &nbsp;·&nbsp; <code style="font-size:10px;">{{ s.nfcId }}</code>
-          </div>
-        </div>
-        <i class="bi bi-chevron-right" style="font-size:14px;color:var(--muted);flex-shrink:0;"></i>
-      </div>
-    </div>
+
+  <!-- Accordion list grouped by course/year/semester/section -->
+  <div id="students_accordion">
+    {# Use groupby on a combined key rendered per student; sort students first #}
+    {% set sorted_students = students|sort(attribute='course')|sort(attribute='year_level')|sort(attribute='semester')|sort(attribute='section') %}
+    {# Collect unique group keys in order #}
+    {% set seen_keys = [] %}
+    {% for s in sorted_students %}
+      {% set gkey = (s.course or 'Unknown') ~ '|||' ~ (s.year_level or 'Unknown') ~ '|||' ~ (s.semester or 'Unknown') ~ '|||' ~ (s.section or 'Unknown') %}
+      {% if gkey not in seen_keys %}{% set _ = seen_keys.append(gkey) %}{% endif %}
     {% endfor %}
-    <div id="stf_empty" style="display:none;" class="empty-state"><i class="bi bi-search"></i>No students match your
-      filters.</div>
+
+    {% for gkey in seen_keys %}
+      {% set gparts = gkey.split('|||') %}
+      {% set g_course = gparts[0] %}
+      {% set g_year = gparts[1] %}
+      {% set g_sem = gparts[2] %}
+      {% set g_sec = gparts[3] %}
+      {% set acc_id = 'acc_' ~ loop.index %}
+      {% set grp_students = sorted_students|selectattr('course','equalto',g_course)|selectattr('year_level','equalto',g_year)|selectattr('section','equalto',g_sec)|list %}
+      <div class="stud-accordion"
+        data-prog="{{ g_course|lower }}"
+        data-year="{{ g_year }}"
+        data-sem="{{ g_sem|lower }}"
+        data-sec="{{ g_sec }}">
+        <!-- Accordion header -->
+        <div class="stud-acc-header" onclick="toggleAccordion('{{ acc_id }}')">
+          <div style="flex:1;min-width:0;">
+            <div class="stud-acc-title">{{ g_course }} / {{ g_year }} / {{ g_sem }} / Section {{ g_sec }}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">{{ grp_students|length }} student{{ 's' if grp_students|length != 1 else '' }}</div>
+          </div>
+          <i class="bi bi-chevron-down stud-acc-chevron" id="chevron_{{ acc_id }}"></i>
+        </div>
+        <!-- Accordion body -->
+        <div class="stud-acc-body" id="{{ acc_id }}" style="display:none;">
+          {% for s in grp_students|sort(attribute='name') %}
+          <div class="student-card"
+            data-name="{{ s.name|lower }}" data-nfc="{{ s.nfcId|lower }}"
+            data-sid="{{ (s.student_id or '')|lower }}"
+            data-year="{{ s.year_level|default('') }}"
+            data-section="{{ s.section|default('') }}"
+            data-prog="{{ (s.course or '')|lower }}"
+            data-sem="{{ (s.semester or '')|lower }}"
+            onclick="openStudModal('{{ s.nfcId }}','{{ s.name|e }}','{{ s.course|default('')|e }}','{{ s.year_level|default('') }}','{{ s.section|default('') }}','{{ s.student_id|default('')|e }}')"
+            style="margin-bottom:6px;border-radius:8px;">
+            <div class="sc-st-top">
+              <div style="flex:1;min-width:0;">
+                <div class="sc-st-name">{{ s.name }}</div>
+                <div class="sc-st-sub">
+                  <code style="font-size:10px;">{{ s.nfcId }}</code>
+                  {% if s.student_id %}&nbsp;&middot;&nbsp; ID: {{ s.student_id }}{% endif %}
+                </div>
+              </div>
+              <i class="bi bi-chevron-right" style="font-size:14px;color:var(--muted);flex-shrink:0;"></i>
+            </div>
+          </div>
+          {% endfor %}
+          <div class="stud-acc-empty" style="display:none;text-align:center;padding:12px;color:var(--muted);font-size:12px;"><i class="bi bi-search"></i> No students match your search.</div>
+        </div>
+      </div>
+    {% endfor %}
+    <div id="stf_empty" style="display:none;text-align:center;padding:16px 20px;color:var(--muted);font-size:12px;"><i class="bi bi-search" style="display:block;font-size:28px;opacity:.2;margin-bottom:8px;"></i>No students match your filters.</div>
   </div>
   {% else %}
-  <div class="empty-state"><i class="bi bi-people"></i>No advisory students found.</div>
+  <div class="empty-state" style="padding:24px 20px;"><i class="bi bi-people"></i>No advisory students found.</div>
   {% endif %}
 </div>
 {% endif %}

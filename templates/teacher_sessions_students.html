@@ -5,7 +5,37 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/teacher_sessions_students.css') }}">
 {% endblock %}
 {% block content %}
-
+<style>
+  /* Fixed header and filter layout overrides */
+  .page-body {
+    height: calc(100vh - var(--topbar-h));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0 !important;
+  }
+  .page-body > div:first-of-type, .main-tabs {
+    flex-shrink: 0;
+  }
+  .main-pane {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+  .main-pane.active {
+    display: flex;
+  }
+  .sec-mono, .filter-bar {
+    flex-shrink: 0;
+  }
+  #sessions_list, #students_accordion {
+    flex: 1;
+    overflow-y: auto !important;
+    max-height: none !important;
+    padding-bottom: 32px;
+  }
+</style>
 
 <!-- SESSION MODAL -->
 <div class="sess-overlay" id="sessModal" onclick="if(event.target===this)closeSessModal()">
@@ -96,7 +126,7 @@
 </div>
 
 <!-- Page header -->
-<div style="margin-bottom:16px;">
+<div style="margin-bottom:16px; flex-shrink: 0;">
   <div class="sec-mono" style="margin-top:0;">// CLASS MANAGEMENT</div>
   <h2 style="font-size:20px;font-weight:600;margin:0;">Sessions &amp; Students</h2>
   <p style="font-size:12px;color:var(--muted);margin-top:4px;">
@@ -319,7 +349,7 @@
     <button class="btn-rst" onclick="resetStudentFilters()"><i class="bi bi-x-circle"></i> Reset</button>
     <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="stf_count">{{ students|length }} students</span>
   </div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+  <div style="font-size:11px;color:var(--muted);margin-bottom:10px; flex-shrink: 0;">
     <i class="bi bi-hand-index"></i> Click a student to view their full session history.
   </div>
 

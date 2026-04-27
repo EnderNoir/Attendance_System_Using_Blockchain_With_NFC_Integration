@@ -367,9 +367,17 @@ async function poll() {
 
     if (!data.active) {
       if (pollInitialized) {
-        // Show blockchain upload overlay and redirect to teacher dashboard
+        // Show blockchain upload overlay
         const loadingEl = document.getElementById('blockchainLoadingModal');
         if (loadingEl) loadingEl.classList.add('show');
+        
+        // Wait for blockchain processing to finish before redirecting
+        if (data.bc_processing) {
+          setTimeout(poll, 2000);
+          return;
+        }
+        
+        // Done processing! Redirect to teacher dashboard
         setTimeout(() => { window.location.href = '/teacher?sess_ended=' + sessId; }, 1200);
       }
       return;

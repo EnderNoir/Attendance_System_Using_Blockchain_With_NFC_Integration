@@ -325,6 +325,7 @@ function renderSessModal(sessId, data) {
         ? `<a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:none; word-break: break-all;">${txHash.slice(0, 10)}...</a>`
         : '<span style="color:var(--muted);font-size:11px;">—</span>';
 
+      const displayTapTime = (status === 'absent' || status === 'excused') ? '—' : tap.time;
       return `<tr>
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '—'}</td>
@@ -333,7 +334,7 @@ function renderSessModal(sessId, data) {
               ? `<span style="font-size:11px;color:var(--muted);">${st.section_origin || '—'}</span>`
               : `<span class="att-status st-excused">${classTypeLabel(st.class_type || s.class_type || data.class_type || 'lecture')}</span>`}</td>
             <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || '—'}</span></td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${displayTapTime}</td>
             <td style="font-size:11px;">${reasonHtml}</td>
             <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
           </tr>`;

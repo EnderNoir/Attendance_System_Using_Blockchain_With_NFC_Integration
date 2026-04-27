@@ -184,6 +184,7 @@ function refocusNFC() {
 
 async function processNFCUid(uid) {
   if (typeof USER_ROLE !== 'undefined' && USER_ROLE === 'admin') {
+    showModal('invalid', 'Admin View', '', 'NFC tapping is disabled for administrators.', '');
     showToast('Admin View', 'NFC tapping is disabled for administrators.', 't-blue', '🛡');
     return;
   }
@@ -273,10 +274,9 @@ window.addEventListener('load', () => {
   if (typeof USER_ROLE !== 'undefined' && USER_ROLE === 'admin') {
     if (nfcInput) nfcInput.disabled = true;
     const mobileBtn = document.getElementById('mobileNfcSessionBtn');
-    if (mobileBtn) {
-      mobileBtn.disabled = true;
-      mobileBtn.title = 'NFC tapping is disabled for administrators';
-    }
+    if (mobileBtn) mobileBtn.style.display = 'none';
+    const stripBtn = document.getElementById('mobileNfcStripBtn');
+    if (stripBtn) stripBtn.style.display = 'none';
     updateNFCStrip('', 'warning', 'Admin View - Tapping Disabled', '🛡');
   } else {
     if (nfcInput) nfcInput.focus();

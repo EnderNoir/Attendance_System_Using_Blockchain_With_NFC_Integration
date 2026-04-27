@@ -357,18 +357,14 @@ function renderSessModal(sessId, data) {
             ? `<a href="${st.attachment_url}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);border-radius:5px;padding:2px 7px;white-space:nowrap;"><i class="bi bi-paperclip"></i> View</a>`
             : '<span style="color:var(--muted);font-size:11px;">-</span>';
           const tap = parseTapDateTime(st.time || st.tap_time || s.started_at || '', s.started_at || '');
-          const txHash = st.tx_hash || '';
-          const txDisplay = txHash 
-            ? `<a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:none; word-break: break-all;">${txHash.slice(0, 10)}...</a>`
-            : '<span style="color:var(--muted);font-size:11px;">—</span>';
-
+          const displayTapTime = (status === 'absent' || status === 'excused') ? '—' : tap.time;
           return `<tr>
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '-'}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '-'}</td>
             <td style="font-size:11px;color:var(--muted);">${classType === 'school_event' ? (st.section_origin || '-') : classTypeLabel}</td>
             <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || status}</span></td>
-            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${tap.time}</td>
+            <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${displayTapTime}</td>
             <td style="font-size:11px;">${status === 'excused' ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>${reasonDetail}` : '<span style="color:var(--muted);">-</span>'}</td>
             <td>${status === 'excused' ? docLink : '<span style="color:var(--muted);font-size:11px;">-</span>'}</td>
           </tr>`;

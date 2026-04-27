@@ -218,7 +218,7 @@ def send_student_attendance_receipt(
               <td style="padding:8px 12px;font-size:12px;color:#666;
                          border-bottom:1px solid #eee;">Tapped Time</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{_fmt_time(tap_time)}</td>
+                         border-bottom:1px solid #eee;">{"—" if status.lower() in ("absent", "excused") else _fmt_time(tap_time)}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
@@ -317,7 +317,7 @@ def send_teacher_session_summary(
           </td>
           <td style="padding:7px 10px;font-size:11px;color:#666;
                      border-bottom:1px solid #eee;white-space:nowrap;">
-            {_fmt_time(st.get("tap_time", "—"))}
+            {"—" if st.get("status", "absent").lower() in ("absent", "excused") else _fmt_time(st.get("tap_time", "—"))}
           </td>
           <td style="padding:7px 10px;border-bottom:1px solid #eee;">
             <span style="background:{bg};color:{clr};font-weight:700;

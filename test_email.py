@@ -26,29 +26,41 @@ msg.attach(MIMEText(html_body, 'html'))
 
 host = cfg.get('smtp_host', '').lower().strip()
 
-if 'sendgrid.net' in host or cfg.get('smtp_user') == 'apikey':
+# ── SENDGRID HTTP API BYPASS ──
+if 'sendgrid.net' in host:
     print("Using SendGrid API...")
     url = "https://api.sendgrid.com/v3/mail/send"
     headers = {
         "Authorization": f"Bearer {cfg['smtp_password'].strip()}",
         "Content-Type": "application/json"
     }
-    html_body_extracted = msg.get_payload()[0].get_payload() if msg.is_multipart() else msg.get_payload()
-    personalizations = [{"to": [{"email": r}]} for r in recipients]
+    sender_email = cfg.get('smtp_from') or "no-reply@davs.com"
     data = {
-        "personalizations": personalizations,
-        "from": {"email": msg['From']},
-        "subject": msg['Subject'],
-        "content": [{"type": "text/html", "value": html_body_extracted}]
+        "personalizations": [{"to": [{"email": r}]} for r in recipients],
+        "from": {"email": sender_email},
+        "subject": subject,
+        "content": [{"type": "text/html", "value": html_body}]
     }
-    
     req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
-    try:
-        response = urllib.request.urlopen(req, timeout=10)
-        print("Success:", response.status, response.read().decode())
-    except Exception as e:
-        print("Error in API:", str(e))
-        if hasattr(e, 'read'):
-            print("Response:", e.read().decode())
-else:
-    print("Not using SendGrid API.")
+    urllib.request.urlopen(req, timeout=10)
+    print(f"Sent via SendGrid API to {recipients}")
+    sys.exit(0)
+
+# ── BREVO API BYPASS ──
+if 'brevo.com' in host or 'sendinblue.com' in host:
+    print("Using Brevo API...")
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = { "api-key": cfg['smtp_password'].strip(), "Content-Type": "application/json" }
+    sender_email = cfg.get('smtp_from') or "no-reply@brevo.com"
+    data = {
+        "sender": {"email": sender_email},
+        "to": [{"email": r} for r in recipients],
+        "subject": subject,
+        "htmlContent": html_body
+    }
+    req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+    urllib.request.urlopen(req, timeout=10)
+    print(f"Sent via Brevo API to {recipients}")
+    sys.exit(0)
+
+print("Not using API. Falling back to SMTP logic.")

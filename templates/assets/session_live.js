@@ -171,7 +171,7 @@ let nfcTimer = null;
 const NFC_TIMEOUT = 300;
 
 function refocusNFC() {
-  if (typeof USER_ROLE !== 'undefined' && USER_ROLE === 'admin') return;
+  if (typeof USER_ROLE !== 'undefined' && (USER_ROLE === 'admin' || USER_ROLE === 'super_admin')) return;
   const tag = document.activeElement ? document.activeElement.tagName : '';
   const excuseOverlay = document.getElementById('excuseOverlay');
   const endSessionModal = document.getElementById('endSessionModal');
@@ -183,7 +183,7 @@ function refocusNFC() {
 }
 
 async function processNFCUid(uid) {
-  if (typeof USER_ROLE !== 'undefined' && USER_ROLE === 'admin') {
+  if (typeof USER_ROLE !== 'undefined' && (USER_ROLE === 'admin' || USER_ROLE === 'super_admin')) {
     showModal('invalid', 'Admin View', '', 'NFC tapping is disabled for administrators.', '');
     showToast('Admin View', 'NFC tapping is disabled for administrators.', 't-blue', '🛡');
     return;
@@ -271,7 +271,7 @@ if (nfcInput) {
 document.addEventListener('click', refocusNFC);
 document.addEventListener('keyup', refocusNFC);
 window.addEventListener('load', () => { 
-  if (typeof USER_ROLE !== 'undefined' && USER_ROLE === 'admin') {
+  if (typeof USER_ROLE !== 'undefined' && (USER_ROLE === 'admin' || USER_ROLE === 'super_admin')) {
     if (nfcInput) nfcInput.disabled = true;
     const mobileBtn = document.getElementById('mobileNfcSessionBtn');
     if (mobileBtn) mobileBtn.style.display = 'none';

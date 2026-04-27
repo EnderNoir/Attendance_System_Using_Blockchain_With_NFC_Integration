@@ -60,7 +60,9 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, cfg: dict):
             host = cfg.get('smtp_host', '').lower().strip()
             
             # ── SENDGRID HTTP API BYPASS ──
-            if 'sendgrid.net' in host or cfg.get('smtp_user') == 'apikey':
+            # Only trigger if host is explicitly SendGrid to avoid intercepting other services (like Brevo)
+            # that might also use 'apikey' as a username but expect standard SMTP.
+            if 'sendgrid.net' in host:
                 import urllib.request
                 import json
                 
@@ -70,20 +72,64 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, cfg: dict):
                     "Content-Type": "application/json"
                 }
                 
-                # We use the raw html_body argument directly instead of extracting from MIME
-                # Prepare personalizations for multiple recipients
-                personalizations = [{"to": [{"email": r}]} for r in recipients]
+                # SendGrid API REQUIRES a valid email in the 'from' field. 
+                # If smtp_from is empty, we must NOT use 'apikey' as the email.
+                sender_email = cfg.get('smtp_from') or ''
+                if not sender_email or '@' not in sender_email:
+                    if cfg.get('smtp_user') and '@' in cfg['smtp_user']:
+                        sender_email = cfg['smtp_user']
+                    else:
+                        sender_email = "no-reply@davs-attendance.com"
                 
+                personalizations = [{"to": [{"email": r}]} for r in recipients]
                 data = {
                     "personalizations": personalizations,
-                    "from": {"email": msg['From']},
-                    "subject": msg['Subject'],
+                    "from": {"email": sender_email},
+                    "subject": subject,
                     "content": [{"type": "text/html", "value": html_body}]
                 }
                 
                 req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
-                urllib.request.urlopen(req, timeout=10)
-                print(f'[EMAIL] Sent "{subject}" to {recipients} via SendGrid API')
+                try:
+                    urllib.request.urlopen(req, timeout=10)
+                    print(f'[EMAIL] Sent "{subject}" to {recipients} via SendGrid API')
+                except urllib.error.HTTPError as he:
+                    err_body = he.read().decode('utf-8')
+                    print(f'[EMAIL] SendGrid API Error {he.code}: {err_body}')
+                    raise
+                return
+
+            # ── BREVO (SENDINBLUE) HTTP API BYPASS ──
+            # Useful for Railway/Heroku where SMTP ports (587/465) are often blocked.
+            if 'brevo.com' in host or 'sendinblue.com' in host:
+                import urllib.request
+                import json
+                
+                url = "https://api.brevo.com/v3/smtp/email"
+                headers = {
+                    "api-key": cfg['smtp_password'].strip(),
+                    "Content-Type": "application/json"
+                }
+                
+                sender_email = cfg.get('smtp_from') or ''
+                if not sender_email or '@' not in sender_email:
+                    sender_email = cfg.get('smtp_user') if (cfg.get('smtp_user') and '@' in cfg['smtp_user']) else "no-reply@brevo.com"
+                
+                data = {
+                    "sender": {"email": sender_email},
+                    "to": [{"email": r} for r in recipients],
+                    "subject": subject,
+                    "htmlContent": html_body
+                }
+                
+                req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+                try:
+                    urllib.request.urlopen(req, timeout=10)
+                    print(f'[EMAIL] Sent "{subject}" to {recipients} via Brevo API')
+                except urllib.error.HTTPError as he:
+                    err_body = he.read().decode('utf-8')
+                    print(f'[EMAIL] Brevo API Error {he.code}: {err_body}')
+                    raise
                 return
 
             # ── STANDARD SMTP ROUTE ──

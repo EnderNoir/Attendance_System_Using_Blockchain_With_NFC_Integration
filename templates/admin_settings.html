@@ -33,98 +33,33 @@
     <div>
       <div class="settings-head-title">Email Notifications</div>
       <div class="settings-head-sub">
-        Send attendance receipts to students and session summaries to teachers via Gmail SMTP.
+        Send attendance receipts to students and session summaries to teachers via Brevo or SendGrid API.
       </div>
     </div>
   </div>
   <div class="settings-body">
 
-    <div class="info-box" style="padding:0;overflow:hidden;border:1px solid rgba(96,165,250,.2);background:rgba(96,165,250,.02);border-radius:12px;">
-      <div style="background:rgba(96,165,250,.08);padding:14px 18px;border-bottom:1px solid rgba(96,165,250,.15);
+    <!-- Brevo Guide -->
+    <div class="info-box" style="padding:0;overflow:hidden;border:1px solid rgba(16,185,129,.2);background:rgba(16,185,129,.02);border-radius:12px;margin-bottom:24px;">
+      <div style="background:rgba(16,185,129,.08);padding:14px 18px;border-bottom:1px solid rgba(16,185,129,.15);
                   display:flex;align-items:center;justify-content:space-between;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <i class="bi bi-shield-check" style="color:#60a5fa;font-size:18px;"></i>
-          <strong style="color:var(--text);font-size:14px;">SENDGRID SETUP GUIDE — STEP-BY-STEP</strong>
+          <i class="bi bi-lightning-charge-fill" style="color:#10b981;font-size:18px;"></i>
+          <strong style="color:var(--text);font-size:14px;">BREVO SETUP GUIDE (RECOMMENDED)</strong>
         </div>
-        <span style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;background:#60a5fa;color:#fff;padding:3px 10px;border-radius:20px;font-weight:800;">RELIABLE</span>
+        <span style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;background:#10b981;color:#fff;padding:3px 10px;border-radius:20px;font-weight:800;">300 FREE EMAILS / DAY</span>
       </div>
       <div style="padding:18px;display:flex;flex-direction:column;gap:16px;">
-
+        
         <div style="display:flex;gap:15px;align-items:flex-start;">
-          <div style="width:28px;height:28px;border-radius:50%;background:#60a5fa;color:#fff;
+          <div style="width:28px;height:28px;border-radius:50%;background:#10b981;color:#fff;
                       display:flex;align-items:center;justify-content:center;font-size:13px;
-                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(96,165,250,.3);">1</div>
+                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">1</div>
           <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Create your SendGrid Account</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Sign up for Brevo</div>
             <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
-              Sign up for a free account at <a href="https://signup.sendgrid.com" target="_blank" style="color:#60a5fa;font-weight:600;text-decoration:underline;">signup.sendgrid.com</a>. 
-              The Free plan includes 100 emails per day forever.
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:15px;align-items:flex-start;">
-          <div style="width:28px;height:28px;border-radius:50%;background:#60a5fa;color:#fff;
-                      display:flex;align-items:center;justify-content:center;font-size:13px;
-                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(96,165,250,.3);">2</div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Verify Your "From" Email Address</div>
-            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
-              In SendGrid, go to <strong style="color:var(--text);">Settings → Sender Authentication</strong>. 
-              Click <strong style="color:var(--text);">"Verify a Single Sender"</strong>. 
-              Fill in your details (use the email you want the students to see).
-              <br>
-              <div style="margin-top:8px;background:rgba(239,68,68,.08);color:#ef4444;border:1px solid rgba(239,68,68,.2);
-                           border-radius:6px;padding:8px 10px;font-size:11.5px;display:inline-block;font-weight:600;">
-                <i class="bi bi-exclamation-triangle-fill"></i> CRITICAL: You must click the verification link in the email SendGrid sends you, or your emails will be blocked.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:15px;align-items:flex-start;">
-          <div style="width:28px;height:28px;border-radius:50%;background:#60a5fa;color:#fff;
-                      display:flex;align-items:center;justify-content:center;font-size:13px;
-                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(96,165,250,.3);">3</div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Generate your API Key</div>
-            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
-              Go to <strong style="color:var(--text);">Settings → API Keys</strong>. 
-              Click <strong style="color:#60a5fa;">"Create API Key"</strong>. 
-              Name it "DAVS Attendance" and choose <strong style="color:var(--text);">"Full Access"</strong>. 
-              Copy the key (starts with <code>SG.</code>) — you won't see it again!
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:15px;align-items:flex-start;">
-          <div style="width:28px;height:28px;border-radius:50%;background:#60a5fa;color:#fff;
-                      display:flex;align-items:center;justify-content:center;font-size:13px;
-                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(96,165,250,.3);">4</div>
-          <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Update Settings Below</div>
-            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:10px;">
-              Copy-paste these exact values into the form fields below:
-            </div>
-            <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-              <table style="border-collapse:collapse;width:100%;font-size:12px;">
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:10px;font-weight:700;color:var(--text);width:140px;background:rgba(96,165,250,.04);">SMTP Host</td>
-                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">smtp.sendgrid.net</td>
-                </tr>
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(96,165,250,.04);">SMTP Port</td>
-                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">2525 <span style="font-size:10px;color:var(--muted);">(Bypasses Railway blocks)</span></td>
-                </tr>
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(96,165,250,.04);">SMTP Username</td>
-                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">apikey</td>
-                </tr>
-                <tr>
-                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(96,165,250,.04);">Password</td>
-                  <td style="padding:10px;font-family:monospace;color:#60a5fa;">(Your SG. API Key)</td>
-                </tr>
-              </table>
+              Create a free account at <a href="https://www.brevo.com" target="_blank" style="color:#10b981;font-weight:600;text-decoration:underline;">brevo.com</a>. 
+              The Free plan includes 300 emails per day without requiring a credit card.
             </div>
           </div>
         </div>
@@ -132,21 +67,61 @@
         <div style="display:flex;gap:15px;align-items:flex-start;">
           <div style="width:28px;height:28px;border-radius:50%;background:#10b981;color:#fff;
                       display:flex;align-items:center;justify-content:center;font-size:13px;
-                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">5</div>
+                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">2</div>
           <div>
-            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Save and Test</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Verify your Sender Email</div>
             <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
-              Click <strong style="color:var(--accent);">Save Settings</strong> first. 
-              Then scroll to the bottom, enter your personal email in "Send Test Email", and click 
-              <strong style="color:#60a5fa;">Send Test</strong>.
+              Go to <strong style="color:var(--text);">Senders, Domains & IPs → Senders</strong>. Click <strong>Add a Sender</strong> and verify your email. 
+              <br>
+              <span style="color:#10b981;font-weight:600;">Check your inbox and click the verification link.</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:15px;align-items:flex-start;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#10b981;color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:13px;
+                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">3</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Get your API Key</div>
+            <div style="font-size:12.5px;color:var(--muted);line-height:1.6;">
+              Go to <strong style="color:var(--text);">SMTP & API → API Keys</strong>. Click <strong>Generate a new API key</strong>. 
+              Copy the key (starts with <code>xkeysib-</code>).
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:15px;align-items:flex-start;">
+          <div style="width:28px;height:28px;border-radius:50%;background:#10b981;color:#fff;
+                      display:flex;align-items:center;justify-content:center;font-size:13px;
+                      font-weight:800;flex-shrink:0;box-shadow:0 2px 4px rgba(16,185,129,.3);">4</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;">Configure DAVS Settings</div>
+            <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:8px;">
+              <table style="border-collapse:collapse;width:100%;font-size:12px;">
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:10px;font-weight:700;color:var(--text);width:140px;background:rgba(16,185,129,.04);">SMTP Host</td>
+                  <td style="padding:10px;font-family:monospace;color:#10b981;">smtp-relay.brevo.com</td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(16,185,129,.04);">SMTP Username</td>
+                  <td style="padding:10px;font-family:monospace;color:#10b981;">(Your Brevo Email)</td>
+                </tr>
+                <tr>
+                  <td style="padding:10px;font-weight:700;color:var(--text);background:rgba(16,185,129,.04);">Password</td>
+                  <td style="padding:10px;font-family:monospace;color:#10b981;">(Your API Key)</td>
+                </tr>
+              </table>
+            </div>
+            <div style="margin-top:10px;background:rgba(16,185,129,.08);color:#10b981;border:1px solid rgba(16,185,129,.2);
+                         border-radius:6px;padding:8px 10px;font-size:11.5px;font-weight:600;">
+              <i class="bi bi-info-circle-fill"></i> AUTO-BYPASS ACTIVE: Your app will automatically use the Brevo API (Port 443) to bypass Railway port blocks.
             </div>
           </div>
         </div>
 
       </div>
     </div>
-
-
 
     <form method="POST" action="{{ url_for('admin_settings_save') }}" id="settingsForm">
 
@@ -204,7 +179,7 @@
           <label class="field-label" for="smtp_from">Display Name / From Address</label>
           <input class="field-input" type="text" name="smtp_from" id="smtp_from"
                  value="{{ cfg.smtp_from }}" placeholder="DAVS CvSU Silang &lt;yourschool@gmail.com&gt;"/>
-          <span class="field-hint">Optional — defaults to Gmail address if blank</span>
+          <span class="field-hint">Optional — defaults to your email address if blank</span>
         </div>
       </div>
 

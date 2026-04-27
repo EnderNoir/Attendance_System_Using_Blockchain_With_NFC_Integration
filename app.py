@@ -4120,7 +4120,15 @@ def admin_settings_test():
         return jsonify({'ok': False, 'message': 'SMTP credentials not configured.'})
     try:
         host = cfg.get('smtp_host', 'smtp.gmail.com').lower().strip()
-        from_email = cfg.get('smtp_from') or cfg['smtp_user']
+        
+        def _extract_email(s):
+            import re
+            if not s: return None
+            match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', s)
+            return match.group(0) if match else s
+
+        from_email_raw = cfg.get('smtp_from') or cfg['smtp_user']
+        from_email_clean = _extract_email(from_email_raw)
         
         # ── SENDGRID HTTP API BYPASS ──
         if 'sendgrid.net' in host:
@@ -4135,9 +4143,10 @@ def admin_settings_test():
                 "Accept": "application/json"
             }
             
-            sender_email = cfg.get('smtp_from') or ''
+            sender_email = _extract_email(cfg.get('smtp_from')) or ''
             if not sender_email or '@' not in sender_email:
-                sender_email = cfg['smtp_user'] if (cfg.get('smtp_user') and '@' in cfg['smtp_user']) else "no-reply@davs.com"
+                u_email = _extract_email(cfg.get('smtp_user'))
+                sender_email = u_email if (u_email and '@' in u_email) else "no-reply@davs.com"
 
             data = {
                 "personalizations": [{"to": [{"email": test_email}]}],
@@ -4167,9 +4176,10 @@ def admin_settings_test():
                 "Accept": "application/json"
             }
             
-            sender_email = cfg.get('smtp_from') or ''
+            sender_email = _extract_email(cfg.get('smtp_from')) or ''
             if not sender_email or '@' not in sender_email:
-                sender_email = cfg['smtp_user'] if (cfg.get('smtp_user') and '@' in cfg['smtp_user']) else "no-reply@brevo.com"
+                u_email = _extract_email(cfg.get('smtp_user'))
+                sender_email = u_email if (u_email and '@' in u_email) else "no-reply@brevo.com"
 
             data = {
                 "sender": {"email": sender_email},
@@ -4193,7 +4203,7 @@ def admin_settings_test():
         
         msg            = MIMEMultipart('alternative')
         msg['Subject'] = '[DAVS] Test Email — SMTP Configuration Verified'
-        msg['From']    = from_email
+        msg['From']    = from_email_raw
         msg['To']      = test_email
         msg.attach(MIMEText(html_content, 'html'))
 

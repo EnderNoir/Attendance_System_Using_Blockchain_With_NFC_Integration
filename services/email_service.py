@@ -57,6 +57,13 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, cfg: dict):
             msg['To'] = ', '.join(recipients)
             msg.attach(MIMEText(html_body, 'html'))
 
+            # ── HELPERS ──
+            def _extract_email(s):
+                import re
+                if not s: return None
+                match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', s)
+                return match.group(0) if match else s
+
             host = cfg.get('smtp_host', '').lower().strip()
             
             # ── SENDGRID HTTP API BYPASS ──
@@ -76,10 +83,11 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, cfg: dict):
                 
                 # SendGrid API REQUIRES a valid email in the 'from' field. 
                 # If smtp_from is empty, we must NOT use 'apikey' as the email.
-                sender_email = cfg.get('smtp_from') or ''
+                sender_email = _extract_email(cfg.get('smtp_from')) or ''
                 if not sender_email or '@' not in sender_email:
-                    if cfg.get('smtp_user') and '@' in cfg['smtp_user']:
-                        sender_email = cfg['smtp_user']
+                    u_email = _extract_email(cfg.get('smtp_user'))
+                    if u_email and '@' in u_email:
+                        sender_email = u_email
                     else:
                         sender_email = "no-reply@davs-attendance.com"
                 
@@ -115,9 +123,10 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, cfg: dict):
                     "Accept": "application/json"
                 }
                 
-                sender_email = cfg.get('smtp_from') or ''
+                sender_email = _extract_email(cfg.get('smtp_from')) or ''
                 if not sender_email or '@' not in sender_email:
-                    sender_email = cfg.get('smtp_user') if (cfg.get('smtp_user') and '@' in cfg['smtp_user']) else "no-reply@brevo.com"
+                    u_email = _extract_email(cfg.get('smtp_user'))
+                    sender_email = u_email if (u_email and '@' in u_email) else "no-reply@brevo.com"
                 
                 data = {
                     "sender": {"email": sender_email},

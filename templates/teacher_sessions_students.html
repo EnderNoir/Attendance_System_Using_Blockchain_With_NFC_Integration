@@ -4,17 +4,20 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/teacher_sessions_students.css') }}">
 {% endblock %}
+{% block page_body_class %}tss-body{% endblock %}
 {% block content %}
 <style>
   /* Fixed header and filter layout overrides */
-  .page-body {
+  .tss-body {
     height: calc(100vh - var(--topbar-h));
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: 16px 24px 0 24px !important;
+    padding: 0;
+    flex: 1;
+    min-width: 0;
   }
-  .page-body > div:first-of-type, .main-tabs {
+  .tss-body > div:first-of-type, .main-tabs {
     flex-shrink: 0;
   }
   .main-pane {

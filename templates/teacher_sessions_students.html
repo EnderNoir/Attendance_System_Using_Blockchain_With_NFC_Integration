@@ -13,12 +13,9 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: 0;
+    padding: 24px 24px 0;
     flex: 1;
     min-width: 0;
-  }
-  .tss-body > div:first-of-type, .main-tabs {
-    flex-shrink: 0;
   }
   .main-pane {
     display: none;
@@ -37,6 +34,12 @@
     overflow-y: auto !important;
     max-height: none !important;
     padding-bottom: 32px;
+  }
+  @media(max-width:1023px) {
+    .tss-body { padding: 16px 16px 0; }
+  }
+  @media(max-width:639px) {
+    .tss-body { padding: 12px 12px 0; }
   }
 </style>
 
@@ -130,7 +133,7 @@
 
 <!-- Page header -->
 <div style="margin-bottom:16px; flex-shrink: 0;">
-  <div class="sec-mono" style="margin-top:0;">// CLASS MANAGEMENT</div>
+  <div class="sec-mono">// CLASS MANAGEMENT</div>
   <h2 style="font-size:20px;font-weight:600;margin:0;">Sessions &amp; Students</h2>
   <p style="font-size:12px;color:var(--muted);margin-top:4px;">
     Click any session card to open details. Click any student to view their attendance history.

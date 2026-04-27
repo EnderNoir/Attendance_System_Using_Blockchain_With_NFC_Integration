@@ -3685,8 +3685,9 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
 
     sess['ended_at'] = ended_at
     sess['absent'] = absent_ids
+    sess['blockchain_processing'] = True
     sessions_db[sess_id] = sess
-    print(f"[FINALIZE] Session {sess_id} marked ended_at={ended_at} in DB.")
+    print(f"[FINALIZE] Session {sess_id} marked ended_at={ended_at} in DB. Processing blockchain...")
 
     # ── Step 2: Fetch logs and record to blockchain ───────────────────────────
     # Blockchain call is now outside the DB context manager to avoid holding
@@ -3740,6 +3741,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
 
     # Reload to get latest state (including TX hash if blockchain succeeded)
     sess = load_session(sess_id)
+    sess['blockchain_processing'] = False
     save_session(sess_id, sess)
     sessions_db[sess_id] = sess
 
@@ -5276,8 +5278,10 @@ def teacher_dashboard():
             _pre  = len(_ended.get('present', []))
             _late = len(_ended.get('late', []))
             _abs  = len(_ended.get('absent', []))
-            _tx_str = f"Blockchain TX: {_tx[:10]}... | " if _tx else ""
-            flash(f"✅ Session ended. {_tx_str}{_pre} present, {_late} late, {_abs} absent.")
+            if _tx:
+                flash(f"✅ Session ended. Blockchain TX: {_tx[:10]}... | {_pre} present, {_late} late, {_abs} absent.")
+            else:
+                flash(f"✅ Session ended, but Blockchain recording failed. | {_pre} present, {_late} late, {_abs} absent.")
     return _teacher_dashboard_page_impl(
         session_obj=session,
         redirect=redirect,
@@ -6045,14 +6049,12 @@ def end_session(sess_id):
         flash('Session not found.'); return redirect(url_for('teacher_dashboard'))
 
     if result.get('tx_hash'):
-        flash(
-            f"Session ended. Blockchain TX: {result.get('tx_hash')[:10]}... | {result.get('present_count', 0)} present, "
-            f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
+        flash(f"✅ Session ended. Blockchain TX: {result.get('tx_hash')[:10]}... | {result.get('present_count', 0)} present, "
+              f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
     else:
         err = result.get('bc_error') or "Skipped"
-        flash(
-            f"Session ended, but Blockchain recording failed ({err}). | {result.get('present_count', 0)} present, "
-            f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
+        flash(f"✅ Session ended, but Blockchain recording failed ({err}). | {result.get('present_count', 0)} present, "
+              f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
     return redirect(url_for('teacher_dashboard'))
 
 @app.route('/teacher/session/<sess_id>/delete', methods=['POST'])
@@ -6337,6 +6339,7 @@ def poll_session(sess_id):
         'new_warnings':  new_warnings,
         'new_invalids':  new_invalids,
         'active':        any(not rs.get('ended_at') for rs in related_sessions),
+        'bc_processing': any(rs.get('blockchain_processing') for rs in related_sessions),
         'late_ids':      late_ids,
         'excused_ids':   excused_ids,
         'present_ids':   present_ids,

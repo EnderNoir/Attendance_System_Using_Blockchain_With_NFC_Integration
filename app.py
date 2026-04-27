@@ -5267,6 +5267,17 @@ def _build_teacher_context(user):
 @app.route('/teacher')
 @login_required
 def teacher_dashboard():
+    # Handle natural session-end redirect (poll auto-ends → redirects here with ?sess_ended=<id>)
+    sess_ended_id = request.args.get('sess_ended', '').strip()
+    if sess_ended_id:
+        _ended = load_session(sess_ended_id)
+        if _ended and _ended.get('ended_at'):
+            _tx   = _ended.get('session_tx_hash', '')
+            _pre  = len(_ended.get('present', []))
+            _late = len(_ended.get('late', []))
+            _abs  = len(_ended.get('absent', []))
+            _tx_str = f"Blockchain TX: {_tx[:10]}... | " if _tx else ""
+            flash(f"✅ Session ended. {_tx_str}{_pre} present, {_late} late, {_abs} absent.")
     return _teacher_dashboard_page_impl(
         session_obj=session,
         redirect=redirect,

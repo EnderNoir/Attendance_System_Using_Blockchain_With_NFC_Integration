@@ -516,13 +516,16 @@ function exportStudentSemester(sem) {
 // ── Filters ──
 function filterSessions() {
   const q    = document.getElementById('sf_q').value.toLowerCase();
+  const sem  = (document.getElementById('sf_sem')  || {value:''}).value.toLowerCase();
   const prog = document.getElementById('sf_program').value;
   const yr   = document.getElementById('sf_year').value;
   const sec  = document.getElementById('sf_sec').value;
   const subj = document.getElementById('sf_subj').value;
   let n = 0;
   document.querySelectorAll('#sessions_list .session-card').forEach(c => {
+    const sessSem = (c.dataset.sem || '').toLowerCase();
     const ok = (!q    || c.dataset.subj.includes(q) || c.dataset.section.includes(q))
+            && (!sem  || sessSem.includes(sem))
             && (!prog || c.dataset.program === prog)
             && (!yr   || c.dataset.year === yr)
             && (!sec  || c.dataset.sec === sec)
@@ -534,23 +537,108 @@ function filterSessions() {
   document.getElementById('sf_empty').style.display = n === 0 ? 'block' : 'none';
 }
 function resetSessionFilters() {
-  ['sf_q','sf_program','sf_year','sf_sec','sf_subj'].forEach(id => {
+  ['sf_q','sf_sem','sf_program','sf_year','sf_sec','sf_subj'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   filterSessions();
 }
 
-function filterStudents(){
-  const q=document.getElementById('stf_q').value.toLowerCase();
-  const y=document.getElementById('stf_year').value;
-  const s=document.getElementById('stf_sec').value;
-  let n=0;
-  document.querySelectorAll('#students_list .student-card').forEach(c=>{
-    const ok=(!q||c.dataset.name.includes(q)||c.dataset.nfc.includes(q)||c.dataset.sid.includes(q))&&(!y||c.dataset.year===y)&&(!s||c.dataset.section===s);
-    c.classList.toggle('hidden',!ok); if(ok)n++;
-  });
-  document.getElementById('stf_count').textContent=n+' students';
-  document.getElementById('stf_empty').style.display=n===0?'block':'none';
+// ── Accordion toggle ──
+function toggleAccordion(id) {
+  const body = document.getElementById(id);
+  const chev = document.getElementById('chevron_' + id);
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (chev) chev.classList.toggle('open', !isOpen);
 }
-function resetStudentFilters(){['stf_q','stf_year','stf_sec'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});filterStudents();}
+
+// ── Student filters (accordion-aware) ──
+function filterStudents() {
+  const q    = document.getElementById('stf_q').value.toLowerCase().trim();
+  const prog = (document.getElementById('stf_prog') || {value:''}).value.toLowerCase();
+  const sem  = (document.getElementById('stf_sem')  || {value:''}).value.toLowerCase();
+  const yr   = document.getElementById('stf_year').value;
+  const sec  = document.getElementById('stf_sec').value;
+
+  let totalVisible = 0;
+  let anyAccordion = false;
+
+  document.querySelectorAll('.stud-accordion').forEach(acc => {
+    const accProg = (acc.dataset.prog || '').toLowerCase();
+    const accSem  = (acc.dataset.sem  || '').toLowerCase();
+    const accYear = acc.dataset.year || '';
+    const accSec  = acc.dataset.sec  || '';
+
+    // Check accordion-level dropdown filters
+    const accMatch =
+      (!prog || accProg.includes(prog)) &&
+      (!sem  || accSem.includes(sem)) &&
+      (!yr   || accYear === yr) &&
+      (!sec  || accSec  === sec);
+
+    if (!accMatch) {
+      acc.classList.add('hidden');
+      return;
+    }
+    acc.classList.remove('hidden');
+    anyAccordion = true;
+
+    // Filter individual student cards within the accordion
+    let visibleInGroup = 0;
+    acc.querySelectorAll('.student-card').forEach(c => {
+      const nameMatch = !q || c.dataset.name.includes(q) || c.dataset.nfc.includes(q) || c.dataset.sid.includes(q);
+      c.classList.toggle('hidden', !nameMatch);
+      if (nameMatch) visibleInGroup++;
+    });
+
+    const emptyMsg = acc.querySelector('.stud-acc-empty');
+    if (emptyMsg) emptyMsg.style.display = visibleInGroup === 0 && q ? 'block' : 'none';
+
+    totalVisible += visibleInGroup;
+
+    // Auto-open accordion on search; collapse when search is cleared
+    const body = acc.querySelector('.stud-acc-body');
+    const chev = acc.querySelector('.stud-acc-chevron');
+    if (body) {
+      if (q) {
+        // Open accordion and highlight if any students match
+        const shouldOpen = visibleInGroup > 0;
+        body.style.display = shouldOpen ? 'block' : 'none';
+        if (chev) chev.classList.toggle('open', shouldOpen);
+        acc.classList.toggle('search-match', shouldOpen);
+      } else {
+        // Respect previous open/close state (leave as-is when clearing search)
+        acc.classList.remove('search-match');
+      }
+    }
+  });
+
+  const countEl = document.getElementById('stf_count');
+  if (countEl) countEl.textContent = totalVisible + ' students';
+  const emptyEl = document.getElementById('stf_empty');
+  if (emptyEl) emptyEl.style.display = (!anyAccordion) ? 'block' : 'none';
+}
+
+function resetStudentFilters() {
+  ['stf_q','stf_prog','stf_sem','stf_year','stf_sec'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  // Close all accordions on reset
+  document.querySelectorAll('.stud-accordion').forEach(acc => {
+    acc.classList.remove('hidden','search-match');
+    const body = acc.querySelector('.stud-acc-body');
+    const chev = acc.querySelector('.stud-acc-chevron');
+    if (body) body.style.display = 'none';
+    if (chev) chev.classList.remove('open');
+    acc.querySelectorAll('.student-card').forEach(c => c.classList.remove('hidden'));
+    const emptyMsg = acc.querySelector('.stud-acc-empty');
+    if (emptyMsg) emptyMsg.style.display = 'none';
+  });
+  const countEl = document.getElementById('stf_count');
+  const total = document.querySelectorAll('.stud-accordion:not(.hidden) .student-card').length;
+  if (countEl) countEl.textContent = total + ' students';
+  const emptyEl = document.getElementById('stf_empty');
+  if (emptyEl) emptyEl.style.display = 'none';
+}
 

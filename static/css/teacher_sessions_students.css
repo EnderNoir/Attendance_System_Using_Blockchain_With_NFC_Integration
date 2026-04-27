@@ -757,7 +757,7 @@
 
   .empty-state {
     text-align: center;
-    padding: 48px 20px;
+    padding: 24px 20px;
     color: var(--muted);
   }
 
@@ -766,6 +766,62 @@
     opacity: .2;
     display: block;
     margin-bottom: 10px;
+  }
+
+  /* ── Student Accordion ── */
+  .stud-accordion {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    background: var(--surface);
+    transition: border-color .2s;
+  }
+
+  .stud-accordion.hidden {
+    display: none !important;
+  }
+
+  .stud-acc-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    background: rgba(45,106,39,.04);
+    transition: background .2s;
+    user-select: none;
+  }
+
+  .stud-acc-header:hover {
+    background: rgba(45,106,39,.08);
+  }
+
+  .stud-acc-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .stud-acc-chevron {
+    font-size: 14px;
+    color: var(--muted);
+    flex-shrink: 0;
+    transition: transform .25s ease;
+  }
+
+  .stud-acc-chevron.open {
+    transform: rotate(180deg);
+  }
+
+  .stud-acc-body {
+    padding: 10px 12px 6px;
+    border-top: 1px solid var(--border);
+    animation: fadeIn .18s ease;
+  }
+
+  .stud-accordion.search-match {
+    border-color: rgba(45,106,39,.4);
   }
 
   @media(max-width:768px) {

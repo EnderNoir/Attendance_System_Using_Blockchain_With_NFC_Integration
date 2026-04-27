@@ -171,7 +171,7 @@
         <div class="field-wrap">
           <label class="field-label" for="smtp_host">SMTP Host</label>
           <input class="field-input" type="text" name="smtp_host" id="smtp_host"
-                 value="{{ cfg.smtp_host }}" placeholder="smtp.sendgrid.net"/>
+                 value="{{ cfg.smtp_host }}" placeholder="smtp-relay.brevo.com"/>
         </div>
         <div class="field-wrap">
           <label class="field-label" for="smtp_port">SMTP Port</label>
@@ -180,16 +180,16 @@
           <span class="field-hint">Use <strong>2525</strong> for Railway to bypass blocked ports</span>
         </div>
         <div class="field-wrap">
-          <label class="field-label" for="smtp_user">SMTP Username <span style="color:var(--danger)">*</span></label>
+          <label class="field-label" for="smtp_user">SMTP Username / Email <span style="color:var(--danger)">*</span></label>
           <input class="field-input" type="text" name="smtp_user" id="smtp_user"
-                 value="{{ cfg.smtp_user }}" placeholder="apikey"/>
-          <span class="field-hint">For SendGrid, this must be exactly <code>apikey</code></span>
+                 value="{{ cfg.smtp_user }}" placeholder="your-email@brevo.com"/>
+          <span class="field-hint">For Brevo, use your login email. For SendGrid, use <code>apikey</code></span>
         </div>
         <div class="field-wrap">
           <label class="field-label" for="smtp_password">API Key / Password <span style="color:var(--danger)">*</span></label>
           <div style="position:relative;">
             <input class="field-input" type="password" name="smtp_password" id="smtp_password"
-                   value="{{ cfg.smtp_password }}" placeholder="SG.xxxxxxxxxxxx"
+                   value="{{ cfg.smtp_password }}" placeholder="xkeysib-xxxxxxxxxxxx"
                    style="padding-right:40px;"/>
             <button type="button" onclick="togglePw()"
                     style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
@@ -197,7 +197,7 @@
               <i class="bi bi-eye" id="pwEye"></i>
             </button>
           </div>
-          <span class="field-hint">Your SendGrid API Key</span>
+          <span class="field-hint">Your Brevo or SendGrid API Key</span>
         </div>
 
         <div class="field-wrap" style="grid-column:1/-1;">

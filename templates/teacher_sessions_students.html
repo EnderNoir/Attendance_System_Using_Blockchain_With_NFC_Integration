@@ -7,39 +7,35 @@
 {% block page_body_class %}tss-body{% endblock %}
 {% block content %}
 <style>
-  /* Fixed header and filter layout overrides */
+  /* Sessions & Students page layout */
   .tss-body {
-    height: calc(100vh - var(--topbar-h));
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    padding: 24px 24px 0;
+    padding: 24px;
     flex: 1;
     min-width: 0;
   }
   .main-pane {
     display: none;
-    flex-direction: column;
-    flex: 1;
-    overflow: hidden;
   }
   .main-pane.active {
-    display: flex;
+    display: block;
   }
-  .sec-mono, .filter-bar {
-    flex-shrink: 0;
+  #sessions_list {
+    max-height: calc(100vh - 320px);
+    overflow-y: auto;
+    padding-bottom: 24px;
   }
-  #sessions_list, #students_accordion {
-    flex: 1;
-    overflow-y: auto !important;
-    max-height: none !important;
-    padding-bottom: 32px;
+  #students_accordion {
+    max-height: calc(100vh - 320px);
+    overflow-y: auto;
+    padding-bottom: 24px;
   }
   @media(max-width:1023px) {
-    .tss-body { padding: 16px 16px 0; }
+    .tss-body { padding: 16px; }
+    #sessions_list, #students_accordion { max-height: calc(100vh - 280px); }
   }
   @media(max-width:639px) {
-    .tss-body { padding: 12px 12px 0; }
+    .tss-body { padding: 12px; }
+    #sessions_list, #students_accordion { max-height: calc(100vh - 260px); }
   }
 </style>
 

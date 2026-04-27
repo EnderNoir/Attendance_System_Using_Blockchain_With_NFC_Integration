@@ -67,9 +67,11 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, cfg: dict):
                 import json
                 
                 url = "https://api.sendgrid.com/v3/mail/send"
+                api_key = cfg['smtp_password'].strip()
                 headers = {
-                    "Authorization": f"Bearer {cfg['smtp_password'].strip()}",
-                    "Content-Type": "application/json"
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
                 }
                 
                 # SendGrid API REQUIRES a valid email in the 'from' field. 
@@ -106,9 +108,11 @@ def send_email_async(to_addrs: list, subject: str, html_body: str, cfg: dict):
                 import json
                 
                 url = "https://api.brevo.com/v3/smtp/email"
+                api_key = cfg['smtp_password'].strip()
                 headers = {
-                    "api-key": cfg['smtp_password'].strip(),
-                    "Content-Type": "application/json"
+                    "api-key": api_key,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
                 }
                 
                 sender_email = cfg.get('smtp_from') or ''

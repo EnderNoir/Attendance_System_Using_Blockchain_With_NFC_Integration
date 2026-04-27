@@ -205,11 +205,13 @@
       minutes.
       {% endif %}
     </div>
+    {% if session.get('role') not in ('admin', 'super_admin') %}
     <div style="margin-top:8px;">
       <button type="button" class="btn-outline-sm" id="mobileNfcSessionBtn">
         <i class="bi bi-phone"></i> Use Phone NFC Reader
       </button>
     </div>
+    {% endif %}
   </div>
 </div>
 
@@ -242,9 +244,11 @@
     <div class="nfc-strip-uid" id="nfcStripUid">Waiting for card tap…</div>
   </div>
   <div class="nfc-strip-status" id="nfcStripStatus" style="color:var(--muted); margin-right: 12px;">—</div>
+  {% if session.get('role') not in ('admin', 'super_admin') %}
   <button type="button" class="btn-outline" id="mobileNfcStripBtn" style="margin-left: auto; white-space: nowrap;" onclick="startMobileSessionNfc()">
     <i class="bi bi-phone"></i> Use Phone's NFC
   </button>
+  {% endif %}
 </div>
 {% endif %}
 

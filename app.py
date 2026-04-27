@@ -4111,8 +4111,8 @@ def admin_settings_save():
 def admin_settings_test():
     """Send a test email to verify SMTP config."""
     cfg = get_email_config()
-    test_to = request.form.get('test_email', '').strip()
-    if not test_to or '@' not in test_to:
+    test_email = request.form.get('test_email', '').strip()
+    if not test_email or '@' not in test_email:
         return jsonify({'ok': False, 'message': 'Invalid email address.'})
     if cfg.get('enabled') != '1':
         return jsonify({'ok': False, 'message': 'Email notifications are disabled. Enable them first.'})
@@ -4120,21 +4120,8 @@ def admin_settings_test():
         return jsonify({'ok': False, 'message': 'SMTP credentials not configured.'})
     try:
         host = cfg.get('smtp_host', 'smtp.gmail.com').lower().strip()
-        test_to = request.form.get('test_email', '').strip()
         from_email = cfg.get('smtp_from') or cfg['smtp_user']
         
-        html_content = f'''
-        <div style="font-family:Arial,sans-serif;padding:24px;max-width:480px;">
-          <div style="font-size:20px;font-weight:700;color:#1E4A1A;margin-bottom:8px;">
-            ✓ DAVS Email Test Successful
-          </div>
-          <p style="color:#555;font-size:13px;">
-            Your configuration is working correctly!<br>
-            Email notifications will be sent from:
-            <strong>{from_email}</strong>
-          </p>
-        </div>'''
-
         # ── SENDGRID HTTP API BYPASS ──
         if 'sendgrid.net' in host or cfg.get('smtp_user') == 'apikey':
             import urllib.request

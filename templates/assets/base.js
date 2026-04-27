@@ -96,21 +96,49 @@
     function buildSectionAccordion(sections) {
       if (!sections || !sections.length) return '<span style="font-size:13px;color:var(--muted);font-weight:500;">No sections assigned.</span>';
       var groups = {};
-      sections.forEach(function (key) { var parts = key.split('|'); var prog = parts[0] || 'Unknown'; var yr = parts[1] || '—'; var sec = parts[2] || '—'; if (!groups[prog]) groups[prog] = {}; if (!groups[prog][yr]) groups[prog][yr] = []; groups[prog][yr].push(sec); });
+      sections.forEach(function (key) { 
+        var parts = key.split('|'); 
+        var prog = parts[0] || 'Unknown'; 
+        var yr = parts[1] || '—'; 
+        var sem = parts.length >= 4 ? (parts[2] || '—') : '';
+        var sec = parts.length >= 4 ? (parts[3] || '—') : (parts[2] || '—'); 
+        
+        if (!groups[prog]) groups[prog] = {}; 
+        if (!groups[prog][yr]) groups[prog][yr] = {}; 
+        if (sem) {
+          if (!groups[prog][yr][sem]) groups[prog][yr][sem] = [];
+          groups[prog][yr][sem].push(sec);
+        } else {
+          if (!groups[prog][yr]['default']) groups[prog][yr]['default'] = [];
+          groups[prog][yr]['default'].push(sec);
+        }
+      });
       var html = '';
       Object.keys(groups).sort().forEach(function (prog) {
-        var yo = groups[prog]; var tot = Object.values(yo).reduce(function (a, b) { return a + b.length; }, 0);
+        var yo = groups[prog]; 
+        var tot = 0;
+        Object.values(yo).forEach(function(y) { 
+          Object.values(y).forEach(function(s) { tot += s.length; });
+        });
         html += '<div class="sec-accordion"><div class="sec-acc-program" onclick="toggleSecAccProgram(this)">';
         html += '<span class="sec-acc-program-name"><i class="bi bi-mortarboard"></i>' + prog + '</span>';
         html += '<span style="display:flex;align-items:center;gap:8px;"><span class="sec-acc-program-count">' + tot + ' section' + (tot !== 1 ? 's' : '') + '</span><i class="bi bi-chevron-down sec-acc-chevron"></i></span></div>';
         html += '<div class="sec-acc-years">';
         Object.keys(yo).sort().forEach(function (yr) {
-          var secs = yo[yr];
+          var sems = yo[yr];
           html += '<div class="sec-acc-year" onclick="toggleSecAccYear(this)">';
           html += '<span class="sec-acc-year-label"><i class="bi bi-layers"></i>' + yr + '</span>';
-          html += '<span style="display:flex;align-items:center;gap:8px;"><span style="font-size:12px;color:var(--muted);font-weight:600;">' + secs.join(', ') + '</span><i class="bi bi-chevron-down sec-acc-year-chevron"></i></span></div>';
-          html += '<div class="sec-acc-sections">';
-          secs.forEach(function (s) { html += '<span class="sec-chip">' + s + '</span>'; });
+          html += '<span style="display:flex;align-items:center;gap:8px;"><i class="bi bi-chevron-down sec-acc-year-chevron"></i></span></div>';
+          html += '<div class="sec-acc-sections" style="padding-left:15px;">';
+          Object.keys(sems).sort().forEach(function(sem) {
+            var secs = sems[sem];
+            if (sem !== 'default') {
+              html += '<div style="font-size:11px; font-weight:700; color:var(--muted); margin: 8px 0 4px 4px; text-transform:uppercase; letter-spacing:0.5px;">' + sem + '</div>';
+            }
+            html += '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">';
+            secs.forEach(function (s) { html += '<span class="sec-chip">' + s + '</span>'; });
+            html += '</div>';
+          });
           html += '</div>';
         });
         html += '</div></div>';

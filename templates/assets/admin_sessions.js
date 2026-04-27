@@ -357,7 +357,7 @@ function renderSessModal(sessId, data) {
             ? `<a href="${st.attachment_url}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);border-radius:5px;padding:2px 7px;white-space:nowrap;"><i class="bi bi-paperclip"></i> View</a>`
             : '<span style="color:var(--muted);font-size:11px;">-</span>';
           const tap = parseTapDateTime(st.time || st.tap_time || s.started_at || '', s.started_at || '');
-          const displayTapTime = (status === 'absent' || status === 'excused') ? '—' : tap.time;
+          const displayTapTime = (status === 'absent' || status === 'excused') ? '-' : tap.time;
           return `<tr>
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '-'}</td>

@@ -325,7 +325,7 @@ function renderSessModal(sessId, data) {
         ? `<a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" title="View on Etherscan" style="font-size:11px; font-family:'Space Mono',monospace; color:var(--accent); text-decoration:none; word-break: break-all;">${txHash.slice(0, 10)}...</a>`
         : '<span style="color:var(--muted);font-size:11px;">—</span>';
 
-      const displayTapTime = (status === 'absent' || status === 'excused') ? '—' : tap.time;
+      const displayTapTime = (status === 'absent' || status === 'excused') ? '-' : tap.time;
       return `<tr>
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '—'}</td>
@@ -481,7 +481,7 @@ function renderSessModal(sessId, data) {
                     <td><span style="font-weight:600;">${s.subject_name || '—'}</span></td>
                     <td><span class="att-status st-excused">${classTypeLabel(s.class_type || 'lecture')}</span></td>
                     <td><span class="att-status ${stCls[s.status] || 'st-absent'}">${stLbl[s.status] || '—'}</span></td>
-                    <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? parseTapDateTime(s.tap_time).time : '—'}</td>
+                    <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? parseTapDateTime(s.tap_time).time : '-'}</td>
                     <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${pickHistoryDate(s)}</td>
                     <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || s.tap_time || '')}</td>
                     <td style="font-size:11px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>

@@ -4123,7 +4123,7 @@ def admin_settings_test():
         from_email = cfg.get('smtp_from') or cfg['smtp_user']
         
         # ── SENDGRID HTTP API BYPASS ──
-        if 'sendgrid.net' in host or cfg.get('smtp_user') == 'apikey':
+        if 'sendgrid.net' in host:
             import urllib.request
             import json
             
@@ -4132,22 +4132,55 @@ def admin_settings_test():
                 "Authorization": f"Bearer {cfg['smtp_password'].strip()}",
                 "Content-Type": "application/json"
             }
+            
+            sender_email = cfg.get('smtp_from') or ''
+            if not sender_email or '@' not in sender_email:
+                sender_email = cfg['smtp_user'] if (cfg.get('smtp_user') and '@' in cfg['smtp_user']) else "no-reply@davs.com"
+
             data = {
-                "personalizations": [{"to": [{"email": test_to}]}],
-                "from": {"email": from_email},
+                "personalizations": [{"to": [{"email": test_email}]}],
+                "from": {"email": sender_email},
                 "subject": "[DAVS] Test Email — SendGrid API Verified",
-                "content": [{"type": "text/html", "value": html_content}]
+                "content": [{"type": "text/html", "value": "<h3>Success!</h3><p>SendGrid API is working correctly.</p>"}]
             }
             
             req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
             try:
                 urllib.request.urlopen(req, timeout=10)
                 return jsonify({'ok': True, 'message': f'Test email sent instantly via SendGrid API (Port 443 Bypass).'})
-            except urllib.error.HTTPError as e:
-                err_body = e.read().decode('utf-8')
-                return jsonify({'ok': False, 'message': f'SendGrid API Error: {e.code} - {err_body}'})
             except Exception as e:
-                return jsonify({'ok': False, 'message': f'API Network Error: {str(e)}'})
+                err_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+                return jsonify({'ok': False, 'message': f'SendGrid API Error: {err_body}'})
+
+        # ── BREVO (SENDINBLUE) HTTP API BYPASS ──
+        if 'brevo.com' in host or 'sendinblue.com' in host:
+            import urllib.request
+            import json
+            
+            url = "https://api.brevo.com/v3/smtp/email"
+            headers = {
+                "api-key": cfg['smtp_password'].strip(),
+                "Content-Type": "application/json"
+            }
+            
+            sender_email = cfg.get('smtp_from') or ''
+            if not sender_email or '@' not in sender_email:
+                sender_email = cfg['smtp_user'] if (cfg.get('smtp_user') and '@' in cfg['smtp_user']) else "no-reply@brevo.com"
+
+            data = {
+                "sender": {"email": sender_email},
+                "to": [{"email": test_email}],
+                "subject": "[DAVS] Test Email — Brevo API Verified",
+                "htmlContent": "<h3>Success!</h3><p>Brevo API is working correctly.</p>"
+            }
+            
+            req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+            try:
+                urllib.request.urlopen(req, timeout=10)
+                return jsonify({'ok': True, 'message': f'Test email sent via Brevo API (Port 443 Bypass).'})
+            except Exception as e:
+                err_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
+                return jsonify({'ok': False, 'message': f'Brevo API Error: {err_body}'})
 
         # ── STANDARD SMTP ROUTE (Gmail, etc.) ──
         import smtplib, ssl, threading, socket
@@ -4157,7 +4190,7 @@ def admin_settings_test():
         msg            = MIMEMultipart('alternative')
         msg['Subject'] = '[DAVS] Test Email — SMTP Configuration Verified'
         msg['From']    = from_email
-        msg['To']      = test_to
+        msg['To']      = test_email
         msg.attach(MIMEText(html_content, 'html'))
 
         result_box = {'ok': False, 'message': 'Test timed out.'}

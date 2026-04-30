@@ -241,7 +241,7 @@ async function applyFilters() {
   const subj = ssdValues.f_subject || '';
   const sem = ssdValues.f_semester || '';
   if (prog) params.append('program', prog);
-  if (yr) params.append('year', yr);
+  if (yr) params.append('year_level', yr);
   if (sec) params.append('section_letter', sec);
   if (subj) params.append('subject', subj);
   if (sem) params.append('semester', sem);
@@ -305,7 +305,7 @@ function exportDashboard() {
     const subj = ssdValues.f_subject || '';
     const sem = ssdValues.f_semester || '';
     if (prog) p.append('program', prog);
-    if (yr) p.append('year', yr);
+    if (yr) p.append('year_level', yr);
     if (sec) p.append('section_letter', sec);
     if (subj) p.append('subject', subj);
     if (sem) p.append('semester', sem);

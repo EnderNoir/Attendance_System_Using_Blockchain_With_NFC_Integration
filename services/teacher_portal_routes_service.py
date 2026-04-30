@@ -116,6 +116,21 @@ def teacher_dashboard_page_impl(
         ).fetchall()
         subjects_from_sessions = sorted([r['subject_name'] for r in rows])
 
+        sec_rows = conn.execute(
+            "SELECT DISTINCT section_key FROM sessions "
+            "WHERE (teacher_username=? OR teacher_name=?) AND section_key IS NOT NULL AND section_key != ''",
+            (session_obj['username'], session_obj.get('full_name', '')),
+        ).fetchall()
+        
+        programs_set = set()
+        years_set = set()
+        sections_set = set()
+        for r in sec_rows:
+            parts = str(r['section_key']).split('|')
+            if len(parts) > 0 and parts[0]: programs_set.add(parts[0])
+            if len(parts) > 1 and parts[1]: years_set.add(parts[1])
+            if len(parts) > 2 and parts[2]: sections_set.add(parts[2])
+
     total_students = len(teacher_students(user))
 
     return render_template(
@@ -129,6 +144,9 @@ def teacher_dashboard_page_impl(
         total_students=total_students,
         fmt_time=fmt_time,
         fmt_time_short=fmt_time_short,
+        filter_programs=sorted(programs_set),
+        filter_years=sorted(years_set),
+        filter_sections=sorted(sections_set),
     )
 
 

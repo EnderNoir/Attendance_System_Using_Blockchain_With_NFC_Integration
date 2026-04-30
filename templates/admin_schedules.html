@@ -566,24 +566,9 @@
           <div style="display:flex;gap:8px;">
             <button type="button" class="btn-outline" onclick="addEventSection()">Add</button>
           </div>
-          <datalist id="eventProgramOptions">
-            {% for sk in sections %}
-            {% set sp = sk.split('|') %}
-            <option value="{{ sp[0] if sp|length > 0 else '' }}"></option>
-            {% endfor %}
-          </datalist>
-          <datalist id="eventYearOptions">
-            {% for sk in sections %}
-            {% set sp = sk.split('|') %}
-            <option value="{{ sp[1] if sp|length > 1 else '' }}"></option>
-            {% endfor %}
-          </datalist>
-          <datalist id="eventSectionOptions">
-            {% for sk in sections %}
-            {% set sp = sk.split('|') %}
-            <option value="{{ sp[2] if sp|length > 2 else '' }}"></option>
-            {% endfor %}
-          </datalist>
+          <datalist id="eventProgramOptions"></datalist>
+          <datalist id="eventYearOptions"></datalist>
+          <datalist id="eventSectionOptions"></datalist>
           <input type="hidden" name="selected_sections" id="eventSectionsHidden">
           <div id="eventSectionsTableWrap" style="margin-top:10px;"></div>
         </div>

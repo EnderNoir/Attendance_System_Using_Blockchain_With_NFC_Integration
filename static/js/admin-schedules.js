@@ -1121,6 +1121,36 @@
       makeAC('editTeacherInput', 'editTeacherHidden', 'editTeacherBody', 'editTeacherDrop', teacherDataFn, 'label', 'role');
       makeAC('editSemesterInput', 'editSemesterInput', 'editSemesterBody', 'editSemesterDrop', semesterDataFn, 'id', 'label');
     }
+
+    /* -- SECTION DROPDOWNS: populate Program & Section from students table data -- */
+    (function populateSectionDropdowns() {
+      const sections = Array.isArray(SECTION_KEYS) ? SECTION_KEYS : [];
+      const programs = [];
+      const sectionLetters = [];
+      sections.forEach(function (sk) {
+        const parts = String(sk || '').split('|');
+        if (parts[0] && programs.indexOf(parts[0]) === -1) programs.push(parts[0]);
+        if (parts[2] && sectionLetters.indexOf(parts[2]) === -1) sectionLetters.push(parts[2]);
+      });
+      programs.sort();
+      sectionLetters.sort();
+
+      function fillSelect(id, values, placeholder) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        let html = '<option value="">' + placeholder + '</option>';
+        values.forEach(function (v) {
+          html += '<option value="' + v.replace(/"/g, '&quot;') + '">' + v + '</option>';
+        });
+        el.innerHTML = html;
+      }
+
+      fillSelect('addProgram',  programs,       '-- Select Program --');
+      fillSelect('addSection',  sectionLetters, '-- Select Section --');
+      fillSelect('editProgram', programs,       '-- Select Program --');
+      fillSelect('editSection', sectionLetters, '-- Select Section --');
+    })();
+
     checkPresessions();
     setInterval(checkRecurringSessions, 60000);
   });

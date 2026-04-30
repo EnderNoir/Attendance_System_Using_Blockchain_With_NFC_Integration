@@ -167,8 +167,11 @@
           <div class="mb-3">
             <label class="form-label-sm">Section *</label>
             <div class="section-fields">
-              <div><label class="form-label-sm" style="margin-top:0;">Program</label><input class="ac-input"
-                  name="program" id="editProgram" required></div>
+              <div><label class="form-label-sm" style="margin-top:0;">Program</label>
+                <select class="ac-input" name="program" id="editProgram" required>
+                  <option value="">-- Select Program --</option>
+                </select>
+              </div>
               <div><label class="form-label-sm" style="margin-top:0;">Year Level</label>
                 <select class="ac-input" name="year_level" id="editYear" required>
                   <option>1st Year</option>
@@ -177,8 +180,11 @@
                   <option>4th Year</option>
                 </select>
               </div>
-              <div><label class="form-label-sm" style="margin-top:0;">Section</label><input class="ac-input"
-                  name="section" id="editSection" required></div>
+              <div><label class="form-label-sm" style="margin-top:0;">Section</label>
+                <select class="ac-input" name="section" id="editSection" required>
+                  <option value="">-- Select Section --</option>
+                </select>
+              </div>
             </div>
           </div>
           <div class="mb-3">
@@ -358,7 +364,9 @@
           <div class="section-fields">
             <div>
               <label class="form-label-sm" style="margin-top:0;">Program</label>
-              <input class="ac-input" name="program" id="addProgram" placeholder="e.g. BSCS" required>
+              <select class="ac-input" name="program" id="addProgram" required>
+                <option value="">-- Select Program --</option>
+              </select>
             </div>
             <div>
               <label class="form-label-sm" style="margin-top:0;">Year Level</label>
@@ -372,7 +380,9 @@
             </div>
             <div>
               <label class="form-label-sm" style="margin-top:0;">Section</label>
-              <input class="ac-input" name="section" id="addSection" placeholder="e.g. A" required>
+              <select class="ac-input" name="section" id="addSection" required>
+                <option value="">-- Select Section --</option>
+              </select>
             </div>
           </div>
         </div>
@@ -617,4 +627,3 @@
 </script>
 <script src="{{ url_for('static', filename='js/admin-schedules.js') }}"></script>
 {% endblock %}
-

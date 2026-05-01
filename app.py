@@ -4422,17 +4422,24 @@ def api_update_student_profile(nfc_id):
 @app.route('/api/students/delete/<nfc_id>', methods=['POST'])
 @admin_required
 def api_delete_student(nfc_id):
-    try:
-        with get_db() as conn:
-            # Delete attendance records first
-            conn.execute("DELETE FROM attendance_logs WHERE nfc_id = ?", (nfc_id,))
-            # Delete photos
-            conn.execute("DELETE FROM photos WHERE person_id = ?", (nfc_id,))
-            # Delete student
-            conn.execute("DELETE FROM students WHERE nfc_id = ?", (nfc_id,))
-        return jsonify({'success': True, 'message': 'Student and all associated records deleted successfully.'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    import time
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with get_db() as conn:
+                # Delete attendance records first
+                conn.execute("DELETE FROM attendance_logs WHERE nfc_id = ?", (nfc_id,))
+                # Delete photos
+                conn.execute("DELETE FROM photos WHERE person_id = ?", (nfc_id,))
+                # Delete student
+                conn.execute("DELETE FROM students WHERE nfc_id = ?", (nfc_id,))
+            return jsonify({'success': True, 'message': 'Student and associated records deleted successfully.'})
+        except Exception as e:
+            err_str = str(e).lower()
+            if "deadlock" in err_str and attempt < max_retries - 1:
+                time.sleep(0.5)
+                continue
+            return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.route('/api/student/move-semester/<nfc_id>', methods=['POST'])
 @admin_required

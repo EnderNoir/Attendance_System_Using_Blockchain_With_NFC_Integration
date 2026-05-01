@@ -829,36 +829,34 @@ async function saveStudentUpdate() {
     });
     const d = await r.json();
     if (d.ok) {
-      // Show Success Pop-up
       showAppSuccess('Student profile updated successfully!');
       
-      // Update local data
-      const s = studentData.find(x => x.nfc === curId);
-      if (s) {
-          sid: payload.student_id,
-          course: payload.course,
-          year: payload.year_level,
-          section: payload.section,
-          enrollment: payload.enrollment_status,
-          nfc: payload.new_nfc_id || curId
-        });
+      const studentObj = studentData.find(x => x.nfc === curId);
+      if (studentObj) {
+        studentObj.name = payload.full_name;
+        studentObj.sid = payload.student_id;
+        studentObj.course = payload.course;
+        studentObj.year = payload.year_level;
+        studentObj.section = payload.section;
+        studentObj.enrollment = payload.enrollment_status;
+        if (payload.new_nfc_id) {
+          studentObj.nfc = payload.new_nfc_id;
+        }
 
-        // Update DOM row attributes and text
-        const row = document.getElementById(`strow_${s.idx}`);
+        const row = document.getElementById(`strow_${studentObj.idx}`);
         if (row) {
-          row.dataset.name = s.name.toLowerCase();
-          row.dataset.id = s.sid.toLowerCase();
-          row.dataset.course = s.course;
-          row.dataset.year = s.year;
-          row.dataset.section = s.section;
-          row.dataset.enrollment = s.enrollment;
-          row.dataset.nfc = s.nfc;
+          row.dataset.name = studentObj.name.toLowerCase();
+          row.dataset.id = studentObj.sid.toLowerCase();
+          row.dataset.course = studentObj.course;
+          row.dataset.year = studentObj.year;
+          row.dataset.section = studentObj.section;
+          row.dataset.enrollment = studentObj.enrollment;
+          row.dataset.nfc = studentObj.nfc;
 
-          // Update Badge
-          const badge = row.querySelector('span[style*="border-radius:6px"]');
+          const badge = row.querySelector('.status-badge') || row.querySelector('span[style*="border-radius:6px"]');
           if (badge) {
-            badge.textContent = s.enrollment.toUpperCase();
-            if (s.enrollment === 'Regular') {
+            badge.textContent = studentObj.enrollment.toUpperCase();
+            if (studentObj.enrollment === 'Regular') {
               badge.style.background = 'rgba(76,175,80,0.15)';
               badge.style.color = '#4caf50';
             } else {
@@ -866,27 +864,25 @@ async function saveStudentUpdate() {
               badge.style.color = '#f44336';
             }
           }
-          // Update Name
           const nameEl = row.querySelector('.prow-name');
-          if (nameEl) nameEl.textContent = s.name;
+          if (nameEl) nameEl.textContent = studentObj.name;
         }
       }
 
-      showMsg('Student record updated successfully', 'success');
       setTimeout(() => closeUpdModal(), 1000);
-      filterStudents(); // Refresh statistics and visibility
+      if (typeof filterStudents === 'function') filterStudents();
+      
+      if (payload.new_nfc_id) curId = payload.new_nfc_id;
     } else {
-      showMsg(d.error || 'Error saving changes', 'error');
+      alert(d.error || 'Update failed');
     }
+  } catch (e) {
+    console.error(e);
+    alert('Network error while saving');
+  } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Update';
-  })
-  .catch(err => {
-    console.error(err);
-    showMsg('Network error', 'error');
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Update';
-  });
+  }
 }
 
 function showMsg(txt, type) {
@@ -976,7 +972,7 @@ function filterStudents(){
     if (crs && rowCourse !== crs) m = false;
     if (yr && rowYear !== yr) m = false;
     if (sec && rowSection !== sec) m = false;
-    if (sem && rowSemester !== sem) m = false;
+    if (sem && !rowSemester.toLowerCase().includes(sem.toLowerCase())) m = false;
     
     if (status === 'regular') {
       if (rowStatus !== 'active' || rowEnrollment !== 'Regular') m = false;
@@ -1192,3 +1188,52 @@ setInterval(() => {
   }
 }, 500);
 
+async function confirmMoveSemester() {
+  const currentSem = document.getElementById('currentSemesterSelect').value;
+  const newSem = document.getElementById('newSemesterSelect').value;
+  const newSY = document.getElementById('newSchoolYear').value.trim();
+
+  if (!newSY) {
+    alert('Please enter a new school year.');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to move students from ${currentSem} to ${newSem} (${newSY})?`)) return;
+
+  const btn = document.querySelector('.semester-modal .btn-primary');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Moving...';
+
+  try {
+    const r = await fetch('/api/students/move-up-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        current_semester: currentSem,
+        new_semester: newSem,
+        new_school_year: newSY
+      })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showAppSuccess(`Successfully moved ${d.count} students!`);
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      alert(d.error || 'Failed to move students');
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Network error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Move Student';
+  }
+}
+
+function closeSemesterModal() {
+  document.getElementById('semesterModal').style.display = 'none';
+}
+
+function moveUpAllStudents() {
+  document.getElementById('semesterModal').style.display = 'flex';
+}

@@ -386,11 +386,8 @@ function renderReviewTable() {
 }
 
 function buildIEFields(s, i) {
-  const courseOpts = [
-    'BS Computer Science', 'BS Information Technology', 'BS Information Systems',
-    'BS Computer Engineering', 'BS Electronics Engineering',
-    'BS Civil Engineering', 'BS Education', 'BS Nursing', 'BS Accountancy', 'BS Business Administration'
-  ].map(c => `<option value="${c}" ${s.course === c ? 'selected' : ''}>${c}</option>`).join('');
+  const courseOpts = ['BS Computer Science', 'BS Information Technology']
+    .map(c => `<option value="${c}" ${s.course === c ? 'selected' : ''}>${c}</option>`).join('');
   const yearOpts = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year']
     .map(y => `<option value="${y}" ${s.year_level === y ? 'selected' : ''}>${y}</option>`).join('');
   const semOpts = ['First', 'Second', 'Summer']
@@ -398,8 +395,12 @@ function buildIEFields(s, i) {
   const secOpts = ['A', 'B', 'C', 'D']
     .map(v => `<option value="${v}" ${s.section === v ? 'selected' : ''}>${v}</option>`).join('');
 
-  // Pre-generate email for the edit field
-  const emailVal = s.email || cvsuEmail(s.name || '');
+  // Use global teachers data if available, else fallback
+  let teacherOpts = '<option value="">— Select —</option>';
+  const adviserList = document.getElementById('f_adviser'); // Single enroll dropdown
+  if (adviserList && adviserList.tagName === 'SELECT') {
+    teacherOpts = adviserList.innerHTML;
+  }
 
   return `
     <div class="ie-field"><label class="ie-label">First Name *</label>
@@ -423,14 +424,14 @@ function buildIEFields(s, i) {
       <select class="ie-input" id="ie_sec_${i}">
         <option value="">—</option>${secOpts}</select></div>
     <div class="ie-field"><label class="ie-label">Email</label>
-      <input class="ie-input" id="ie_email_${i}" value="${esc(emailVal)}" placeholder="sc.first.last@cvsu.edu.ph"/></div>
+      <input class="ie-input" id="ie_email_${i}" value="${esc(s.email || '')}" placeholder="sc.first.last@cvsu.edu.ph"/></div>
     <div class="ie-field"><label class="ie-label">Semester</label>
       <select class="ie-input" id="ie_sem_${i}">
         <option value="">—</option>${semOpts}</select></div>
     <div class="ie-field"><label class="ie-label">School Year</label>
       <input class="ie-input" id="ie_sy_${i}" value="${esc(s.school_year)}" placeholder="2024-2025"/></div>
     <div class="ie-field"><label class="ie-label">Adviser</label>
-      <input class="ie-input" id="ie_adv_${i}" value="${esc(s.adviser)}" placeholder="Prof. Santos"/></div>
+      <select class="ie-input" id="ie_adv_${i}">${teacherOpts}</select></div>
     <div class="ie-field"><label class="ie-label">Contact</label>
       <input class="ie-input" id="ie_contact_${i}" value="${esc(s.contact)}" placeholder="09XX-XXX-XXXX"/></div>
     <div class="ie-field"><label class="ie-label">Major</label>

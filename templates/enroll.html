@@ -131,9 +131,17 @@
             </div>
           </div>
         </div>
-        <div class="field-wrap span-2">
-          <label class="form-label">Student Full Name <span style="color:var(--danger)">*</span></label>
-          <input type="text" class="form-control" name="name" id="f_name" placeholder="e.g. Juan Dela Cruz" required />
+        <div class="field-wrap">
+          <label class="form-label">First Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" class="form-control" name="first_name" id="f_fname" placeholder="Juan" required />
+        </div>
+        <div class="field-wrap">
+          <label class="form-label">Middle Initial</label>
+          <input type="text" class="form-control" name="middle_initial" id="f_mi" placeholder="D." maxlength="2" />
+        </div>
+        <div class="field-wrap">
+          <label class="form-label">Last Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" class="form-control" name="last_name" id="f_lname" placeholder="Dela Cruz" required />
         </div>
         <div class="field-wrap">
           <label class="form-label">Student ID Number <span style="color:var(--danger)">*</span></label>
@@ -193,13 +201,12 @@
         </div>
         <div class="field-wrap span-2">
           <label class="form-label">Adviser Name <span style="color:var(--danger)">*</span></label>
-          <input type="text" class="form-control" name="adviser" id="f_adviser"
-            placeholder="Type or pick a teacher name…" list="adviserList" required autocomplete="off" />
-          <datalist id="adviserList">
+          <select class="form-control" name="adviser" id="f_adviser" required>
+            <option value="" disabled selected>Select adviser…</option>
             {% for u, d in users_db.items() %}{% if d.role in ('teacher','admin') %}
             <option value="{{ d.full_name }}">{{ d.full_name }}</option>
             {% endif %}{% endfor %}
-          </datalist>
+          </select>
         </div>
 
         <div class="fsec" style="margin-top:6px;">// NFC Card</div>

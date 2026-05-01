@@ -1696,13 +1696,18 @@ def db_save_student(s):
     with get_db() as conn:
         conn.execute(
             "INSERT INTO students "
-            "(nfc_id, full_name, student_id, program, year_level, section, "
+            "(nfc_id, full_name, first_name, middle_initial, last_name, "
+            "student_id, program, year_level, section, "
             "adviser, email, contact, major, semester, school_year, "
             "date_registered, raw_name, eth_address, reg_tx_hash, reg_block, "
             "photo_file, enrollment_status, created_at, updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(nfc_id) DO UPDATE SET "
-            "full_name=EXCLUDED.full_name, student_id=EXCLUDED.student_id, "
+            "full_name=EXCLUDED.full_name, "
+            "first_name=EXCLUDED.first_name, "
+            "middle_initial=EXCLUDED.middle_initial, "
+            "last_name=EXCLUDED.last_name, "
+            "student_id=EXCLUDED.student_id, "
             "program=EXCLUDED.program, year_level=EXCLUDED.year_level, "
             "section=EXCLUDED.section, adviser=EXCLUDED.adviser, "
             "email=EXCLUDED.email, contact=EXCLUDED.contact, major=EXCLUDED.major, "
@@ -1714,6 +1719,9 @@ def db_save_student(s):
             (
                 s.get('nfcId', s.get('nfc_id','')),
                 s.get('name',  s.get('full_name','')),
+                s.get('first_name', ''),
+                s.get('middle_initial', ''),
+                s.get('last_name', ''),
                 s.get('student_id',''),
                 s.get('course', s.get('program','')),
                 s.get('year_level',''),
@@ -1723,8 +1731,8 @@ def db_save_student(s):
                 s.get('date_registered',''),
                 s.get('raw_name',''),
                 s.get('address', s.get('eth_address','')),
-                '',  # ALWAYS EMPTY: reg_tx_hash must never be populated for student identity
-                0,   # ALWAYS 0: reg_block must never be populated
+                '',
+                0,
                 s.get('photo_file',''),
                 s.get('enrollment_status', 'Regular'),
                 s.get('created_at', now), now
@@ -4344,6 +4352,9 @@ def api_update_student_profile(nfc_id):
         
         # Extract fields
         full_name = data.get('full_name')
+        first_name = data.get('first_name')
+        middle_initial = data.get('middle_initial')
+        last_name = data.get('last_name')
         student_id = data.get('student_id')
         email = data.get('email')
         contact = data.get('contact')
@@ -4374,11 +4385,13 @@ def api_update_student_profile(nfc_id):
                 # Update with new NFC ID
                 conn.execute("""
                     UPDATE students 
-                    SET nfc_id=?, full_name=?, student_id=?, email=?, contact=?, adviser=?, 
+                    SET nfc_id=?, full_name=?, first_name=?, middle_initial=?, last_name=?,
+                        student_id=?, email=?, contact=?, adviser=?, 
                         major=?, semester=?, school_year=?, date_registered=?, 
                         program=?, year_level=?, section=?, enrollment_status=?
                     WHERE nfc_id=?
-                """, (new_nfc_id, full_name, student_id, email, contact, adviser,
+                """, (new_nfc_id, full_name, first_name, middle_initial, last_name,
+                      student_id, email, contact, adviser,
                       major, semester, school_year, date_registered,
                       course, year_level, section, enrollment_status, nfc_id))
                 
@@ -4389,11 +4402,13 @@ def api_update_student_profile(nfc_id):
                 # Update existing record
                 conn.execute("""
                     UPDATE students 
-                    SET full_name=?, student_id=?, email=?, contact=?, adviser=?, 
+                    SET full_name=?, first_name=?, middle_initial=?, last_name=?,
+                        student_id=?, email=?, contact=?, adviser=?, 
                         major=?, semester=?, school_year=?, date_registered=?, 
                         program=?, year_level=?, section=?, enrollment_status=?
                     WHERE nfc_id=?
-                """, (full_name, student_id, email, contact, adviser,
+                """, (full_name, first_name, middle_initial, last_name,
+                      student_id, email, contact, adviser,
                       major, semester, school_year, date_registered,
                       course, year_level, section, enrollment_status, nfc_id))
         
@@ -4618,8 +4633,12 @@ def api_move_up_all_students():
 def register():
     if request.method == 'POST':
         nfc_id = request.form['nfc_id'].strip().upper()
-        name   = request.form['name'].strip()
         
+        fname = request.form.get('first_name', '').strip()
+        mi = request.form.get('middle_initial', '').strip()
+        lname = request.form.get('last_name', '').strip()
+        name = f"{fname} {mi} {lname}".replace('  ', ' ').strip()
+
         # ── Check for duplicate NFC ID ──────────────────────────────────
         existing_student = db_get_student(nfc_id)
         if existing_student:
@@ -4694,6 +4713,10 @@ def register():
         db_save_student({
             **p,
             'nfcId': nfc_id,
+            'name': name,
+            'first_name': fname,
+            'middle_initial': mi,
+            'last_name': lname,
             'raw_name': on_chain,
             'address': student_address,
             'tx_hash': reg_tx,
@@ -4874,6 +4897,10 @@ def batch_register():
             db_save_student({
                 **p,
                 'nfcId':      nfc_id,
+                'name':       name,
+                'first_name': student.get('first_name', ''),
+                'middle_initial': student.get('middle_initial', ''),
+                'last_name':  student.get('last_name', ''),
                 'raw_name':   on_chain,
                 'address':    '',
                 'tx_hash':    '',

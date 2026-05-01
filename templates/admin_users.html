@@ -312,7 +312,11 @@ function openFaModal(u) {
 
   // ── UPDATE TAB: photo upload + all fields + editable section checkboxes ──
   const roleOpts  = ['teacher','admin'].map(v=>`<option value="${v}" ${u.role===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
-  const stOpts    = ['approved','pending','rejected'].map(v=>`<option value="${v}" ${st===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
+  let stArr = [];
+  if (st === 'pending') stArr = ['pending', 'rejected'];
+  else if (st === 'approved') stArr = ['approved', 'rejected'];
+  else if (st === 'rejected') stArr = ['rejected', 'approved'];
+  const stOpts = stArr.map(v=>`<option value="${v}" ${st===v?'selected':''}>${v==='approved'?'Active':v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
 
   const editPhotoInner = u.photo
     ? `<img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`
@@ -391,10 +395,6 @@ function openFaModal(u) {
       ${isRejected ? `<button class="btn-action-restore" id="btnRestore" onclick="doApprove()"><i class="bi bi-arrow-counterclockwise"></i> Restore Account</button>` : ''}
       ${isApproved ? `<div style="font-size:12px;color:var(--muted);padding:6px 0;">This account is active. Use the <strong>Update</strong> tab to modify details or change status to rejected.</div>` : ''}
       <div id="faActionMsg" style="font-size:12px;display:none;padding:8px 12px;border-radius:8px;"></div>
-      <div style="margin-top:8px;padding-top:12px;border-top:1px solid var(--border);">
-        <div style="font-size:11px;color:var(--danger);font-weight:600;margin-bottom:8px;"><i class="bi bi-exclamation-triangle"></i> Danger Zone</div>
-        <button class="btn-action-delete" id="btnDelete" onclick="doDelete()"><i class="bi bi-trash"></i> Delete Account Permanently</button>
-      </div>
     </div>`;
 
   // Reset to info tab
@@ -476,7 +476,7 @@ function saveFaculty() {
 }
 
 function setActionBtnsDisabled(disabled) {
-  ['btnApprove','btnReject','btnRestore','btnDelete'].forEach(id => { const el=document.getElementById(id); if(el) el.disabled=disabled; });
+  ['btnApprove','btnReject','btnRestore'].forEach(id => { const el=document.getElementById(id); if(el) el.disabled=disabled; });
 }
 function showActionMsg(msg, isError) {
   const el = document.getElementById('faActionMsg');
@@ -506,10 +506,6 @@ function doAction(url, successMsg) {
 }
 function doApprove() { doAction('/admin/approve/' + encodeURIComponent(curFaUser.username), 'Account approved.'); }
 function doReject()  { doAction('/admin/reject/'  + encodeURIComponent(curFaUser.username), 'Account rejected.'); }
-function doDelete()  {
-  if (!confirm('Permanently delete ' + curFaUser.name + '? This cannot be undone.')) return;
-  doAction('/admin/delete/' + encodeURIComponent(curFaUser.username), 'Account deleted.');
-}
 
 function validateFaField(input, errId, rule) {
   const err = document.getElementById(errId);

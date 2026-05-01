@@ -205,7 +205,7 @@ def export_student_sessions_impl(
                     'tap_time': '-' if status.lower() in ('absent', 'excused') else (_fmt_time_hms_ampm(lg['tap_time'] or '') if lg.get('tap_time') else '-'),
                     'time_slot': _normalize_time_slot(lg['time_slot'] or ''),
                     'status': status,
-                    'enrollment_status': st.get('enrollment_status', 'Regular') if st else 'Regular',
+                    'enrollment_status': student.get('enrollment_status', 'Regular') if student else 'Regular',
                     'tx_hash': lg['tx_hash'] or '—',
                     'block': str(lg['block_number']) if lg['block_number'] else '—',
                     'excuse': reason or '—',
@@ -519,6 +519,13 @@ def export_session_attendance_impl(
             present_ids = {nid for nid, lg in att_logs.items() if str(lg.get('status', '')).strip().lower() in ('present', 'late')}
             late_ids = set()
             excused_ids = set()
+
+        tapped_nfc_ids = present_ids | late_ids | excused_ids
+        existing_nfc_ids = {s['nfcId'] for s in enrolled}
+        for s in all_students:
+            if s['nfcId'] in tapped_nfc_ids and s['nfcId'] not in existing_nfc_ids:
+                enrolled.append(s)
+                existing_nfc_ids.add(s['nfcId'])
 
         excuse_details = {}
         with get_db_fn() as _conn:

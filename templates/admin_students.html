@@ -333,34 +333,34 @@
   <!-- Stats Row -->
   <div class="stats-row" id="statsRow">
     <div class="stat-card">
-      <div class="stat-value" id="countActive">0</div>
-      <div class="stat-label">Active Students</div>
+      <div class="stat-value" id="countRegular">0</div>
+      <div class="stat-label">Regular Students</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="countIrregular">0</div>
+      <div class="stat-label">Irregular Students</div>
     </div>
     <div class="stat-card">
       <div class="stat-value" id="countGraduated">0</div>
       <div class="stat-label">Graduated</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value" id="countAlumni">0</div>
-      <div class="stat-label">Alumni</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value" id="countTotal">0</div>
-      <div class="stat-label">Total Students</div>
+      <div class="stat-value" id="countActive">0</div>
+      <div class="stat-label">Total Active Students</div>
     </div>
   </div>
 
   <!-- Status Filter Tabs -->
   <div>
     <div class="status-filter-tabs">
-      <button class="status-tab active" onclick="filterByStatus('active')">
-        <i class="bi bi-person-check"></i> Active
+      <button class="status-tab active" onclick="filterByStatus('regular')">
+        <i class="bi bi-person-check"></i> Regular
+      </button>
+      <button class="status-tab" onclick="filterByStatus('irregular')">
+        <i class="bi bi-person-gear"></i> Irregular
       </button>
       <button class="status-tab" onclick="filterByStatus('graduated')">
-        <i class="bi bi-mortarboard"></i> Graduated
-      </button>
-      <button class="status-tab" onclick="filterByStatus('alumni')">
-        <i class="bi bi-award"></i> Alumni
+        <i class="bi bi-mortarboard"></i> Graduated / Alumni
       </button>
       <button class="status-tab" onclick="filterByStatus('all')">
         <i class="bi bi-people"></i> All Students
@@ -388,27 +388,56 @@
   </div>
 </div>
 
-<!-- Modal: Change Status -->
-<div class="modal-overlay" id="statusModal">
-  <div class="modal-content">
-    <div class="modal-title">Update Student Status</div>
-    <div class="modal-body">
-      <div class="form-group">
-        <div class="form-label">Student</div>
-        <div id="statusModalStudent" style="color: var(--text); font-weight: 600;"></div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">New Status</label>
-        <select class="form-control" id="statusSelect">
+<style>
+.vs-tab { flex: 1; padding: 12px; border: none; background: transparent; color: var(--muted); font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.vs-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.vs-tab:hover:not(.active) { color: var(--text); }
+.mb-3 { margin-bottom: 16px; }
+</style>
+
+<!-- Modal: View Student -->
+<div class="modal-overlay" id="viewStudentModal">
+  <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden;">
+    <div style="padding: 16px 24px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
+      <h3 style="margin: 0; font-size: 18px; color: var(--text);" id="vsTitle">Student Details</h3>
+      <button onclick="closeModal('viewStudentModal')" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted);"><i class="bi bi-x"></i></button>
+    </div>
+    
+    <div style="display: flex; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary);">
+      <button class="vs-tab active" onclick="switchVsTab('info')" id="vsTabInfo">Info</button>
+      <button class="vs-tab" onclick="switchVsTab('update')" id="vsTabUpdate">Update</button>
+    </div>
+
+    <!-- Info Tab -->
+    <div id="vsPaneInfo" class="vs-pane active" style="padding: 24px; max-height: 60vh; overflow-y: auto;">
+      <div id="vsInfoContent"></div>
+    </div>
+
+    <!-- Update Tab -->
+    <div id="vsPaneUpdate" class="vs-pane" style="display: none; padding: 24px; max-height: 60vh; overflow-y: auto;">
+      <div class="form-group mb-3">
+        <label class="form-label">Student Status</label>
+        <select class="form-control" id="vsEditStatus">
           <option value="active">Active</option>
           <option value="graduated">Graduated</option>
           <option value="alumni">Alumni</option>
         </select>
       </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-modal cancel" onclick="closeModal('statusModal')">Cancel</button>
-      <button class="btn-modal confirm" onclick="confirmStatusChange()">Update</button>
+      <div class="form-group mb-3">
+        <label class="form-label">Enrollment Type</label>
+        <select class="form-control" id="vsEditEnrollment">
+          <option value="Regular">Regular</option>
+          <option value="Irregular">Irregular</option>
+        </select>
+      </div>
+      <div class="form-group mb-3">
+        <label class="form-label">Change NFC UID</label>
+        <input type="text" class="form-control" id="vsEditNfc" placeholder="Tap card or enter UID" onkeyup="if(event.key==='Enter') confirmStudentUpdate()"/>
+        <small style="color:var(--muted); font-size: 11px;">Select this field and tap the new card to auto-fill.</small>
+      </div>
+      <div style="margin-top: 20px;">
+        <button class="btn-modal confirm" style="width: 100%; padding: 12px; border-radius: 8px;" onclick="confirmStudentUpdate()">Apply Changes</button>
+      </div>
     </div>
   </div>
 </div>
@@ -453,7 +482,7 @@
 <script>
 let allStudents = [];
 let filteredStudents = [];
-let currentStatusFilter = 'active';
+let currentStatusFilter = 'regular';
 let currentEditStudent = null;
 
 // Load students on page load
@@ -476,14 +505,15 @@ async function loadStudents() {
 }
 
 function updateStats() {
-  const active = allStudents.filter(s => s.student_status === 'active').length;
-  const graduated = allStudents.filter(s => s.student_status === 'graduated').length;
-  const alumni = allStudents.filter(s => s.student_status === 'alumni').length;
+  const activeStudents = allStudents.filter(s => s.student_status === 'active');
+  const regular = activeStudents.filter(s => s.enrollment_status === 'Regular' || !s.enrollment_status).length;
+  const irregular = activeStudents.filter(s => s.enrollment_status === 'Irregular').length;
+  const graduated = allStudents.filter(s => s.student_status === 'graduated' || s.student_status === 'alumni').length;
   
-  document.getElementById('countActive').textContent = active;
+  document.getElementById('countRegular').textContent = regular;
+  document.getElementById('countIrregular').textContent = irregular;
   document.getElementById('countGraduated').textContent = graduated;
-  document.getElementById('countAlumni').textContent = alumni;
-  document.getElementById('countTotal').textContent = allStudents.length;
+  document.getElementById('countActive').textContent = activeStudents.length;
 }
 
 function filterByStatus(status) {
@@ -502,8 +532,12 @@ function filterStudents() {
   let filtered = allStudents;
   
   // Filter by status
-  if (currentStatusFilter !== 'all') {
-    filtered = filtered.filter(s => s.student_status === currentStatusFilter);
+  if (currentStatusFilter === 'regular') {
+    filtered = filtered.filter(s => s.student_status === 'active' && (s.enrollment_status === 'Regular' || !s.enrollment_status));
+  } else if (currentStatusFilter === 'irregular') {
+    filtered = filtered.filter(s => s.student_status === 'active' && s.enrollment_status === 'Irregular');
+  } else if (currentStatusFilter === 'graduated') {
+    filtered = filtered.filter(s => s.student_status === 'graduated' || s.student_status === 'alumni');
   }
   
   // Filter by search term
@@ -533,13 +567,25 @@ function renderStudents() {
     return;
   }
   
-  container.innerHTML = filteredStudents.map(student => `
+  container.innerHTML = filteredStudents.map(student => {
+    const photoHtml = student.photo_file 
+      ? `<img src="/static/uploads/${student.photo_file}?t=${Date.now()}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px;"/>`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--border-color);display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-right:8px;font-size:12px;color:var(--muted);"><i class="bi bi-person"></i></div>`;
+    
+    const isAct = student.student_status === 'active';
+    const isReg = student.enrollment_status === 'Regular' || !student.enrollment_status;
+    const badgeHtml = isAct
+      ? (isReg 
+          ? `<span class="status-badge" style="background:rgba(46,204,113,.1);color:var(--success);">REGULAR</span>`
+          : `<span class="status-badge" style="background:rgba(192,57,43,.1);color:var(--danger);">IRREGULAR</span>`)
+      : `<span class="status-badge badge-${student.student_status}">${student.student_status.toUpperCase()}</span>`;
+
+    return `
     <div class="student-card">
       <div class="student-info">
-        <div class="student-name">
-          <span class="status-badge badge-${student.student_status || 'active'}">
-            ${(student.student_status || 'active').toUpperCase()}
-          </span>
+        <div class="student-name" style="display:flex; align-items:center;">
+          ${badgeHtml}
+          ${photoHtml}
           ${student.full_name}
         </div>
         <div class="student-details">
@@ -553,7 +599,7 @@ function renderStudents() {
           </div>
           <div class="detail-item">
             <i class="bi bi-credit-card"></i>
-            <span>${student.nfcId || 'No card'}</span>
+            <span><code style="font-size:11px;">${student.nfcId || 'No card'}</code></span>
           </div>
           <div class="detail-item">
             <i class="bi bi-calendar"></i>
@@ -563,23 +609,107 @@ function renderStudents() {
       </div>
       <div class="student-actions">
         ${student.student_status === 'active' ? `
-          <button class="btn-semester" onclick="openMoveSemesterModal('${student.nfcId}', '${student.full_name}', '${student.semester}', '${student.school_year}')">
+          <button class="btn-semester" onclick="openMoveSemesterModal('${student.nfcId}', '${student.full_name.replace(/'/g, "\\'")}', '${student.semester}', '${student.school_year}')">
             <i class="bi bi-arrow-right"></i> Next Semester
           </button>
         ` : ''}
-        <button class="btn-status" onclick="openStatusModal('${student.nfcId}', '${student.full_name}', '${student.student_status}')">
-          <i class="bi bi-pencil"></i> Change Status
+        <button class="btn-status" onclick="openViewStudentModal('${student.nfcId}')">
+          <i class="bi bi-eye"></i> View Profile
         </button>
       </div>
     </div>
-  `).join('');
+  `}).join('');
+}
+
+function switchVsTab(tabId) {
+  document.querySelectorAll('.vs-pane').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.vs-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('vsPane' + tabId.charAt(0).toUpperCase() + tabId.slice(1)).style.display = 'block';
+  document.getElementById('vsTab' + tabId.charAt(0).toUpperCase() + tabId.slice(1)).classList.add('active');
+  if (tabId === 'update') {
+    setTimeout(() => document.getElementById('vsEditNfc').focus(), 100);
+  }
+}
+
+function openViewStudentModal(nfcId) {
+  const student = allStudents.find(s => s.nfcId === nfcId);
+  if (!student) return;
+  currentEditStudent = student;
+  document.getElementById('vsTitle').textContent = student.full_name;
+  
+  const photoHtml = student.photo_file 
+    ? `<img src="/static/uploads/${student.photo_file}?t=${Date.now()}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);"/>`
+    : `<div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2ecc71);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:white;">${student.full_name.charAt(0).toUpperCase()}</div>`;
+    
+  document.getElementById('vsInfoContent').innerHTML = `
+    <div style="display:flex; gap: 16px; margin-bottom: 20px;">
+      ${photoHtml}
+      <div>
+        <div style="font-size: 18px; font-weight: 700;">${student.full_name}</div>
+        <div style="font-size: 13px; color: var(--muted);"><code style="background:var(--bg);padding:2px 6px;border-radius:4px;">${student.nfcId}</code></div>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns: 100px 1fr; gap: 8px 12px; font-size: 13px;">
+      <div style="color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">ID No.</div><div>${student.student_id || '—'}</div>
+      <div style="color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Email</div><div>${student.email || '—'}</div>
+      <div style="color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Course</div><div>${student.course || '—'}</div>
+      <div style="color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Yr & Sec</div><div>${student.year_level || '—'} - Section ${student.section || '—'}</div>
+      <div style="color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Semester</div><div>${student.semester || '—'}</div>
+      <div style="color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Sch. Year</div><div>${student.school_year || '—'}</div>
+      <div style="color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Status</div><div>${student.student_status.toUpperCase()}</div>
+      <div style="color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;">Enrollment</div><div>${student.enrollment_status || 'Regular'}</div>
+    </div>
+  `;
+  
+  document.getElementById('vsEditStatus').value = student.student_status || 'active';
+  document.getElementById('vsEditEnrollment').value = student.enrollment_status || 'Regular';
+  document.getElementById('vsEditNfc').value = student.nfcId;
+  
+  switchVsTab('info');
+  document.getElementById('viewStudentModal').classList.add('active');
+}
+
+async function confirmStudentUpdate() {
+  if (!currentEditStudent) return;
+  const newStatus = document.getElementById('vsEditStatus').value;
+  const newEnrollment = document.getElementById('vsEditEnrollment').value;
+  const newNfc = document.getElementById('vsEditNfc').value.trim();
+  
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Applying...';
+  
+  try {
+    const response = await fetch('/api/student/update-profile/' + currentEditStudent.nfcId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        student_status: newStatus,
+        enrollment_status: newEnrollment,
+        new_nfc_id: newNfc
+      })
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to update');
+    }
+    
+    closeModal('viewStudentModal');
+    await loadStudents();
+    showMsg('Student profile updated successfully', 'success');
+  } catch (error) {
+    console.error('Failed to update:', error);
+    showMsg(error.message || 'Failed to update student profile', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Apply Changes';
+  }
 }
 
 function openStatusModal(nfcId, studentName, currentStatus) {
-  currentEditStudent = { nfcId, studentName, currentStatus };
-  document.getElementById('statusModalStudent').textContent = studentName;
-  document.getElementById('statusSelect').value = currentStatus || 'active';
-  document.getElementById('statusModal').classList.add('active');
+  // Kept for backward compatibility if needed, but not used now
+  console.log("Use openViewStudentModal instead");
 }
 
 function openMoveSemesterModal(nfcId, studentName, currentSem, currentYear) {

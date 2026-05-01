@@ -301,6 +301,7 @@ function renderSessModal(sessId, data) {
         <th style="width:32px;">#</th>
         <th>Student Name</th>
         <th>Student ID</th>
+        <th>Student Type</th>
         <th>${classType === 'school_event' ? 'Program-Year-Section' : 'Class Type'}</th>
         <th>Status</th>
         <th>Tapped Time</th>
@@ -330,6 +331,7 @@ function renderSessModal(sessId, data) {
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '—'}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '—'}</td>
+            <td>${st.enrollment_status === 'Irregular' ? '<span style="font-size:9px;background:rgba(192,57,43,.1);color:var(--danger);padding:1px 5px;border-radius:4px;font-weight:700;text-transform:uppercase;border:1px solid rgba(192,57,43,.2);">Irregular</span>' : '<span style="font-size:9px;background:rgba(46,204,113,.1);color:var(--success);padding:1px 5px;border-radius:4px;font-weight:700;text-transform:uppercase;border:1px solid rgba(46,204,113,.2);">Regular</span>'}</td>
             <td>${classType === 'school_event'
               ? `<span style="font-size:11px;color:var(--muted);">${st.section_origin || '—'}</span>`
               : `<span class="att-status st-excused">${classTypeLabel(st.class_type || s.class_type || data.class_type || 'lecture')}</span>`}</td>
@@ -464,6 +466,7 @@ function renderSessModal(sessId, data) {
                 <th>Tapped Time</th>
                 <th>Date</th>
                 <th>Time Slot</th>
+                <th>Transaction No.</th>
                 <th>Excused Reason</th>
                 <th>Document</th>
               </tr></thead>
@@ -484,6 +487,7 @@ function renderSessModal(sessId, data) {
                     <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? parseTapDateTime(s.tap_time).time : '-'}</td>
                     <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${pickHistoryDate(s)}</td>
                     <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || s.tap_time || '')}</td>
+                    <td style="font-family:'Space Mono',monospace;font-size:11px;">${s.tx_hash ? `<a href="https://sepolia.etherscan.io/tx/${s.tx_hash}" target="_blank" style="color:var(--accent);text-decoration:none;" title="View on Etherscan">${s.tx_hash.slice(0, 10)}...</a>` : '<span style="color:var(--muted);">—</span>'}</td>
                     <td style="font-size:11px;">${isExcused && reasonKey ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>` : '<span style="color:var(--muted);">—</span>'}</td>
                     <td>${isExcused ? docHtml : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
                   </tr>`;

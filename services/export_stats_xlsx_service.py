@@ -192,6 +192,7 @@ def export_stats_xlsx_impl(
             'Program',
             'Year',
             'Sec',
+            'Enrollment Type',
             'Subject',
             'Class Type',
             'Session Date',
@@ -203,11 +204,11 @@ def export_stats_xlsx_impl(
             'Excuse Reason',
             'Document',
         ]
-        det_wids = [24, 14, 14, 24, 10, 6, 28, 12, 20, 16, 22, 10, 52, 10, 26, 20]
+        det_wids = [24, 14, 14, 24, 10, 6, 15, 28, 12, 20, 16, 22, 10, 52, 10, 26, 20]
         H['make_header_row'](ws2, dr, det_hdrs, det_wids)
         dr += 1
         for ri, row in enumerate(detail_rows, dr):
-            col_fmt = {12: ('status',), 13: ('tx',), 14: ('num',)}
+            col_fmt = {13: ('status',), 14: ('tx',), 15: ('num',)}
             H['data_row'](ws2, ri, row, alt=(ri % 2 == 0), col_formats=col_fmt)
         ws2.freeze_panes = ws2.cell(row=dr, column=1)
 

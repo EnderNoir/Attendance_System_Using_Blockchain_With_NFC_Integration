@@ -833,9 +833,6 @@ function openTeacherRecord(username){
           : `<input class="upd-input" id="tf_role" value="${u.role.charAt(0).toUpperCase()+u.role.slice(1)}" readonly/>`
         }
       </div>
-      <div class="upd-field"><span class="upd-label">Account Status</span>
-        <input class="upd-input" id="tf_status" value="${u.status.charAt(0).toUpperCase()+u.status.slice(1)}" readonly/>
-      </div>
       <div class="upd-field"><span class="upd-label">Registered</span>
         <input class="upd-input" value="${u.created||'-'}" readonly/>
       </div>
@@ -1007,7 +1004,7 @@ function saveTeacherUpdate(){
   if(pwErr) pwErr.style.display='none';
   const g=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
   const payload={username:curId,full_name:g('tf_name'),new_username:g('tf_username'),
-    email:g('tf_email'),role:(CURRENT_ROLE==='super_admin'?g('tf_role').toLowerCase():''),status:'',new_password:pw||null,
+    email:g('tf_email'),role:(CURRENT_ROLE==='super_admin'?(g('tf_role')||'').toLowerCase():''),new_password:pw||null,
     sections:getSelectedSections()};
   btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass"></i> Saving...';
   fetch('/update_faculty',{method:'POST',credentials:'same-origin',
@@ -1018,11 +1015,11 @@ function saveTeacherUpdate(){
       showAppSuccess('Faculty record updated.');
       const u=teacherData[curId];
       if(u){u.name=payload.full_name||u.name;u.email=payload.email||u.email;
-        u.role=payload.role||u.role;u.status=payload.status||u.status;}
+        u.role=payload.role||u.role;}
       document.getElementById('updTitle').textContent=payload.full_name;
       const nameEl=document.querySelector(`#tcrow_${curId} .prow-name`);
       if(nameEl) nameEl.textContent=payload.full_name;
-      setTimeout(() => closeUpdModal(), 600);
+      setTimeout(() => closeUpdModal(), 500);
     } else { alert(d.error || 'Update failed'); }
     btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
   }).catch(()=>{
@@ -1173,11 +1170,25 @@ async function deleteFacultyAccount(username, fullName) {
     'Cancel'
   );
   if (!ok) return;
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = `/admin/users/${encodeURIComponent(username)}/delete`;
-  document.body.appendChild(form);
-  form.submit();
+  
+  try {
+    const r = await fetch(`/admin/users/${encodeURIComponent(username)}/delete`, {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    // The backend redirects, but fetch follows it. We check if it was successful.
+    if (r.ok) {
+      showAppSuccess('Faculty account deleted successfully.');
+      setTimeout(() => {
+        window.location.href = '/index?tab=faculty';
+      }, 500);
+    } else {
+      alert('Error deleting faculty account.');
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Network error.');
+  }
 }
 
 function applyInitialDashboardTab() {

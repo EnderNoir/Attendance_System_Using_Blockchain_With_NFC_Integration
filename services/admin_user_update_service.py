@@ -74,8 +74,8 @@ def update_faculty_impl(
         return jsonify({'error': 'User not found'}), 404
 
     requester_role = session_obj.get('role', '')
-    if requester_role != 'super_admin':
-        return jsonify({'error': 'Only Super Admin can edit user accounts.'}), 403
+    if requester_role not in ('super_admin', 'admin'):
+        return jsonify({'error': 'Only Admin or Super Admin can edit user accounts.'}), 403
 
     if data.get('full_name'):
         user['full_name'] = data['full_name'].strip()

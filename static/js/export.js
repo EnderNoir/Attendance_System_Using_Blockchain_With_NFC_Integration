@@ -109,6 +109,8 @@ function setLoading(on) {
 async function loadStats(period, extra) {
   setLoading(true);
   const params = new URLSearchParams({ period });
+  const enr = document.getElementById('pickEnrollment')?.value;
+  if (enr) params.append('enrollment_type', enr);
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
       if (v) {

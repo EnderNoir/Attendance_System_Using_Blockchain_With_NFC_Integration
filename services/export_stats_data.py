@@ -244,6 +244,7 @@ def build_stats_export_dataset(
                     st.get('course', ''),
                     st.get('year_level', ''),
                     st.get('section', ''),
+                    st.get('enrollment_status', 'Regular'),
                     subj_lbl,
                     class_type_norm.capitalize(),
                     fmt_time_fn(s['started_at']),

@@ -23,6 +23,7 @@ def attendance_stats_impl(
     f_tod = request_obj.args.get('time_of_day', '').strip()
     f_class_type = request_obj.args.get('class_type', '').strip().lower()
     f_semester = request_obj.args.get('semester', '').strip()
+    f_enrollment = request_obj.args.get('enrollment_type', '').strip()
     role = session_obj.get('role')
     username = session_obj.get('username')
     now = now_local_fn()
@@ -91,6 +92,10 @@ def attendance_stats_impl(
         where.append('s.time_slot = ?')
         params.append(f_tod)
 
+    if f_enrollment:
+        where.append('LOWER(st.enrollment_status) = ?')
+        params.append(f_enrollment.lower())
+
     wsql = ' AND '.join(where)
 
     if period == 'today':
@@ -109,6 +114,7 @@ def attendance_stats_impl(
             "SELECT al.status, COUNT(*) as cnt "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
+            "LEFT JOIN students st ON al.nfc_id = st.nfc_id "
             "WHERE " + wsql + ' GROUP BY al.status',
             tuple(params),
         ).fetchall()
@@ -116,6 +122,7 @@ def attendance_stats_impl(
             "SELECT " + tkey_expr + " as tkey, al.status, COUNT(*) as cnt "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
+            "LEFT JOIN students st ON al.nfc_id = st.nfc_id "
             "WHERE " + wsql + ' GROUP BY tkey, al.status ORDER BY tkey',
             tuple(params),
         ).fetchall()
@@ -123,6 +130,7 @@ def attendance_stats_impl(
             "SELECT s.subject_name, s.course_code, al.status, COUNT(*) as cnt "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
+            "LEFT JOIN students st ON al.nfc_id = st.nfc_id "
             "WHERE " + wsql + ' GROUP BY s.subject_name, s.course_code, al.status',
             tuple(params),
         ).fetchall()

@@ -38,9 +38,10 @@
     <div class="mpane" id="mpane-edit">
       <div id="editContent"></div>
       <div class="upd-footer">
-        <span class="upd-msg" id="updMsg" style="display:none;"></span>
-        <button class="btn-outline" onclick="closeUpdModal()"><i class="bi bi-x"></i> Cancel</button>
-        <button class="btn-primary" id="updSaveBtn" onclick="saveUpdate()"><i class="bi bi-check-circle-fill"></i> Update</button>
+        <button class="btn-cancel" onclick="closeUpdModal()"><i class="bi bi-arrow-left"></i> Back</button>
+        <button class="btn-save" id="updSaveBtn" onclick="curMode==='student'?saveStudentUpdate():saveTeacherUpdate()">
+          <i class="bi bi-check-circle-fill"></i> Update
+        </button>
       </div>
     </div>
 
@@ -441,174 +442,11 @@
     currentUsername: {{ session.get('username','') | tojson }}
   };
   
-  // Alumni/Semester Management Variables
-  let currentStatusFilterMode = 'all';
-  let currentEditStudent = null;
-  
-  // Update statistics
-  function updateStatistics() {
-    const rows = document.querySelectorAll('#studentList .person-row');
-    let activeCount = 0;
-    let graduatedAlumniCount = 0;
-    let totalCount = 0;
-    
-    rows.forEach(row => {
-      const studentStatus = row.getAttribute('data-status') || 'active';
-      totalCount++;
-      if (studentStatus === 'active') {
-        activeCount++;
-      } else if (studentStatus === 'graduated' || studentStatus === 'alumni') {
-        graduatedAlumniCount++;
-      }
-    });
-    
-    document.getElementById('statActive').textContent = activeCount;
-    document.getElementById('statGraduatedAlumni').textContent = graduatedAlumniCount;
-    document.getElementById('statAll').textContent = totalCount;
-  }
-  
-  // Sort students alphabetically by name
-  function sortStudentsAlphabetically() {
-    const container = document.getElementById('studentList');
-    const rows = Array.from(container.querySelectorAll('.person-row'));
-    
-    rows.sort((a, b) => {
-      const nameA = a.getAttribute('data-name') || '';
-      const nameB = b.getAttribute('data-name') || '';
-      return nameA.localeCompare(nameB);
-    });
-    
-    rows.forEach(row => container.appendChild(row));
-  }
-  
-  // Filter students based on all criteria
-  function filterStudents() {
-    const searchTerm = document.getElementById('st_search').value.toLowerCase();
-    const course = document.getElementById('st_course').value;
-    const year = document.getElementById('st_year').value;
-    const section = document.getElementById('st_section').value;
-    const status = document.getElementById('st_status').value;
-    
-    const rows = document.querySelectorAll('#studentList .person-row');
-    let visibleCount = 0;
-    
-    rows.forEach(row => {
-      const name = row.getAttribute('data-name') || '';
-      const id = row.getAttribute('data-id') || '';
-      const rowCourse = row.getAttribute('data-course') || '';
-      const rowYear = row.getAttribute('data-year') || '';
-      const rowSection = row.getAttribute('data-section') || '';
-      const rowStatus = row.getAttribute('data-status') || 'active';
-      
-      let shouldShow = true;
-      
-      // Search filter
-      if (searchTerm && !name.includes(searchTerm) && !id.includes(searchTerm)) {
-        shouldShow = false;
-      }
-      
-      // Course filter
-      if (course && rowCourse !== course) {
-        shouldShow = false;
-      }
-      
-      // Year filter
-      if (year && rowYear !== year) {
-        shouldShow = false;
-      }
-      
-      // Section filter
-      if (section && rowSection !== section) {
-        shouldShow = false;
-      }
-      
-      // Status filter
-      if (status === 'active' && rowStatus !== 'active') {
-        shouldShow = false;
-      } else if (status === 'graduated_alumni' && (rowStatus !== 'graduated' && rowStatus !== 'alumni')) {
-        shouldShow = false;
-      }
-      
-      row.style.display = shouldShow ? '' : 'none';
-      if (shouldShow) visibleCount++;
-    });
-    
-    document.getElementById('st_count').textContent = visibleCount + ' students';
+  // Initialize student list on page load
+  function initializeStudentList() {
+    sortStudentsAlphabetically();
+    filterStudents();
     updateStatistics();
-  }
-  
-  // Move up all students to next semester
-  function moveUpAllStudents() {
-    document.getElementById('moveUpConfirmModal').classList.add('show');
-  }
-  
-  // Close confirmation modal
-  function closeMoveUpConfirmModal() {
-    document.getElementById('moveUpConfirmModal').classList.remove('show');
-  }
-  
-  // Proceed with move up
-  async function proceedMoveUpAllStudents() {
-    closeMoveUpConfirmModal();
-    
-    const btn = event.target;
-    btn.disabled = true;
-    btn.textContent = 'Moving...';
-    
-    try {
-      const response = await fetch('/api/students/move-up-all', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        showMoveUpResult(false, data.message || `Error: HTTP ${response.status}`);
-        throw new Error(`HTTP ${response.status}`);
-      }
-      
-      showMoveUpResult(true, data.message || 'Successfully moved students', data.updated_count);
-      
-      // Reload page to reflect changes
-      setTimeout(() => location.reload(), 2000);
-    } catch (error) {
-      console.error('Failed to move up students:', error);
-      showMoveUpResult(false, error.message || 'Failed to move students to next semester');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Move Up';
-    }
-  }
-  
-  // Show move up result in modal
-  function showMoveUpResult(success, message, count) {
-    const modal = document.getElementById('moveUpResultModal');
-    const icon = document.getElementById('moveUpResultIcon');
-    const titleEl = document.getElementById('moveUpResultTitle');
-    const msgEl = document.getElementById('moveUpResultMessage');
-    const detailsEl = document.getElementById('moveUpResultDetails');
-    
-    if (success) {
-      icon.innerHTML = '<i class="bi bi-check-circle" style="color:#4caf50;"></i>';
-      titleEl.textContent = 'Success!';
-      msgEl.textContent = message;
-      if (count) {
-        detailsEl.innerHTML = `<strong>${count} students</strong> have been advanced to the next semester.<br/>Page will refresh in 2 seconds...`;
-      }
-    } else {
-      icon.innerHTML = '<i class="bi bi-exclamation-circle" style="color:#f44336;"></i>';
-      titleEl.textContent = 'Error';
-      msgEl.textContent = message;
-      detailsEl.innerHTML = 'Please check the server logs for more information.';
-    }
-    
-    modal.classList.add('show');
-  }
-  
-  // Close move up result modal
-  function closeMoveUpResultModal() {
-    document.getElementById('moveUpResultModal').classList.remove('show');
   }
   
   // Initialize student list on page load

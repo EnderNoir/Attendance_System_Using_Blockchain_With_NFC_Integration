@@ -4282,7 +4282,7 @@ def api_get_all_students():
     try:
         with get_db() as conn:
             students = conn.execute(
-                """SELECT nfcId, full_name, student_id, email, 
+                """SELECT nfc_id, full_name, student_id, email, 
                            program as course, year_level, section, photo_file, 
                            enrollment_status, semester, school_year, student_status 
                    FROM students ORDER BY full_name"""
@@ -4376,7 +4376,7 @@ def api_update_student_profile(nfc_id):
                     UPDATE students 
                     SET nfc_id=?, full_name=?, student_id=?, email=?, contact=?, adviser=?, 
                         major=?, semester=?, school_year=?, date_registered=?, 
-                        course=?, year_level=?, section=?, enrollment_status=?
+                        program=?, year_level=?, section=?, enrollment_status=?
                     WHERE nfc_id=?
                 """, (new_nfc_id, full_name, student_id, email, contact, adviser,
                       major, semester, school_year, date_registered,
@@ -4391,7 +4391,7 @@ def api_update_student_profile(nfc_id):
                     UPDATE students 
                     SET full_name=?, student_id=?, email=?, contact=?, adviser=?, 
                         major=?, semester=?, school_year=?, date_registered=?, 
-                        course=?, year_level=?, section=?, enrollment_status=?
+                        program=?, year_level=?, section=?, enrollment_status=?
                     WHERE nfc_id=?
                 """, (full_name, student_id, email, contact, adviser,
                       major, semester, school_year, date_registered,
@@ -4440,8 +4440,8 @@ def api_move_student_semester(nfc_id):
         with get_db() as conn:
             # Get student info
             student = conn.execute(
-                """SELECT full_name, student_id, nfcId, semester, school_year 
-                   FROM students WHERE nfcId=?""",
+                """SELECT full_name, student_id, nfc_id, semester, school_year 
+                   FROM students WHERE nfc_id=?""",
                 (nfc_id,)
             ).fetchone()
             
@@ -4453,7 +4453,7 @@ def api_move_student_semester(nfc_id):
             
             # Update semester and school year
             conn.execute(
-                """UPDATE students SET semester=?, school_year=? WHERE nfcId=?""",
+                """UPDATE students SET semester=?, school_year=? WHERE nfc_id=?""",
                 (new_semester, new_school_year, nfc_id)
             )
             

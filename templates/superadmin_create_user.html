@@ -6,7 +6,7 @@
 {% endblock %}
 {% block content %}
 <div class="sacu-wrap">
-  <a href="{{ url_for('superadmin_users') }}" class="btn-outline sacu-back-link"><i class="bi bi-arrow-left"></i> Back</a>
+  <a href="{{ url_for('dashboard', tab='faculty') }}" class="btn-outline sacu-back-link"><i class="bi bi-arrow-left"></i> Back</a>
   <h2 class="sacu-title">Create New Account</h2>
   <p class="sacu-subtitle">The account will be immediately approved (no pending review).</p>
 
@@ -40,7 +40,7 @@
       <small class="text-muted">Share this temporary password securely and require immediate change after first login.</small>
     </div>
     <div class="sacu-actions">
-      <a href="{{ url_for('superadmin_users') }}" class="btn-outline">Cancel</a>
+      <a href="{{ url_for('dashboard', tab='faculty') }}" class="btn-outline">Cancel</a>
       <button type="submit" class="btn-primary"><i class="bi bi-person-check"></i> Create Account</button>
     </div>
   </form>

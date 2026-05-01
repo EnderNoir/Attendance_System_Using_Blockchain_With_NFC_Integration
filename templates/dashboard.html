@@ -327,7 +327,8 @@
          data-semester="{{ s.semester or '' }}"
          data-status="{{ s.student_status or 'active' }}"
          data-enrollment="{{ s.enrollment_status or 'Regular' }}"
-         style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border-color);">
+         title="show student's name info"
+         style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border-color);cursor:pointer;">
       <div style="flex:1;min-width:0;display:flex;align-items:center;">
         {% set p_file = photos_db.get(s.nfc_id) %}
         <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;margin-right:12px;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;border:1px solid var(--border-color);">
@@ -404,7 +405,10 @@
          data-name="{{ u.full_name|lower }}"
          data-username="{{ username|lower }}"
          data-role="{{ u.role }}"
-         data-status="{{ u.status|default('pending') }}">
+         data-status="{{ u.status|default('pending') }}"
+         onclick="openTeacherRecord('{{ username }}')"
+         title="show teacher's/admin's names' info"
+         style="cursor:pointer;">
       <div style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;">
         {% set photo = photos_db.get(username) %}
         {% if photo %}

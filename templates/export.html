@@ -54,6 +54,14 @@
         <button class="ptab"        onclick="switchPeriod('year',this)">Year</button>
         <button class="ptab"        onclick="switchPeriod('all',this)">All Time</button>
       </div>
+      <!-- Enrollment Type Filter -->
+      <div class="period-picker show" style="margin-left:8px;">
+        <select class="pp-select" id="pickEnrollment" onchange="loadStats(curPeriod)" style="min-width:120px;">
+          <option value="">All Enrollment</option>
+          <option value="Regular">Regular</option>
+          <option value="Irregular">Irregular</option>
+        </select>
+      </div>
       <!-- Month picker -->
       <div class="period-picker" id="monthPicker">
         <select class="pp-select" id="pickMonth" onchange="applyPeriodPick()">

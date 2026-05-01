@@ -114,7 +114,8 @@ function s_autofill(d) {
     f_email: emailVal,
     f_contact: d.contact, f_section: d.section,
     f_adviser: d.adviser, f_major: d.major,
-    f_school_year: d.school_year, f_date_registered: d.date_registered
+    f_school_year: d.school_year, f_date_registered: d.date_registered,
+    f_enrollment_status: d.enrollment_status || 'Regular'
   };
   for (const [id, val] of Object.entries(map)) {
     const el = document.getElementById(id);
@@ -306,7 +307,7 @@ function b_processPDFFiles(files) {
       // ── FIX: ensure email is generated for every student ──────────
       b_students = (data.students || []).map(s => {
         if (!s.email && s.name) s.email = cvsuEmail(s.name);
-        return { ...s, nfc_id: null, _skipped: false };
+        return { ...s, nfc_id: null, _skipped: false, enrollment_status: 'Regular' };
       });
       if (!b_students.length) {
         b_setBanner('error', '❌', 'No student data found', 'Check that the PDFs are CvSU registration forms.');
@@ -341,6 +342,9 @@ function renderReviewTable() {
     const courseHtml = (s.course || '<em style="color:var(--muted)">—</em>') + (missCourse ? '<span class="miss-badge">!</span>' : '');
     const yearSec = [s.year_level, s.section].filter(Boolean).join(' / ') || '<em style="color:var(--muted)">—</em>';
     const emailHtml = s.email || '<em style="color:var(--muted)">—</em>';
+    const statusHtml = s.enrollment_status === 'Irregular' 
+      ? '<span style="color:var(--danger);font-weight:700;font-size:10px;background:rgba(220,53,69,.1);padding:2px 6px;border-radius:4px;text-transform:uppercase;">Irregular</span>'
+      : '<span style="color:var(--success);font-weight:700;font-size:10px;background:rgba(40,167,69,.1);padding:2px 6px;border-radius:4px;text-transform:uppercase;">Regular</span>';
     const file = (s.filename || '').replace(/\.pdf$/i, '');
 
     const mainRow = document.createElement('tr');
@@ -351,7 +355,7 @@ function renderReviewTable() {
       <td>${sidHtml}</td>
       <td>${courseHtml}</td>
       <td>${yearSec}${missYear ? '<span class="miss-badge">!</span>' : ''}</td>
-      <td style="font-size:11px;">${emailHtml}</td>
+      <td>${statusHtml}</td>
       <td style="font-size:11px;color:var(--muted);">${esc(file)}</td>
       <td>
         <button class="btn-edit-row" id="editbtn_${i}" onclick="toggleInlineEdit(${i})">
@@ -419,7 +423,12 @@ function buildIEFields(s, i) {
     <div class="ie-field"><label class="ie-label">Contact</label>
       <input class="ie-input" id="ie_contact_${i}" value="${esc(s.contact)}" placeholder="09XX-XXX-XXXX"/></div>
     <div class="ie-field"><label class="ie-label">Major</label>
-      <input class="ie-input" id="ie_major_${i}" value="${esc(s.major)}" placeholder="N/A"/></div>`;
+      <input class="ie-input" id="ie_major_${i}" value="${esc(s.major)}" placeholder="N/A"/></div>
+    <div class="ie-field"><label class="ie-label">Enrollment Type</label>
+      <select class="ie-input" id="ie_status_${i}">
+        <option value="Regular" ${s.enrollment_status === 'Regular' ? 'selected' : ''}>Regular</option>
+        <option value="Irregular" ${s.enrollment_status === 'Irregular' ? 'selected' : ''}>Irregular</option>
+      </select></div>`;
 }
 
 // Live email update when name is changed in edit row
@@ -455,6 +464,7 @@ function saveInlineEdit(i) {
   s.adviser = g(`ie_adv_${i}`) || s.adviser;
   s.contact = g(`ie_contact_${i}`) || s.contact;
   s.major = g(`ie_major_${i}`) || s.major || 'N/A';
+  s.enrollment_status = g(`ie_status_${i}`) || 'Regular';
   renderReviewTable();
 }
 
@@ -636,6 +646,7 @@ function renderSummary() {
       <td style="font-size:11px;font-family:monospace;">${s.student_id || '—'}</td>
       <td style="font-size:11px;">${s.course || '—'}</td>
       <td style="font-size:11px;">${[s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
+      <td style="font-size:11px;">${s.enrollment_status || 'Regular'}</td>
       <td>${s.nfc_id ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
       <td>${statusHtml}</td>`;
     tbody.appendChild(tr);

@@ -80,6 +80,7 @@ def send_student_attendance_receipt(
     url_for_fn: Optional[Callable] = None,
     semester=None,
     time_slot=None,
+    enrollment_status='Regular',
 ):
     """Send attendance receipt email to student."""
     if not student_email or '@' not in student_email or send_email_fn is None:
@@ -225,6 +226,12 @@ def send_student_attendance_receipt(
                          border-bottom:1px solid #eee;">Time Slot</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
                          border-bottom:1px solid #eee;">{_fmt_slot(time_slot)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Enrollment Type</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{enrollment_status}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;

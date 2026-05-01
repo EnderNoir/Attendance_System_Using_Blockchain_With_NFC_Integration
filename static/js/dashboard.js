@@ -1189,20 +1189,23 @@ setInterval(() => {
 }, 500);
 
 function showAppSuccess(message) {
-  const popup = document.createElement('div');
-  popup.className = 'app-success-popup';
-  popup.innerHTML = `
-    <div class="asp-content">
-      <div class="asp-icon"><i class="bi bi-check-circle-fill"></i></div>
-      <div class="asp-text">${message}</div>
+  // Remove existing modals if any
+  const existing = document.getElementById('successModal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'successModal';
+  modal.className = 'upd-overlay show';
+  modal.style.zIndex = '10001';
+  modal.innerHTML = `
+    <div class="upd-box" style="max-width:400px;text-align:center;padding:32px 24px;">
+      <div style="font-size:48px;color:var(--success);margin-bottom:16px;"><i class="bi bi-check-circle-fill"></i></div>
+      <h3 style="margin-bottom:8px;">Success!</h3>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:24px;">${message}</p>
+      <button class="btn-primary" onclick="this.closest('.upd-overlay').remove()" style="width:100%;padding:10px;">Great</button>
     </div>
   `;
-  document.body.appendChild(popup);
-  setTimeout(() => popup.classList.add('show'), 10);
-  setTimeout(() => {
-    popup.classList.remove('show');
-    setTimeout(() => popup.remove(), 400);
-  }, 3000);
+  document.body.appendChild(modal);
 }
 
 function moveUpAllStudents() {

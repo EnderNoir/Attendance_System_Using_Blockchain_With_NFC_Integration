@@ -135,7 +135,8 @@ def send_student_attendance_receipt(
         student_name, student_email, student_id,
         subject_name, section_key, teacher_name,
         tap_time, status, tx_hash, block_num,
-        sess_id=None, nfc_id=None, semester=None, time_slot=None):
+        sess_id=None, nfc_id=None, semester=None, time_slot=None,
+        enrollment_status='Regular'):
         """Send attendance receipt email to student."""
         _send_student_attendance_receipt_template(
                 student_name=student_name,
@@ -154,6 +155,7 @@ def send_student_attendance_receipt(
                 url_for_fn=url_for,
                 semester=semester,
                 time_slot=time_slot,
+                enrollment_status=enrollment_status,
         )
  
 def send_teacher_session_summary(
@@ -1685,6 +1687,7 @@ def _student_row(row):
     d['address']  = d.get('eth_address', '')
     d['tx_hash']  = d.get('reg_tx_hash', '')
     d['section']  = (d.get('section') or '').strip().upper()
+    d['enrollment_status'] = d.get('enrollment_status', 'Regular')
     return d
 
 def db_save_student(s):
@@ -1695,8 +1698,8 @@ def db_save_student(s):
             "(nfc_id,full_name,student_id,program,year_level,section,"
             " adviser,email,contact,major,semester,school_year,"
             " date_registered,raw_name,eth_address,reg_tx_hash,reg_block,"
-            " photo_file,created_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            " photo_file,enrollment_status,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(nfc_id) DO UPDATE SET "
             "full_name=excluded.full_name, student_id=excluded.student_id, "
             "program=excluded.program, year_level=excluded.year_level, "
@@ -1706,7 +1709,7 @@ def db_save_student(s):
             "date_registered=excluded.date_registered, raw_name=excluded.raw_name, "
             "eth_address=excluded.eth_address, reg_tx_hash=excluded.reg_tx_hash, "
             "reg_block=excluded.reg_block, photo_file=excluded.photo_file, "
-            "updated_at=excluded.updated_at",
+            "enrollment_status=excluded.enrollment_status, updated_at=excluded.updated_at",
             (
                 s.get('nfcId', s.get('nfc_id','')),
                 s.get('name',  s.get('full_name','')),
@@ -1722,6 +1725,7 @@ def db_save_student(s):
                 '',  # ← ALWAYS EMPTY: reg_tx_hash must never be populated for student identity
                 0,   # ← ALWAYS 0: reg_block must never be populated
                 s.get('photo_file',''),
+                s.get('enrollment_status', 'Regular'),
                 s.get('created_at', now), now
             )
         )
@@ -1897,8 +1901,8 @@ def db_save_override(nfc_id, fields):
     with get_db() as conn:
         conn.execute(
             "INSERT INTO student_overrides (nfc_id,full_name,student_id,email,contact,"
-            "adviser,major,semester,school_year,date_registered,course,year_level,section)"
-            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
+            "adviser,major,semester,school_year,date_registered,course,year_level,section,enrollment_status)"
+            " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
             " ON CONFLICT(nfc_id) DO UPDATE SET"
             " full_name=excluded.full_name, student_id=excluded.student_id,"
             " email=excluded.email, contact=excluded.contact,"
@@ -1906,13 +1910,14 @@ def db_save_override(nfc_id, fields):
             " semester=excluded.semester, school_year=excluded.school_year,"
             " date_registered=excluded.date_registered,"
             " course=excluded.course, year_level=excluded.year_level,"
-            " section=excluded.section",
+            " section=excluded.section, enrollment_status=excluded.enrollment_status",
             (nfc_id, fields.get('full_name',''), fields.get('student_id',''),
              fields.get('email',''), fields.get('contact',''),
              fields.get('adviser',''), fields.get('major',''),
              fields.get('semester',''), fields.get('school_year',''),
              fields.get('date_registered',''), fields.get('course',''),
-             fields.get('year_level',''), fields.get('section','').upper())
+             fields.get('year_level',''), (fields.get('section','') or '').upper(),
+             fields.get('enrollment_status', 'Regular'))
         )
 
 # ── Schedule DB helpers ────────────────────────────────────────────────────
@@ -3072,7 +3077,7 @@ def parse_student(raw):
     parts = raw.split(' | ')
     r = {'name':parts[0],'student_id':'','course':'','year_level':'','section':'',
          'adviser':'','email':'','contact':'','semester':'','school_year':'',
-         'date_registered':'','major':''}
+         'date_registered':'','major':'','enrollment_status':'Regular'}
     for p in parts[1:]:
         if   p.startswith('ID:'):       r['student_id']      = p[3:]
         elif p.startswith('Course:'):   r['course']          = p[7:]
@@ -3085,6 +3090,7 @@ def parse_student(raw):
         elif p.startswith('SY:'):       r['school_year']     = p[3:]
         elif p.startswith('RegDate:'): r['date_registered'] = p[8:]
         elif p.startswith('Major:'):    r['major']           = p[6:]
+        elif p.startswith('Type:'):     r['enrollment_status'] = p[5:]
     return r
 
 def get_all_students():
@@ -3775,6 +3781,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                         nfc_id=nid,
                         semester=sess.get('semester'),
                         time_slot=sess.get('time_slot'),
+                        enrollment_status=st.get('enrollment_status', 'Regular'),
                     )
                 except Exception as e:
                     print(f"[EMAIL] Failed absence email for {nid}: {e}")
@@ -3806,6 +3813,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                             nfc_id=nid,
                             semester=sess.get('semester'),
                             time_slot=sess.get('time_slot'),
+                            enrollment_status=st.get('enrollment_status', 'Regular'),
                         )
                 except Exception as e:
                     print(f"[EMAIL] Failed final receipt email for {nid}: {e}")
@@ -3906,7 +3914,9 @@ def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
                 pref_class_type = str(pref_dict.get('class_type', 'lecture') or 'lecture').strip().lower()
 
                 # Normal schedules must match both student's section AND semester.
-                if pref_section == student_key and (not pref_semester or not student_semester or pref_semester == student_semester):
+                # IRREGULAR student bypass: if student is irregular, they can join the preferred session regardless of section/semester match
+                is_irregular = (student.get('enrollment_status') == 'Irregular')
+                if is_irregular or (pref_section == student_key and (not pref_semester or not student_semester or pref_semester == student_semester)):
                     s = _session_row_with_logs(get_db(), pref_row)
                     return pref_row['sess_id'], s
 
@@ -4780,6 +4790,7 @@ def batch_register():
  
             # Parse and save to PostgreSQL
             p = parse_student(on_chain)
+            enroll_status = student.get('enrollment_status', 'Regular')
             student_name_map[nfc_id] = name
             db_save_student({
                 **p,
@@ -4788,6 +4799,7 @@ def batch_register():
                 'address':    '',
                 'tx_hash':    '',
                 'photo_file': student.get('photo_file', ''),
+                'enrollment_status': enroll_status,
             })
             send_student_welcome_email(
                 student_name=name,
@@ -5489,6 +5501,7 @@ def api_session_attendance(sess_id):
                 'reason':     excuse_info.get('reason') or lg.get('excuse_note') or '',
                 'reason_detail': excuse_info.get('reason_detail') or '',
                 'attachment_url': url_for('admin_excuse_attachment', excuse_id=lg.get('excuse_request_id')) if lg.get('excuse_request_id') else '',
+                'enrollment_status': st.get('enrollment_status', 'Regular'),
             }
 
         # Primary approach: use get_all_students() and match by section_key
@@ -5549,6 +5562,7 @@ def api_session_attendance(sess_id):
                 'reason':     '',
                 'reason_detail': '',
                 'attachment_url': '',
+                'enrollment_status': s.get('enrollment_status', 'Regular'),
             }
 
         students_out = sorted(students_map.values(), key=lambda x: (x.get('name') or 'Unknown').lower())
@@ -6190,6 +6204,9 @@ def excuse_student(sess_id):
         status='excused',
         tx_hash=exc_tx,
         block_num=exc_block,
+        semester=sess.get('semester'),
+        time_slot=sess.get('time_slot'),
+        enrollment_status=student.get('enrollment_status', 'Regular')
     )
     
     name = student.get('name', nfc_id)
@@ -6800,6 +6817,7 @@ def mark_pico():
         nfc_id         = nfc_id,
         semester       = sess.get('semester'),
         time_slot      = sess.get('time_slot'),
+        enrollment_status = student_info.get('enrollment_status', 'Regular'),
     )
 
     return jsonify({

@@ -42,6 +42,7 @@ COLUMNS_TO_ADD = [
     ("students", "reg_tx_hash",     "TEXT NOT NULL DEFAULT ''"),
     ("students", "reg_block",       "INTEGER NOT NULL DEFAULT 0"),
     ("students", "photo_file",      "TEXT NOT NULL DEFAULT ''"),
+    ("students", "enrollment_status", "TEXT NOT NULL DEFAULT 'Regular'"),
     ("students", "created_at",      "TEXT NOT NULL DEFAULT ''"),
     ("students", "updated_at",      "TEXT NOT NULL DEFAULT ''"),
 
@@ -74,6 +75,7 @@ COLUMNS_TO_ADD = [
     ('sessions', 'semester',               "TEXT NOT NULL DEFAULT '1st Semester'"),
     ('sessions', 'session_tx_hash',        "TEXT NOT NULL DEFAULT ''"),
     ('sessions', 'session_block_number',   "INTEGER NOT NULL DEFAULT 0"),
+            ("student_overrides", "enrollment_status", "TEXT NOT NULL DEFAULT 'Regular'"),
 ]
 
 # Tables that must exist (created if missing)
@@ -113,7 +115,8 @@ TABLES_TO_CREATE = [
             date_registered TEXT DEFAULT '',
             course          TEXT DEFAULT '',
             year_level      TEXT DEFAULT '',
-            section         TEXT DEFAULT ''
+            section         TEXT DEFAULT '',
+            enrollment_status TEXT DEFAULT 'Regular'
         )"""
     ),
     (

@@ -205,6 +205,7 @@ def export_student_sessions_impl(
                     'tap_time': '-' if status.lower() in ('absent', 'excused') else (_fmt_time_hms_ampm(lg['tap_time'] or '') if lg.get('tap_time') else '-'),
                     'time_slot': _normalize_time_slot(lg['time_slot'] or ''),
                     'status': status,
+                    'enrollment_status': st.get('enrollment_status', 'Regular') if st else 'Regular',
                     'tx_hash': lg['tx_hash'] or '—',
                     'block': str(lg['block_number']) if lg['block_number'] else '—',
                     'excuse': reason or '—',
@@ -235,10 +236,11 @@ def export_student_sessions_impl(
                 'Transaction Number (TX)',
                 'Block Number',
                 'Status',
+                'Enrollment Type',
                 'Excused Reason',
                 'Document',
             ]
-            widths = [4, 12, 28, 12, 24, 16, 16, 20, 56, 12, 12, 28, 22]
+            widths = [4, 12, 28, 12, 24, 16, 16, 20, 56, 12, 12, 16, 28, 22]
         else:
             headers = [
                 '#',
@@ -248,12 +250,14 @@ def export_student_sessions_impl(
                 'Date',
                 'Tapped Time',
                 'Time Slot',
+                'Status',
+                'Enrollment Type',
                 'Excused Reason',
                 'Document',
                 'Transaction Number (TX)',
                 'Block Number',
             ]
-            widths = [4, 12, 30, 12, 16, 16, 20, 30, 22, 56, 12]
+            widths = [4, 12, 30, 12, 16, 16, 20, 12, 16, 30, 22, 56, 12]
         subtitles = [
             'Cavite State University — DAVS Attendance Record',
             f'Student: {stud_name}  |  ID: {sid_}  |  NFC: {nfc_id}',
@@ -285,6 +289,7 @@ def export_student_sessions_impl(
                     row['tx_hash'],
                     row['block'],
                     row['status'],
+                    row['enrollment_status'],
                     row['excuse'],
                     row['document'],
                 ]
@@ -297,6 +302,8 @@ def export_student_sessions_impl(
                     row['date_colon'],
                     row['tap_time'],
                     row['time_slot'],
+                    row['status'],
+                    row['enrollment_status'],
                     row['excuse'],
                     row['document'],
                     row['tx_hash'],
@@ -587,6 +594,7 @@ def export_session_attendance_impl(
                     ]).strip('-') or '—',
                     'year': st.get('year_level', ''),
                     'status': status,
+                    'enrollment_status': st.get('enrollment_status', 'Regular'),
                     'tap_date': '-' if status.lower() in ('absent', 'excused') else _fmt_date_dash(lg.get('tap_time', '') or ''),
                     'tap_time': '-' if status.lower() in ('absent', 'excused') else _fmt_time_hms_ampm(lg.get('tap_time', '') or ''),
                     'tx_hash': lg.get('tx_hash', '') or '—',
@@ -636,12 +644,13 @@ def export_session_attendance_impl(
             'Program-Year-Section',
             'Class Type',
             'Status',
+            'Enrollment Type',
             'Date',
             'Time',
             'Excuse Reason',
             'Document',
         ]
-        widths = [4, 24, 14, 24, 12, 12, 16, 14, 30, 24]
+        widths = [4, 24, 14, 24, 12, 12, 16, 16, 14, 30, 24]
         H['make_header_row'](ws, first_data, headers, widths)
         first_data += 1
         col_fmt = {6: ('status',), 9: ('tx',), 10: ('num',)}
@@ -656,6 +665,7 @@ def export_session_attendance_impl(
                     row['section_origin'],
                     class_type_label,
                     row['status'],
+                    row['enrollment_status'],
                     row['tap_date'],
                     row['tap_time'],
                     row['excuse_reason'],

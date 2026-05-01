@@ -184,6 +184,13 @@
             <option value="D">D</option>
           </select>
         </div>
+        <div class="field-wrap">
+          <label class="form-label">Enrollment Type <span style="color:var(--danger)">*</span></label>
+          <select class="form-control" name="enrollment_status" id="f_enrollment_status" required>
+            <option value="Regular">Regular Student</option>
+            <option value="Irregular">Irregular Student</option>
+          </select>
+        </div>
         <div class="field-wrap span-2">
           <label class="form-label">Adviser Name <span style="color:var(--danger)">*</span></label>
           <input type="text" class="form-control" name="adviser" id="f_adviser"
@@ -280,7 +287,7 @@
               <th>Student ID</th>
               <th>Course</th>
               <th>Year / Sec</th>
-              <th>Email</th>
+              <th>Status</th>
               <th>PDF File</th>
               <th>Actions</th>
             </tr>
@@ -399,6 +406,7 @@
             <th>Student ID</th>
             <th>Course</th>
             <th>Year / Sec</th>
+            <th>Type</th>
             <th>NFC Card</th>
             <th>Status</th>
           </tr>

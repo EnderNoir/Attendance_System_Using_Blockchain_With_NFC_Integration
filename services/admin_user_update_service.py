@@ -6,7 +6,8 @@ def update_student_impl(*, request, datetime_now, get_db, db_save_override, json
 
     fields = [
         'full_name', 'student_id', 'email', 'contact', 'adviser', 'major',
-        'semester', 'school_year', 'date_registered', 'course', 'year_level', 'section'
+        'semester', 'school_year', 'date_registered', 'course', 'year_level', 'section',
+        'enrollment_status'
     ]
     update_data = {f: (data.get(f) or '').strip() for f in fields}
     if update_data.get('section'):
@@ -28,6 +29,7 @@ def update_student_impl(*, request, datetime_now, get_db, db_save_override, json
         'course': 'program',
         'year_level': 'year_level',
         'section': 'section',
+        'enrollment_status': 'enrollment_status',
     }
 
     for field, db_col in db_col_map.items():

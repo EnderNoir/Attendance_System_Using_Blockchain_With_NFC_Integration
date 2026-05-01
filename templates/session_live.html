@@ -298,7 +298,12 @@
       <div class="student-row" data-enroll-name="{{ s.name|lower }}">
         <div class="student-avatar av-gray">{{ s.name[0].upper() if s.name else '?' }}</div>
         <div class="student-info">
-          <div class="student-name">{{ s.name }}</div>
+          <div class="student-name">
+            {{ s.name }}
+            {% if s.enrollment_status == 'Irregular' %}
+            <span style="font-size:9px;background:rgba(192,57,43,.1);color:var(--danger);padding:1px 5px;border-radius:4px;margin-left:4px;font-weight:700;text-transform:uppercase;vertical-align:middle;border:1px solid rgba(192,57,43,.2);">Irregular</span>
+            {% endif %}
+          </div>
           <div class="student-sub"><code>{{ s.student_id or s.nfcId }}</code></div>
           <div class="student-reason" id="ereason_{{ s.nfcId }}"
             style="font-size:11px;color:var(--warning);margin-top:2px;display:{% if s.status == 'excused' %}block{% else %}none{% endif %};">
@@ -350,7 +355,12 @@
           {% elif s.status == 'absent' %}av-red
           {% else %}av-gray{% endif %}" id="savt_{{ s.nfcId }}">{{ s.name[0].upper() if s.name else '?' }}</div>
         <div class="student-info">
-          <div class="student-name">{{ s.name }}</div>
+          <div class="student-name">
+            {{ s.name }}
+            {% if s.enrollment_status == 'Irregular' %}
+            <span style="font-size:9px;background:rgba(192,57,43,.1);color:var(--danger);padding:1px 5px;border-radius:4px;margin-left:4px;font-weight:700;text-transform:uppercase;vertical-align:middle;border:1px solid rgba(192,57,43,.2);">Irregular</span>
+            {% endif %}
+          </div>
           <div class="student-sub"><code>{{ s.student_id or s.nfcId }}</code></div>
           <div class="student-reason" id="sreason_{{ s.nfcId }}"
             style="font-size:11px;color:var(--warning);margin-top:2px;display:{% if s.status == 'excused' %}block{% else %}none{% endif %};">

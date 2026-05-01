@@ -41,7 +41,7 @@
           <div class="pm-avatar-block">
             <div id="pmInfoAvatarWrap"
               style="width:72px;height:72px;margin:0 auto;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;border:3px solid var(--accent);">
-              {{ session.get('full_name','?')[0].upper() }}</div>
+              {{ (session.get('full_name') or '?')[0].upper() }}</div>
             <div class="pm-display-name" id="pmDisplayName">{{ session.get('full_name','') }}</div>
             <div class="pm-display-sub">System Administrator · CvSU Silang DAVS</div>
           </div>
@@ -62,7 +62,7 @@
           <div class="pm-photo-block">
             <div id="pmEditAvatarWrap"
               style="width:58px;height:58px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
-              {{ session.get('full_name','?')[0].upper() }}</div>
+              {{ (session.get('full_name') or '?')[0].upper() }}</div>
             <div>
               <div
                 style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
@@ -156,7 +156,7 @@
           <div class="pm-avatar-block">
             <div id="tpmInfoAvatarWrap"
               style="width:72px;height:72px;margin:0 auto;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;border:3px solid var(--accent);">
-              {{ session.get('full_name','?')[0].upper() }}</div>
+              {{ (session.get('full_name') or '?')[0].upper() }}</div>
             <div class="pm-display-name" id="tpmDisplayName">{{ session.get('full_name','') }}</div>
             <div class="pm-display-sub">Faculty · CvSU Silang DAVS</div>
           </div>
@@ -179,7 +179,7 @@
           <div class="pm-photo-block">
             <div id="tpmEditAvatarWrap"
               style="width:58px;height:58px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
-              {{ session.get('full_name','?')[0].upper() }}</div>
+              {{ (session.get('full_name') or '?')[0].upper() }}</div>
             <div>
               <div
                 style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
@@ -321,7 +321,7 @@
            if(r==='admin'||r==='super_admin'){openPM();}
            else if(r==='teacher'){openTPM();}
          })()" title="Edit your profile">
-        <div class="s-avatar-init" id="sidebarAvatarWrap">{{ session.get('full_name','?')[0].upper() }}</div>
+        <div class="s-avatar-init" id="sidebarAvatarWrap">{{ (session.get('full_name') or '?')[0].upper() }}</div>
         <div style="min-width:0;flex:1;overflow:hidden;">
           <div class="u-name" id="sidebarName">{{ session.get('full_name','') }}</div>
           <div class="u-role">{{ session.get('role','') }} <i class="bi bi-pencil"

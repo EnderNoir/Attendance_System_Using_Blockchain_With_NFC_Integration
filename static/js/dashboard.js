@@ -757,38 +757,40 @@ function saveUpdate(){
   else if(curMode==='teacher') saveTeacherUpdate();
 }
 
-function saveStudentUpdate(){
-  const msg=document.getElementById('updMsg');
-  const btn=document.getElementById('updSaveBtn');
-  const g=id=>{const el=document.getElementById(id);return el?el.value.trim():'';};
-  const payload={
-    nfc_id:curId,
-    full_name:g('uf_name'), student_id:g('uf_sid'),
-    email:g('uf_email'), contact:g('uf_contact'),
-    adviser:g('uf_adviser'), major:g('uf_major')||'N/A',
-    semester:g('uf_semester'), school_year:g('uf_sy'),
-    date_registered:g('uf_datereg'),
-    course:g('uf_course'), year_level:g('uf_year'), section:g('uf_section'),
+function saveStudentUpdate() {
+  const btn = document.getElementById('updSaveBtn');
+  const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  
+  const payload = {
+    full_name: g('uf_name'),
+    student_id: g('uf_sid'),
+    email: g('uf_email'),
+    contact: g('uf_contact'),
+    adviser: g('uf_adviser'),
+    major: g('uf_major') || 'N/A',
+    semester: g('uf_semester'),
+    school_year: g('uf_sy'),
+    date_registered: g('uf_datereg'),
+    course: g('uf_course'),
+    year_level: g('uf_year'),
+    section: g('uf_section'),
+    enrollment_status: g('uf_enrollment'),
+    new_nfc_id: document.getElementById('vsNewNfcId')?.value.trim() || ''
   };
-  btn.disabled=true; btn.innerHTML='<i class="bi bi-hourglass"></i> Saving...';
-  fetch('/update_student',{method:'POST',credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-  .then(r=>r.json()).then(d=>{
-    msg.style.display='block';
-    if(d.ok){
-      msg.style.color='var(--success)'; msg.textContent='Student information updated.';
-      const s=studentData.find(x=>x.nfc===curId);
-      if(s){ Object.assign(s,{name:payload.full_name||s.name,sid:payload.student_id||s.sid,
-        email:payload.email||s.email,contact:payload.contact||s.contact,
-        adviser:payload.adviser||s.adviser,major:payload.major||s.major,
-        semester:payload.semester||s.semester,sy:payload.school_year||s.sy,
-        datereg:payload.date_registered||s.datereg,course:payload.course||s.course,
-        year:payload.year_level||s.year,section:payload.section||s.section});
-  fetch('/api/student/update-profile/' + curId, {method:'POST',credentials:'same-origin',
-    headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-  .then(r=>r.json()).then(d=>{
-    if(d.ok){
-      // Update local data
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass"></i> Saving...';
+
+  fetch('/api/student/update-profile/' + curId, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      // Update local studentData array
       const s = studentData.find(x => x.nfc === curId);
       if (s) {
         Object.assign(s, {
@@ -800,8 +802,8 @@ function saveStudentUpdate(){
           enrollment: payload.enrollment_status,
           nfc: payload.new_nfc_id || curId
         });
-        
-        // Update DOM row
+
+        // Update DOM row attributes and text
         const row = document.getElementById(`strow_${s.idx}`);
         if (row) {
           row.dataset.name = s.name.toLowerCase();
@@ -811,7 +813,8 @@ function saveStudentUpdate(){
           row.dataset.section = s.section;
           row.dataset.enrollment = s.enrollment;
           row.dataset.nfc = s.nfc;
-          
+
+          // Update Badge
           const badge = row.querySelector('span[style*="border-radius:6px"]');
           if (badge) {
             badge.textContent = s.enrollment.toUpperCase();
@@ -823,22 +826,26 @@ function saveStudentUpdate(){
               badge.style.color = '#f44336';
             }
           }
+          // Update Name
           const nameEl = row.querySelector('.prow-name');
           if (nameEl) nameEl.textContent = s.name;
         }
       }
-      
+
       showMsg('Student record updated successfully', 'success');
       setTimeout(() => closeUpdModal(), 1000);
-      filterStudents(); // Refresh view
-    } else { 
+      filterStudents(); // Refresh statistics and visibility
+    } else {
       showMsg(d.error || 'Error saving changes', 'error');
     }
-    btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
-  }).catch(err=>{
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Update';
+  })
+  .catch(err => {
     console.error(err);
     showMsg('Network error', 'error');
-    btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Update';
   });
 }
 
@@ -889,6 +896,20 @@ function saveTeacherUpdate(){
 
 // FIX 4: NO DOMContentLoaded guard - switchMTab handles this now
 // (the old guard with allSessions.length===0 has been removed)
+
+function sortStudentsAlphabetically() {
+  const container = document.getElementById('studentList');
+  if (!container) return;
+  const rows = Array.from(container.querySelectorAll('.person-row'));
+  
+  rows.sort((a, b) => {
+    const nameA = a.getAttribute('data-name') || '';
+    const nameB = b.getAttribute('data-name') || '';
+    return nameA.localeCompare(nameB);
+  });
+  
+  rows.forEach(row => container.appendChild(row));
+}
 
 const totalSt=studentData.length;
 function filterStudents(){

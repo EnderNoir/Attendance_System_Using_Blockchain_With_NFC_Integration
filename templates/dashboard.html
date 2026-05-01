@@ -433,6 +433,7 @@
 
 {% endblock %}
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=1.1"></script>
 <script>
   window.DASHBOARD_BOOTSTRAP = {
     students: {{ students | tojson }},
@@ -441,7 +442,6 @@
     currentRole: {{ session.get('role','') | tojson }},
     currentUsername: {{ session.get('username','') | tojson }}
   };
-  
   // Initialize student list on page load
   function initializeStudentList() {
     sortStudentsAlphabetically();
@@ -449,83 +449,9 @@
     updateStatistics();
   }
   
-  // Initialize student list on page load
-  function initializeStudentList() {
-    sortStudentsAlphabetically();
-    filterStudents();
-    updateStatistics();
-  }
-  
-  // Sort students alphabetically by name
-  function sortStudentsAlphabetically() {
-    const container = document.getElementById('studentList');
-    const rows = Array.from(container.querySelectorAll('.person-row'));
-    
-    rows.sort((a, b) => {
-      const nameA = a.getAttribute('data-name') || '';
-      const nameB = b.getAttribute('data-name') || '';
-      return nameA.localeCompare(nameB);
-    });
-    
-    rows.forEach(row => container.appendChild(row));
-  }
-  
-  // Filter students based on all criteria
-  function filterStudents() {
-    const searchTerm = document.getElementById('st_search').value.toLowerCase();
-    const course = document.getElementById('st_course').value;
-    const year = document.getElementById('st_year').value;
-    const section = document.getElementById('st_section').value;
-    const status = document.getElementById('st_status').value;
-    
-    const rows = document.querySelectorAll('#studentList .person-row');
-    let visibleCount = 0;
-    
-    rows.forEach(row => {
-      const name = row.getAttribute('data-name') || '';
-      const id = row.getAttribute('data-id') || '';
-      const rowCourse = row.getAttribute('data-course') || '';
-      const rowYear = row.getAttribute('data-year') || '';
-      const rowSection = row.getAttribute('data-section') || '';
-      const rowStatus = row.getAttribute('data-status') || 'active';
-      
-      let shouldShow = true;
-      
-      // Search filter
-      if (searchTerm && !name.includes(searchTerm) && !id.includes(searchTerm)) {
-        shouldShow = false;
-      }
-      
-      // Course filter
-      if (course && rowCourse !== course) {
-        shouldShow = false;
-      }
-      
-      // Year filter
-      if (year && rowYear !== year) {
-        shouldShow = false;
-      }
-      
-      // Section filter
-      if (section && rowSection !== section) {
-        shouldShow = false;
-      }
-      
-      // Status filter
-      if (status === 'active' && rowStatus !== 'active') {
-        shouldShow = false;
-      } else if (status === 'graduated_alumni' && (rowStatus !== 'graduated' && rowStatus !== 'alumni')) {
-        shouldShow = false;
-      }
-      
-      row.style.display = shouldShow ? '' : 'none';
-      if (shouldShow) visibleCount++;
-    });
-    
-    document.getElementById('st_count').textContent = visibleCount + ' students';
-    updateStatistics();
-  }
-  
+  // Alumni/Semester Management Variables
+  let currentEditStudent = null;
+
   // Open status change modal
   function openStatusModal(nfcId, studentName, currentStatus) {
     currentEditStudent = { nfcId, studentName, currentStatus };
@@ -589,11 +515,9 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       
       closeStatusModal();
-      // Reload page to reflect changes
       location.reload();
     } catch (error) {
       console.error('Failed to update status:', error);
-      showMsg('Failed to update status', 'error');
     } finally {
       btn.disabled = false;
       btn.textContent = 'Update Status';
@@ -603,14 +527,9 @@
   // Confirm semester move
   async function confirmMoveSemester() {
     if (!currentEditStudent) return;
-    
     const newSem = document.getElementById('newSemesterSelect').value;
     const newYear = document.getElementById('newSchoolYear').value;
-    
-    if (!newYear || !newYear.match(/^\d{4}-\d{4}$/)) {
-      showMsg('Invalid school year format (use YYYY-YYYY)', 'warning');
-      return;
-    }
+    if (!newYear || !newYear.match(/^\d{4}-\d{4}$/)) return;
     
     const btn = event.target;
     btn.disabled = true;
@@ -620,20 +539,15 @@
       const response = await fetch(`/api/student/move-semester/${currentEditStudent.nfcId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          new_semester: newSem,
-          new_school_year: newYear
-        })
+        body: JSON.stringify({ new_semester: newSem, new_school_year: newYear })
       });
       
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       
       closeSemesterModal();
-      // Reload page to reflect changes
       location.reload();
     } catch (error) {
       console.error('Failed to move semester:', error);
-      showMsg('Failed to move to next semester', 'error');
     } finally {
       btn.disabled = false;
       btn.textContent = 'Move Student';
@@ -642,12 +556,8 @@
   
   // Close modal when clicking overlay
   document.addEventListener('click', (e) => {
-    if (e.target.id === 'statusModal') {
-      closeStatusModal();
-    }
-    if (e.target.id === 'semesterModal') {
-      closeSemesterModal();
-    }
+    if (e.target.id === 'statusModal') closeStatusModal();
+    if (e.target.id === 'semesterModal') closeSemesterModal();
   });
   
   // Add event listeners to filters
@@ -657,11 +567,7 @@
   document.getElementById('st_section')?.addEventListener('change', filterStudents);
   document.getElementById('st_status')?.addEventListener('change', filterStudents);
   
-  // Initialize on page load
-  window.addEventListener('load', () => {
-    initializeStudentList();
-  });
+  window.addEventListener('load', initializeStudentList);
 </script>
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=1.1"></script>
 {% endblock %}
 

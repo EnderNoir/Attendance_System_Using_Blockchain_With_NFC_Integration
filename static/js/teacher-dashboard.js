@@ -261,7 +261,7 @@ async function applyFilters() {
   try {
     const r = await fetch('/api/attendance/stats?' + params.toString(), { credentials: 'same-origin' });
     const d = await r.json();
-    renderAll(d, subj, sec, tod);
+    renderAll(d, subj, sec, sem);
   } catch (e) {
     console.error(e);
   }
@@ -326,7 +326,7 @@ function exportDashboard() {
 }
 
 // Render all charts with data from API
-function renderAll(data, subj, sec, tod) {
+function renderAll(data, subj, sec, sem) {
   const d = data.donut;
   const total = d.present + d.late + d.absent + d.excused;
   const pct = (v) => (total ? Math.round((v / total) * 100) + '%' : '0%');
@@ -341,7 +341,7 @@ function renderAll(data, subj, sec, tod) {
   const parts = [];
   if (subj) parts.push('Subject: ' + subj);
   if (sec) parts.push('Section: ' + sec.split('|').pop());
-  if (tod) parts.push('Semester: ' + tod);
+  if (sem) parts.push('Semester: ' + sem);
   document.getElementById('sb_main').textContent = (periods[curPeriod] || curPeriod) + (parts.length ? ' — Filtered' : '');
   document.getElementById('sb_sub').textContent = parts.length ? parts.join(' · ') : 'Showing all your sessions';
   document.getElementById('showingBar').style.display = 'flex';

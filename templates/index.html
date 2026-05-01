@@ -43,7 +43,7 @@
   <div class="ap-head" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--border);">
     <div>
       <h2>Attendance Analytics</h2>
-      <p id="showingSub">Select a period and optional filters, then click <strong>Apply Filters</strong>.</p>
+      <p id="showingSub">Analytics update automatically based on your filter selection.</p>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <span style="font-size:11px;color:var(--muted);" id="sessionCountNum_label">— sessions</span>
@@ -238,7 +238,6 @@
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
-        <button class="btn-apply" onclick="applyFilters()"><i class="bi bi-search"></i> Apply Filters</button>
         <button class="btn-reset-f" onclick="resetFilters()"><i class="bi bi-x-circle"></i> Clear Filters</button>
         <span style="font-size:11px;color:var(--muted);" id="activeFilterBadge"></span>
       </div>
@@ -248,7 +247,7 @@
     <div>
       <div class="showing-bar" style="margin-bottom:14px;">
         <div>
-          <div class="sb-title" id="showingMain">Click "Apply Filters" to load data</div>
+          <div class="sb-title" id="showingMain">Dashboard Analytics</div>
           <div class="sb-sub" id="showingDetail">Choose a time period above, then apply.</div>
         </div>
         <div>

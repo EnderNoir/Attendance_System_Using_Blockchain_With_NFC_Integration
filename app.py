@@ -6423,10 +6423,13 @@ def poll_session(sess_id):
                 ts = datetime.strptime(row['created_at'], '%Y-%m-%d %H:%M:%S').timestamp()
             except Exception:
                 ts = since + 1
+            # Get enrollment status for each tap
+            st_cached = get_student_by_nfc_cached(row['nfc_id']) or {}
             new_taps.append({
                 'nfc_id':     row['nfc_id'],
                 'name':       row['student_name'],
                 'student_id': row['student_id'],
+                'enrollment_status': st_cached.get('enrollment_status', 'Regular'),
                 'time':       row['tap_time'],
                 'timestamp':  ts,
                 'tx_hash':    row['tx_hash'],
@@ -6912,6 +6915,7 @@ def mark_pico():
 
     return jsonify({
         'status':'ok','name':name,'student_id':student_id,
+        'enrollment_status': student_info.get('enrollment_status', 'Regular'),
         'time':tap_time,'subject':sess.get('subject_name',''),
         'tx_hash':tx_hash,'block':block_num,
         'attendance_status': status_label,

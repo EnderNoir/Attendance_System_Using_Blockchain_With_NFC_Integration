@@ -103,15 +103,54 @@ if (tapModalOverlay) {
 }
 
 // ── Status update (used by both HID handler and poll) ─────────────────────
-function updateStudentStatus(nfc_id, status, reason = '') {
-  const row = document.getElementById('srow_' + nfc_id);
+function updateStudentStatus(nfc_id, status, reason = '', extra = {}) {
+  let row = document.getElementById('srow_' + nfc_id);
+  if (!row && (status === 'present' || status === 'late') && extra.name) {
+    const list = document.getElementById('statusList');
+    if (list) {
+      const emptyMsg = list.querySelector('div[style*="text-align:center"]');
+      if (emptyMsg) emptyMsg.remove();
+
+      row = document.createElement('div');
+      row.className = 'student-row slide-in';
+      row.id = 'srow_' + nfc_id;
+      row.dataset.nfc = nfc_id;
+      row.dataset.status = status;
+      row.dataset.statusName = extra.name.toLowerCase();
+      
+      const enrollStatus = extra.enrollment_status || 'Regular';
+      const badgeColor = enrollStatus === 'Irregular' ? 'rgba(192,57,43,.1)' : 'rgba(46,204,113,.1)';
+      const badgeText = enrollStatus === 'Irregular' ? 'var(--danger)' : 'var(--success)';
+      const badgeBorder = enrollStatus === 'Irregular' ? 'rgba(192,57,43,.2)' : 'rgba(46,204,113,.2)';
+
+      row.innerHTML = `
+        <div class="student-avatar av-gray" id="savt_${nfc_id}">${(extra.name[0] || '?').toUpperCase()}</div>
+        <div class="student-info">
+          <div class="student-name">
+            ${extra.name}
+            <span style="font-size:9px;background:${badgeColor};color:${badgeText};padding:1px 5px;border-radius:4px;margin-left:4px;font-weight:700;text-transform:uppercase;vertical-align:middle;border:1px solid ${badgeBorder};">${enrollStatus}</span>
+          </div>
+          <div class="student-sub"><code>${extra.student_id || nfc_id}</code></div>
+          <div class="student-reason" id="sreason_${nfc_id}" style="font-size:11px;color:var(--warning);margin-top:2px;display:none;"></div>
+        </div>
+        <span class="status-badge sb-unknown" id="sbadge_${nfc_id}">— Unknown</span>
+        ${(!IS_SCHOOL_EVENT) ? `
+        <button class="btn-excuse" id="sexc_${nfc_id}" onclick="openExcuse('${nfc_id}','${extra.name.replace(/'/g, "\\'")}')" title="Mark as Excused">
+          <i class="bi bi-journal-check"></i> Excuse
+        </button>` : ''}
+      `;
+      list.appendChild(row);
+    }
+  }
+  
+  if (!row) return;
+  row.dataset.status = status;
   const badge = document.getElementById('sbadge_' + nfc_id);
   const avt = document.getElementById('savt_' + nfc_id);
   const excBtn = document.getElementById('sexc_' + nfc_id);
   const reasEl = document.getElementById('sreason_' + nfc_id);
   const ereasEl = document.getElementById('ereason_' + nfc_id);
-  if (!row) return;
-  row.dataset.status = status;
+
   const map = {
     'present': { avCls: 'av-green', badgeCls: 'sb-present', label: '✔ Present' },
     'late': { avCls: 'av-yellow', badgeCls: 'sb-late', label: '⏱ Late' },
@@ -206,7 +245,11 @@ async function processNFCUid(uid) {
       const color = isLate ? 'warning' : 'active';
       const icon = isLate ? '⏱' : '✔';
       updateNFCStrip(uid, color, `${label} — ${data.name || uid}`, icon);
-      updateStudentStatus(uid, isLate ? 'late' : 'present');
+      updateStudentStatus(uid, isLate ? 'late' : 'present', '', {
+        name: data.name,
+        student_id: data.student_id,
+        enrollment_status: data.enrollment_status
+      });
       updateCounts();
       if (consumePopupGate()) {
         showModal(isLate ? 'late' : 'present', data.name, data.student_id, '', data.time);
@@ -408,7 +451,11 @@ async function poll() {
         shownTaps.add(tapKey);
         gotNew = true;
         const isLate = !IS_SCHOOL_EVENT && (data.late_ids || []).includes(tap.nfc_id);
-        updateStudentStatus(tap.nfc_id, isLate ? 'late' : 'present');
+        updateStudentStatus(tap.nfc_id, isLate ? 'late' : 'present', '', {
+          name: tap.name,
+          student_id: tap.student_id,
+          enrollment_status: tap.enrollment_status
+        });
         if (tap.timestamp && tap.timestamp > lastTimestamp)
           lastTimestamp = tap.timestamp + 0.001;
       });

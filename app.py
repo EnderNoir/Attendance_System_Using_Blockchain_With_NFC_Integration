@@ -3621,6 +3621,14 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
         and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
     ]
     
+    # Add irregular students who tapped in but aren't in the official section list
+    tapped_nfc_ids = set(sess.get('present', [])) | set(sess.get('late', [])) | set(sess.get('excused', []))
+    existing_nfc_ids = {s['nfcId'] for s in section_students}
+    for s in all_students_list:
+        if s['nfcId'] in tapped_nfc_ids and s['nfcId'] not in existing_nfc_ids:
+            section_students.append(s)
+            existing_nfc_ids.add(s['nfcId'])
+    
     if not section_students:
         print(f"[DEBUG] _finalize_session {sess_id}: NO STUDENTS FOUND for section='{section_key}', sem='{sess_semester}'")
         # Log a sample student to see why it doesn't match
@@ -3827,6 +3835,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                             'tap_time': lg.get('tap_time', '—') if lg else '—',
                             'tx_hash': lg.get('tx_hash', '') if lg else '',
                             'block_num': lg.get('block_number', '') if lg else '',
+                            'enrollment_status': st.get('enrollment_status', 'Regular'),
                         })
                     
                     # Reload session to get the latest TX hash/block

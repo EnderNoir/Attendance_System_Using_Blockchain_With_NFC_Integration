@@ -322,6 +322,11 @@ def send_teacher_session_summary(
             {st.get("name", "—")}
             <div style="font-size:10px;color:#999;">{st.get("student_id", "")}</div>
           </td>
+          <td style="padding:7px 10px;font-size:11px;color:#666;border-bottom:1px solid #eee;">
+             <span style="font-size:10px;font-weight:700;color:{'#C0392B' if st.get('enrollment_status','Regular')=='Irregular' else '#2D6A27'};">
+               {st.get('enrollment_status', 'Regular')}
+             </span>
+          </td>
           <td style="padding:7px 10px;font-size:11px;color:#666;
                      border-bottom:1px solid #eee;white-space:nowrap;">
              {"-" if st.get("status", "absent").lower() in ("absent", "excused") else _fmt_time(st.get("tap_time", "-"))}
@@ -472,6 +477,8 @@ def send_teacher_session_summary(
               <tr style="background:#1E4A1A;">
                 <th style="padding:9px 10px;font-size:11px;color:#fff;
                            text-align:left;font-weight:600;">Student</th>
+                <th style="padding:9px 10px;font-size:11px;color:#fff;
+                           text-align:left;font-weight:600;">Enrollment</th>
                 <th style="padding:9px 10px;font-size:11px;color:#fff;
                            text-align:left;font-weight:600;">Tap Time</th>
                 <th style="padding:9px 10px;font-size:11px;color:#fff;

@@ -1,4 +1,4 @@
-﻿/* Dashboard page styles: extracted from template for maintainability. */
+/* Dashboard page styles: extracted from template for maintainability. */
 
 /* Tabs */
 .tab-row{display:flex;gap:4px;margin-bottom:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:4px;}
@@ -134,3 +134,33 @@
   .modal-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
   .mtab{flex:0 0 auto;padding:10px 12px;}
 }
+/* Success Popup */
+.app-success-popup {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  z-index: 10000;
+  transform: translateX(120%);
+  transition: transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+.app-success-popup.show { transform: translateX(0); }
+.asp-content { display: flex; align-items: center; gap: 12px; }
+.asp-icon { font-size: 22px; color: var(--success); }
+.asp-text { font-size: 14px; font-weight: 600; color: var(--text); }
+
+/* Spinners */
+.spin {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

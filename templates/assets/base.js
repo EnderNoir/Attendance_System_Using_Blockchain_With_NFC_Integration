@@ -92,6 +92,25 @@
       return showAppDialog({ message: message, title: title || 'Confirmation', confirm: true, okText: okText || 'Confirm', cancelText: cancelText || 'Cancel' });
     }
 
+    function showAppSuccess(msg) {
+      const overlay = document.createElement('div');
+      overlay.className = 'app-success-overlay';
+      overlay.innerHTML = `<div class="app-success-box">
+        <div class="app-success-icon"><i class="bi bi-check-lg"></i></div>
+        <div class="app-success-text">${msg}</div>
+      </div>`;
+      document.body.appendChild(overlay);
+      setTimeout(() => overlay.classList.add('show'), 10);
+      setTimeout(() => {
+        overlay.classList.remove('show');
+        setTimeout(() => overlay.remove(), 400);
+      }, 500);
+    }
+    
+    function showAppError(msg) {
+       showAppAlert(msg, 'Error');
+    }
+
     /* ══ SECTION ACCORDION ══ */
     function buildSectionAccordion(sections) {
       if (!sections || !sections.length) return '<span style="font-size:13px;color:var(--muted);font-weight:500;">No sections assigned.</span>';

@@ -54,14 +54,6 @@
         <button class="ptab"        onclick="switchPeriod('year',this)">Year</button>
         <button class="ptab"        onclick="switchPeriod('all',this)">All Time</button>
       </div>
-      <!-- Enrollment Type Filter -->
-      <div class="period-picker show" style="margin-left:8px;">
-        <select class="pp-select" id="pickEnrollment" onchange="loadStats(curPeriod)" style="min-width:120px;">
-          <option value="">All Enrollment</option>
-          <option value="Regular">Regular</option>
-          <option value="Irregular">Irregular</option>
-        </select>
-      </div>
       <!-- Month picker -->
       <div class="period-picker" id="monthPicker">
         <select class="pp-select" id="pickMonth" onchange="applyPeriodPick()">
@@ -129,6 +121,12 @@
         <select class="cf-select" id="tf_section"><option value="">All Sections</option>
           <option>CS1A</option><option>CS1B</option><option>CS2A</option><option>CS2B</option>
           <option>IT1A</option><option>IT1B</option><option>IT2A</option><option>IT2B</option>
+        </select></div>
+      <div class="cf-group"><span class="cf-label">Enrollment</span>
+        <select class="cf-select" id="tf_enrollment">
+          <option value="">All Types</option>
+          <option value="Regular">Regular</option>
+          <option value="Irregular">Irregular</option>
         </select></div>
       <div class="cf-group"><span class="cf-label">Year Level</span>
         <select class="cf-select" id="tf_year"><option value="">All Years</option>

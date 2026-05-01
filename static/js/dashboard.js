@@ -485,6 +485,24 @@ function formatDateMonthDayYear(input) {
   }
 }
 
+function formatFullDateTime(raw) {
+  if (!raw || raw === '-') return '-';
+  try {
+    const normalized = raw.replace(' ', 'T');
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return raw;
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const m = months[d.getMonth()];
+    const day = d.getDate();
+    const yr = d.getFullYear();
+    let h = d.getHours();
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12;
+    return `${m} ${day} ${yr} ${h}:${min}${ampm}`;
+  } catch (e) { return raw; }
+}
+
 function pickSessionDate(sessionObj) {
   if (!sessionObj) return '-';
   const candidates = [sessionObj.started_at, sessionObj.date, sessionObj.tap_time];
@@ -792,8 +810,7 @@ function openTeacherRecord(username){
       ${infoRow('Username', '@'+u.username)}
       ${infoRow('Email Address', u.email||'-', true)}
       ${infoRow('Role', u.role.charAt(0).toUpperCase()+u.role.slice(1))}
-      ${infoRow('Account Status', u.status.charAt(0).toUpperCase()+u.status.slice(1))}
-      ${infoRow('Registered', u.created||'-')}
+      ${infoRow('Registered', formatFullDateTime(u.created))}
     </div>
     </div>`;
 
@@ -1180,7 +1197,7 @@ async function deleteFacultyAccount(username, fullName) {
     if (r.ok) {
       showAppSuccess('Faculty account deleted successfully.');
       setTimeout(() => {
-        window.location.href = '/index?tab=faculty';
+        window.location.href = '/?tab=faculty';
       }, 500);
     } else {
       alert('Error deleting faculty account.');

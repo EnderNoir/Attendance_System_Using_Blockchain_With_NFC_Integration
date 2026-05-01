@@ -12,23 +12,23 @@
     Creates an approved Instructor account. Only Super Admin can create Admin accounts.
   </p>
 
-  <form method="POST" class="card aci-form">
+  <form id="createInstructorForm" class="card aci-form">
     <div class="mb-3">
       <label class="form-label">Full Name *</label>
-      <input type="text" name="full_name" class="form-control" placeholder="e.g. Juan dela Cruz" required>
+      <input type="text" name="full_name" id="f_full_name" class="form-control" placeholder="e.g. Juan dela Cruz" required>
     </div>
     <div class="mb-3">
       <label class="form-label">Username * <span class="aci-label-help">(lowercase, no spaces)</span></label>
-      <input type="text" name="username" class="form-control" placeholder="e.g. jdelacruz"
+      <input type="text" name="username" id="f_username" class="form-control" placeholder="e.g. jdelacruz"
              oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'')" required>
     </div>
     <div class="mb-3">
       <label class="form-label">Email</label>
-      <input type="email" name="email" class="form-control" placeholder="instructor@cvsu.edu.ph">
+      <input type="email" name="email" id="f_email" class="form-control" placeholder="instructor@cvsu.edu.ph">
     </div>
     <div class="mb-3">
       <label class="form-label">Initial Password * <span class="aci-label-help">(default: test12345, editable)</span></label>
-      <input type="text" name="password" class="form-control" minlength="8" value="test12345" placeholder="test12345">
+      <input type="text" name="password" id="f_password" class="form-control" minlength="8" value="test12345" placeholder="test12345">
     </div>
     <div class="aci-info-box">
       <i class="bi bi-info-circle aci-info-icon"></i>
@@ -36,8 +36,49 @@
     </div>
     <div class="aci-actions">
       <a href="{{ url_for('dashboard', tab='faculty') }}" class="btn-outline">Cancel</a>
-      <button type="submit" class="btn-primary"><i class="bi bi-person-check"></i> Create Instructor</button>
+      <button type="submit" id="submitBtn" class="btn-primary"><i class="bi bi-person-check"></i> Create Instructor</button>
     </div>
   </form>
 </div>
+
+<script>
+document.getElementById('createInstructorForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Creating...';
+  
+  const payload = {
+    full_name: document.getElementById('f_full_name').value.trim(),
+    username: document.getElementById('f_username').value.trim(),
+    email: document.getElementById('f_email').value.trim(),
+    password: document.getElementById('f_password').value
+  };
+  
+  try {
+    const r = await fetch("{{ url_for('admin_create_instructor') }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showAppSuccess('Instructor account created successfully!');
+      setTimeout(() => {
+        window.location.href = "{{ url_for('dashboard', tab='faculty') }}";
+      }, 500);
+    } else {
+      alert(d.error || 'Creation failed');
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Network error');
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+});
+</script>
 {% endblock %}

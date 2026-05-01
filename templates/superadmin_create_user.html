@@ -10,23 +10,23 @@
   <h2 class="sacu-title">Create New Account</h2>
   <p class="sacu-subtitle">The account will be immediately approved (no pending review).</p>
 
-  <form method="POST" class="card sacu-form">
+  <form id="createUserForm" class="card sacu-form">
     <div class="mb-3">
       <label class="form-label">Full Name *</label>
-      <input type="text" name="full_name" class="form-control" placeholder="e.g. Maria Santos" required>
+      <input type="text" name="full_name" id="f_full_name" class="form-control" placeholder="e.g. Maria Santos" required>
     </div>
     <div class="mb-3">
       <label class="form-label">Username * <span class="sacu-label-help">(lowercase, no spaces)</span></label>
-      <input type="text" name="username" class="form-control" placeholder="e.g. msantos"
+      <input type="text" name="username" id="f_username" class="form-control" placeholder="e.g. msantos"
              oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'')" required>
     </div>
     <div class="mb-3">
       <label class="form-label">Email</label>
-      <input type="email" name="email" class="form-control" placeholder="msantos@cvsu.edu.ph">
+      <input type="email" name="email" id="f_email" class="form-control" placeholder="msantos@cvsu.edu.ph">
     </div>
     <div class="mb-3">
       <label class="form-label">Role *</label>
-      <select name="role" class="form-select" required>
+      <select name="role" id="f_role" class="form-select" required>
         <option value="teacher">Instructor</option>
         <option value="admin">Admin</option>
         {% if show_super_admin %}
@@ -36,13 +36,55 @@
     </div>
     <div class="mb-3">
       <label class="form-label">Initial Password * <span class="sacu-label-help">(default: test12345, editable)</span></label>
-      <input type="text" name="password" class="form-control" minlength="8" value="test12345" placeholder="test12345">
+      <input type="text" name="password" id="f_password" class="form-control" minlength="8" value="test12345" placeholder="test12345">
       <small class="text-muted">Share this temporary password securely and require immediate change after first login.</small>
     </div>
     <div class="sacu-actions">
       <a href="{{ url_for('dashboard', tab='faculty') }}" class="btn-outline">Cancel</a>
-      <button type="submit" class="btn-primary"><i class="bi bi-person-check"></i> Create Account</button>
+      <button type="submit" id="submitBtn" class="btn-primary"><i class="bi bi-person-check"></i> Create Account</button>
     </div>
   </form>
 </div>
+
+<script>
+document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Creating...';
+  
+  const payload = {
+    full_name: document.getElementById('f_full_name').value.trim(),
+    username: document.getElementById('f_username').value.trim(),
+    email: document.getElementById('f_email').value.trim(),
+    role: document.getElementById('f_role').value,
+    password: document.getElementById('f_password').value
+  };
+  
+  try {
+    const r = await fetch("{{ url_for('superadmin_create_user') }}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showAppSuccess('Account created successfully!');
+      setTimeout(() => {
+        window.location.href = "{{ url_for('dashboard', tab='faculty') }}";
+      }, 500);
+    } else {
+      alert(d.error || 'Creation failed');
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Network error');
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+});
+</script>
 {% endblock %}

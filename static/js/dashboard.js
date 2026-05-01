@@ -180,7 +180,6 @@ function openStudentRecord(idx){
       ${infoRow('Date of Admission', s.datereg)}
       ${infoRow('Year Level', s.year)}
       ${infoRow('Section', s.section)}
-      ${infoRow('Status', s.status.toUpperCase())}
       ${infoRow('Enrollment Type', s.enrollment)}
       ${infoRow('Major', s.major)}
       ${infoRow('Class Adviser', s.adviser)}
@@ -261,13 +260,6 @@ function openStudentRecord(idx){
     </div>
     <div class="sec-title">// Account & Status</div>
     <div class="upd-grid">
-      <div class="upd-field"><span class="upd-label">Account Status</span>
-        <select class="upd-input" id="uf_status" style="appearance:none;">
-          <option value="active" ${s.status==='active'?'selected':''}>Active</option>
-          <option value="graduated" ${s.status==='graduated'?'selected':''}>Graduated</option>
-          <option value="alumni" ${s.status==='alumni'?'selected':''}>Alumni</option>
-        </select>
-      </div>
       <div class="upd-field"><span class="upd-label">Enrollment Type</span>
         <select class="upd-input" id="uf_enrollment" style="appearance:none;">
           <option value="Regular" ${s.enrollment==='Regular'?'selected':''}>Regular</option>
@@ -792,18 +784,74 @@ function saveStudentUpdate(){
         semester:payload.semester||s.semester,sy:payload.school_year||s.sy,
         datereg:payload.date_registered||s.datereg,course:payload.course||s.course,
         year:payload.year_level||s.year,section:payload.section||s.section});
+  fetch('/api/student/update-profile/' + curId, {method:'POST',credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+  .then(r=>r.json()).then(d=>{
+    if(d.ok){
+      // Update local data
+      const s = studentData.find(x => x.nfc === curId);
+      if (s) {
+        Object.assign(s, {
+          name: payload.full_name,
+          sid: payload.student_id,
+          course: payload.course,
+          year: payload.year_level,
+          section: payload.section,
+          enrollment: payload.enrollment_status,
+          nfc: payload.new_nfc_id || curId
+        });
+        
+        // Update DOM row
+        const row = document.getElementById(`strow_${s.idx}`);
+        if (row) {
+          row.dataset.name = s.name.toLowerCase();
+          row.dataset.id = s.sid.toLowerCase();
+          row.dataset.course = s.course;
+          row.dataset.year = s.year;
+          row.dataset.section = s.section;
+          row.dataset.enrollment = s.enrollment;
+          row.dataset.nfc = s.nfc;
+          
+          const badge = row.querySelector('span[style*="border-radius:6px"]');
+          if (badge) {
+            badge.textContent = s.enrollment.toUpperCase();
+            if (s.enrollment === 'Regular') {
+              badge.style.background = 'rgba(76,175,80,0.15)';
+              badge.style.color = '#4caf50';
+            } else {
+              badge.style.background = 'rgba(244,67,54,0.15)';
+              badge.style.color = '#f44336';
+            }
+          }
+          const nameEl = row.querySelector('.prow-name');
+          if (nameEl) nameEl.textContent = s.name;
+        }
       }
-      document.getElementById('updTitle').textContent = payload.full_name||curId;
-      document.getElementById('updSub').textContent   = `${payload.course} | ${payload.year_level} | Section ${payload.section}`;
-      const si = studentData.find(x=>x.nfc===curId);
-      const nameEl = si ? document.querySelector(`#strow_${si.idx} .prow-name`) : null;
-      if(nameEl) nameEl.textContent=payload.full_name;
-    } else { msg.style.color='var(--danger)'; msg.textContent=d.error||'Error saving changes.'; }
+      
+      showMsg('Student record updated successfully', 'success');
+      setTimeout(() => closeUpdModal(), 1000);
+      filterStudents(); // Refresh view
+    } else { 
+      showMsg(d.error || 'Error saving changes', 'error');
+    }
     btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
-  }).catch(()=>{
-    msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='Network error.';
+  }).catch(err=>{
+    console.error(err);
+    showMsg('Network error', 'error');
     btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
   });
+}
+
+function showMsg(txt, type) {
+  // Simple alert fallback for now, or use a dedicated element
+  const msgEl = document.getElementById('updMsg');
+  if (msgEl) {
+    msgEl.textContent = txt;
+    msgEl.style.display = 'block';
+    msgEl.style.color = type === 'success' ? 'var(--accent)' : 'var(--danger)';
+  } else {
+    alert(txt);
+  }
 }
 
 function saveTeacherUpdate(){
@@ -844,19 +892,69 @@ function saveTeacherUpdate(){
 
 const totalSt=studentData.length;
 function filterStudents(){
-  const q=document.getElementById('st_search').value.toLowerCase();
-  const crs=document.getElementById('st_course').value;
-  const yr=document.getElementById('st_year').value;
-  const sec=document.getElementById('st_section').value;
-  const sem=document.getElementById('st_semester').value;
+  const q=(document.getElementById('st_search')?.value || '').toLowerCase();
+  const crs=document.getElementById('st_course')?.value;
+  const yr=document.getElementById('st_year')?.value;
+  const sec=document.getElementById('st_section')?.value;
+  const status=document.getElementById('st_status')?.value;
+  
   let shown=0;
   document.querySelectorAll('#studentList .person-row').forEach(r=>{
-    const m=(!q||r.dataset.name.includes(q)||r.dataset.id.includes(q))&&
-            (!crs||r.dataset.course===crs)&&(!yr||r.dataset.year===yr)&&(!sec||r.dataset.section===sec)&&
-            (!sem||r.dataset.semester.toLowerCase().includes(sem.toLowerCase()));
+    const name = (r.dataset.name || '').toLowerCase();
+    const sid = (r.dataset.id || '').toLowerCase();
+    const rowCourse = r.dataset.course;
+    const rowYear = r.dataset.year;
+    const rowSection = r.dataset.section;
+    const rowStatus = r.dataset.status || 'active';
+    const rowEnrollment = r.dataset.enrollment || 'Regular';
+
+    let m = true;
+    if (q && !name.includes(q) && !sid.includes(q)) m = false;
+    if (crs && rowCourse !== crs) m = false;
+    if (yr && rowYear !== yr) m = false;
+    if (sec && rowSection !== sec) m = false;
+    
+    if (status === 'regular') {
+      if (rowStatus !== 'active' || rowEnrollment !== 'Regular') m = false;
+    } else if (status === 'irregular') {
+      if (rowStatus !== 'active' || rowEnrollment !== 'Irregular') m = false;
+    } else if (status === 'graduated_alumni') {
+      if (rowStatus !== 'graduated' && rowStatus !== 'alumni') m = false;
+    }
+
     r.style.display=m?'':'none'; if(m)shown++;
   });
-  document.getElementById('st_count').textContent=`${shown} of ${totalSt} students`;
+  const countEl = document.getElementById('st_count');
+  if (countEl) countEl.textContent=`${shown} of ${studentData.length} students`;
+  updateStatistics();
+}
+
+function updateStatistics() {
+  const rows = document.querySelectorAll('#studentList .person-row');
+  let reg = 0, irreg = 0, grad = 0, total = 0;
+  
+  rows.forEach(r => {
+    total++;
+    const st = r.dataset.status || 'active';
+    const en = r.dataset.enrollment || 'Regular';
+    
+    if (st === 'active') {
+      if (en === 'Regular') reg++;
+      else irreg++;
+    } else if (st === 'graduated' || st === 'alumni') {
+      grad++;
+    }
+  });
+  
+  const elReg = document.getElementById('statRegular');
+  const elIrreg = document.getElementById('statIrregular');
+  const elGrad = document.getElementById('statGraduatedAlumni');
+  const elTotal = document.getElementById('statAll');
+  
+  if (elReg) elReg.textContent = reg;
+  if (elIrreg) elIrreg.textContent = irreg;
+  if (elGrad) elGrad.textContent = grad;
+  if (elTotal) elTotal.textContent = total;
 }
 function resetStudentFilters(){
   ['st_search','st_course','st_year','st_section','st_semester'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});

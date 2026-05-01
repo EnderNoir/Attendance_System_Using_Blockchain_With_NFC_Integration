@@ -45,6 +45,107 @@ Object.entries(RAW_TEACHERS).forEach(([username, u]) => {
 });
 
 let curMode=null, curId=null, allSessions=[];
+let currentEditStudent = null;
+
+// Status Management
+function openStatusModal(nfcId, studentName, currentStatus) {
+  currentEditStudent = { nfcId, studentName, currentStatus };
+  const nameEl = document.getElementById('statusModalStudent');
+  if (nameEl) nameEl.textContent = studentName;
+  const sel = document.getElementById('statusSelect');
+  if (sel) sel.value = currentStatus || 'active';
+  const modal = document.getElementById('statusModal');
+  if (modal) modal.classList.add('show');
+}
+function closeStatusModal() {
+  const modal = document.getElementById('statusModal');
+  if (modal) modal.classList.remove('show');
+  currentEditStudent = null;
+}
+async function confirmStatusChange() {
+  if (!currentEditStudent) return;
+  const newStatus = document.getElementById('statusSelect').value;
+  const btn = event.target;
+  const oldText = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Updating...';
+  try {
+    const response = await fetch(`/api/student/update-status/${currentEditStudent.nfcId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    closeStatusModal();
+    location.reload();
+  } catch (error) {
+    console.error('Failed to update status:', error);
+    alert('Update failed: ' + error.message);
+  } finally {
+    btn.disabled = false; btn.textContent = oldText;
+  }
+}
+
+// Semester Management
+function openMoveSemesterModal(nfcId, studentName, currentSem, currentYear) {
+  currentEditStudent = { nfcId, studentName, currentSem, currentYear };
+  const nameEl = document.getElementById('semesterModalStudent');
+  if (nameEl) nameEl.textContent = studentName;
+  const curSemSel = document.getElementById('currentSemesterSelect');
+  if (curSemSel) curSemSel.value = currentSem || 'First';
+  const semOptions = ['First', 'Second', 'Summer'];
+  const currentIdx = semOptions.indexOf(currentSem);
+  const nextIdx = (currentIdx + 1) % semOptions.length;
+  const newSemSel = document.getElementById('newSemesterSelect');
+  if (newSemSel) newSemSel.value = semOptions[nextIdx];
+  if (currentYear && currentYear !== 'N/A') {
+    const [start, end] = currentYear.split('-');
+    if (start && end) {
+      const yrInp = document.getElementById('newSchoolYear');
+      if (yrInp) yrInp.value = end + '-' + (parseInt(end) + 1);
+    }
+  }
+  
+  // Update modal title and button for SINGLE move
+  document.querySelector('#semesterModal h3').textContent = 'Move to Next Semester';
+  const btn = document.querySelector('#semesterModal .btn-primary');
+  btn.textContent = 'Move Student';
+  btn.onclick = confirmStudentSemesterChange;
+  
+  const modal = document.getElementById('semesterModal');
+  if (modal) modal.classList.add('show');
+}
+function closeSemesterModal() {
+  const modal = document.getElementById('semesterModal');
+  if (modal) modal.classList.remove('show');
+  currentEditStudent = null;
+}
+async function confirmStudentSemesterChange() {
+  if (!currentEditStudent) return;
+  const newSem = document.getElementById('newSemesterSelect').value;
+  const newYear = document.getElementById('newSchoolYear').value;
+  if (!newYear || !newYear.match(/^\d{4}-\d{4}$/)) {
+    alert('Please enter a valid school year (e.g. 2024-2025)');
+    return;
+  }
+  const btn = event.target;
+  const oldText = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Moving...';
+  try {
+    const response = await fetch(`/api/student/move-semester/${currentEditStudent.nfcId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_semester: newSem, new_school_year: newYear })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    closeSemesterModal();
+    location.reload();
+  } catch (error) {
+    console.error('Failed to move semester:', error);
+    alert('Move failed: ' + error.message);
+  } finally {
+    btn.disabled = false; btn.textContent = oldText;
+  }
+}
 
 // Modal open / close (required by openStudentRecord and openTeacherRecord)
 function openUpdModal() {
@@ -1211,18 +1312,22 @@ function showAppSuccess(message) {
 function moveUpAllStudents() {
   const modal = document.getElementById('semesterModal');
   if (modal) {
-    modal.style.display = 'flex';
-    const syInput = document.getElementById('newSchoolYear');
-    if (syInput) syInput.value = '';
+    // Reset fields
+    document.getElementById('semesterModalStudent').textContent = 'All Active Students';
+    document.getElementById('newSchoolYear').value = '';
+    
+    // Update modal title and button for BULK move
+    document.querySelector('#semesterModal h3').textContent = 'Advance All Students';
+    const btn = document.querySelector('#semesterModal .btn-primary');
+    btn.textContent = 'Move All Students';
+    btn.onclick = confirmBulkSemesterMove;
+
+    modal.classList.add('show');
   }
 }
 
-function closeSemesterModal() {
-  const modal = document.getElementById('semesterModal');
-  if (modal) modal.style.display = 'none';
-}
 
-async function confirmMoveSemester() {
+async function confirmBulkSemesterMove() {
   const currentSem = document.getElementById('currentSemesterSelect').value;
   const newSem = document.getElementById('newSemesterSelect').value;
   const newSY = document.getElementById('newSchoolYear').value.trim();
@@ -1262,4 +1367,9 @@ async function confirmMoveSemester() {
     btn.disabled = false;
     btn.innerHTML = 'Move Student';
   }
+}
+function initializeStudentList() {
+  sortStudentsAlphabetically();
+  filterStudents();
+  updateStatistics();
 }

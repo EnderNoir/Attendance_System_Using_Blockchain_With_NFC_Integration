@@ -109,7 +109,7 @@ function setLoading(on) {
 async function loadStats(period, extra) {
   setLoading(true);
   const params = new URLSearchParams({ period });
-  const enr = document.getElementById('pickEnrollment')?.value;
+  const enr = document.getElementById('tf_enrollment')?.value;
   if (enr) params.append('enrollment_type', enr);
   if (extra) {
     for (const [k, v] of Object.entries(extra)) {
@@ -184,6 +184,7 @@ function applyTrendFilter() {
   const extra = {
     subject: document.getElementById('tf_subject').value,
     section_key: document.getElementById('tf_section').value,
+    enrollment_type: document.getElementById('tf_enrollment').value,
     year_level: document.getElementById('tf_year').value,
     instructor: document.getElementById('tf_instructor').value
   };
@@ -191,7 +192,7 @@ function applyTrendFilter() {
 }
 
 function resetTrendFilter() {
-  ['tf_subject', 'tf_section', 'tf_year', 'tf_instructor'].forEach((id) => {
+  ['tf_subject', 'tf_section', 'tf_enrollment', 'tf_year', 'tf_instructor'].forEach((id) => {
     const el = document.getElementById(id);
     if (el) {
       el.value = '';

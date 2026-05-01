@@ -7073,17 +7073,27 @@ def superadmin_users():
 @super_admin_required
 def superadmin_create_user():
     if request.method == 'POST':
-        username  = request.form.get('username', '').strip().lower()
-        fullname  = request.form.get('full_name', '').strip()
-        email     = request.form.get('email', '').strip()
-        role      = request.form.get('role', 'teacher')
-        password  = request.form.get('password', '').strip() or 'test12345'
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
+            
+        username  = data.get('username', '').strip().lower()
+        fullname  = data.get('full_name', '').strip()
+        email     = data.get('email', '').strip()
+        role      = data.get('role', 'teacher')
+        password  = data.get('password', '').strip() or 'test12345'
+        
         if not username or not fullname:
-            flash('Username and full name are required.', 'danger')
-            return redirect(url_for('superadmin_create_user'))
+            msg = 'Username and full name are required.'
+            if request.is_json: return jsonify({'error': msg}), 400
+            flash(msg, 'danger'); return redirect(url_for('superadmin_create_user'))
+            
         if role not in {'teacher', 'admin', 'super_admin'}:
-            flash('Invalid role.', 'danger')
-            return redirect(url_for('superadmin_create_user'))
+            msg = 'Invalid role.'
+            if request.is_json: return jsonify({'error': msg}), 400
+            flash(msg, 'danger'); return redirect(url_for('superadmin_create_user'))
+            
         # Prevent duplicate Super Admin
         if role == 'super_admin':
             with get_db() as conn:
@@ -7091,14 +7101,20 @@ def superadmin_create_user():
                     "SELECT * FROM users WHERE role='super_admin'"
                 ).fetchone()
             if existing:
-                flash('A Super Admin already exists. Only one Super Admin is allowed.', 'danger')
-                return redirect(url_for('superadmin_create_user'))
+                msg = 'A Super Admin already exists. Only one Super Admin is allowed.'
+                if request.is_json: return jsonify({'error': msg}), 400
+                flash(msg, 'danger'); return redirect(url_for('superadmin_create_user'))
+                
         if db_get_user(username):
-            flash(f'Username "{username}" is already taken.', 'danger')
-            return redirect(url_for('superadmin_create_user'))
+            msg = f'Username "{username}" is already taken.'
+            if request.is_json: return jsonify({'error': msg}), 400
+            flash(msg, 'danger'); return redirect(url_for('superadmin_create_user'))
+            
         if len(password) < 8:
-            flash('Password must be at least 8 characters.', 'danger')
-            return redirect(url_for('superadmin_create_user'))
+            msg = 'Password must be at least 8 characters.'
+            if request.is_json: return jsonify({'error': msg}), 400
+            flash(msg, 'danger'); return redirect(url_for('superadmin_create_user'))
+            
         db_save_user(username, {
             'username': username, 'password': hash_password(password),
             'role': role, 'full_name': fullname, 'email': email,
@@ -7112,8 +7128,9 @@ def superadmin_create_user():
             role=role,
             initial_password=password,
         )
-        flash(f'Account "{username}" ({role}) created successfully.', 'success')
-        return redirect(url_for('superadmin_users'))
+        msg = f'Account "{username}" ({role}) created successfully.'
+        if request.is_json: return jsonify({'ok': True, 'message': msg})
+        flash(msg, 'success'); return redirect(url_for('dashboard', tab='faculty'))
     # Check if Super Admin exists for frontend
     with get_db() as conn:
         super_admin_exists = conn.execute(
@@ -7156,19 +7173,31 @@ def admin_create_instructor():
         flash('Normal admin access required.', 'danger')
         return redirect(url_for('index'))
     if request.method == 'POST':
-        username = request.form.get('username', '').strip().lower()
-        fullname = request.form.get('full_name', '').strip()
-        email    = request.form.get('email', '').strip()
-        password = request.form.get('password', '').strip() or 'test12345'
+        if request.is_json:
+            data = request.get_json()
+        else:
+            data = request.form
+        
+        username = data.get('username', '').strip().lower()
+        fullname = data.get('full_name', '').strip()
+        email    = data.get('email', '').strip()
+        password = data.get('password', '').strip() or 'test12345'
+        
         if not username or not fullname:
-            flash('Username and full name are required.', 'danger')
-            return redirect(url_for('admin_create_instructor'))
+            msg = 'Username and full name are required.'
+            if request.is_json: return jsonify({'error': msg}), 400
+            flash(msg, 'danger'); return redirect(url_for('admin_create_instructor'))
+            
         if db_get_user(username):
-            flash(f'Username "{username}" is already taken.', 'danger')
-            return redirect(url_for('admin_create_instructor'))
+            msg = f'Username "{username}" is already taken.'
+            if request.is_json: return jsonify({'error': msg}), 400
+            flash(msg, 'danger'); return redirect(url_for('admin_create_instructor'))
+            
         if len(password) < 8:
-            flash('Password must be at least 8 characters.', 'danger')
-            return redirect(url_for('admin_create_instructor'))
+            msg = 'Password must be at least 8 characters.'
+            if request.is_json: return jsonify({'error': msg}), 400
+            flash(msg, 'danger'); return redirect(url_for('admin_create_instructor'))
+            
         db_save_user(username, {
             'username': username, 'password': hash_password(password),
             'role': 'teacher', 'full_name': fullname, 'email': email,
@@ -7182,8 +7211,9 @@ def admin_create_instructor():
             role='teacher',
             initial_password=password,
         )
-        flash(f'Instructor account "{username}" created successfully.', 'success')
-        return redirect(url_for('dashboard', tab='faculty'))
+        msg = f'Instructor account "{username}" created successfully.'
+        if request.is_json: return jsonify({'ok': True, 'message': msg})
+        flash(msg, 'success'); return redirect(url_for('dashboard', tab='faculty'))
     return render_template('admin_create_instructor.html')
 
 # ══════════════════════════════════════════════════════════════════════════════

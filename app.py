@@ -4312,7 +4312,7 @@ def api_update_student_status(nfc_id):
         with get_db() as conn:
             # Check student exists
             student = conn.execute(
-                "SELECT full_name FROM students WHERE nfcId=?",
+                "SELECT full_name FROM students WHERE nfc_id=?",
                 (nfc_id,)
             ).fetchone()
             
@@ -4321,7 +4321,7 @@ def api_update_student_status(nfc_id):
             
             # Update status
             conn.execute(
-                "UPDATE students SET student_status=? WHERE nfcId=?",
+                "UPDATE students SET student_status=? WHERE nfc_id=?",
                 (new_status, nfc_id)
             )
         
@@ -4337,49 +4337,70 @@ def api_update_student_status(nfc_id):
 @app.route('/api/student/update-profile/<nfc_id>', methods=['POST'])
 @admin_required
 def api_update_student_profile(nfc_id):
-    """Update a student's profile including NFC UID and status."""
+    """Update a student's profile including NFC UID and all academic fields."""
     try:
         nfc_id = nfc_id.strip().upper()
         data = request.get_json()
-        new_status = data.get('student_status', 'active')
-        new_enrollment = data.get('enrollment_status', 'Regular')
-        new_nfc_id = data.get('new_nfc_id', '').strip().upper()
         
-        if new_status not in ['active', 'graduated', 'alumni']:
-            return jsonify({'ok': False, 'error': 'Invalid status'}), 400
-            
-        target_nfc = new_nfc_id if new_nfc_id else nfc_id
+        # Extract fields
+        full_name = data.get('full_name')
+        student_id = data.get('student_id')
+        email = data.get('email')
+        contact = data.get('contact')
+        adviser = data.get('adviser')
+        major = data.get('major', 'N/A')
+        semester = data.get('semester')
+        school_year = data.get('school_year')
+        date_registered = data.get('date_registered')
+        course = data.get('course')
+        year_level = data.get('year_level')
+        section = data.get('section')
+        enrollment_status = data.get('enrollment_status', 'Regular')
+        new_nfc_id = data.get('new_nfc_id', '').strip().upper()
         
         with get_db() as conn:
             # Check student exists
-            student = conn.execute("SELECT * FROM students WHERE nfcId=?", (nfc_id,)).fetchone()
+            student = conn.execute("SELECT * FROM students WHERE nfc_id=?", (nfc_id,)).fetchone()
             if not student:
                 return jsonify({'ok': False, 'error': 'Student not found'}), 404
-                
+            
+            # Prepare update
             if new_nfc_id and new_nfc_id != nfc_id:
                 # Check if new NFC is already taken
-                exists = conn.execute("SELECT nfcId FROM students WHERE nfcId=?", (new_nfc_id,)).fetchone()
+                exists = conn.execute("SELECT nfc_id FROM students WHERE nfc_id=?", (new_nfc_id,)).fetchone()
                 if exists:
                     return jsonify({'ok': False, 'error': 'New NFC UID is already registered'}), 400
                 
-                # Update NFC ID everywhere
-                conn.execute("UPDATE students SET nfcId=?, student_status=?, enrollment_status=? WHERE nfcId=?", 
-                             (new_nfc_id, new_status, new_enrollment, nfc_id))
+                # Update with new NFC ID
+                conn.execute("""
+                    UPDATE students 
+                    SET nfc_id=?, full_name=?, student_id=?, email=?, contact=?, adviser=?, 
+                        major=?, semester=?, school_year=?, date_registered=?, 
+                        course=?, year_level=?, section=?, enrollment_status=?
+                    WHERE nfc_id=?
+                """, (new_nfc_id, full_name, student_id, email, contact, adviser,
+                      major, semester, school_year, date_registered,
+                      course, year_level, section, enrollment_status, nfc_id))
+                
+                # Update dependent tables
                 conn.execute("UPDATE attendance_logs SET nfc_id=? WHERE nfc_id=?", (new_nfc_id, nfc_id))
                 conn.execute("UPDATE excuse_requests SET nfc_id=? WHERE nfc_id=?", (new_nfc_id, nfc_id))
             else:
-                conn.execute(
-                    "UPDATE students SET student_status=?, enrollment_status=? WHERE nfcId=?",
-                    (new_status, new_enrollment, nfc_id)
-                )
+                # Update existing record
+                conn.execute("""
+                    UPDATE students 
+                    SET full_name=?, student_id=?, email=?, contact=?, adviser=?, 
+                        major=?, semester=?, school_year=?, date_registered=?, 
+                        course=?, year_level=?, section=?, enrollment_status=?
+                    WHERE nfc_id=?
+                """, (full_name, student_id, email, contact, adviser,
+                      major, semester, school_year, date_registered,
+                      course, year_level, section, enrollment_status, nfc_id))
         
-        print(f"[STUDENT] {student['full_name']} profile updated.")
-        return jsonify({
-            'ok': True,
-            'message': 'Profile updated successfully'
-        })
+        print(f"[STUDENT] Profile updated for {full_name or nfc_id}")
+        return jsonify({'ok': True, 'message': 'Profile updated successfully'})
     except Exception as e:
-        print(f"[ERROR] Failed to update student profile: {e}")
+        print(f"[ERROR] api_update_student_profile: {e}")
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 

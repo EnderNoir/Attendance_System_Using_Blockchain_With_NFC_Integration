@@ -228,6 +228,13 @@
 
 <!-- STUDENTS TAB -->
 <div class="tab-pane active" id="tab-students">
+  <div style="margin-bottom:24px;">
+    <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">// STUDENT & FACULTY MANAGEMENT</div>
+    <h2 style="font-size:20px;font-weight:800;margin:0;color:var(--text);">User Directory</h2>
+    <p style="font-size:13px;color:var(--muted);margin-top:6px;max-width:600px;">
+      Manage enrolled students and faculty members. Maintain academic records, track enrollment status, and assign advisers.
+    </p>
+  </div>
   <!-- Status Statistics Table -->
   <div style="margin-bottom:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px;" id="studentStatsRow">
     <div style="padding:16px;background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);border-radius:8px;text-align:center;">
@@ -438,88 +445,6 @@
   };
 </script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=1.1"></script>
-<script>
-  // Initialize student list on page load
-  function initializeStudentList() {
-    sortStudentsAlphabetically();
-    filterStudents();
-    updateStatistics();
-  }
-  
-  // Alumni/Semester Management Variables
-  let currentEditStudent = null;
-
-  // Open status change modal
-  function openStatusModal(nfcId, studentName, currentStatus) {
-    currentEditStudent = { nfcId, studentName, currentStatus };
-    document.getElementById('statusModalStudent').textContent = studentName;
-    document.getElementById('statusSelect').value = currentStatus || 'active';
-    document.getElementById('statusModal').classList.add('active');
-  }
-  
-  // Close status modal
-  function closeStatusModal() {
-    document.getElementById('statusModal').classList.remove('active');
-    currentEditStudent = null;
-  }
-  
-  // Open semester move modal
-  function openMoveSemesterModal(nfcId, studentName, currentSem, currentYear) {
-    currentEditStudent = { nfcId, studentName, currentSem, currentYear };
-    document.getElementById('semesterModalStudent').textContent = studentName;
-    document.getElementById('currentSemesterSelect').value = currentSem || 'First';
-    
-    // Auto-set next semester
-    const semOptions = ['First', 'Second', 'Summer'];
-    const currentIdx = semOptions.indexOf(currentSem);
-    const nextIdx = (currentIdx + 1) % semOptions.length;
-    document.getElementById('newSemesterSelect').value = semOptions[nextIdx];
-    
-    // Auto-calculate next year
-    if (currentYear && currentYear !== 'N/A') {
-      const [start, end] = currentYear.split('-');
-      if (start && end) {
-        const nextYear = parseInt(end) + 1;
-        document.getElementById('newSchoolYear').value = parseInt(end) + '-' + nextYear;
-      }
-    }
-    
-    document.getElementById('semesterModal').classList.add('active');
-  }
-  
-  // Close semester modal
-  function closeSemesterModal() {
-    document.getElementById('semesterModal').classList.remove('active');
-    currentEditStudent = null;
-  }
-  
-  // Confirm status change
-  async function confirmStatusChange() {
-    if (!currentEditStudent) return;
-    
-    const newStatus = document.getElementById('statusSelect').value;
-    const btn = event.target;
-    btn.disabled = true;
-    btn.textContent = 'Updating...';
-    
-    try {
-      const response = await fetch(`/api/student/update-status/${currentEditStudent.nfcId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
-      closeStatusModal();
-      location.reload();
-    } catch (error) {
-      console.error('Failed to update status:', error);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Update Status';
-    }
-  }
   
   // Confirm semester move
   async function confirmMoveSemester() {
@@ -562,6 +487,7 @@
   document.getElementById('st_course')?.addEventListener('change', filterStudents);
   document.getElementById('st_year')?.addEventListener('change', filterStudents);
   document.getElementById('st_section')?.addEventListener('change', filterStudents);
+  document.getElementById('st_semester')?.addEventListener('change', filterStudents);
   document.getElementById('st_status')?.addEventListener('change', filterStudents);
   
   window.addEventListener('load', initializeStudentList);

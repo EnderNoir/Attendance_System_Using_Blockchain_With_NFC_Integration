@@ -958,7 +958,6 @@ def init_db():
         semester        TEXT NOT NULL DEFAULT '',
         school_year     TEXT NOT NULL DEFAULT '',
         date_registered TEXT NOT NULL DEFAULT '',
-        raw_name        TEXT NOT NULL DEFAULT '',
         eth_address     TEXT NOT NULL DEFAULT '',
         reg_tx_hash     TEXT NOT NULL DEFAULT '',
         reg_block       INTEGER NOT NULL DEFAULT 0,
@@ -1044,15 +1043,7 @@ def init_db():
         requested_at TEXT NOT NULL DEFAULT ''
     );
     INSERT OR IGNORE INTO nfc_registration (id, waiting, scanned_uid) VALUES (1, 0, '');
-    CREATE TABLE IF NOT EXISTS student_overrides (
-        nfc_id TEXT PRIMARY KEY, full_name TEXT DEFAULT '',
-        student_id TEXT DEFAULT '', email TEXT DEFAULT '',
-        contact TEXT DEFAULT '', adviser TEXT DEFAULT '',
-        major TEXT DEFAULT '', semester TEXT DEFAULT '',
-        school_year TEXT DEFAULT '', date_registered TEXT DEFAULT '',
-        course TEXT DEFAULT '', year_level TEXT DEFAULT '',
-        section TEXT DEFAULT ''
-    );
+    -- student_overrides removed
     CREATE TABLE IF NOT EXISTS email_config (
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL DEFAULT ''
@@ -1699,9 +1690,9 @@ def db_save_student(s):
             "(nfc_id, full_name, first_name, middle_initial, last_name, "
             "student_id, program, year_level, section, "
             "adviser, email, contact, major, semester, school_year, "
-            "date_registered, raw_name, eth_address, reg_tx_hash, reg_block, "
+            "date_registered, eth_address, reg_tx_hash, reg_block, "
             "photo_file, enrollment_status, created_at, updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(nfc_id) DO UPDATE SET "
             "full_name=EXCLUDED.full_name, "
             "first_name=EXCLUDED.first_name, "
@@ -1712,7 +1703,7 @@ def db_save_student(s):
             "section=EXCLUDED.section, adviser=EXCLUDED.adviser, "
             "email=EXCLUDED.email, contact=EXCLUDED.contact, major=EXCLUDED.major, "
             "semester=EXCLUDED.semester, school_year=EXCLUDED.school_year, "
-            "date_registered=EXCLUDED.date_registered, raw_name=EXCLUDED.raw_name, "
+            "date_registered=EXCLUDED.date_registered, "
             "eth_address=EXCLUDED.eth_address, reg_tx_hash=EXCLUDED.reg_tx_hash, "
             "reg_block=EXCLUDED.reg_block, photo_file=EXCLUDED.photo_file, "
             "enrollment_status=EXCLUDED.enrollment_status, updated_at=EXCLUDED.updated_at",
@@ -1729,7 +1720,6 @@ def db_save_student(s):
                 s.get('adviser',''), s.get('email',''), s.get('contact',''),
                 s.get('major',''), s.get('semester',''), s.get('school_year',''),
                 s.get('date_registered',''),
-                s.get('raw_name',''),
                 s.get('address', s.get('eth_address','')),
                 '',
                 0,
@@ -3104,24 +3094,7 @@ def parse_student(raw):
 
 def get_all_students():
     cached = db_get_all_students()
-    if not cached:
-        return []
-    for s in cached:
-        ov = db_get_override(s['nfcId'])
-        if ov.get('full_name'):       s['name']            = ov['full_name']
-        if ov.get('student_id'):      s['student_id']      = ov['student_id']
-        if ov.get('email'):           s['email']           = ov['email']
-        if ov.get('contact'):         s['contact']         = ov['contact']
-        if ov.get('adviser'):         s['adviser']         = ov['adviser']
-        if ov.get('major'):           s['major']           = ov['major']
-        if ov.get('semester'):        s['semester']        = ov['semester']
-        if ov.get('school_year'):     s['school_year']     = ov['school_year']
-        if ov.get('date_registered'): s['date_registered'] = ov['date_registered']
-        if ov.get('course'):          s['course']          = ov['course']
-        if ov.get('year_level'):      s['year_level']      = ov['year_level']
-        if ov.get('section'):         s['section']         = ov['section'].upper()
-        s['section'] = (s.get('section') or '').strip().upper()
-    return cached
+    return cached or []
 
 def get_attendance_records(nfc_id):
     try:
@@ -4691,30 +4664,9 @@ def register():
         on_chain = name + (' | ' + ' | '.join(extras) if extras else '')
         p = parse_student(on_chain)
         student_name_map[nfc_id] = name
-        # ── Blockchain Registration ─────────────────────────────────────
-        reg_tx = ''
-        reg_block = 0
+        # ── Blockchain Registration (DISABLED for Profiles) ─────────────
+        # Only attendance is recorded on-chain now to support NFC recycling.
         student_address = request.form.get('eth_address', '0x0000000000000000000000000000000000000000').strip() or '0x0000000000000000000000000000000000000000'
-        
-        if BLOCKCHAIN_ONLINE and contract and admin_account:
-            try:
-                print(f"[BLOCKCHAIN] Registering student {name} ({nfc_id}) on-chain...")
-                tx_hash = send_contract_tx(
-                    contract.functions.registerStudent(
-                        student_address,
-                        nfc_id,
-                        name
-                    )
-                )
-                if tx_hash:
-                    receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
-                    reg_tx = receipt['transactionHash'].hex()
-                    reg_block = receipt['blockNumber']
-                    print(f"[BLOCKCHAIN] Student {nfc_id} registered on-chain: TX={reg_tx[:16]}")
-            except Exception as e:
-                print(f"[BLOCKCHAIN ERROR] Failed on-chain registration for {nfc_id}: {e}")
-
-        # Capture enrollment_status from form
         enrollment_status_val = request.form.get('enrollment_status', 'Regular').strip()
 
         db_save_student({
@@ -4724,10 +4676,7 @@ def register():
             'first_name': fname,
             'middle_initial': mi,
             'last_name': lname,
-            'raw_name': on_chain,
             'address': student_address,
-            'tx_hash': reg_tx,
-            'reg_block': reg_block,
             'enrollment_status': enrollment_status_val
         })
         send_student_welcome_email(
@@ -4792,6 +4741,22 @@ def parse_registration_pdf():
         tb = traceback.format_exc()
         print(f'[parse_registration_pdf ERROR]\n{tb}')
         return jsonify({'error': f'{type(e).__name__}: {str(e)}'}), 500
+
+def _save_base64_photo(person_id, b64_str):
+    if not b64_str or ';base64,' not in b64_str: return ''
+    try:
+        header, data = b64_str.split(';base64,')
+        ext = header.split('/')[-1].split(';')[0]
+        if ext == 'jpeg': ext = 'jpg'
+        filename = f"photo_{person_id.replace(' ','_')}.{ext}"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        with open(filepath, 'wb') as f:
+            f.write(base64.b64decode(data))
+        db_save_photo(person_id, filename)
+        return filename
+    except Exception as e:
+        print(f"Photo decode failed for {person_id}: {e}")
+        return ''
 
 @app.route('/batch_register', methods=['GET', 'POST'])
 @admin_required
@@ -4895,25 +4860,29 @@ def batch_register():
             major = (student.get('major') or 'N/A').strip()
             extras.append(f"Major:{major}")
  
-            on_chain = name + (' | ' + ' | '.join(extras) if extras else '')
- 
-            # Parse and save to PostgreSQL
-            p = parse_student(on_chain)
-            enroll_status = student.get('enrollment_status', 'Regular')
-            student_name_map[nfc_id] = name
+            # Save photo if provided
+            photo_file = _save_base64_photo(nfc_id, student.get('photo_base64', ''))
+            
             db_save_student({
-                **p,
                 'nfcId':      nfc_id,
                 'name':       name,
                 'first_name': student.get('first_name', ''),
                 'middle_initial': student.get('middle_initial', ''),
                 'last_name':  student.get('last_name', ''),
-                'raw_name':   on_chain,
-                'address':    '',
-                'tx_hash':    '',
-                'photo_file': student.get('photo_file', ''),
-                'enrollment_status': enroll_status,
+                'student_id': (student.get('student_id') or '').strip(),
+                'course': (student.get('course') or '').strip(),
+                'year_level': (student.get('year_level') or '').strip(),
+                'section': (student.get('section') or '').strip().upper(),
+                'email': email_val,
+                'semester': (student.get('semester') or '').strip(),
+                'school_year': (student.get('school_year') or '').strip(),
+                'adviser': (student.get('adviser') or '').strip(),
+                'contact': (student.get('contact') or '').strip(),
+                'major': (student.get('major') or 'N/A').strip(),
+                'photo_file': photo_file,
+                'enrollment_status': student.get('enrollment_status', 'Regular'),
             })
+            
             send_student_welcome_email(
                 student_name=name,
                 student_email=email_val,
@@ -4921,7 +4890,7 @@ def batch_register():
                 student_id=(student.get('student_id') or '').strip(),
                 course=(student.get('course') or '').strip(),
                 year_level=(student.get('year_level') or '').strip(),
-                section=section_val,
+                section=(student.get('section') or '').strip().upper(),
             )
             success_count += 1
  

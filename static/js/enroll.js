@@ -440,7 +440,14 @@ function buildIEFields(s, i) {
       <select class="ie-input" id="ie_status_${i}">
         <option value="Regular" ${s.enrollment_status === 'Regular' ? 'selected' : ''}>Regular</option>
         <option value="Irregular" ${s.enrollment_status === 'Irregular' ? 'selected' : ''}>Irregular</option>
-      </select></div>`;
+      </select></div>
+    <div class="ie-field" style="grid-column: 1 / -1;">
+      <label class="ie-label">Student Photo</label>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div id="ie_photo_preview_${i}" style="width:40px;height:40px;border-radius:50%;background:#eee;background-size:cover;background-position:center;${s.photo_base64 ? `background-image:url(${s.photo_base64})` : ''}"></div>
+        <input type="file" id="ie_photo_${i}" accept="image/*" style="font-size:11px;" onchange="handleIEPhoto(${i}, this)"/>
+      </div>
+    </div>`;
 }
 
 // Live email update when name parts are changed
@@ -483,7 +490,20 @@ function saveInlineEdit(i) {
   s.contact = g(`ie_contact_${i}`) || s.contact;
   s.major = g(`ie_major_${i}`) || s.major || 'N/A';
   s.enrollment_status = g(`ie_status_${i}`) || 'Regular';
+  // photo_base64 is handled by handleIEPhoto
   renderReviewTable();
+}
+
+function handleIEPhoto(i, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    b_students[i].photo_base64 = e.target.result;
+    const preview = document.getElementById(`ie_photo_preview_${i}`);
+    if (preview) preview.style.backgroundImage = `url(${e.target.result})`;
+  };
+  reader.readAsDataURL(file);
 }
 
 function proceedToNFC() {

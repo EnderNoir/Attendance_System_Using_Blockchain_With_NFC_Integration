@@ -130,7 +130,7 @@ async function loadStats() {
     params.append('section_key', `${prog}|${yr}|${sec}`);
   } else {
     if (prog) params.append('program', prog);
-    if (yr) params.append('year', yr);
+    if (yr) params.append('year_level', yr);
     if (sec) params.append('section_letter', sec);
   }
   if (subj) params.append('subject', subj);
@@ -277,6 +277,7 @@ function switchPeriod(p, btn) {
   btn.classList.add('active');
   document.getElementById('monthPicker').classList.toggle('show', p === 'month');
   document.getElementById('yearPicker').classList.toggle('show', p === 'year');
+  applyFilters(); // Auto-apply
 }
 
 function applyFilters() {
@@ -383,6 +384,7 @@ function selectSSD(id, value, label) {
   if (id === 'gf_program') {
     updateSectionLabel(value);
   }
+  applyFilters(); // Auto-apply
 }
 
 function updateSectionLabel(program) {

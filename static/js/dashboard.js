@@ -25,6 +25,8 @@ const studentData = RAW_STUDENTS.map((s, idx) => {
     sy: s.school_year || '',
     datereg: s.date_registered || '',
     photo: PHOTO_MAP[nfc] || '',
+    status: s.student_status || 'active',
+    enrollment: s.enrollment_status || 'Regular',
   };
 });
 
@@ -148,6 +150,9 @@ function handleUpdPhoto(input){
 function openStudentRecord(idx){
   const s=studentData[idx];
   curMode='student'; curId=s.nfc; allSessions=[];
+  
+  // Reset NFC Capture state
+  vsNfcActive = false;
 
   document.getElementById('updTitle').textContent = s.name;
   document.getElementById('updSub').textContent   = (s.course||'-')+' | '+(s.year||'-')+' | Section '+(s.section||'-');
@@ -175,6 +180,8 @@ function openStudentRecord(idx){
       ${infoRow('Date of Admission', s.datereg)}
       ${infoRow('Year Level', s.year)}
       ${infoRow('Section', s.section)}
+      ${infoRow('Status', s.status.toUpperCase())}
+      ${infoRow('Enrollment Type', s.enrollment)}
       ${infoRow('Major', s.major)}
       ${infoRow('Class Adviser', s.adviser)}
       ${infoRow('Contact Number', s.contact)}
@@ -252,12 +259,45 @@ function openStudentRecord(idx){
         <input class="upd-input" id="uf_adviser" value="${s.adviser}" placeholder="Prof. Santos"/>
       </div>
     </div>
-    <div class="sec-title">// NFC Card (Cannot be changed)</div>
-    <div class="upd-grid g1">
-      <div class="upd-field"><span class="upd-label">NFC Card UID</span>
-        <input class="upd-input" value="${s.nfc}" readonly style="font-family:'Space Mono',monospace;font-size:12px;"/>
+    <div class="sec-title">// Account & Status</div>
+    <div class="upd-grid">
+      <div class="upd-field"><span class="upd-label">Account Status</span>
+        <select class="upd-input" id="uf_status" style="appearance:none;">
+          <option value="active" ${s.status==='active'?'selected':''}>Active</option>
+          <option value="graduated" ${s.status==='graduated'?'selected':''}>Graduated</option>
+          <option value="alumni" ${s.status==='alumni'?'selected':''}>Alumni</option>
+        </select>
       </div>
-    </div>`;
+      <div class="upd-field"><span class="upd-label">Enrollment Type</span>
+        <select class="upd-input" id="uf_enrollment" style="appearance:none;">
+          <option value="Regular" ${s.enrollment==='Regular'?'selected':''}>Regular</option>
+          <option value="Irregular" ${s.enrollment==='Irregular'?'selected':''}>Irregular</option>
+        </select>
+      </div>
+    </div>
+    <div class="sec-title">// NFC Card</div>
+    <div class="upd-grid g1">
+      <div class="upd-field">
+        <span class="upd-label">NFC Card UID</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input class="upd-input" id="uf_nfc_display" value="${s.nfc}" readonly style="font-family:'Space Mono',monospace;font-size:12px;flex:1;background:rgba(255,255,255,.05);"/>
+          <button type="button" id="btnShowNfcCapture" onclick="toggleNfcCapture()" style="padding:8px 12px;background:var(--accent);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Change UID</button>
+        </div>
+        <input type="hidden" id="vsNewNfcId" value=""/>
+      </div>
+    </div>
+    
+    <!-- NFC Capture Container (Hidden by default) -->
+    <div id="nfcCaptureContainer" style="display:none;margin-top:16px;padding:16px;background:rgba(255,255,255,.03);border:1px dashed var(--accent);border-radius:12px;text-align:center;">
+      <div id="vsNfcIcon" style="font-size:32px;margin-bottom:8px;">💳</div>
+      <div id="vsNfcTitle" style="font-size:14px;font-weight:700;margin-bottom:4px;">Tap NFC card on the reader</div>
+      <div id="vsNfcSub" style="font-size:11px;color:var(--muted);margin-bottom:12px;">Hold the card near the reader — the UID will appear automatically</div>
+      <div id="vsNfcUidDisplay" style="font-family:'Space Mono',monospace;font-size:16px;font-weight:700;color:var(--muted);padding:8px;background:rgba(0,0,0,.2);border-radius:6px;margin-bottom:12px;">No card tapped yet</div>
+      <button type="button" onclick="startPhoneNFC()" style="width:100%;padding:10px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+        <i class="bi bi-phone"></i> Use Phone's NFC
+      </button>
+    </div>
+    `;
 
   // Reset sessions tab
   document.getElementById('sessLogWrap').innerHTML =
@@ -894,3 +934,99 @@ function applyInitialDashboardTab() {
 applyInitialDashboardTab();
 
 fetch('/api/block_number').then(r=>r.json()).then(d=>{if(d.block!==undefined)document.getElementById('blockNum').textContent=d.block;}).catch(()=>{});
+
+// --- NFC Capture Logic for Dashboard Modal ---
+let vsNfcActive = false;
+function toggleNfcCapture() {
+  const container = document.getElementById('nfcCaptureContainer');
+  const btn = document.getElementById('btnShowNfcCapture');
+  vsNfcActive = !vsNfcActive;
+  
+  if (vsNfcActive) {
+    container.style.display = 'block';
+    btn.textContent = 'Cancel Change';
+    btn.style.background = 'var(--danger)';
+    resetVsNfcStrip();
+    refocusNfc();
+  } else {
+    container.style.display = 'none';
+    btn.textContent = 'Change UID';
+    btn.style.background = 'var(--accent)';
+    document.getElementById('vsNewNfcId').value = '';
+  }
+}
+
+function resetVsNfcStrip() {
+  const icon = document.getElementById('vsNfcIcon');
+  const title = document.getElementById('vsNfcTitle');
+  const sub = document.getElementById('vsNfcSub');
+  const display = document.getElementById('vsNfcUidDisplay');
+  if (icon) icon.textContent = '💳';
+  if (title) title.textContent = 'Tap NFC card on the reader';
+  if (sub) sub.textContent = 'Hold the card near the reader — the UID will appear automatically';
+  if (display) {
+    display.textContent = 'No card tapped yet';
+    display.style.color = 'var(--muted)';
+  }
+  const hid = document.getElementById('vsNewNfcId');
+  if (hid) hid.value = '';
+}
+
+function applyVsNfcUid(uid) {
+  if (!vsNfcActive) return;
+  uid = uid.trim().toUpperCase();
+  if (uid.length < 4) return;
+  
+  const hid = document.getElementById('vsNewNfcId');
+  const icon = document.getElementById('vsNfcIcon');
+  const title = document.getElementById('vsNfcTitle');
+  const sub = document.getElementById('vsNfcSub');
+  const display = document.getElementById('vsNfcUidDisplay');
+  
+  if (hid) hid.value = uid;
+  if (icon) icon.textContent = '✅';
+  if (title) title.textContent = 'Card Captured!';
+  if (sub) sub.textContent = 'Click Update to save this new UID.';
+  if (display) {
+    display.textContent = uid;
+    display.style.color = 'var(--success)';
+  }
+}
+
+// Global NFC HID Handler for Dashboard
+const nfcHid = document.getElementById('nfcHidInput');
+let nfcBuf = '', nfcTimer = null;
+function refocusNfc() {
+  const tag = document.activeElement ? document.activeElement.tagName : '';
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+    const hid = document.getElementById('nfcHidInput');
+    if (hid) hid.focus();
+  }
+}
+
+if (nfcHid) {
+  nfcHid.addEventListener('keydown', e => {
+    clearTimeout(nfcTimer);
+    if (e.key === 'Enter') {
+      const u = nfcBuf.trim(); nfcBuf = ''; nfcHid.value = '';
+      if (u) applyVsNfcUid(u);
+      return;
+    }
+    if (e.key.length === 1) { nfcBuf += e.key; nfcHid.value = nfcBuf; }
+    nfcTimer = setTimeout(() => {
+      const u = nfcBuf.trim(); nfcBuf = ''; nfcHid.value = '';
+      if (u) applyVsNfcUid(u);
+    }, 300);
+  });
+  document.addEventListener('click', refocusNfc);
+  nfcHid.addEventListener('blur', () => setTimeout(refocusNfc, 150));
+}
+
+// Poll for phone NFC changes if active
+setInterval(() => {
+  if (vsNfcActive && window.lastNfcUid) {
+    applyVsNfcUid(window.lastNfcUid);
+    window.lastNfcUid = null;
+  }
+}, 500);
+

@@ -445,44 +445,13 @@
   };
 </script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=1.1"></script>
-  
-  // Confirm semester move
-  async function confirmMoveSemester() {
-    if (!currentEditStudent) return;
-    const newSem = document.getElementById('newSemesterSelect').value;
-    const newYear = document.getElementById('newSchoolYear').value;
-    if (!newYear || !newYear.match(/^\d{4}-\d{4}$/)) return;
-    
-    const btn = event.target;
-    btn.disabled = true;
-    btn.textContent = 'Moving...';
-    
-    try {
-      const response = await fetch(`/api/student/move-semester/${currentEditStudent.nfcId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ new_semester: newSem, new_school_year: newYear })
-      });
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      
-      closeSemesterModal();
-      location.reload();
-    } catch (error) {
-      console.error('Failed to move semester:', error);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Move Student';
-    }
-  }
-  
-  // Close modal when clicking overlay
+<script>
+  // Filter listeners
   document.addEventListener('click', (e) => {
     if (e.target.id === 'statusModal') closeStatusModal();
     if (e.target.id === 'semesterModal') closeSemesterModal();
   });
   
-  // Add event listeners to filters
   document.getElementById('st_search')?.addEventListener('input', filterStudents);
   document.getElementById('st_course')?.addEventListener('change', filterStudents);
   document.getElementById('st_year')?.addEventListener('change', filterStudents);

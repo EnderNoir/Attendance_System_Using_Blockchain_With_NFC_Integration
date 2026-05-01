@@ -1188,6 +1188,37 @@ setInterval(() => {
   }
 }, 500);
 
+function showAppSuccess(message) {
+  const popup = document.createElement('div');
+  popup.className = 'app-success-popup';
+  popup.innerHTML = `
+    <div class="asp-content">
+      <div class="asp-icon"><i class="bi bi-check-circle-fill"></i></div>
+      <div class="asp-text">${message}</div>
+    </div>
+  `;
+  document.body.appendChild(popup);
+  setTimeout(() => popup.classList.add('show'), 10);
+  setTimeout(() => {
+    popup.classList.remove('show');
+    setTimeout(() => popup.remove(), 400);
+  }, 3000);
+}
+
+function moveUpAllStudents() {
+  const modal = document.getElementById('semesterModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    const syInput = document.getElementById('newSchoolYear');
+    if (syInput) syInput.value = '';
+  }
+}
+
+function closeSemesterModal() {
+  const modal = document.getElementById('semesterModal');
+  if (modal) modal.style.display = 'none';
+}
+
 async function confirmMoveSemester() {
   const currentSem = document.getElementById('currentSemesterSelect').value;
   const newSem = document.getElementById('newSemesterSelect').value;
@@ -1200,7 +1231,7 @@ async function confirmMoveSemester() {
 
   if (!confirm(`Are you sure you want to move students from ${currentSem} to ${newSem} (${newSY})?`)) return;
 
-  const btn = document.querySelector('.semester-modal .btn-primary');
+  const btn = document.querySelector('#semesterModal .btn-primary');
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span> Moving...';
 
@@ -1228,12 +1259,4 @@ async function confirmMoveSemester() {
     btn.disabled = false;
     btn.innerHTML = 'Move Student';
   }
-}
-
-function closeSemesterModal() {
-  document.getElementById('semesterModal').style.display = 'none';
-}
-
-function moveUpAllStudents() {
-  document.getElementById('semesterModal').style.display = 'flex';
 }

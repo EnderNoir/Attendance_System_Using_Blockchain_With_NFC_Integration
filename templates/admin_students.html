@@ -2,6 +2,12 @@
 {% block title %}Student Management — DAVS{% endblock %}
 {% block page_title %}STUDENT MANAGEMENT{% endblock %}
 {% block content %}
+<!-- Global NFC HID input — shared by modal -->
+<input id="nfcHidInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+  tabindex="0" style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;
+         pointer-events:none;border:none;outline:none;background:transparent;
+         color:transparent;z-index:-1;font-size:1px;" aria-hidden="true" />
+
 
 <style>
 .student-management-container {
@@ -342,11 +348,11 @@
     </div>
     <div class="stat-card">
       <div class="stat-value" id="countGraduated">0</div>
-      <div class="stat-label">Graduated</div>
+      <div class="stat-label">Graduate / Alumni</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value" id="countActive">0</div>
-      <div class="stat-label">Total Active Students</div>
+      <div class="stat-value" id="countTotal">0</div>
+      <div class="stat-label">Total Students</div>
     </div>
   </div>
 
@@ -400,7 +406,6 @@
   <div class="modal-content" style="max-width: 500px; padding: 0; overflow: hidden;">
     <div style="padding: 16px 24px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between;">
       <h3 style="margin: 0; font-size: 18px; color: var(--text);" id="vsTitle">Student Details</h3>
-      <button onclick="closeModal('viewStudentModal')" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted);"><i class="bi bi-x"></i></button>
     </div>
     
     <div style="display: flex; border-bottom: 1px solid var(--border-color); background: var(--bg-secondary);">
@@ -431,9 +436,27 @@
         </select>
       </div>
       <div class="form-group mb-3">
-        <label class="form-label">Change NFC UID</label>
-        <input type="text" class="form-control" id="vsEditNfc" placeholder="Tap card or enter UID" onkeyup="if(event.key==='Enter') confirmStudentUpdate()"/>
-        <small style="color:var(--muted); font-size: 11px;">Select this field and tap the new card to auto-fill.</small>
+        <label class="form-label">NFC Card</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="text" class="form-control" id="vsEditNfc" readonly style="background: var(--bg); color: var(--muted); cursor: not-allowed;"/>
+          <button type="button" class="btn-status" id="btnShowNfcCapture" onclick="toggleNfcCapture()">Change UID</button>
+        </div>
+      </div>
+
+      <!-- NFC Capture Container (Hidden by default) -->
+      <div id="nfcCaptureContainer" style="display: none; margin-top: 12px; padding: 16px; border: 1px dashed var(--accent); border-radius: 8px; background: rgba(var(--accent-rgb), 0.05);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div id="vsNfcIcon" style="font-size: 24px;">💳</div>
+          <div style="flex: 1;">
+            <div id="vsNfcTitle" style="font-size: 13px; font-weight: 700;">Tap NFC card on the reader</div>
+            <div id="vsNfcSub" style="font-size: 11px; color: var(--muted);">Hold the card near the reader — the UID will appear automatically</div>
+            <div id="vsNfcUidDisplay" style="font-family: monospace; font-size: 12px; font-weight: 700; color: var(--accent); margin-top: 4px;">No card tapped yet</div>
+          </div>
+          <button type="button" class="btn-status" onclick="startPhoneNFC()" style="font-size: 11px;">
+            <i class="bi bi-phone"></i> Use Phone's NFC
+          </button>
+        </div>
+        <input type="hidden" id="vsNewNfcId" />
       </div>
       <div style="margin-top: 20px;">
         <button class="btn-modal confirm" style="width: 100%; padding: 12px; border-radius: 8px;" onclick="confirmStudentUpdate()">Apply Changes</button>
@@ -513,7 +536,7 @@ function updateStats() {
   document.getElementById('countRegular').textContent = regular;
   document.getElementById('countIrregular').textContent = irregular;
   document.getElementById('countGraduated').textContent = graduated;
-  document.getElementById('countActive').textContent = activeStudents.length;
+  document.getElementById('countTotal').textContent = allStudents.length;
 }
 
 function filterByStatus(status) {
@@ -574,18 +597,17 @@ function renderStudents() {
     
     const isAct = student.student_status === 'active';
     const isReg = student.enrollment_status === 'Regular' || !student.enrollment_status;
+    const typeLabel = isReg ? 'REGULAR' : 'IRREGULAR';
     const badgeHtml = isAct
-      ? (isReg 
-          ? `<span class="status-badge" style="background:rgba(46,204,113,.1);color:var(--success);">REGULAR</span>`
-          : `<span class="status-badge" style="background:rgba(192,57,43,.1);color:var(--danger);">IRREGULAR</span>`)
+      ? `<span class="status-badge" style="background:rgba(${isReg ? '46,204,113' : '231,76,60'},.1);color:var(--${isReg ? 'success' : 'danger'});">${typeLabel}</span>`
       : `<span class="status-badge badge-${student.student_status}">${student.student_status.toUpperCase()}</span>`;
 
     return `
     <div class="student-card">
       <div class="student-info">
         <div class="student-name" style="display:flex; align-items:center;">
-          ${badgeHtml}
           ${photoHtml}
+          <div style="margin-right: 8px;">${badgeHtml}</div>
           ${student.full_name}
         </div>
         <div class="student-details">
@@ -626,10 +648,96 @@ function switchVsTab(tabId) {
   document.querySelectorAll('.vs-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('vsPane' + tabId.charAt(0).toUpperCase() + tabId.slice(1)).style.display = 'block';
   document.getElementById('vsTab' + tabId.charAt(0).toUpperCase() + tabId.slice(1)).classList.add('active');
-  if (tabId === 'update') {
-    setTimeout(() => document.getElementById('vsEditNfc').focus(), 100);
+  
+  // Hide NFC capture when switching tabs or if it's not the update tab
+  if (tabId !== 'update') {
+    document.getElementById('nfcCaptureContainer').style.display = 'none';
   }
 }
+
+let vsNfcActive = false;
+function toggleNfcCapture() {
+  const container = document.getElementById('nfcCaptureContainer');
+  const btn = document.getElementById('btnShowNfcCapture');
+  vsNfcActive = !vsNfcActive;
+  
+  if (vsNfcActive) {
+    container.style.display = 'block';
+    btn.textContent = 'Cancel Change';
+    btn.classList.add('primary');
+    resetVsNfcStrip();
+    refocusNfc();
+  } else {
+    container.style.display = 'none';
+    btn.textContent = 'Change UID';
+    btn.classList.remove('primary');
+    document.getElementById('vsNewNfcId').value = '';
+  }
+}
+
+function resetVsNfcStrip() {
+  document.getElementById('vsNfcIcon').textContent = '💳';
+  document.getElementById('vsNfcTitle').textContent = 'Tap NFC card on the reader';
+  document.getElementById('vsNfcSub').textContent = 'Hold the card near the reader — the UID will appear automatically';
+  document.getElementById('vsNfcUidDisplay').textContent = 'No card tapped yet';
+  document.getElementById('vsNfcUidDisplay').style.color = 'var(--muted)';
+  document.getElementById('vsNewNfcId').value = '';
+}
+
+function applyVsNfcUid(uid) {
+  if (!vsNfcActive) return;
+  uid = uid.trim().toUpperCase();
+  if (uid.length < 4) return;
+  
+  document.getElementById('vsNewNfcId').value = uid;
+  document.getElementById('vsNfcIcon').textContent = '✅';
+  document.getElementById('vsNfcTitle').textContent = 'Card Captured!';
+  document.getElementById('vsNfcSub').textContent = 'Click Apply Changes to save this new UID.';
+  document.getElementById('vsNfcUidDisplay').textContent = uid;
+  document.getElementById('vsNfcUidDisplay').style.color = 'var(--success)';
+}
+
+// Global NFC HID Handler for this page
+const nfcHid = document.getElementById('nfcHidInput');
+let nfcBuf = '', nfcTimer = null;
+function refocusNfc() {
+  const tag = document.activeElement ? document.activeElement.tagName : '';
+  if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') nfcHid.focus();
+}
+nfcHid.addEventListener('keydown', e => {
+  clearTimeout(nfcTimer);
+  if (e.key === 'Enter') {
+    const u = nfcBuf.trim(); nfcBuf = ''; nfcHid.value = '';
+    if (u) applyVsNfcUid(u);
+    return;
+  }
+  if (e.key.length === 1) { nfcBuf += e.key; nfcHid.value = nfcBuf; }
+  nfcTimer = setTimeout(() => {
+    const u = nfcBuf.trim(); nfcBuf = ''; nfcHid.value = '';
+    if (u) applyVsNfcUid(u);
+  }, 300);
+});
+document.addEventListener('click', refocusNfc);
+nfcHid.addEventListener('blur', () => setTimeout(refocusNfc, 150));
+
+// Override base.js startPhoneNFC to pipe into our local applier if modal open
+const _origStartPhoneNFC = window.startPhoneNFC;
+window.startPhoneNFC = function() {
+  // If we are on this page and the modal is active, we can intercept the capture
+  // But base.js usually just alerts or uses a global. 
+  // Let's ensure base.js uses a callback if possible, or just poll.
+  // Actually, base.js in this project usually sets window.lastNfcUid.
+  _origStartPhoneNFC();
+};
+
+// Poll for phone NFC changes if active
+setInterval(() => {
+  if (vsNfcActive && window.lastNfcUid) {
+    applyVsNfcUid(window.lastNfcUid);
+    window.lastNfcUid = null;
+  }
+}, 500);
+
 
 function openViewStudentModal(nfcId) {
   const student = allStudents.find(s => s.nfcId === nfcId);
@@ -637,6 +745,13 @@ function openViewStudentModal(nfcId) {
   currentEditStudent = student;
   document.getElementById('vsTitle').textContent = student.full_name;
   
+  // Reset NFC Capture state
+  vsNfcActive = false;
+  document.getElementById('nfcCaptureContainer').style.display = 'none';
+  document.getElementById('btnShowNfcCapture').textContent = 'Change UID';
+  document.getElementById('btnShowNfcCapture').classList.remove('primary');
+  document.getElementById('vsNewNfcId').value = '';
+
   const photoHtml = student.photo_file 
     ? `<img src="/static/uploads/${student.photo_file}?t=${Date.now()}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);"/>`
     : `<div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2ecc71);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:white;">${student.full_name.charAt(0).toUpperCase()}</div>`;
@@ -673,9 +788,13 @@ async function confirmStudentUpdate() {
   if (!currentEditStudent) return;
   const newStatus = document.getElementById('vsEditStatus').value;
   const newEnrollment = document.getElementById('vsEditEnrollment').value;
-  const newNfc = document.getElementById('vsEditNfc').value.trim();
+  
+  // Use new captured NFC ID if present, otherwise keep old one
+  const capturedNfc = document.getElementById('vsNewNfcId').value.trim();
+  const newNfc = capturedNfc || currentEditStudent.nfcId;
   
   const btn = event.target;
+  const oldText = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Applying...';
   
@@ -695,7 +814,9 @@ async function confirmStudentUpdate() {
       throw new Error(data.error || 'Failed to update');
     }
     
-    closeModal('viewStudentModal');
+    // Auto close and refresh
+    document.getElementById('viewStudentModal').classList.remove('active');
+    currentEditStudent = null;
     await loadStudents();
     showMsg('Student profile updated successfully', 'success');
   } catch (error) {
@@ -703,7 +824,7 @@ async function confirmStudentUpdate() {
     showMsg(error.message || 'Failed to update student profile', 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Apply Changes';
+    btn.textContent = oldText;
   }
 }
 

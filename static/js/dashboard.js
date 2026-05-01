@@ -202,6 +202,24 @@ function openStudentRecord(idx){
     ? `<img src="/static/uploads/${s.photo}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
     : `<span style="font-size:22px;font-weight:700;color:#000;">${s.name[0].toUpperCase()}</span>`;
 
+    const teacherOpts = Object.values(teacherData).map(t => 
+      `<option value="${t.name}" ${s.adviser === t.name ? 'selected' : ''}>${t.name}</option>`
+    ).join('');
+
+    const nameParts = s.name.split(' ');
+    let firstName = '', middleInitial = '', lastName = '';
+    
+    if (nameParts.length >= 3) {
+      lastName = nameParts[nameParts.length - 1];
+      middleInitial = nameParts[nameParts.length - 2];
+      firstName = nameParts.slice(0, -2).join(' ');
+    } else if (nameParts.length === 2) {
+      lastName = nameParts[1];
+      firstName = nameParts[0];
+    } else {
+      firstName = s.name;
+    }
+
   document.getElementById('editContent').innerHTML = `
     <div class="photo-upload-block">
       <div class="photo-avatar-preview" id="editPhotoPreview" onclick="document.getElementById('updPhotoInput').click()" title="Click to change photo">${editPhotoInner}</div>
@@ -227,8 +245,14 @@ function openStudentRecord(idx){
     </div>
     <div class="sec-title">// Personal Information</div>
     <div class="upd-grid">
-      <div class="upd-field" style="grid-column:1/-1"><span class="upd-label">Full Name *</span>
-        <input class="upd-input" id="uf_name" value="${s.name}" placeholder="Juan Dela Cruz"/>
+      <div class="upd-field"><span class="upd-label">First Name *</span>
+        <input class="upd-input" id="uf_fname" value="${firstName}" placeholder="Juan"/>
+      </div>
+      <div class="upd-field"><span class="upd-label">Middle Initial</span>
+        <input class="upd-input" id="uf_mi" value="${middleInitial}" placeholder="D." maxlength="2"/>
+      </div>
+      <div class="upd-field"><span class="upd-label">Last Name *</span>
+        <input class="upd-input" id="uf_lname" value="${lastName}" placeholder="Dela Cruz"/>
       </div>
       <div class="upd-field"><span class="upd-label">Student ID</span>
         <input class="upd-input" id="uf_sid" value="${s.sid}" placeholder="e.g. 2021-00123"/>
@@ -255,7 +279,10 @@ function openStudentRecord(idx){
         <input class="upd-input" id="uf_major" value="${s.major==='N/A'?'':s.major}" placeholder="e.g. Software Engineering"/>
       </div>
       <div class="upd-field"><span class="upd-label">Class Adviser *</span>
-        <input class="upd-input" id="uf_adviser" value="${s.adviser}" placeholder="Prof. Santos"/>
+        <select class="upd-input" id="uf_adviser" style="appearance:none;">
+          <option value="">- Select Teacher -</option>
+          ${teacherOpts}
+        </select>
       </div>
     </div>
     <div class="sec-title">// Account & Status</div>
@@ -757,12 +784,20 @@ function saveUpdate(){
   else if(curMode==='teacher') saveTeacherUpdate();
 }
 
-function saveStudentUpdate() {
-  const btn = document.getElementById('updSaveBtn');
+async function saveStudentUpdate() {
   const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+  const btn = document.getElementById('updSaveBtn');
   
+  const fname = g('uf_fname');
+  const mi = g('uf_mi');
+  const lname = g('uf_lname');
+  const fullName = `${fname} ${mi} ${lname}`.replace(/\s+/g, ' ').trim();
+
   const payload = {
-    full_name: g('uf_name'),
+    first_name: fname,
+    middle_initial: mi,
+    last_name: lname,
+    full_name: fullName,
     student_id: g('uf_sid'),
     email: g('uf_email'),
     contact: g('uf_contact'),
@@ -778,23 +813,28 @@ function saveStudentUpdate() {
     new_nfc_id: document.getElementById('vsNewNfcId')?.value.trim() || ''
   };
 
-  btn.disabled = true;
-  btn.innerHTML = '<i class="bi bi-hourglass"></i> Saving...';
+  if (!payload.first_name || !payload.last_name || !payload.course || !payload.year_level || !payload.section) {
+    alert('Please fill in all required fields.');
+    return;
+  }
 
-  fetch('/api/student/update-profile/' + curId, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  .then(r => r.json())
-  .then(d => {
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+
+  try {
+    const r = await fetch(`/api/student/update-profile/${curId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
     if (d.ok) {
-      // Update local studentData array
+      // Show Success Pop-up
+      showAppSuccess('Student profile updated successfully!');
+      
+      // Update local data
       const s = studentData.find(x => x.nfc === curId);
       if (s) {
-        Object.assign(s, {
-          name: payload.full_name,
           sid: payload.student_id,
           course: payload.course,
           year: payload.year_level,
@@ -917,6 +957,7 @@ function filterStudents(){
   const crs=document.getElementById('st_course')?.value;
   const yr=document.getElementById('st_year')?.value;
   const sec=document.getElementById('st_section')?.value;
+  const sem=document.getElementById('st_semester')?.value;
   const status=document.getElementById('st_status')?.value;
   
   let shown=0;
@@ -926,6 +967,7 @@ function filterStudents(){
     const rowCourse = r.dataset.course;
     const rowYear = r.dataset.year;
     const rowSection = r.dataset.section;
+    const rowSemester = r.dataset.semester;
     const rowStatus = r.dataset.status || 'active';
     const rowEnrollment = r.dataset.enrollment || 'Regular';
 
@@ -934,6 +976,7 @@ function filterStudents(){
     if (crs && rowCourse !== crs) m = false;
     if (yr && rowYear !== yr) m = false;
     if (sec && rowSection !== sec) m = false;
+    if (sem && rowSemester !== sem) m = false;
     
     if (status === 'regular') {
       if (rowStatus !== 'active' || rowEnrollment !== 'Regular') m = false;

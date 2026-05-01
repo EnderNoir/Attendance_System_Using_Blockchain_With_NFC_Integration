@@ -21,7 +21,9 @@
         <h3 id="updTitle">-</h3>
         <p id="updSub">-</p>
       </div>
-      <button onclick="closeUpdModal()" style="display:none;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;"><i class="bi bi-x-lg"></i></button>
+      <button class="btn-outline" onclick="closeUpdModal()" style="padding:6px 12px;font-size:12px;border-radius:6px;display:flex;align-items:center;gap:6px;">
+        <i class="bi bi-arrow-left"></i> Back
+      </button>
     </div>
 
     <div class="modal-tabs" id="modalTabs">
@@ -38,8 +40,7 @@
     <div class="mpane" id="mpane-edit">
       <div id="editContent"></div>
       <div class="upd-footer">
-        <button class="btn-outline" onclick="closeUpdModal()"><i class="bi bi-arrow-left"></i> Back</button>
-        <button class="btn-primary" id="updSaveBtn" onclick="curMode==='student'?saveStudentUpdate():saveTeacherUpdate()">
+        <button class="btn-primary" id="updSaveBtn" onclick="curMode==='student'?saveStudentUpdate():saveTeacherUpdate()" style="width:100%;">
           <i class="bi bi-check-circle-fill"></i> Update
         </button>
       </div>

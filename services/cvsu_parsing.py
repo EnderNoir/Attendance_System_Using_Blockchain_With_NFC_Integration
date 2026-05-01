@@ -175,6 +175,21 @@ def _extract_cvsu_fields(full: str) -> dict:
     if raw_name:
         result['name'] = raw_name.title()
         result['email'] = _generate_cvsu_email(raw_name)
+        
+        # Split name into first, middle, last
+        parts = raw_name.split()
+        if len(parts) >= 3:
+            result['last_name'] = parts[-1].title()
+            result['middle_initial'] = parts[-2].title()
+            result['first_name'] = ' '.join(parts[:-2]).title()
+        elif len(parts) == 2:
+            result['last_name'] = parts[-1].title()
+            result['first_name'] = parts[0].title()
+            result['middle_initial'] = ''
+        else:
+            result['first_name'] = raw_name.title()
+            result['middle_initial'] = ''
+            result['last_name'] = ''
 
     result['adviser'] = next_line(r'Adviser|Advisor')
     result['contact'] = next_line(r'Contact\s*(?:No\.?|Number)')
@@ -187,21 +202,25 @@ def _extract_cvsu_fields(full: str) -> dict:
         raw_date = _m.group(1).replace('\t', ' ').strip()
         break
     if raw_date:
-        dm = re.search(r'(\d{1,2})[-\s/]+([A-Za-z]+)[-\s/]+(\d{4})', raw_date)
+        # Match "Wed, 01 Mar 2023 | 1:45:14 PM" or similar
+        dm = re.search(r'([A-Za-z]+),\s*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})', raw_date)
         if dm:
+            # Result: "March 2023"
             try:
-                d = datetime.strptime(f"{dm.group(2)} {dm.group(3)}", "%b %Y")
-                result['date_registered'] = d.strftime('%Y-%m')
-            except Exception:
-                pass
+                # Group 3 is month (e.g. Mar), Group 4 is year (e.g. 2023)
+                mon = dm.group(3)
+                yr = dm.group(4)
+                d = datetime.strptime(f"{mon} {yr}", "%b %Y")
+                result['date_registered'] = d.strftime('%B %Y')
+            except Exception: pass
         if not result['date_registered']:
+            # Fallback for "Mar 2023"
             dm2 = re.search(r'([A-Za-z]+)\s+(\d{4})', raw_date)
             if dm2:
                 try:
                     d = datetime.strptime(f"{dm2.group(1)} {dm2.group(2)}", "%b %Y")
-                    result['date_registered'] = d.strftime('%Y-%m')
-                except Exception:
-                    pass
+                    result['date_registered'] = d.strftime('%B %Y')
+                except Exception: pass
 
     raw_course = next_line(r'Course').strip().upper()
     result['course'] = abbr_course.get(raw_course, '')

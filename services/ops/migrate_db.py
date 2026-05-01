@@ -26,6 +26,9 @@ if DATABASE_URL.startswith('postgres://'):
 COLUMNS_TO_ADD = [
     # students table
     ("students", "full_name",       "TEXT NOT NULL DEFAULT ''"),
+    ("students", "first_name",      "TEXT NOT NULL DEFAULT ''"),
+    ("students", "middle_initial",  "TEXT NOT NULL DEFAULT ''"),
+    ("students", "last_name",       "TEXT NOT NULL DEFAULT ''"),
     ("students", "program",         "TEXT NOT NULL DEFAULT ''"),
     ("students", "student_id",      "TEXT NOT NULL DEFAULT ''"),
     ("students", "year_level",      "TEXT NOT NULL DEFAULT ''"),

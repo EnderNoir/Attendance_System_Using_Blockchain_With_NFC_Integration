@@ -110,7 +110,10 @@ function s_autofill(d) {
   // Generate email from name if server didn't return one
   const emailVal = d.email || cvsuEmail(d.name || '');
   const map = {
-    f_student_id: d.student_id, f_name: d.name,
+    f_student_id: d.student_id, 
+    f_fname: d.first_name,
+    f_mi: d.middle_initial,
+    f_lname: d.last_name,
     f_email: emailVal,
     f_contact: d.contact, f_section: d.section,
     f_adviser: d.adviser, f_major: d.major,
@@ -209,7 +212,8 @@ function previewStudentPhoto(input) {
 function validateRegisterForm() {
   let ok = true;
   const req = [
-    { id: 'f_name', msg: 'Full name required.' },
+    { id: 'f_fname', msg: 'First name required.' },
+    { id: 'f_lname', msg: 'Last name required.' },
     { id: 'f_student_id', msg: 'Student ID required.' },
     { id: 'f_course', msg: 'Select a program.' },
     { id: 'f_year_level', msg: 'Select year level.' },
@@ -337,7 +341,8 @@ function renderReviewTable() {
     // Ensure email shown is always populated
     if (!s.email && s.name) s.email = cvsuEmail(s.name);
 
-    const nameHtml = (s.name || '<em style="color:var(--muted)">—</em>') + (missName ? '<span class="miss-badge">!</span>' : '');
+    const fullName = s.full_name || s.name || `${s.first_name || ''} ${s.middle_initial || ''} ${s.last_name || ''}`.trim();
+    const nameHtml = (fullName || '<em style="color:var(--muted)">—</em>') + (missName ? '<span class="miss-badge">!</span>' : '');
     const sidHtml = (s.student_id || '<em style="color:var(--muted)">—</em>') + (missSid ? '<span class="miss-badge">!</span>' : '');
     const courseHtml = (s.course || '<em style="color:var(--muted)">—</em>') + (missCourse ? '<span class="miss-badge">!</span>' : '');
     const yearSec = [s.year_level, s.section].filter(Boolean).join(' / ') || '<em style="color:var(--muted)">—</em>';
@@ -397,9 +402,15 @@ function buildIEFields(s, i) {
   const emailVal = s.email || cvsuEmail(s.name || '');
 
   return `
-    <div class="ie-field"><label class="ie-label">Full Name *</label>
-      <input class="ie-input ${!s.name ? 'warn' : ''}" id="ie_name_${i}" value="${esc(s.name)}" placeholder="Full Name"
-             oninput="autoEmailFromName(${i})"/></div>
+    <div class="ie-field"><label class="ie-label">First Name *</label>
+      <input class="ie-input" id="ie_fname_${i}" value="${esc(s.first_name || '')}" placeholder="First Name"
+             oninput="autoEmailFromNameParts(${i})"/></div>
+    <div class="ie-field"><label class="ie-label">Middle Initial</label>
+      <input class="ie-input" id="ie_mi_${i}" value="${esc(s.middle_initial || '')}" placeholder="D." maxlength="2"
+             oninput="autoEmailFromNameParts(${i})"/></div>
+    <div class="ie-field"><label class="ie-label">Last Name *</label>
+      <input class="ie-input" id="ie_lname_${i}" value="${esc(s.last_name || '')}" placeholder="Last Name"
+             oninput="autoEmailFromNameParts(${i})"/></div>
     <div class="ie-field"><label class="ie-label">Student ID</label>
       <input class="ie-input ${!s.student_id ? 'warn' : ''}" id="ie_sid_${i}" value="${esc(s.student_id)}" placeholder="e.g. 2021-00123"/></div>
     <div class="ie-field"><label class="ie-label">Course *</label>
@@ -431,12 +442,15 @@ function buildIEFields(s, i) {
       </select></div>`;
 }
 
-// Live email update when name is changed in edit row
-function autoEmailFromName(i) {
-  const nameEl = document.getElementById(`ie_name_${i}`);
+// Live email update when name parts are changed
+function autoEmailFromNameParts(i) {
+  const f = document.getElementById(`ie_fname_${i}`)?.value || '';
+  const m = document.getElementById(`ie_mi_${i}`)?.value || '';
+  const l = document.getElementById(`ie_lname_${i}`)?.value || '';
   const emailEl = document.getElementById(`ie_email_${i}`);
-  if (!nameEl || !emailEl) return;
-  const generated = cvsuEmail(nameEl.value);
+  if (!emailEl) return;
+  const fullName = `${f} ${m} ${l}`.replace(/\s+/g, ' ').trim();
+  const generated = cvsuEmail(fullName);
   if (generated) emailEl.value = generated;
 }
 
@@ -453,7 +467,10 @@ function toggleInlineEdit(i) {
 function saveInlineEdit(i) {
   const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
   const s = b_students[i];
-  s.name = g(`ie_name_${i}`) || s.name;
+  s.first_name = g(`ie_fname_${i}`) || s.first_name;
+  s.middle_initial = g(`ie_mi_${i}`) || s.middle_initial;
+  s.last_name = g(`ie_lname_${i}`) || s.last_name;
+  s.name = `${s.first_name} ${s.middle_initial} ${s.last_name}`.replace(/\s+/g, ' ').trim();
   s.student_id = g(`ie_sid_${i}`) || s.student_id;
   s.course = g(`ie_course_${i}`) || s.course;
   s.year_level = g(`ie_year_${i}`) || s.year_level;

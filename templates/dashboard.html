@@ -433,7 +433,6 @@
 
 {% endblock %}
 {% block extra_scripts %}
-<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=1.1"></script>
 <script>
   window.DASHBOARD_BOOTSTRAP = {
     students: {{ students | tojson }},
@@ -442,6 +441,9 @@
     currentRole: {{ session.get('role','') | tojson }},
     currentUsername: {{ session.get('username','') | tojson }}
   };
+</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}?v=1.1"></script>
+<script>
   // Initialize student list on page load
   function initializeStudentList() {
     sortStudentsAlphabetically();

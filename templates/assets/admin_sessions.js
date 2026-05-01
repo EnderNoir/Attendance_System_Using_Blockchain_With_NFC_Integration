@@ -341,6 +341,7 @@ function renderSessModal(sessId, data) {
         <th>Student Name</th>
         <th>Student ID</th>
         <th>${classType === 'school_event' ? 'Program-Year-Section' : 'Class Type'}</th>
+        <th>Enrollment Type</th>
         <th>Status</th>
         <th>Tapped Time</th>
         <th>Excused Reason</th>
@@ -363,6 +364,7 @@ function renderSessModal(sessId, data) {
             <td style="font-weight:600;">${st.name || '-'}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '-'}</td>
             <td style="font-size:11px;color:var(--muted);">${classType === 'school_event' ? (st.section_origin || '-') : classTypeLabel}</td>
+            <td><span style="font-size:10px; font-weight:700; color:${(st.enrollment_status||'Regular')==='Irregular'?'var(--danger)':'var(--success)'};">${st.enrollment_status||'Regular'}</span></td>
             <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || status}</span></td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${displayTapTime}</td>
             <td style="font-size:11px;">${status === 'excused' ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>${reasonDetail}` : '<span style="color:var(--muted);">-</span>'}</td>

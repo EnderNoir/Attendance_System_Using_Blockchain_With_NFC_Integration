@@ -625,6 +625,7 @@ function renderSessions(sessions){
                 <th>Tapped Time</th>
                 <th>Transaction Number (TX)</th>
                 <th>Block Number</th>
+                <th>Enrollment Type</th>
                 <th>Status</th>
                 <th>Excused Reason</th>
                 <th>Document</th>
@@ -655,6 +656,7 @@ function renderSessions(sessions){
                   <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? toAmPm(s.tap_time.split(' ')[1]||s.tap_time) : '—'}</td>
                   <td>${tx}</td>
                   <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '-'}</td>
+                  <td><span style="font-size:10px; font-weight:700; color:${(s.enrollment_status||'Regular')==='Irregular'?'var(--danger)':'var(--success)'};">${s.enrollment_status||'Regular'}</span></td>
                   <td><span class="status-badge ${sbClass}">${statusLabel}</span></td>
                   <td>${reason}</td>
                   <td>${doc}</td>
@@ -1302,11 +1304,18 @@ function showAppSuccess(message) {
     <div class="upd-box" style="max-width:400px;text-align:center;padding:32px 24px;">
       <div style="font-size:48px;color:var(--success);margin-bottom:16px;"><i class="bi bi-check-circle-fill"></i></div>
       <h3 style="margin-bottom:8px;">Success!</h3>
-      <p style="color:var(--muted);font-size:14px;margin-bottom:24px;">${message}</p>
-      <button class="btn-primary" onclick="this.closest('.upd-overlay').remove()" style="width:100%;padding:10px;">Great</button>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:8px;">${message}</p>
     </div>
   `;
   document.body.appendChild(modal);
+
+  // Auto-close after 2 seconds
+  setTimeout(() => {
+    if (modal.parentNode) {
+      modal.classList.remove('show');
+      setTimeout(() => modal.remove(), 400);
+    }
+  }, 2000);
 }
 
 function moveUpAllStudents() {

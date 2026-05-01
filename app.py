@@ -963,6 +963,7 @@ def init_db():
         reg_tx_hash     TEXT NOT NULL DEFAULT '',
         reg_block       INTEGER NOT NULL DEFAULT 0,
         photo_file      TEXT NOT NULL DEFAULT '',
+        enrollment_status TEXT NOT NULL DEFAULT 'Regular',
         created_at      TEXT NOT NULL DEFAULT '',
         updated_at      TEXT NOT NULL DEFAULT ''
     );
@@ -1695,21 +1696,21 @@ def db_save_student(s):
     with get_db() as conn:
         conn.execute(
             "INSERT INTO students "
-            "(nfc_id,full_name,student_id,program,year_level,section,"
-            " adviser,email,contact,major,semester,school_year,"
-            " date_registered,raw_name,eth_address,reg_tx_hash,reg_block,"
-            " photo_file,enrollment_status,created_at,updated_at) "
+            "(nfc_id, full_name, student_id, program, year_level, section, "
+            "adviser, email, contact, major, semester, school_year, "
+            "date_registered, raw_name, eth_address, reg_tx_hash, reg_block, "
+            "photo_file, enrollment_status, created_at, updated_at) "
             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(nfc_id) DO UPDATE SET "
-            "full_name=excluded.full_name, student_id=excluded.student_id, "
-            "program=excluded.program, year_level=excluded.year_level, "
-            "section=excluded.section, adviser=excluded.adviser, "
-            "email=excluded.email, contact=excluded.contact, major=excluded.major, "
-            "semester=excluded.semester, school_year=excluded.school_year, "
-            "date_registered=excluded.date_registered, raw_name=excluded.raw_name, "
-            "eth_address=excluded.eth_address, reg_tx_hash=excluded.reg_tx_hash, "
-            "reg_block=excluded.reg_block, photo_file=excluded.photo_file, "
-            "enrollment_status=excluded.enrollment_status, updated_at=excluded.updated_at",
+            "full_name=EXCLUDED.full_name, student_id=EXCLUDED.student_id, "
+            "program=EXCLUDED.program, year_level=EXCLUDED.year_level, "
+            "section=EXCLUDED.section, adviser=EXCLUDED.adviser, "
+            "email=EXCLUDED.email, contact=EXCLUDED.contact, major=EXCLUDED.major, "
+            "semester=EXCLUDED.semester, school_year=EXCLUDED.school_year, "
+            "date_registered=EXCLUDED.date_registered, raw_name=EXCLUDED.raw_name, "
+            "eth_address=EXCLUDED.eth_address, reg_tx_hash=EXCLUDED.reg_tx_hash, "
+            "reg_block=EXCLUDED.reg_block, photo_file=EXCLUDED.photo_file, "
+            "enrollment_status=EXCLUDED.enrollment_status, updated_at=EXCLUDED.updated_at",
             (
                 s.get('nfcId', s.get('nfc_id','')),
                 s.get('name',  s.get('full_name','')),
@@ -1722,8 +1723,8 @@ def db_save_student(s):
                 s.get('date_registered',''),
                 s.get('raw_name',''),
                 s.get('address', s.get('eth_address','')),
-                '',  # ← ALWAYS EMPTY: reg_tx_hash must never be populated for student identity
-                0,   # ← ALWAYS 0: reg_block must never be populated
+                '',  # ALWAYS EMPTY: reg_tx_hash must never be populated for student identity
+                0,   # ALWAYS 0: reg_block must never be populated
                 s.get('photo_file',''),
                 s.get('enrollment_status', 'Regular'),
                 s.get('created_at', now), now
@@ -4619,8 +4620,18 @@ def register():
             except Exception as e:
                 print(f"[BLOCKCHAIN ERROR] Failed on-chain registration for {nfc_id}: {e}")
 
-        db_save_student({**p, 'nfcId': nfc_id, 'raw_name': on_chain,
-                         'address': student_address, 'tx_hash': reg_tx, 'reg_block': reg_block})
+        # Capture enrollment_status from form
+        enrollment_status_val = request.form.get('enrollment_status', 'Regular').strip()
+
+        db_save_student({
+            **p,
+            'nfcId': nfc_id,
+            'raw_name': on_chain,
+            'address': student_address,
+            'tx_hash': reg_tx,
+            'reg_block': reg_block,
+            'enrollment_status': enrollment_status_val
+        })
         send_student_welcome_email(
             student_name=name,
             student_email=email_val,

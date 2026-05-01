@@ -405,24 +405,23 @@
          data-username="{{ username|lower }}"
          data-role="{{ u.role }}"
          data-status="{{ u.status|default('pending') }}">
-      <div style="flex:1;min-width:0;">
-        <div class="prow-name">{{ u.full_name }}</div>
-        <div class="prow-sub" style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;">
-          <code style="font-size:10px;">@{{ username }}</code>
-          <span class="{{ 'pill-a' if u.role=='admin' else 'pill-t' }}">{{ u.role|capitalize }}</span>
-          {% set st = u.status|default('pending') %}
-          <span class="{{ 'pill-ok' if st=='approved' else ('pill-pend' if st=='pending' else 'pill-rej') }}">{{ st|capitalize }}</span>
+      <div style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;">
+        {% set photo = photos_db.get(username) %}
+        {% if photo %}
+          <img src="{{ url_for('static', filename='uploads/' + photo) }}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid var(--border);">
+        {% else %}
+          <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#000;">
+            {{ u.full_name[0].upper() }}
+          </div>
+        {% endif %}
+        <div>
+          <div class="prow-name">{{ u.full_name }} <span style="font-size:11px;color:var(--muted);font-weight:400;margin-left:4px;">({{ u.role|capitalize }})</span></div>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <button class="btn-vr" onclick="openTeacherRecord('{{ username }}')">
           <i class="bi bi-eye"></i> View Record
         </button>
-        {% if session.get('role') in ('admin', 'super_admin') and username != session.get('username') %}
-        <button class="btn-rst" onclick="deleteFacultyAccount('{{ username }}','{{ u.full_name|e }}')">
-          <i class="bi bi-trash"></i> Delete
-        </button>
-        {% endif %}
       </div>
     </div>
     {% else %}

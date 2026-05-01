@@ -795,8 +795,7 @@ function openTeacherRecord(username){
       ${infoRow('Account Status', u.status.charAt(0).toUpperCase()+u.status.slice(1))}
       ${infoRow('Registered', u.created||'-')}
     </div>
-    <div class="sec-title">// Assigned Sections</div>
-    <div style="padding:4px 0;">${secAccordion}</div>`;
+    </div>`;
 
   const roleOpts   = ['teacher','admin'].map(v=>`<option value="${v}" ${u.role===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
   const statusOpts = ['approved','pending','rejected'].map(v=>`<option value="${v}" ${u.status===v?'selected':''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('');
@@ -851,9 +850,7 @@ function openTeacherRecord(username){
       </div>
     </div>
     <div id="tf_pw_err" style="font-size:11px;color:var(--danger);display:none;margin-top:4px;"><i class="bi bi-exclamation-circle"></i> Passwords do not match.</div>
-    <div class="sec-title">// Assigned Sections</div>
-    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">Select which sections this faculty member handles.</p>
-    <div id="dashSectionGrid">${buildSectionGrid(u.sections || [])}</div>`;
+    </div>`;
 
   // Hide sessions tab for teachers
   document.getElementById('mtab_action').style.display='';
@@ -1018,14 +1015,15 @@ function saveTeacherUpdate(){
   .then(r=>r.json()).then(d=>{
     msg.style.display='block';
     if(d.ok){
-      msg.style.color='var(--success)'; msg.textContent='Faculty record updated.';
+      showAppSuccess('Faculty record updated.');
       const u=teacherData[curId];
       if(u){u.name=payload.full_name||u.name;u.email=payload.email||u.email;
         u.role=payload.role||u.role;u.status=payload.status||u.status;}
       document.getElementById('updTitle').textContent=payload.full_name;
       const nameEl=document.querySelector(`#tcrow_${curId} .prow-name`);
       if(nameEl) nameEl.textContent=payload.full_name;
-    } else { msg.style.color='var(--danger)'; msg.textContent=d.error||'Error.'; }
+      setTimeout(() => closeUpdModal(), 600);
+    } else { alert(d.error || 'Update failed'); }
     btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
   }).catch(()=>{
     msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='Network error.';
@@ -1309,13 +1307,13 @@ function showAppSuccess(message) {
   `;
   document.body.appendChild(modal);
 
-  // Auto-close after 2 seconds
+  // Auto-close after 0.5 seconds
   setTimeout(() => {
     if (modal.parentNode) {
       modal.classList.remove('show');
-      setTimeout(() => modal.remove(), 400);
+      setTimeout(() => modal.remove(), 200);
     }
-  }, 2000);
+  }, 500);
 }
 
 function moveUpAllStudents() {

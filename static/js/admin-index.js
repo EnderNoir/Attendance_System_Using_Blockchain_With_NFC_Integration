@@ -125,6 +125,7 @@ async function loadStats() {
   const subj = ssdValues.gf_subject || '';
   const instr = ssdValues.gf_instructor || '';
   const classType = ssdValues.gf_class_type || '';
+  const enrollment = ssdValues.gf_enrollment || '';
 
   if (prog && yr && sec) {
     params.append('section_key', `${prog}|${yr}|${sec}`);
@@ -137,6 +138,7 @@ async function loadStats() {
   if (instr) params.append('instructor', instr);
   if (classType) params.append('class_type', classType);
   if (sem) params.append('semester', sem);
+  if (enrollment) params.append('enrollment_type', enrollment);
 
   const expLink = document.getElementById('exportBtn');
   expLink.href = `/export/stats.xlsx?${params.toString()}&filename=${encodeURIComponent(buildExportFilename())}`;
@@ -162,6 +164,7 @@ function buildExportFilename() {
   const instr = ssdValues.gf_instructor || '';
   const classType = ssdValues.gf_class_type || '';
   const sem = ssdValues.gf_semester || '';
+  const enrollment = ssdValues.gf_enrollment || '';
   if (prog) parts.push(prog.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase().substring(0, 10));
   if (yr) parts.push(yr.replace(' ', '').toLowerCase());
   if (sec) parts.push('sec' + sec.toLowerCase());
@@ -169,6 +172,7 @@ function buildExportFilename() {
   if (instr) parts.push(instr.split(' ')[0].toLowerCase());
   if (classType) parts.push(classType);
   if (sem) parts.push(sem.replace(' ', '').toLowerCase());
+  if (enrollment) parts.push(enrollment.toLowerCase());
   const now = new Date();
   parts.push(`exported_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`);
   return parts.join('_') + '.xlsx';
@@ -201,6 +205,7 @@ function renderAll(data) {
   const instr = ssdValues.gf_instructor || '';
   const classType = ssdValues.gf_class_type || '';
   const sem = ssdValues.gf_semester || '';
+  const enrollment = ssdValues.gf_enrollment || '';
   if (prog) parts.push('Program: ' + prog);
   if (yr) parts.push(yr);
   if (sec) parts.push('Section ' + sec);
@@ -208,6 +213,7 @@ function renderAll(data) {
   if (instr) parts.push('Instructor: ' + instr);
   if (classType) parts.push('Class Type: ' + fmtClassTypeLabel(classType));
   if (sem) parts.push('Semester: ' + sem);
+  if (enrollment) parts.push('Type: ' + enrollment);
   document.getElementById('showingDetail').textContent = parts.length ? parts.join(' - ') : 'Showing all data across every subject, section, and instructor.';
 
   const badge = document.getElementById('activeFilterBadge');
@@ -286,7 +292,7 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  ['gf_program', 'gf_year', 'gf_semester', 'gf_section', 'gf_subject', 'gf_instructor', 'gf_class_type'].forEach((id) => {
+  ['gf_program', 'gf_year', 'gf_semester', 'gf_section', 'gf_subject', 'gf_instructor', 'gf_class_type', 'gf_enrollment'].forEach((id) => {
     const defaults = {
       gf_program: 'All Programs',
       gf_year: 'All Years',
@@ -295,6 +301,7 @@ function resetFilters() {
       gf_subject: 'All Subjects',
       gf_instructor: 'All Instructors',
       gf_class_type: 'All Types',
+      gf_enrollment: 'All Types',
     };
     selectSSD(id, '', defaults[id]);
   });

@@ -175,6 +175,25 @@
           </div>
         </div>
 
+        <!-- Enrollment Type -->
+        <div class="fg-item">
+          <span class="fg-label">Enrollment Type</span>
+          <div class="search-select-wrap" id="wrap_gf_enrollment">
+            <div class="search-select-display" id="disp_gf_enrollment" onclick="toggleSSD('gf_enrollment')">
+              <span class="ssd-label" id="label_gf_enrollment">All Types</span>
+              <span class="ssd-arrow"><i class="bi bi-chevron-down"></i></span>
+            </div>
+            <div class="search-select-dropdown" id="drop_gf_enrollment">
+              <input class="ssd-input" type="text" placeholder="Search type…" oninput="filterSSDOpts('gf_enrollment',this.value)" autocomplete="off"/>
+              <div class="ssd-opts" id="opts_gf_enrollment">
+                <div class="ssd-opt selected" data-value="" onclick="selectSSD('gf_enrollment','','All Types')">All Types</div>
+                <div class="ssd-opt" data-value="Regular" onclick="selectSSD('gf_enrollment','Regular','Regular')">Regular</div>
+                <div class="ssd-opt" data-value="Irregular" onclick="selectSSD('gf_enrollment','Irregular','Irregular')">Irregular</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Subject -->
         <div class="fg-item">
           <span class="fg-label">Subject</span>

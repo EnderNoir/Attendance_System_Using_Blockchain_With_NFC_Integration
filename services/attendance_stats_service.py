@@ -93,7 +93,7 @@ def attendance_stats_impl(
         params.append(f_tod)
 
     if f_enrollment:
-        where.append('LOWER(st.enrollment_status) = ?')
+        where.append("LOWER(COALESCE(st.enrollment_status, 'Irregular')) = ?")
         params.append(f_enrollment.lower())
 
     wsql = ' AND '.join(where)
@@ -134,10 +134,16 @@ def attendance_stats_impl(
             "WHERE " + wsql + ' GROUP BY s.subject_name, s.course_code, al.status',
             tuple(params),
         ).fetchall()
-        sess_count_row = conn.execute(
-            'SELECT COUNT(DISTINCT s.sess_id) as cnt FROM sessions s WHERE ' + wsql,
-            tuple(params),
-        ).fetchone()
+        
+        # Fixed: sessions count query must join students if wsql uses st
+        count_sql = (
+            "SELECT COUNT(DISTINCT s.sess_id) as cnt "
+            "FROM sessions s "
+            "LEFT JOIN attendance_logs al ON s.sess_id = al.sess_id "
+            "LEFT JOIN students st ON al.nfc_id = st.nfc_id "
+            "WHERE " + wsql
+        )
+        sess_count_row = conn.execute(count_sql, tuple(params)).fetchone()
         sess_count = sess_count_row['cnt'] if sess_count_row else 0
         subj_labels_rows = conn.execute(
             "SELECT DISTINCT s.subject_name, s.course_code FROM sessions s "

@@ -851,7 +851,7 @@ function openTeacherRecord(username){
         }
       </div>
       <div class="upd-field"><span class="upd-label">Registered</span>
-        <input class="upd-input" value="${u.created||'-'}" readonly/>
+        <input class="upd-input" value="${formatFullDateTime(u.created)}" readonly/>
       </div>
     </div>
     <div class="sec-title">// Change Password <span style="color:var(--muted);font-size:9px;font-family:inherit;text-transform:none;letter-spacing:0;">(leave blank to keep current)</span></div>
@@ -1012,7 +1012,6 @@ function showMsg(txt, type) {
 }
 
 function saveTeacherUpdate(){
-  const msg=document.getElementById('updMsg');
   const btn=document.getElementById('updSaveBtn');
   const pw=document.getElementById('tf_pw')?.value||'';
   const pw2=document.getElementById('tf_pw2')?.value||'';
@@ -1027,7 +1026,6 @@ function saveTeacherUpdate(){
   fetch('/update_faculty',{method:'POST',credentials:'same-origin',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
   .then(r=>r.json()).then(d=>{
-    msg.style.display='block';
     if(d.ok){
       showAppSuccess('Faculty record updated.');
       const u=teacherData[curId];
@@ -1040,7 +1038,7 @@ function saveTeacherUpdate(){
     } else { alert(d.error || 'Update failed'); }
     btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
   }).catch(()=>{
-    msg.style.display='block'; msg.style.color='var(--danger)'; msg.textContent='Network error.';
+    alert('Network error while saving faculty update');
     btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
   });
 }
@@ -1197,7 +1195,7 @@ async function deleteFacultyAccount(username, fullName) {
     if (r.ok) {
       showAppSuccess('Faculty account deleted successfully.');
       setTimeout(() => {
-        window.location.href = '/?tab=faculty';
+        window.location.href = '/dashboard?tab=faculty';
       }, 500);
     } else {
       alert('Error deleting faculty account.');

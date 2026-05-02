@@ -146,6 +146,7 @@ def teacher_sessions_students_page_impl(
     datetime_cls,
     fmt_time,
     fmt_time_short,
+    photos_db,
 ):
     if session_obj.get('role') == 'admin':
         return redirect(url_for('index'))
@@ -234,6 +235,7 @@ def teacher_sessions_students_page_impl(
         now=str(datetime_cls.now().year),
         fmt_time=fmt_time,
         fmt_time_short=fmt_time_short,
+        photos_db=photos_db,
     )
 
 

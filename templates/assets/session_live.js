@@ -98,7 +98,7 @@ async function confirmSkipSession() {
   }
 }
 
-function showModal(type, name, studentId, message, time) {
+function showModal(type, name, studentId, message, time, uid) {
   const overlay = document.getElementById('tapModalOverlay');
   const modal = document.getElementById('tapModal');
   const icon = document.getElementById('modalIcon');
@@ -127,7 +127,7 @@ function showModal(type, name, studentId, message, time) {
   
   if (type === 'present' || type === 'late' || type === 'warning') {
     // Use DB photo URL from template-injected PHOTO_MAP
-    const photoUrl = (typeof PHOTO_MAP !== 'undefined' && PHOTO_MAP[studentId]) ? PHOTO_MAP[studentId] + '?t=' + Date.now() : '';
+    const photoUrl = (typeof PHOTO_MAP !== 'undefined' && PHOTO_MAP[uid]) ? PHOTO_MAP[uid] + '?t=' + Date.now() : '';
     if (photoUrl) {
       icon.style.display = 'none';
       photoWrap.style.display = 'block';
@@ -344,13 +344,13 @@ async function processNFCUid(uid) {
       });
       updateCounts();
       if (consumePopupGate()) {
-        showModal(isLate ? 'late' : 'present', data.name, data.student_id, '', data.time);
+        showModal(isLate ? 'late' : 'present', data.name, data.student_id, '', data.time, uid);
         showToast(data.name || uid, isLate ? `⏱ Marked LATE · ${data.time || ''}` : `✔ Marked PRESENT · ${data.time || ''}`, isLate ? 't-yellow' : 't-green', isLate ? '⏱' : '✔');
       }
     } else if (status === 'already_marked') {
       updateNFCStrip(uid, 'warning', `DUPLICATE — ${data.name || uid}`, '⚠');
       if (consumePopupGate()) {
-        showModal('warning', data.name, data.student_id, '', '');
+        showModal('warning', data.name, data.student_id, '', '', uid);
         showToast(data.name || uid, 'Already marked — not counted again.', 't-yellow', '⚠');
       }
     } else if (status === 'registration') {
@@ -361,19 +361,19 @@ async function processNFCUid(uid) {
     } else if (status === 'no_session') {
       updateNFCStrip(uid, 'error', 'No active session', '✕');
       if (consumePopupGate()) {
-        showModal('invalid', 'No Session', '', 'No active session for this section.', uid);
+        showModal('invalid', 'No Session', '', 'No active session for this section.', '', uid);
         showToast('No Session', `UID: ${uid} — no active session.`, 't-red', '✕');
       }
     } else if (status === 'excused') {
       updateNFCStrip(uid, 'warning', 'Excused student tap blocked', '⚠');
       if (consumePopupGate()) {
-        showModal('warning', 'Excused', '', data.message || 'Student is marked Excused and cannot tap in.', uid);
+        showModal('warning', 'Excused', '', data.message || 'Student is marked Excused and cannot tap in.', uid, uid);
         showToast('Excused Student', data.message || 'Tap ignored for excused student.', 't-yellow', '⚠');
       }
     } else {
       updateNFCStrip(uid, 'error', 'Not registered', '✕');
       if (consumePopupGate()) {
-        showModal('invalid', 'Unknown Card', '', data.message || 'Card not registered.', uid);
+        showModal('invalid', 'Unknown Card', '', data.message || 'Card not registered.', uid, uid);
         showToast('Unknown Card', `UID: ${uid}`, 't-red', '✕');
       }
     }

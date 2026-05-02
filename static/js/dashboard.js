@@ -259,7 +259,12 @@ function openStudentRecord(idx){
   document.getElementById('updSub').textContent   = (s.course||'-')+' | '+(s.year||'-')+' | Section '+(s.section||'-');
 
   const photoHtml = s.photo
-    ? `<img src="/static/uploads/${s.photo}?t=${Date.now()}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);" id="infoPhotoWrap" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<i class=\'bi bi-person\' style=\'font-size:32px;color:var(--muted);\'></i>'; this.parentElement.style.background='var(--bg-secondary)';"/>`
+    ? `<div style="position:relative; width:72px; height:72px; flex-shrink:0;">
+         <img src="/static/uploads/${s.photo}?t=${Date.now()}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid var(--accent);cursor:pointer;" id="infoPhotoWrap" onclick="window.open('/static/uploads/${s.photo}', '_blank')" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div style=\'width:72px;height:72px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;\'><i class=\'bi bi-person\' style=\'font-size:32px;color:var(--muted);\'></i></div>';"/>
+         <div onclick="window.open('/static/uploads/${s.photo}', '_blank')" style="position:absolute; bottom:0; right:0; width:22px; height:22px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); border:2px solid var(--bg-body);" title="View full photo">
+           <i class="bi bi-zoom-in" style="color:#000; font-size:11px;"></i>
+         </div>
+       </div>`
     : `<div id="infoPhotoWrap" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;">${s.name[0].toUpperCase()}</div>`;
 
   document.getElementById('infoContent').innerHTML = `
@@ -323,7 +328,10 @@ function openStudentRecord(idx){
 
   document.getElementById('editContent').innerHTML = `
     <div class="photo-upload-block">
-      <div class="photo-avatar-preview" id="editPhotoPreview" onclick="document.getElementById('updPhotoInput').click()" title="Click to change photo">${editPhotoInner}</div>
+      <div style="position:relative; display:inline-block;">
+        <div class="photo-avatar-preview" id="editPhotoPreview" onclick="document.getElementById('updPhotoInput').click()" title="Click to change photo">${editPhotoInner}</div>
+        ${s.photo ? `<div onclick="window.open('/static/uploads/${s.photo}', '_blank')" style="position:absolute; bottom:0; right:0; width:22px; height:22px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); border:2px solid var(--bg-body);" title="View full photo"><i class="bi bi-zoom-in" style="color:#000; font-size:11px;"></i></div>` : ''}
+      </div>
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;"><i class="bi bi-camera-fill"></i> Student Photo</div>
         <button type="button" onclick="document.getElementById('updPhotoInput').click()" style="background:rgba(45,106,39,.1);border:1px solid rgba(45,106,39,.2);color:var(--accent);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif;font-weight:600;">
@@ -671,7 +679,7 @@ function renderSessions(sessions){
                   <td>${s.teacher_name || '-'}</td>
                   <td style="font-family:'Space Mono',monospace;font-size:11px;">${pickSessionDate(s)}</td>
                   <td style="font-size:11px;color:var(--muted);">${formatTimeSlot(s.time_slot || s.tap_time || '')}</td>
-                  <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? toAmPm(s.tap_time.split(' ')[1]||s.tap_time) : '—'}</td>
+                  <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${(s.status === 'absent' || s.status === 'excused') ? '—' : (s.tap_time ? toAmPm(s.tap_time.split(' ')[1]||s.tap_time) : '—')}</td>
                   <td>${tx}</td>
                   <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${s.block || '-'}</td>
                   <td><span style="font-size:10px; font-weight:700; color:${(s.enrollment_status||'Regular')==='Irregular'?'var(--danger)':'var(--success)'};">${s.enrollment_status||'Regular'}</span></td>
@@ -793,7 +801,12 @@ function openTeacherRecord(username){
     : '<span style="color:var(--muted);font-size:12px;">No sections assigned</span>';
 
   const tPhotoHtml = u.photo
-    ? `<img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);" id="infoPhotoWrap" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<i class=\'bi bi-person\' style=\'font-size:32px;color:var(--muted);\'></i>'; this.parentElement.style.background='var(--bg-secondary)';"/>`
+    ? `<div style="position:relative; width:72px; height:72px; flex-shrink:0;">
+         <img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid var(--accent);cursor:pointer;" id="infoPhotoWrap" onclick="window.open('/static/uploads/${u.photo}', '_blank')" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<div style=\\'width:72px;height:72px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;\\'><i class=\\'bi bi-person\\' style=\\'font-size:32px;color:var(--muted);\\'></i></div>';"/>
+         <div onclick="window.open('/static/uploads/${u.photo}', '_blank')" style="position:absolute; bottom:0; right:0; width:22px; height:22px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); border:2px solid var(--bg-body);" title="View full photo">
+           <i class="bi bi-zoom-in" style="color:#000; font-size:11px;"></i>
+         </div>
+       </div>`
     : `<div id="infoPhotoWrap" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;">${u.name[0].toUpperCase()}</div>`;
 
   document.getElementById('infoContent').innerHTML = `

@@ -398,13 +398,97 @@ function renderSessModal(sessId, data) {
     document.getElementById('studModal').classList.add('show');
     if (studCache[nfcId]) { renderStudModal(studCache[nfcId]); return; }
     document.getElementById('stud_hist').innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);font-size:12px;"><span style="display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;"></span><div style="margin-top:8px;">Loading…</div></div>';
+    
+    // Reset filters
+    ['shf_subj', 'shf_instr', 'shf_year', 'shf_sec', 'shf_type'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+
     fetch('/api/student_sessions/' + nfcId, { credentials: 'same-origin' })
       .then(r => r.json())
-      .then(data => { studCache[nfcId] = data; renderStudModal(data); })
+      .then(data => { 
+        studCache[nfcId] = data; 
+        populateHistoryFilters(data);
+        renderStudModal(data); 
+      })
       .catch(() => {
         document.getElementById('stud_hist').innerHTML = '<div style="color:var(--danger);text-align:center;padding:20px;font-size:12px;">Failed to load. Please try again.</div>';
       });
   }
+
+  function populateHistoryFilters(sessions) {
+    const subjs = new Set();
+    const instrs = new Set();
+    sessions.forEach(s => {
+      if (s.subject_name) subjs.add(s.subject_name);
+      if (s.teacher_name) instrs.add(s.teacher_name);
+    });
+
+    const subjSel = document.getElementById('shf_subj');
+    const instrSel = document.getElementById('shf_instr');
+    
+    if (subjSel) {
+      subjSel.innerHTML = '<option value="">All Subjects</option>';
+      Array.from(subjs).sort().forEach(sub => {
+        const opt = document.createElement('option');
+        opt.value = sub; opt.textContent = sub;
+        subjSel.appendChild(opt);
+      });
+    }
+    if (instrSel) {
+      instrSel.innerHTML = '<option value="">All Instructors</option>';
+      Array.from(instrs).sort().forEach(ins => {
+        const opt = document.createElement('option');
+        opt.value = ins; opt.textContent = ins;
+        instrSel.appendChild(opt);
+      });
+    }
+  }
+
+  function filterHistory() {
+    const subj = document.getElementById('shf_subj').value;
+    const instr = document.getElementById('shf_instr').value;
+    const year = document.getElementById('shf_year').value;
+    const sec = document.getElementById('shf_sec').value;
+    const type = document.getElementById('shf_type').value;
+
+    document.querySelectorAll('.sem-accordion').forEach(acc => {
+      let visibleInAcc = 0;
+      acc.querySelectorAll('tbody tr').forEach(tr => {
+        const match = (!subj || tr.dataset.subj === subj) &&
+                      (!instr || tr.dataset.instr === instr) &&
+                      (!year || tr.dataset.year === year) &&
+                      (!sec || tr.dataset.sec === sec) &&
+                      (!type || tr.dataset.type === type);
+        tr.style.display = match ? '' : 'none';
+        if (match) visibleInAcc++;
+      });
+      acc.style.display = visibleInAcc > 0 ? '' : 'none';
+    });
+  }
+
+  function exportFilteredHistory() {
+    if (!currentStudNfc) return;
+    const subj = document.getElementById('shf_subj').value;
+    const instr = document.getElementById('shf_instr').value;
+    const year = document.getElementById('shf_year').value;
+    const sec = document.getElementById('shf_sec').value;
+    const type = document.getElementById('shf_type').value;
+
+    let url = `/export/student_sessions/${currentStudNfc}?name=${encodeURIComponent(currentStudName)}`;
+    if (subj) url += `&subject=${encodeURIComponent(subj)}`;
+    if (instr) url += `&instructor=${encodeURIComponent(instr)}`;
+    if (year) url += `&year=${encodeURIComponent(year)}`;
+    if (sec) url += `&section=${encodeURIComponent(sec)}`;
+    if (type) url += `&class_type=${encodeURIComponent(type)}`;
+    
+    const now = new Date();
+    const fname = `Filtered_Report_${currentStudName.replace(/ /g, '_')}_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}.xlsx`;
+    url += `&filename=${encodeURIComponent(fname)}`;
+    
+    window.location.href = url;
+  }
+
 
   function renderStudModal(sessions) {
     const stCls = { present: 'st-present', late: 'st-late', absent: 'st-absent', excused: 'st-excused' };
@@ -478,7 +562,7 @@ function renderSessModal(sessId, data) {
                   const docHtml = s.attachment_url
                     ? `<a href="${s.attachment_url}" target="_blank" style="font-size:11px;color:var(--accent);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px;background:rgba(45,106,39,.07);border:1px solid rgba(45,106,39,.2);border-radius:5px;padding:2px 7px;white-space:nowrap;"><i class="bi bi-paperclip"></i> View</a>`
                     : '<span style="color:var(--muted);font-size:11px;">—</span>';
-                  return `<tr>
+                  return `<tr data-subj="${s.subject_name || ''}" data-instr="${s.teacher_name || ''}" data-year="${s.year_level || ''}" data-sec="${s.section || ''}" data-type="${(s.class_type || 'lecture').toLowerCase()}">
                     <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${i + 1}</td>
                     <td>${s.course_code ? `<span class="hist-code">${s.course_code}</span>` : '<span style="color:var(--muted);font-size:11px;">—</span>'}</td>
                     <td><span style="font-weight:600;">${s.subject_name || '—'}</span></td>

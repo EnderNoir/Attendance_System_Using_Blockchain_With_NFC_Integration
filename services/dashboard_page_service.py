@@ -1,4 +1,4 @@
-def dashboard_page_impl(*, get_all_students, db_get_all_users, get_db, render_template, fmt_time):
+def dashboard_page_impl(*, get_all_students, db_get_all_users, get_db, render_template, fmt_time, **kwargs):
     """Render admin dashboard with students, faculty map, and cached photos."""
     students = get_all_students()
     all_users = db_get_all_users()
@@ -14,4 +14,5 @@ def dashboard_page_impl(*, get_all_students, db_get_all_users, get_db, render_te
         teachers=teachers,
         photos_db=photos_db,
         fmt_time=fmt_time,
+        **kwargs
     )

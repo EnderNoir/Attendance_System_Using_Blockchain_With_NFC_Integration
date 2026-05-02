@@ -1344,8 +1344,6 @@ function submitMoveUp() {
   if (action === 'graduated') {
     if (year !== '4th Year' || semester !== 'Second') {
       showAppSuccess('Error: Only 4th Year 2nd Semester students can be marked as Graduated.', 'error');
-      // Re-style success to look like error if possible, or just alert
-      alert('Eligibility Error: Marking as Graduated is only available for 4th Year, Second Semester students.');
       return;
     }
   }

@@ -1755,7 +1755,7 @@ def db_save_attendance_log(sess_id, nfc_id, student_name, student_id,
     now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     class_type_norm = str(class_type or '').strip().lower()
     if class_type_norm not in ('lecture', 'laboratory', 'school_event'):
-        class_type_norm = ''
+        class_type_norm = 'lecture'
     if not class_type_norm:
         try:
             with get_db() as _conn:
@@ -1801,8 +1801,9 @@ def db_update_session_totals(sess_id):
             "UPDATE sessions SET "
             "total_present=?, total_late=?, total_absent=?, total_excused=? "
             "WHERE sess_id=?",
-            (totals.get('present',0), totals.get('late',0),
-             totals.get('absent',0),  totals.get('excused',0), sess_id)
+            (totals.get('present',0) + totals.get('late',0),
+             totals.get('late',0), totals.get('absent',0),
+             totals.get('excused',0), sess_id)
         )
 
 def nfc_is_waiting():
@@ -4065,7 +4066,8 @@ def index():
                            active_sessions=unified_active,
                            subjects_db=db_get_all_subjects(),
                            users_db=db_get_all_users(),
-                           active_student_count=len(active_students))
+                           active_student_count=len(active_students),
+                           now_ts=int(time.time()))
 
 def _register_save_pending_subjects(req, sess):
     import json as _json
@@ -4670,6 +4672,7 @@ def register():
             'first_name': fname,
             'middle_initial': mi,
             'last_name': lname,
+            'date_registered': raw_date,
             'address': student_address,
             'enrollment_status': enrollment_status_val
         })
@@ -4873,6 +4876,7 @@ def batch_register():
                 'adviser': (student.get('adviser') or '').strip(),
                 'contact': (student.get('contact') or '').strip(),
                 'major': (student.get('major') or 'N/A').strip(),
+                'date_registered': student.get('date_registered', '').strip(),
                 'photo_file': photo_file,
                 'enrollment_status': student.get('enrollment_status', 'Regular'),
             })
@@ -5044,6 +5048,7 @@ def dashboard():
         get_db=get_db,
         render_template=render_template,
         fmt_time=fmt_time,
+        now_ts=int(time.time()),
     )
 
 @app.route('/upload_photo', methods=['POST'])

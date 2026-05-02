@@ -1314,50 +1314,38 @@ setInterval(() => {
 function moveUpAllStudents() {
   const modal = document.getElementById('semesterModal');
   if (modal) {
-    // Reset fields
-    document.getElementById('semesterModalStudent').textContent = 'All Active Students';
-    document.getElementById('newSchoolYear').value = '';
-    
-    // Update modal title and button for BULK move
-    document.querySelector('#semesterModal h3').textContent = 'Advance All Students';
-    const btn = document.querySelector('#semesterModal .btn-primary');
-    btn.textContent = 'Move All Students';
-    btn.onclick = confirmBulkSemesterMove;
-
     modal.classList.add('show');
   }
 }
 
+function closeSemesterModal() {
+  document.getElementById('semesterModal').classList.remove('show');
+}
 
-async function confirmBulkSemesterMove() {
-  const currentSem = document.getElementById('currentSemesterSelect').value;
-  const newSem = document.getElementById('newSemesterSelect').value;
-  const newSY = document.getElementById('newSchoolYear').value.trim();
+async function confirmMoveUp() {
+  const program = document.getElementById('mu_program').value;
+  const year = document.getElementById('mu_year').value;
+  const semester = document.getElementById('mu_semester').value;
+  const action = document.querySelector('input[name="mu_action"]:checked').value;
 
-  if (!newSY) {
-    alert('Please enter a new school year.');
-    return;
-  }
+  const groupText = `${program || 'All Programs'} · ${year} · ${semester}`;
+  if (!confirm(`Are you sure you want to perform "${action}" on:\n${groupText}?`)) return;
 
-  if (!confirm(`Are you sure you want to move students from ${currentSem} to ${newSem} (${newSY})?`)) return;
-
-  const btn = document.querySelector('#semesterModal .btn-primary');
+  const btn = document.getElementById('muSubmitBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span> Moving...';
+  const oldHtml = btn.innerHTML;
+  btn.innerHTML = '<span class="spin"></span> Processing...';
 
   try {
     const r = await fetch('/api/students/move-up-all', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        current_semester: currentSem,
-        new_semester: newSem,
-        new_school_year: newSY
-      })
+      body: JSON.stringify({ program, year_level: year, semester, action })
     });
     const d = await r.json();
     if (d.ok) {
-      showAppSuccess(`Successfully moved ${d.count} students!`);
+      showAppSuccess(`Success! ${d.count} students moved.`);
+      closeSemesterModal();
       setTimeout(() => window.location.reload(), 1500);
     } else {
       alert(d.error || 'Failed to move students');
@@ -1367,7 +1355,7 @@ async function confirmBulkSemesterMove() {
     alert('Network error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = 'Move Student';
+    btn.innerHTML = oldHtml;
   }
 }
 function initializeStudentList() {

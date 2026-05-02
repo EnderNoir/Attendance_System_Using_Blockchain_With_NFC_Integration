@@ -55,6 +55,7 @@ def export_stats_xlsx_impl(
             f_sec_ltr = qp('section_letter')
             f_tod = qp('time_of_day')
             f_semester = qp('semester')
+            f_enrollment = qp('enrollment_type')
         else:
             qp = lambda _k: ''
             period = request_obj.args.get('period', 'all')
@@ -69,6 +70,7 @@ def export_stats_xlsx_impl(
             f_sec_ltr = request_obj.args.get('section_letter', '').strip()
             f_tod = request_obj.args.get('time_of_day', '').strip()
             f_semester = request_obj.args.get('semester', '').strip()
+            f_enrollment = request_obj.args.get('enrollment_type', '').strip()
 
         role = session_obj.get('role')
         username = session_obj.get('username')
@@ -92,6 +94,7 @@ def export_stats_xlsx_impl(
             f_sec_ltr=f_sec_ltr,
             f_tod=f_tod,
             f_semester=f_semester,
+            f_enrollment=f_enrollment,
             role=role,
             username=username,
             now=now,

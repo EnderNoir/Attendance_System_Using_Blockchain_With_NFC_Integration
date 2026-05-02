@@ -158,14 +158,21 @@ def build_stats_export_dataset(
         if class_type_norm not in ('lecture', 'laboratory', 'school_event'):
             class_type_norm = 'lecture'
         sk = normalize_section_key_fn(s.get('section_key', ''))
-        enrolled = [st for st in all_stud if build_student_section_key_fn(st) == sk]
-        en_ids = {st['nfcId'] for st in enrolled}
+        enrolled_official = [st for st in all_stud if build_student_section_key_fn(st) == sk]
+        
+        att_logs = {lg['nfc_id']: lg for lg in db_get_session_attendance_fn(sid)}
+        
+        # Combined student set: official enrolled + any irregular student who tapped
+        all_session_stud_ids = {st['nfcId'] for st in enrolled_official} | set(att_logs.keys())
+        
         pre = set(s.get('present', []))
         late = set(s.get('late', []))
         exc = set(s.get('excused', []))
-        abs_ = en_ids - pre - late - exc
+        
+        # Recalculate counts to include irregular students
+        abs_ = all_session_stud_ids - pre - late - exc
         cnt = {
-            'enrolled': len(en_ids),
+            'enrolled': len(all_session_stud_ids),
             'present': len(pre - late),
             'late': len(late),
             'absent': len(abs_),
@@ -206,21 +213,21 @@ def build_stats_export_dataset(
                 rate,
             ]
         )
-        att_logs = {lg['nfc_id']: lg for lg in db_get_session_attendance_fn(sid)}
-        excuse_details = {}
-        with get_db_fn() as _conn:
-            excuses = _conn.execute(
-                "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
-                (sid,),
-            ).fetchall()
-            for exc_row in excuses:
-                excuse_details[exc_row['nfc_id']] = {
-                    'reason': exc_row['reason_type'],
-                    'reason_detail': exc_row['reason_detail'],
-                    'attachment_file': exc_row['attachment_file'],
-                }
-        for st in enrolled:
-            nid = st['nfcId']
+        # Map all students for quick lookup
+        stud_db_map = {st['nfcId']: st for st in all_stud}
+        
+        for nid in sorted(all_session_stud_ids):
+            st = stud_db_map.get(nid)
+            lg = att_logs.get(nid, {})
+            
+            # If student not in DB (rare), use log data
+            st_name = st['name'] if st else lg.get('student_name', 'Unknown')
+            st_id = st.get('student_id', '') if st else lg.get('student_id', '')
+            st_course = st.get('course', '') if st else ''
+            st_year = st.get('year_level', '') if st else ''
+            st_sec = st.get('section', '') if st else ''
+            st_enrollment = st.get('enrollment_status', 'Regular') if st else 'Irregular'
+            
             if nid in exc:
                 status = 'Excused'
             elif nid in late:
@@ -229,32 +236,33 @@ def build_stats_export_dataset(
                 status = 'Present'
             else:
                 status = 'Absent'
-            lg = att_logs.get(nid, {})
+            
             excuse_info = excuse_details.get(nid, {})
             excuse_reason = ''
             if excuse_info.get('reason'):
                 excuse_reason = reason_labels.get(excuse_info['reason'], excuse_info['reason'])
                 if excuse_info.get('reason_detail'):
                     excuse_reason += f" ({excuse_info['reason_detail']})"
+            
             detail_rows.append(
                 [
-                    st['name'],
-                    st.get('student_id', ''),
+                    st_name,
+                    st_id,
                     nid,
-                    st.get('course', ''),
-                    st.get('year_level', ''),
-                    st.get('section', ''),
-                    st.get('enrollment_status', 'Regular'),
+                    st_course,
+                    st_year,
+                    st_sec,
+                    st_enrollment,
                     subj_lbl,
                     class_type_norm.capitalize(),
                     fmt_time_fn(s['started_at']),
                     s.get('time_slot', ''),
                     s.get('teacher_name', ''),
                     status,
-                    lg.get('tx_hash', '') or s.get('tx_hashes', {}).get(nid, {}).get('tx_hash', ''),
-                    str(lg.get('block_number', '') or s.get('tx_hashes', {}).get(nid, {}).get('block', '')),
+                    lg.get('tx_hash', ''),
+                    lg.get('block_number', ''),
                     excuse_reason,
-                    excuse_info.get('attachment_file', '') or '',
+                    'Yes' if excuse_info.get('attachment_file') else '',
                 ]
             )
 

@@ -342,10 +342,12 @@
       <div class="student-row" data-enroll-name="{{ s.name|lower }}" 
            onclick="openStudModalLive('{{ s.nfcId }}', '{{ s.name|e }}', '{{ s.student_id or '' }}', '{{ s.enrollment_status or 'Regular' }}')">
         <div class="student-avatar av-gray">
-          <img src="/static/uploads/photos/{{ s.student_id }}.jpg" 
-               onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+          <img src="/static/uploads/photos/{{ s.student_id }}.jpg?t={{ now_ts }}" 
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
-          <span style="display:none;">{{ s.name[0].upper() if s.name else '?' }}</span>
+          <span style="display:none; align-items:center; justify-content:center; width:100%; height:100%; background:var(--bg-secondary); border-radius:50%;">
+            <i class="bi bi-person-fill" style="font-size:16px;color:var(--muted);"></i>
+          </span>
         </div>
         <div class="student-info">
           <div class="student-name">
@@ -407,10 +409,12 @@
           {% elif s.status == 'excused' %}av-blue
           {% elif s.status == 'absent' %}av-red
           {% else %}av-gray{% endif %}" id="savt_{{ s.nfcId }}">
-          <img src="/static/uploads/photos/{{ s.student_id }}.jpg" 
-               onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+          <img src="/static/uploads/photos/{{ s.student_id }}.jpg?t={{ now_ts }}" 
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
-          <span style="display:none;">{{ s.name[0].upper() if s.name else '?' }}</span>
+          <span style="display:none; align-items:center; justify-content:center; width:100%; height:100%; background:var(--bg-secondary); border-radius:50%;">
+            <i class="bi bi-person-fill" style="font-size:16px;color:var(--muted);"></i>
+          </span>
         </div>
         <div class="student-info">
           <div class="student-name">
@@ -456,48 +460,74 @@
 
 <!-- Student Info Modal (Live Session) -->
 <div class="stud-overlay" id="studModalLive" onclick="if(event.target===this)closeStudModalLive()">
-  <div class="stud-modal" style="max-width: 500px;">
+  <div class="stud-modal" style="max-width: 550px;">
     <div class="stud-bar">
       <button class="sm-back" onclick="closeStudModalLive()"><i class="bi bi-arrow-left"></i> Back</button>
-      <h3>Student Information</h3>
+      <h3 style="margin:0; font-size:16px;">Student Information</h3>
     </div>
     
-    <div style="padding: 24px; text-align: center;">
-      <div style="position: relative; display: inline-block; margin-bottom: 20px;">
-        <img id="sl_photo" src="" alt="Student Photo" 
-             style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 5px solid var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,0.3); background: var(--surface);">
-        <button class="btn-zoom-tr" onclick="zoomPhoto(document.getElementById('sl_photo').src)" 
-                style="position: absolute; bottom: 5px; right: 5px; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
-          <i class="bi bi-zoom-in"></i>
-        </button>
-      </div>
-      
-      <h2 id="sl_name" style="margin-bottom: 4px; font-size: 22px; font-weight: 700;"></h2>
-      <div id="sl_status_badge" style="margin-bottom: 20px;"></div>
-      
-      <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 15px; text-align: left;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-          <div>
-            <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700;">Student ID</div>
-            <div id="sl_id" style="font-weight: 600;"></div>
+    <div style="padding: 24px;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="position: relative; display: inline-block;">
+          <div id="sl_photo_wrap" style="width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 5px solid var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,0.3); background: var(--surface); display: flex; align-items: center; justify-content: center;">
+            <img id="sl_photo" src="" alt="Student Photo" style="width: 100%; height: 100%; object-fit: cover;">
+            <i id="sl_photo_fallback" class="bi bi-person-fill" style="display:none; font-size: 80px; color: var(--muted);"></i>
           </div>
-          <div>
-            <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700;">Enrollment</div>
-            <div id="sl_enroll" style="font-weight: 600;"></div>
-          </div>
-          <div style="grid-column: 1/-1;">
-            <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700;">NFC UID</div>
-            <code id="sl_nfc" style="font-size: 12px; color: var(--accent);"></code>
-          </div>
+          <button class="btn-zoom-tr" onclick="zoomPhoto(document.getElementById('sl_photo').src)" 
+                  style="position: absolute; bottom: 5px; right: 5px; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+            <i class="bi bi-zoom-in"></i>
+          </button>
         </div>
+        <h2 id="sl_name" style="margin: 15px 0 5px; font-size: 24px; font-weight: 800; color: var(--text);"></h2>
+        <div id="sl_status_badge"></div>
       </div>
       
-      <div style="margin-top: 24px; display: flex; gap: 10px;">
-        <button class="btn-primary" style="flex: 1; padding: 12px;" onclick="closeStudModalLive()">Close</button>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(255,255,255,0.02); padding: 20px; border-radius: 15px; border: 1px solid var(--border);">
+        <div class="inf-g">
+          <label>Student ID</label>
+          <div id="sl_id">—</div>
+        </div>
+        <div class="inf-g">
+          <label>NFC UID</label>
+          <code id="sl_nfc" style="color:var(--accent); font-weight:700;">—</code>
+        </div>
+        <div class="inf-g">
+          <label>Semester</label>
+          <div id="sl_semester">—</div>
+        </div>
+        <div class="inf-g">
+          <label>Date of Admission</label>
+          <div id="sl_admission">—</div>
+        </div>
+        <div class="inf-g">
+          <label>School Year</label>
+          <div id="sl_sy">—</div>
+        </div>
+        <div class="inf-g">
+          <label>Year Level</label>
+          <div id="sl_year">—</div>
+        </div>
+        <div class="inf-g">
+          <label>Enrollment Type</label>
+          <div id="sl_enroll">—</div>
+        </div>
+        <div class="inf-g">
+          <label>Class Adviser</label>
+          <div id="sl_adviser">—</div>
+        </div>
+        <div class="inf-g" style="grid-column: 1 / -1;">
+          <label>Email Address</label>
+          <div id="sl_email">—</div>
+        </div>
       </div>
     </div>
   </div>
 </div>
+
+<style>
+  .inf-g label { display: block; font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .inf-g div { font-size: 13px; font-weight: 600; color: var(--text); }
+</style>
 
 <!-- Photo Zoom Overlay -->
 <div class="zoom-overlay" id="photoZoomOverlay" onclick="this.classList.remove('show')">

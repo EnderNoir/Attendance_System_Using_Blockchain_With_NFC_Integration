@@ -780,7 +780,7 @@ function openTeacherRecord(username){
   curMode='teacher'; curId=username;
 
   document.getElementById('updTitle').textContent = u.name;
-  document.getElementById('updSub').textContent   = u.role.charAt(0).toUpperCase()+u.role.slice(1)+' | '+u.status;
+  document.getElementById('updSub').textContent   = u.role.charAt(0).toUpperCase()+u.role.slice(1);
 
   // INFO TAB: use accordion (buildSectionAccordion is defined in base.html)
   const secAccordion = (u.sections && u.sections.length)
@@ -1028,13 +1028,7 @@ function saveTeacherUpdate(){
   .then(r=>r.json()).then(d=>{
     if(d.ok){
       showAppSuccess('Faculty record updated.');
-      const u=teacherData[curId];
-      if(u){u.name=payload.full_name||u.name;u.email=payload.email||u.email;
-        u.role=payload.role||u.role;}
-      document.getElementById('updTitle').textContent=payload.full_name;
-      const nameEl=document.querySelector(`#tcrow_${curId} .prow-name`);
-      if(nameEl) nameEl.textContent=payload.full_name;
-      setTimeout(() => closeUpdModal(), 500);
+      setTimeout(() => window.location.reload(), 500);
     } else { alert(d.error || 'Update failed'); }
     btn.disabled=false; btn.innerHTML='<i class="bi bi-check-circle-fill"></i> Update';
   }).catch(()=>{
@@ -1315,32 +1309,7 @@ setInterval(() => {
   }
 }, 500);
 
-function showAppSuccess(message) {
-  // Remove existing modals if any
-  const existing = document.getElementById('successModal');
-  if (existing) existing.remove();
-
-  const modal = document.createElement('div');
-  modal.id = 'successModal';
-  modal.className = 'upd-overlay show';
-  modal.style.zIndex = '10001';
-  modal.innerHTML = `
-    <div class="upd-box" style="max-width:400px;text-align:center;padding:32px 24px;">
-      <div style="font-size:48px;color:var(--success);margin-bottom:16px;"><i class="bi bi-check-circle-fill"></i></div>
-      <h3 style="margin-bottom:8px;">Success!</h3>
-      <p style="color:var(--muted);font-size:14px;margin-bottom:8px;">${message}</p>
-    </div>
-  `;
-  document.body.appendChild(modal);
-
-  // Auto-close after 0.5 seconds
-  setTimeout(() => {
-    if (modal.parentNode) {
-      modal.classList.remove('show');
-      setTimeout(() => modal.remove(), 200);
-    }
-  }, 500);
-}
+// showAppSuccess moved to base.html
 
 function moveUpAllStudents() {
   const modal = document.getElementById('semesterModal');

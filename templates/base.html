@@ -412,7 +412,30 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
   <script>{% include 'assets/base.js' %}</script>
   {% block extra_scripts %}{% endblock %}
+
+  <script>
+    function showAppSuccess(message) {
+      const existing = document.getElementById('successModal');
+      if (existing) existing.remove();
+      const modal = document.createElement('div');
+      modal.id = 'successModal';
+      modal.className = 'upd-overlay show';
+      modal.style.zIndex = '20000';
+      modal.innerHTML = `
+        <div class="upd-box" style="max-width:400px;text-align:center;padding:32px 24px;margin:auto;margin-top:15vh;">
+          <div style="font-size:48px;color:var(--success);margin-bottom:16px;"><i class="bi bi-check-circle-fill"></i></div>
+          <h3 style="margin-bottom:8px;">Success!</h3>
+          <p style="color:var(--muted);font-size:14px;margin-bottom:8px;">${message}</p>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      setTimeout(() => {
+        if (modal.parentNode) {
+          modal.classList.remove('show');
+          setTimeout(() => modal.remove(), 200);
+        }
+      }, 500);
+    }
+  </script>
 </body>
-
 </html>
-

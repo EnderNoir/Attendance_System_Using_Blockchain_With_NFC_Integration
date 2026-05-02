@@ -3,7 +3,7 @@ from web3 import Web3
 from datetime import datetime
 from functools import wraps
 from threading import Thread, Lock
-import json, os, secrets, time, hashlib, uuid, re
+import json, os, secrets, time, hashlib, uuid, re, base64
 from collections import deque
 from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
@@ -1018,6 +1018,11 @@ def init_db():
         person_id   TEXT PRIMARY KEY,
         filename    TEXT NOT NULL,
         uploaded_at TEXT NOT NULL DEFAULT ''
+    );
+    CREATE TABLE IF NOT EXISTS skipped_sessions (
+        schedule_id TEXT,
+        skip_date   TEXT,
+        PRIMARY KEY (schedule_id, skip_date)
     );
     CREATE TABLE IF NOT EXISTS nfc_scanner (
         id           INTEGER PRIMARY KEY CHECK (id = 1),
@@ -2495,6 +2500,15 @@ def check_and_start_scheduled_sessions():
                 continue
 
             if db_get_no_class_days_for_date(today_ymd, s.get('teacher_username', '')):
+                continue
+
+            # Check if this automated session was manually skipped today
+            with get_db() as conn:
+                was_skipped = conn.execute(
+                    "SELECT 1 FROM skipped_sessions WHERE schedule_id=? AND skip_date=?",
+                    (str(s.get('schedule_id','')), today_ymd)
+                ).fetchone()
+            if was_skipped:
                 continue
 
             if not already_ran and start_dt <= now_dt < end_dt:
@@ -5252,8 +5266,8 @@ def delete_user(username):
         role = user.get('role')
         db_delete_user(username); flash(f'{user["full_name"]} deleted.', 'success')
         if role == 'teacher':
-            return redirect(url_for('index', tab='faculty'))
-    return redirect(url_for('index'))
+            return redirect(url_for('dashboard', tab='faculty'))
+    return redirect(url_for('dashboard'))
 
 @app.route('/admin/subjects')
 @admin_required
@@ -6209,32 +6223,38 @@ def end_session(sess_id):
 def api_skip_session(sess_id):
     """Permanently discard a session without saving to blockchain or marking attendance."""
     if sess_id not in sessions_db:
-        # Fallback to DB check
         with get_db() as conn:
-            exists = conn.execute("SELECT sess_id FROM sessions WHERE sess_id=?", (sess_id,)).fetchone()
+            exists = conn.execute("SELECT * FROM sessions WHERE sess_id=?", (sess_id,)).fetchone()
             if not exists:
                 return jsonify({'ok': False, 'error': 'Session not found'}), 404
-    
-    sess = load_session(sess_id)
+            sess = _row_to_dict(exists)
+    else:
+        sess = sessions_db[sess_id]
+
     if not _is_my_session(sess):
         return jsonify({'ok': False, 'error': 'Access denied'}), 403
         
-    # Mark as ended but KEEP the row so automation doesn't restart it today
-    now_str = _now_local().strftime('%Y-%m-%d %H:%M:%S')
+    sched_id = sess.get('schedule_id')
+    today_ymd = _now_local().strftime('%Y-%m-%d')
+    
     with get_db() as conn:
-        # Clear logs first
-        conn.execute("DELETE FROM attendance_logs WHERE sess_id=?", (sess_id,))
-        # Update session to ended/skipped state
-        conn.execute(
-            "UPDATE sessions SET ended_at=?, total_enrolled=0 WHERE sess_id=?",
-            (now_str, sess_id)
-        )
+        # 1. If it was a scheduled session, record that it was skipped for today
+        if sched_id:
+            conn.execute(
+                "INSERT INTO skipped_sessions (schedule_id, skip_date) VALUES (?,?)"
+                " ON CONFLICT(schedule_id, skip_date) DO NOTHING",
+                (str(sched_id), today_ymd)
+            )
         
-    # Delete from active memory
+        # 2. Delete logs and session record
+        conn.execute("DELETE FROM attendance_logs WHERE sess_id=?", (sess_id,))
+        conn.execute("DELETE FROM sessions WHERE sess_id=?", (sess_id,))
+        
+    # 3. Remove from active memory
     if sess_id in sessions_db:
         del sessions_db[sess_id]
     
-    print(f"[SKIP] Session {sess_id} discarded by user.")
+    print(f"[SKIP] Session {sess_id} deleted and blocked for today.")
     return jsonify({'ok': True})
 
 

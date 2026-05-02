@@ -48,13 +48,11 @@ def attendance_stats_impl(
         start_dt = datetime(2000, 1, 1)
         end_dt = None
 
-    # PostgreSQL strict casting for TEXT timestamps
-    ts_cast = "TO_TIMESTAMP(s.started_at, 'YYYY-MM-DD HH24:MI:SS')"
-    
-    where = [f"{ts_cast}::date >= ?"]
+    # Comparison using string prefix to avoid timezone/casting issues on s.started_at
+    where = ["SUBSTR(s.started_at, 1, 10) >= ?"]
     params = [start_dt.strftime('%Y-%m-%d')]
     if end_dt:
-        where.append(f"{ts_cast}::date <= ?")
+        where.append("SUBSTR(s.started_at, 1, 10) <= ?")
         params.append(end_dt.strftime('%Y-%m-%d'))
     if role == 'teacher':
         where.append('s.teacher_username = ?')
@@ -98,13 +96,13 @@ def attendance_stats_impl(
     wsql = ' AND '.join(where)
 
     if period == 'today':
-        tkey_expr = f"TO_CHAR({ts_cast}, 'HH24:00')"
+        tkey_expr = "SUBSTR(s.started_at, 12, 2) || ':00'"
     elif period == 'month':
-        tkey_expr = f"TO_CHAR({ts_cast}, 'MM/DD')"
+        tkey_expr = "SUBSTR(s.started_at, 6, 5)"
     elif period == 'year':
-        tkey_expr = f"TO_CHAR({ts_cast}, 'MM')"
+        tkey_expr = "SUBSTR(s.started_at, 6, 2)"
     else:
-        tkey_expr = f"TO_CHAR({ts_cast}, 'YYYY')"
+        tkey_expr = "SUBSTR(s.started_at, 1, 4)"
 
     params = tuple(params)
 

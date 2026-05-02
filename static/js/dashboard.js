@@ -1322,40 +1322,88 @@ function closeSemesterModal() {
   document.getElementById('semesterModal').classList.remove('show');
 }
 
-async function confirmMoveUp() {
-  const program = document.getElementById('mu_program').value;
-  const year = document.getElementById('mu_year').value;
-  const semester = document.getElementById('mu_semester').value;
-  const action = document.querySelector('input[name="mu_action"]:checked').value;
+// Store pending move-up payload for the confirm modal
+let _muPending = null;
 
-  const groupText = `${program || 'All Programs'} · ${year} · ${semester}`;
-  if (!confirm(`Are you sure you want to perform "${action}" on:\n${groupText}?`)) return;
+function _nextSemLabel(year, sem) {
+  const semMap = { First: 'Second', Second: 'First', Summer: 'First' };
+  const yearMap = { '1st Year': '2nd Year', '2nd Year': '3rd Year', '3rd Year': '4th Year', '4th Year': '4th Year' };
+  const nextSem = semMap[sem] || 'First';
+  const bumpYear = (sem === 'Second' || sem === 'Summer');
+  const nextYear = bumpYear ? (yearMap[year] || year) : year;
+  return `${nextYear} — ${nextSem} Semester`;
+}
 
-  const btn = document.getElementById('muSubmitBtn');
-  btn.disabled = true;
-  const oldHtml = btn.innerHTML;
-  btn.innerHTML = '<span class="spin"></span> Processing...';
+function submitMoveUp() {
+  const program    = document.getElementById('mu_program').value;
+  const year       = document.getElementById('mu_year').value;
+  const semester   = document.getElementById('mu_semester').value;
+  const action     = document.querySelector('input[name="mu_action"]:checked').value;
+  const enrollment = document.querySelector('input[name="mu_enrollment"]:checked').value;
+
+  _muPending = { program, year_level: year, semester, action, enrollment_type: enrollment };
+
+  // Build human-readable confirm text
+  const actionLabels = {
+    next_sem:   'Move to Next Sem',
+    summer:     'Move to Summer Class',
+    graduated:  'Mark as Graduated'
+  };
+  const enrollLabel = enrollment || 'All';
+  const groupText   = `${program || 'All Programs'} · ${year} · ${semester} Sem · ${enrollLabel}`;
+
+  let resultDesc = '';
+  if (action === 'next_sem') {
+    resultDesc = `Selected students will move from <b>${year} — ${semester}</b> to <b>${_nextSemLabel(year, semester)}</b>.`;
+  } else if (action === 'summer') {
+    resultDesc = `Selected students will move from <b>${year} — ${semester}</b> to <b>${year} — Summer</b>.`;
+  } else if (action === 'graduated') {
+    resultDesc = `Selected students will be marked as <b>Graduated / Alumni</b> and removed from active live sessions.`;
+  }
+
+  document.getElementById('muConfirmText').textContent = `You are about to apply: "${actionLabels[action]}" to the group below.`;
+  document.getElementById('muConfirmDetails').innerHTML =
+    `<b>Group:</b> ${groupText}<br><br>${resultDesc}<br><br><span style="color:#ef4444;">⚠ This action cannot be undone. Please double-check your selection.</span>`;
+
+  document.getElementById('muConfirmModal').classList.add('show');
+}
+
+async function executeMoveUp() {
+  const confirmModal = document.getElementById('muConfirmModal');
+  const yesBtn       = document.getElementById('muConfirmYesBtn');
+
+  yesBtn.disabled = true;
+  const oldHtml   = yesBtn.innerHTML;
+  yesBtn.innerHTML = '<span class="spin"></span> Processing...';
 
   try {
     const r = await fetch('/api/students/move-up-all', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ program, year_level: year, semester, action })
+      body: JSON.stringify(_muPending)
     });
     const d = await r.json();
+
+    confirmModal.classList.remove('show');
+
     if (d.ok) {
-      showAppSuccess(`Success! ${d.count} students moved.`);
       closeSemesterModal();
+      showAppSuccess(`Done! ${d.count} student${d.count !== 1 ? 's' : ''} updated.`);
       setTimeout(() => window.location.reload(), 1500);
     } else {
-      alert(d.error || 'Failed to move students');
+      // Show error inside confirm modal body
+      document.getElementById('muConfirmDetails').innerHTML =
+        `<span style="color:#ef4444;">❌ Error: ${d.error || 'Unknown error occurred.'}</span>`;
+      confirmModal.classList.add('show');
     }
   } catch (e) {
     console.error(e);
-    alert('Network error');
+    confirmModal.classList.remove('show');
+    document.getElementById('muConfirmDetails').textContent = 'Network error. Please try again.';
   } finally {
-    btn.disabled = false;
-    btn.innerHTML = oldHtml;
+    yesBtn.disabled = false;
+    yesBtn.innerHTML = oldHtml;
+    _muPending = null;
   }
 }
 function initializeStudentList() {

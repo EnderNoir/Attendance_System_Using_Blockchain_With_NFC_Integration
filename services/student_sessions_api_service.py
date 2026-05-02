@@ -73,6 +73,8 @@ def student_sessions_api_impl(
             'excuse_note': row['excuse_note'] or '',
             'attachment_url': attachment_url,
             'semester': _format_sem(row['section_key'], row['semester']),
+            'year_level': str(row['section_key'] or '').split('|')[1] if len(str(row['section_key'] or '').split('|')) >= 2 else '',
+            'section': str(row['section_key'] or '').split('|')[2] if len(str(row['section_key'] or '').split('|')) >= 3 else '',
         })
 
     if not result:
@@ -126,6 +128,8 @@ def student_sessions_api_impl(
                 'excuse_note': '',
                 'attachment_url': '',
                 'semester': _format_sem(sess.get('section_key'), sess.get('semester')),
+                'year_level': str(sess.get('section_key', '') or '').split('|')[1] if len(str(sess.get('section_key', '') or '').split('|')) >= 2 else '',
+                'section': str(sess.get('section_key', '') or '').split('|')[2] if len(str(sess.get('section_key', '') or '').split('|')) >= 3 else '',
             })
 
     result.sort(key=lambda x: x['date'], reverse=True)

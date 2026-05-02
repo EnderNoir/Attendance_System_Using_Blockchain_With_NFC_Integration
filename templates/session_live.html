@@ -14,6 +14,10 @@
 <div class="tap-modal-overlay" id="tapModalOverlay">
   <div class="tap-modal" id="tapModal">
     <div class="modal-icon-ring" id="modalIcon">✔</div>
+    <div class="modal-photo-wrap" id="modalPhotoWrap" style="display:none; position:relative; margin-bottom:15px;">
+      <img id="modalStudentPhoto" src="" alt="" style="width:120px; height:120px; border-radius:50%; object-fit:cover; border:4px solid var(--accent); box-shadow: 0 0 20px rgba(0,0,0,0.3);">
+      <div id="modalStatusBadge" style="position:absolute; bottom:0; right:0; background:var(--accent); color:white; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid var(--surface); font-size:18px;">✔</div>
+    </div>
     <div class="modal-status" id="modalStatus">PRESENT</div>
     <div class="modal-name" id="modalName">Student Name</div>
     <div class="modal-student-id" id="modalStudentId">ID: —</div>
@@ -335,8 +339,14 @@
     </div>
     <div class="scroll-list" id="enrolledList">
       {% for s in section_students %}
-      <div class="student-row" data-enroll-name="{{ s.name|lower }}">
-        <div class="student-avatar av-gray">{{ s.name[0].upper() if s.name else '?' }}</div>
+      <div class="student-row" data-enroll-name="{{ s.name|lower }}" 
+           onclick="openStudModalLive('{{ s.nfcId }}', '{{ s.name|e }}', '{{ s.student_id or '' }}', '{{ s.enrollment_status or 'Regular' }}')">
+        <div class="student-avatar av-gray">
+          <img src="/static/uploads/photos/{{ s.student_id }}.jpg" 
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+               style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
+          <span style="display:none;">{{ s.name[0].upper() if s.name else '?' }}</span>
+        </div>
         <div class="student-info">
           <div class="student-name">
             {{ s.name }}
@@ -389,13 +399,19 @@
     <div class="scroll-list" id="statusList">
       {% for s in student_statuses %}
       <div class="student-row slide-in" id="srow_{{ s.nfcId }}" data-nfc="{{ s.nfcId }}" data-status="{{ s.status }}"
-        data-status-name="{{ s.name|lower }}" style="animation-delay:{{ loop.index0 * 0.03 }}s">
+        data-status-name="{{ s.name|lower }}" style="animation-delay:{{ loop.index0 * 0.03 }}s" 
+        onclick="openStudModalLive('{{ s.nfcId }}', '{{ s.name|e }}', '{{ s.student_id or '' }}', '{{ s.enrollment_status or 'Regular' }}')">
         <div class="student-avatar
           {% if s.status == 'present' %}av-green
           {% elif s.status == 'late' %}av-yellow
           {% elif s.status == 'excused' %}av-blue
           {% elif s.status == 'absent' %}av-red
-          {% else %}av-gray{% endif %}" id="savt_{{ s.nfcId }}">{{ s.name[0].upper() if s.name else '?' }}</div>
+          {% else %}av-gray{% endif %}" id="savt_{{ s.nfcId }}">
+          <img src="/static/uploads/photos/{{ s.student_id }}.jpg" 
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+               style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
+          <span style="display:none;">{{ s.name[0].upper() if s.name else '?' }}</span>
+        </div>
         <div class="student-info">
           <div class="student-name">
             {{ s.name }}
@@ -425,7 +441,7 @@
         </span>
         {% if is_active and not is_school_event %}
         <button class="btn-excuse {% if s.status in ('absent','present','late') %}show-excuse{% endif %}"
-          id="sexc_{{ s.nfcId }}" onclick="openExcuse('{{ s.nfcId }}','{{ s.name|e }}')" title="Mark as Excused"
+          id="sexc_{{ s.nfcId }}" onclick="event.stopPropagation(); openExcuse('{{ s.nfcId }}','{{ s.name|e }}')" title="Mark as Excused"
           style="{% if s.status == 'excused' %}display:none;{% endif %}">
           <i class="bi bi-journal-check"></i> Excuse
         </button>
@@ -437,6 +453,67 @@
     </div>
   </div>
 </div>
+
+<!-- Student Info Modal (Live Session) -->
+<div class="stud-overlay" id="studModalLive" onclick="if(event.target===this)closeStudModalLive()">
+  <div class="stud-modal" style="max-width: 500px;">
+    <div class="stud-bar">
+      <button class="sm-back" onclick="closeStudModalLive()"><i class="bi bi-arrow-left"></i> Back</button>
+      <h3>Student Information</h3>
+    </div>
+    
+    <div style="padding: 24px; text-align: center;">
+      <div style="position: relative; display: inline-block; margin-bottom: 20px;">
+        <img id="sl_photo" src="" alt="Student Photo" 
+             style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 5px solid var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,0.3); background: var(--surface);">
+        <button class="btn-zoom-tr" onclick="zoomPhoto(document.getElementById('sl_photo').src)" 
+                style="position: absolute; bottom: 5px; right: 5px; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+          <i class="bi bi-zoom-in"></i>
+        </button>
+      </div>
+      
+      <h2 id="sl_name" style="margin-bottom: 4px; font-size: 22px; font-weight: 700;"></h2>
+      <div id="sl_status_badge" style="margin-bottom: 20px;"></div>
+      
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 12px; padding: 15px; text-align: left;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <div>
+            <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700;">Student ID</div>
+            <div id="sl_id" style="font-weight: 600;"></div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700;">Enrollment</div>
+            <div id="sl_enroll" style="font-weight: 600;"></div>
+          </div>
+          <div style="grid-column: 1/-1;">
+            <div style="font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700;">NFC UID</div>
+            <code id="sl_nfc" style="font-size: 12px; color: var(--accent);"></code>
+          </div>
+        </div>
+      </div>
+      
+      <div style="margin-top: 24px; display: flex; gap: 10px;">
+        <button class="btn-primary" style="flex: 1; padding: 12px;" onclick="closeStudModalLive()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Photo Zoom Overlay -->
+<div class="zoom-overlay" id="photoZoomOverlay" onclick="this.classList.remove('show')">
+  <img id="zoomedPhoto" src="" alt="Zoomed Photo">
+  <div class="zoom-close"><i class="bi bi-x-lg"></i></div>
+</div>
+
+<style>
+  .modal-photo-wrap { text-align: center; margin-bottom: 20px; }
+  .btn-zoom-tr:hover { transform: scale(1.1); background: var(--accent-hover); }
+  .zoom-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 30000; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+  .zoom-overlay.show { display: flex; opacity: 1; }
+  .zoom-overlay img { max-width: 90%; max-height: 90%; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); transform: scale(0.9); transition: transform 0.3s; }
+  .zoom-overlay.show img { transform: scale(1); }
+  .zoom-close { position: absolute; top: 30px; right: 30px; color: white; font-size: 30px; cursor: pointer; }
+</style>
 
 {% if is_active %}
 

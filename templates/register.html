@@ -94,7 +94,7 @@
       </div>
       <div class="field-wrap">
         <label class="form-label">Date of Admission</label>
-        <input type="month" class="form-control" name="date_registered" id="f_date_registered" />
+        <input type="date" class="form-control" name="date_registered" id="f_date_registered" />
       </div>
 
       <div class="fsec" style="margin-top:6px;">// Personal Information</div>
@@ -104,9 +104,10 @@
         <div class="photo-row">
           <div class="photo-preview-wrap" id="photoPreviewWrap"
             onclick="document.getElementById('studentPhotoInput').click()">
-            <div id="photoPreviewInit" style="text-align:center;"><i class="bi bi-camera"
-                style="font-size:20px;color:var(--muted);display:block;"></i><span
-                style="font-size:10px;color:var(--muted);">Upload</span></div>
+            <div id="photoPreviewInit" style="text-align:center;">
+              <i class="bi bi-person-fill" style="font-size:24px;color:var(--muted);display:block;"></i>
+              <span style="font-size:10px;color:var(--muted);font-weight:600;">UPLOAD</span>
+            </div>
             <img id="photoPreviewImg" src="" style="display:none;width:100%;height:100%;object-fit:cover;" />
           </div>
           <div>

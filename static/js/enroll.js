@@ -361,6 +361,7 @@ function renderReviewTable() {
       <td>${courseHtml}</td>
       <td>${yearSec}${missYear ? '<span class="miss-badge">!</span>' : ''}</td>
       <td>${statusHtml}</td>
+      <td style="font-size:11px;">${s.date_registered || '<em style="color:var(--muted)">—</em>'}</td>
       <td style="font-size:11px;color:var(--muted);">${esc(file)}</td>
       <td>
         <button class="btn-edit-row" id="editbtn_${i}" onclick="toggleInlineEdit(${i})">
@@ -372,7 +373,7 @@ function renderReviewTable() {
     editRow.id = `stedit_${i}`;
     editRow.className = 'inline-edit-row';
     editRow.style.display = 'none';
-    editRow.innerHTML = `<td colspan="8"><div class="ie-grid">${buildIEFields(s, i)}</div>
+    editRow.innerHTML = `<td colspan="9"><div class="ie-grid">${buildIEFields(s, i)}</div>
       <div class="ie-actions">
         <button class="btn-ie-save" onclick="saveInlineEdit(${i})">
           <i class="bi bi-check-lg"></i> Save
@@ -569,6 +570,7 @@ function renderQueue() {
       <td><span class="order-badge">${i + 1}</span></td>
       <td style="font-weight:${isCurrent ? 700 : 500};">${s.name || '—'}</td>
       <td style="font-size:12px;color:var(--muted);">${[s.course, s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
+      <td style="font-size:11px;color:var(--muted);">${s.date_registered || '—'}</td>
       <td>${isAssigned ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
       <td>${statusHtml}</td>`;
     tbody.appendChild(tr);
@@ -688,6 +690,7 @@ function renderSummary() {
       <td style="font-size:11px;">${s.course || '—'}</td>
       <td style="font-size:11px;">${[s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
       <td style="font-size:11px;">${s.enrollment_status || 'Regular'}</td>
+      <td style="font-size:11px;color:var(--muted);">${s.date_registered || '—'}</td>
       <td>${s.nfc_id ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
       <td>${statusHtml}</td>`;
     tbody.appendChild(tr);

@@ -111,6 +111,55 @@
       <h3 id="stud_name">Student History</h3>
     </div>
     <div class="stud-meta" id="stud_meta"></div>
+    
+    <!-- Dynamic Filter Bar for Student History -->
+    <div class="filter-bar" style="margin: 0 20px 15px; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 10px; border: 1px solid var(--border); gap: 10px;">
+      <div class="fg" style="flex:1;">
+        <span class="fl">Subject</span>
+        <select class="fi" id="shf_subj" onchange="filterHistory()">
+          <option value="">All Subjects</option>
+        </select>
+      </div>
+      <div class="fg" style="flex:1;">
+        <span class="fl">Instructor</span>
+        <select class="fi" id="shf_instr" onchange="filterHistory()">
+          <option value="">All Instructors</option>
+        </select>
+      </div>
+      <div class="fg" style="width: 100px;">
+        <span class="fl">Year</span>
+        <select class="fi" id="shf_year" onchange="filterHistory()">
+          <option value="">All</option>
+          <option>1st Year</option>
+          <option>2nd Year</option>
+          <option>3rd Year</option>
+          <option>4th Year</option>
+        </select>
+      </div>
+      <div class="fg" style="width: 80px;">
+        <span class="fl">Section</span>
+        <select class="fi" id="shf_sec" onchange="filterHistory()">
+          <option value="">All</option>
+          <option>A</option>
+          <option>B</option>
+          <option>C</option>
+          <option>D</option>
+        </select>
+      </div>
+      <div class="fg" style="flex:1;">
+        <span class="fl">Class Type</span>
+        <select class="fi" id="shf_type" onchange="filterHistory()">
+          <option value="">All Types</option>
+          <option value="lecture">Lecture</option>
+          <option value="laboratory">Laboratory</option>
+          <option value="school_event">School Event</option>
+        </select>
+      </div>
+      <button class="btn-export-xl" style="height: 38px; align-self: flex-end; padding: 0 15px;" onclick="exportFilteredHistory()">
+        <i class="bi bi-file-earmark-arrow-down"></i> Export Report
+      </button>
+    </div>
+
     <div class="hist-table-wrap" id="stud_hist">
       <div style="text-align:center;padding:32px;color:var(--muted);font-size:12px;">
         <span
@@ -393,7 +442,13 @@
             data-sem="{{ (s.semester or '')|lower }}"
             onclick="openStudModal('{{ s.nfcId }}','{{ s.name|e }}','{{ s.course|default('')|e }}','{{ s.year_level|default('') }}','{{ s.section|default('') }}','{{ s.student_id|default('')|e }}')"
             style="margin-bottom:6px;border-radius:8px;">
-            <div class="sc-st-top">
+            <div class="sc-st-top" style="align-items:center;gap:12px;">
+              <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;border:1px solid var(--border-color);flex-shrink:0;">
+                <img src="/static/uploads/photos/{{ s.student_id or 'none' }}.jpg" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                     style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
+                <span style="display:none; align-items:center; justify-content:center; width:100%; height:100%;"><i class="bi bi-person-fill" style="font-size:16px;color:var(--muted);"></i></span>
+              </div>
               <div style="flex:1;min-width:0;">
                 <div class="sc-st-name">{{ s.name }}</div>
                 <div class="sc-st-sub">

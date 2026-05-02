@@ -122,6 +122,9 @@ def export_student_sessions_impl(
 
         f_status = request.args.get('status', '').strip()
         f_subject = request.args.get('subject', '').strip()
+        f_instructor = request.args.get('instructor', '').strip()
+        f_year = request.args.get('year', '').strip()
+        f_section = request.args.get('section', '').strip()
         f_class_type = request.args.get('class_type', '').strip().lower()
         f_semester = request.args.get('semester', '').strip()
         stud_name = request.args.get('name', 'Student').strip()
@@ -133,9 +136,11 @@ def export_student_sessions_impl(
         with get_db_fn() as conn:
             log_rows = conn.execute(
                 "SELECT al.*, s.subject_name, s.course_code, s.section_key, s.semester, "
-                "s.teacher_name, s.class_type, s.time_slot, s.started_at, s.ended_at "
+                "s.teacher_name, s.class_type, s.time_slot, s.started_at, s.ended_at, "
+                "st.year_level, st.section "
                 "FROM attendance_logs al "
                 "JOIN sessions s ON al.sess_id = s.sess_id "
+                "LEFT JOIN students st ON al.nfc_id = st.nfcId "
                 "WHERE al.nfc_id=? ORDER BY s.started_at DESC",
                 (nfc_id,),
             ).fetchall()
@@ -175,8 +180,15 @@ def export_student_sessions_impl(
                 continue
             if f_subject and lg['subject_name'] != f_subject:
                 continue
+            if f_instructor and lg['teacher_name'] != f_instructor:
+                continue
+            if f_year and str(lg.get('year_level') or '') != f_year:
+                continue
+            if f_section and str(lg.get('section') or '') != f_section:
+                continue
+
             class_type = str(lg['class_type'] or 'lecture').strip().lower()
-            if f_class_type in ('lecture', 'laboratory') and class_type != f_class_type:
+            if f_class_type in ('lecture', 'laboratory', 'school_event') and class_type != f_class_type:
                 continue
             
             # Semester filtering

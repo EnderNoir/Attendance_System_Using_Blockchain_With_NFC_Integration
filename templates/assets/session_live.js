@@ -102,6 +102,9 @@ function showModal(type, name, studentId, message, time) {
   const overlay = document.getElementById('tapModalOverlay');
   const modal = document.getElementById('tapModal');
   const icon = document.getElementById('modalIcon');
+  const photoWrap = document.getElementById('modalPhotoWrap');
+  const photoImg = document.getElementById('modalStudentPhoto');
+  const statusBadge = document.getElementById('modalStatusBadge');
   const status = document.getElementById('modalStatus');
   const mName = document.getElementById('modalName');
   const mId = document.getElementById('modalStudentId');
@@ -113,6 +116,7 @@ function showModal(type, name, studentId, message, time) {
     modal.classList.remove(c); icon.classList.remove(c);
     status.classList.remove(c); mMsg.classList.remove(c);
   });
+  
   const cfg = {
     'present': { cls: 'green', icon: '✔', label: 'PRESENT', msg: 'Attendance recorded successfully.' },
     'late': { cls: 'orange', icon: '⏱', label: 'LATE', msg: `Arrived after the ${gracePeriodMinutes}-minute grace period - marked Late.` },
@@ -120,6 +124,28 @@ function showModal(type, name, studentId, message, time) {
     'invalid': { cls: 'red', icon: '✕', label: 'INVALID CARD', msg: message || 'This NFC card is not registered in the system.' },
   };
   const c = cfg[type] || cfg['invalid'];
+  
+  if (type === 'present' || type === 'late' || type === 'warning') {
+    icon.style.display = 'none';
+    photoWrap.style.display = 'block';
+    photoImg.src = `/static/uploads/photos/${studentId}.jpg?t=${Date.now()}`;
+    photoImg.onerror = function() {
+      photoImg.style.display = 'none';
+      icon.innerHTML = '<i class="bi bi-person-fill"></i>';
+      icon.style.display = 'flex';
+      icon.className = 'modal-icon-ring ' + c.cls;
+    };
+    photoImg.onload = function() {
+      photoImg.style.display = 'block';
+    };
+    statusBadge.textContent = c.icon;
+    statusBadge.style.background = `var(--${c.cls === 'green' ? 'success' : c.cls === 'orange' ? 'warning' : 'warning'})`;
+  } else {
+    icon.innerHTML = c.icon;
+    icon.style.display = 'flex';
+    photoWrap.style.display = 'none';
+  }
+
   modal.classList.add(c.cls); icon.className = 'modal-icon-ring ' + c.cls; icon.textContent = c.icon;
   status.className = 'modal-status ' + c.cls; status.textContent = c.label;
   mMsg.className = 'modal-message ' + c.cls; mMsg.textContent = c.msg;
@@ -160,7 +186,12 @@ function updateStudentStatus(nfc_id, status, reason = '', extra = {}) {
       const badgeBorder = enrollStatus === 'Irregular' ? 'rgba(192,57,43,.2)' : 'rgba(46,204,113,.2)';
 
       row.innerHTML = `
-        <div class="student-avatar av-gray" id="savt_${nfc_id}">${(extra.name[0] || '?').toUpperCase()}</div>
+        <div class="student-avatar av-gray" id="savt_${nfc_id}">
+          <img src="/static/uploads/photos/${extra.student_id}.jpg" 
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+               style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
+          <span style="display:none;">${(extra.name[0] || '?').toUpperCase()}</span>
+        </div>
         <div class="student-info">
           <div class="student-name">
             ${extra.name}
@@ -171,10 +202,11 @@ function updateStudentStatus(nfc_id, status, reason = '', extra = {}) {
         </div>
         <span class="status-badge sb-unknown" id="sbadge_${nfc_id}">— Unknown</span>
         ${(!IS_SCHOOL_EVENT) ? `
-        <button class="btn-excuse" id="sexc_${nfc_id}" onclick="openExcuse('${nfc_id}','${extra.name.replace(/'/g, "\\'")}')" title="Mark as Excused">
+        <button class="btn-excuse" id="sexc_${nfc_id}" onclick="event.stopPropagation(); openExcuse('${nfc_id}','${extra.name.replace(/'/g, "\\'")}')" title="Mark as Excused">
           <i class="bi bi-journal-check"></i> Excuse
         </button>` : ''}
       `;
+      row.onclick = () => openStudModalLive(nfc_id, extra.name, extra.student_id, enrollStatus);
       list.appendChild(row);
     }
   }
@@ -623,3 +655,44 @@ function filterByStatus() {
   });
 }
 function filterStatus() { filterByStatus(); }
+
+// ── Student Info Modal (Live) ─────────────────────────────────────────────
+function openStudModalLive(nfcId, name, studentId, enrollment) {
+  const modal = document.getElementById('studModalLive');
+  if (!modal) return;
+  
+  const statusRow = document.getElementById('srow_' + nfcId);
+  const statusBadge = statusRow ? statusRow.querySelector('.status-badge').cloneNode(true) : null;
+  
+  document.getElementById('sl_name').textContent = name;
+  document.getElementById('sl_id').textContent = studentId || '—';
+  document.getElementById('sl_nfc').textContent = nfcId;
+  document.getElementById('sl_enroll').textContent = enrollment || 'Regular';
+  document.getElementById('sl_photo').src = `/static/uploads/photos/${studentId}.jpg`;
+  document.getElementById('sl_photo').onerror = function() {
+    this.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22150%22%20height%3D%22150%22%3E%3Crect%20fill%3D%22%23eee%22%20width%3D%22150%22%20height%3D%22150%22%2F%3E%3Ctext%20fill%3D%22%23aaa%22%20font-family%3D%22sans-serif%22%20font-size%3D%2260%22%20dy%3D%22.35em%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3E%3F%3C%2Ftext%3E%3C%2Fsvg%3E';
+  };
+  
+  const badgeWrap = document.getElementById('sl_status_badge');
+  badgeWrap.innerHTML = '';
+  if (statusBadge) {
+    statusBadge.style.display = 'inline-block';
+    statusBadge.style.fontSize = '12px';
+    statusBadge.style.padding = '4px 12px';
+    badgeWrap.appendChild(statusBadge);
+  }
+  
+  modal.classList.add('show');
+}
+
+function closeStudModalLive() {
+  document.getElementById('studModalLive').classList.remove('show');
+}
+
+function zoomPhoto(src) {
+  const overlay = document.getElementById('photoZoomOverlay');
+  const img = document.getElementById('zoomedPhoto');
+  if (!overlay || !img) return;
+  img.src = src;
+  overlay.classList.add('show');
+}

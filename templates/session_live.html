@@ -342,10 +342,13 @@
       <div class="student-row" data-enroll-name="{{ s.name|lower }}" 
            onclick="openStudModalLive('{{ s.nfcId }}', '{{ s.name|e }}', '{{ s.student_id or '' }}', '{{ s.enrollment_status or 'Regular' }}')">
         <div class="student-avatar av-gray">
-          <img src="/static/uploads/photos/{{ s.student_id }}.jpg?t={{ now_ts }}" 
+          {% set _pf = photos_db.get(s.nfcId) %}
+          {% if _pf %}
+          <img src="/static/uploads/{{ _pf }}?t={{ now_ts }}"
                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
-          <span style="display:none; align-items:center; justify-content:center; width:100%; height:100%; background:var(--bg-secondary); border-radius:50%;">
+          {% endif %}
+          <span style="display:{% if not _pf %}flex{% else %}none{% endif %}; align-items:center; justify-content:center; width:100%; height:100%; background:var(--bg-secondary); border-radius:50%;">
             <i class="bi bi-person-fill" style="font-size:16px;color:var(--muted);"></i>
           </span>
         </div>
@@ -409,10 +412,13 @@
           {% elif s.status == 'excused' %}av-blue
           {% elif s.status == 'absent' %}av-red
           {% else %}av-gray{% endif %}" id="savt_{{ s.nfcId }}">
-          <img src="/static/uploads/photos/{{ s.student_id }}.jpg?t={{ now_ts }}" 
+          {% set _pf2 = photos_db.get(s.nfcId) %}
+          {% if _pf2 %}
+          <img src="/static/uploads/{{ _pf2 }}?t={{ now_ts }}"
                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
-          <span style="display:none; align-items:center; justify-content:center; width:100%; height:100%; background:var(--bg-secondary); border-radius:50%;">
+          {% endif %}
+          <span style="display:{% if not _pf2 %}flex{% else %}none{% endif %}; align-items:center; justify-content:center; width:100%; height:100%; background:var(--bg-secondary); border-radius:50%;">
             <i class="bi bi-person-fill" style="font-size:16px;color:var(--muted);"></i>
           </span>
         </div>
@@ -606,6 +612,22 @@
 {% block extra_scripts %}
 <script>
   const USER_ROLE = "{{ session.get('role', 'teacher') }}";
+  // Photo map: nfcId -> full URL (from DB). Used for all image rendering.
+  const PHOTO_MAP = {
+    {% for s in section_students %}{% set _pf = photos_db.get(s.nfcId) %}{% if _pf %}'{{ s.nfcId }}': '/static/uploads/{{ _pf }}',{% endif %}{% endfor %}
+  };
+  // Student data map: nfcId -> full student info. Avoids API call in popup.
+  const STUDENT_MAP = {
+    {% for s in section_students %}'{{ s.nfcId }}': {
+      semester: {{ (s.semester or '')|tojson }},
+      date_registered: {{ (s.date_registered or '')|tojson }},
+      school_year: {{ (s.school_year or '')|tojson }},
+      year_level: {{ (s.year_level or '')|tojson }},
+      enrollment_status: {{ (s.enrollment_status or 'Regular')|tojson }},
+      adviser: {{ (s.adviser or '')|tojson }},
+      email: {{ (s.email or '')|tojson }},
+    },{% endfor %}
+  };
 </script>
 <script>{% include 'assets/session_live.js' %}</script>
 {% endblock %}

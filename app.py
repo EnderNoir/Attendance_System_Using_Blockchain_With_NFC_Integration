@@ -6153,6 +6153,7 @@ def live_session(sess_id):
             'end_time': end_time,
             'class_type': class_type_label,
         }
+    photos_db = db_get_all_photos()
     return render_template('session_live.html', sess=sess, sess_id=sess_id,
                            section_students=section_students,
                            student_statuses=student_statuses,
@@ -6164,7 +6165,8 @@ def live_session(sess_id):
                            session_meta=session_meta,
                            can_end_early=(not is_school_event),
                            fmt_time=fmt_time, fmt_time_short=fmt_time_short,
-                           now_ts=int(time.time()))
+                           now_ts=int(time.time()),
+                           photos_db=photos_db)
 
 @app.route('/teacher/session/<sess_id>/end', methods=['POST'])
 @login_required

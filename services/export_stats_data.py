@@ -140,6 +140,7 @@ def build_stats_export_dataset(
     sess_rows = []
     detail_rows = []
     by_section = {}
+    by_class_type = {}
     reason_labels = {
         'sickness': 'Sickness / Illness',
         'lbm': 'LBM',
@@ -165,14 +166,28 @@ def build_stats_export_dataset(
         # Combined student set: official enrolled + any irregular student who tapped
         all_session_stud_ids = {st['nfcId'] for st in enrolled_official} | set(att_logs.keys())
         
+        # Smart Absent Logic: Only count official students as "Absent" if they were already registered when the session started.
+        # This prevents new students from appearing absent in history.
+        official_ids_for_absent = {
+            st['nfcId'] for st in enrolled_official 
+            if (st.get('created_at') or '9999') <= s.get('started_at', '')
+        }
+        
         pre = set(s.get('present', []))
         late = set(s.get('late', []))
         exc = set(s.get('excused', []))
         
         # Recalculate counts to include irregular students
-        abs_ = all_session_stud_ids - pre - late - exc
+        # Absent = (Eligible Official IDs + Irregular Taps) - (Present + Late + Excused)
+        # Actually, Irregular Taps are never absent by definition.
+        # So Absent = Eligible Official IDs - (Present + Late + Excused)
+        abs_ = official_ids_for_absent - pre - late - exc
+        
+        # All IDs involved in this specific session (for total enrollment stat)
+        session_total_ids = official_ids_for_absent | set(att_logs.keys())
+        
         cnt = {
-            'enrolled': len(all_session_stud_ids),
+            'enrolled': len(session_total_ids),
             'present': len(pre - late),
             'late': len(late),
             'absent': len(abs_),
@@ -197,6 +212,13 @@ def build_stats_export_dataset(
             by_section[sk] = {'present': 0, 'late': 0, 'absent': 0, 'excused': 0, 'enrolled': 0}
         for k in ('present', 'late', 'absent', 'excused', 'enrolled'):
             by_section[sk][k] += cnt[k]
+        
+        ct_key = class_type_norm.title()
+        if ct_key not in by_class_type:
+            by_class_type[ct_key] = {'present': 0, 'late': 0, 'absent': 0, 'excused': 0}
+        for k in ('present', 'late', 'absent', 'excused'):
+            by_class_type[ct_key][k] += cnt[k]
+
         sess_rows.append(
             [
                 subj_lbl,
@@ -288,4 +310,5 @@ def build_stats_export_dataset(
         'sess_rows': sess_rows,
         'detail_rows': detail_rows,
         'by_section': by_section,
+        'by_class_type': by_class_type,
     }

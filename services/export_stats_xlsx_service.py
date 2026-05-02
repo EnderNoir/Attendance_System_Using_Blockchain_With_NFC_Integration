@@ -361,14 +361,7 @@ def export_stats_xlsx_impl(
             [22, 12, 12, 12, 12, 12, 12],
         )
         ts6 += 1
-        by_class_type = {}
-        for dr in detail_rows:
-            ctype = str(dr[7] or 'Lecture').strip().title()
-            status = str(dr[11] or '').strip().lower()
-            if ctype not in by_class_type:
-                by_class_type[ctype] = {'present': 0, 'late': 0, 'absent': 0, 'excused': 0}
-            if status in by_class_type[ctype]:
-                by_class_type[ctype][status] += 1
+        by_class_type = ds.get('by_class_type', {})
 
         for ri, (ctype, cnts) in enumerate(sorted(by_class_type.items()), ts6):
             total6 = cnts['present'] + cnts['late'] + cnts['absent'] + cnts['excused']

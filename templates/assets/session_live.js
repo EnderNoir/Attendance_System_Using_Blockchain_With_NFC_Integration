@@ -126,20 +126,30 @@ function showModal(type, name, studentId, message, time) {
   const c = cfg[type] || cfg['invalid'];
   
   if (type === 'present' || type === 'late' || type === 'warning') {
-    icon.style.display = 'none';
-    photoWrap.style.display = 'block';
-    photoImg.src = `/static/uploads/photos/${studentId}.jpg?t=${Date.now()}`;
-    photoImg.onerror = function() {
-      photoImg.style.display = 'none';
-      icon.innerHTML = '<i class="bi bi-person-fill"></i>';
-      icon.style.display = 'flex';
-      icon.className = 'modal-icon-ring ' + c.cls;
-    };
-    photoImg.onload = function() {
+    // Use DB photo URL from template-injected PHOTO_MAP
+    const photoUrl = (typeof PHOTO_MAP !== 'undefined' && PHOTO_MAP[studentId]) ? PHOTO_MAP[studentId] + '?t=' + Date.now() : '';
+    if (photoUrl) {
+      icon.style.display = 'none';
+      photoWrap.style.display = 'block';
       photoImg.style.display = 'block';
-    };
+      photoImg.onload = function() { photoImg.style.display = 'block'; };
+      photoImg.onerror = function() {
+        photoImg.style.display = 'none';
+        photoWrap.style.display = 'none';
+        icon.innerHTML = '<i class="bi bi-person-fill"></i>';
+        icon.className = 'modal-icon-ring ' + c.cls;
+        icon.style.display = 'flex';
+      };
+      photoImg.src = photoUrl;
+    } else {
+      // No photo in DB — show human icon
+      photoWrap.style.display = 'none';
+      icon.innerHTML = '<i class="bi bi-person-fill"></i>';
+      icon.className = 'modal-icon-ring ' + c.cls;
+      icon.style.display = 'flex';
+    }
     statusBadge.textContent = c.icon;
-    statusBadge.style.background = `var(--${c.cls === 'green' ? 'success' : c.cls === 'orange' ? 'warning' : 'warning'})`;
+    statusBadge.style.background = c.cls === 'green' ? 'var(--success)' : 'var(--warning)';
   } else {
     icon.innerHTML = c.icon;
     icon.style.display = 'flex';
@@ -674,31 +684,43 @@ function filterStatus() { filterByStatus(); }
 function openStudModalLive(nfcId, name, studentId, enrollment) {
   const modal = document.getElementById('studModalLive');
   if (!modal) return;
-  
+
   const statusRow = document.getElementById('srow_' + nfcId);
   const statusBadge = statusRow ? statusRow.querySelector('.status-badge').cloneNode(true) : null;
-  
-  // Set basic info immediately
+
+  // Basic fields
   document.getElementById('sl_name').textContent = name;
   document.getElementById('sl_id').textContent = studentId || '—';
   document.getElementById('sl_nfc').textContent = nfcId;
-  document.getElementById('sl_enroll').textContent = enrollment || 'Regular';
-  
-  // Reset other fields
-  ['sl_semester','sl_admission','sl_sy','sl_year','sl_adviser','sl_email'].forEach(id=>{
-    document.getElementById(id).textContent = 'Loading...';
-  });
 
+  // Extended fields from STUDENT_MAP (injected by template — no API call needed)
+  const sd = (typeof STUDENT_MAP !== 'undefined') ? STUDENT_MAP[nfcId] : null;
+  document.getElementById('sl_enroll').textContent    = (sd && sd.enrollment_status) || enrollment || 'Regular';
+  document.getElementById('sl_semester').textContent  = (sd && sd.semester)          || '—';
+  document.getElementById('sl_admission').textContent = (sd && sd.date_registered)   || '—';
+  document.getElementById('sl_sy').textContent        = (sd && sd.school_year)       || '—';
+  document.getElementById('sl_year').textContent      = (sd && sd.year_level)        || '—';
+  document.getElementById('sl_adviser').textContent   = (sd && sd.adviser)           || '—';
+  document.getElementById('sl_email').textContent     = (sd && sd.email)             || '—';
+
+  // Photo from PHOTO_MAP (DB-sourced filename)
   const photo = document.getElementById('sl_photo');
   const fallback = document.getElementById('sl_photo_fallback');
-  photo.src = `/static/uploads/photos/${studentId}.jpg?t=${Date.now()}`;
-  photo.style.display = 'block';
-  fallback.style.display = 'none';
-  photo.onerror = function() {
-    this.style.display = 'none';
+  const photoUrl = (typeof PHOTO_MAP !== 'undefined' && PHOTO_MAP[nfcId]) ? PHOTO_MAP[nfcId] + '?t=' + Date.now() : '';
+  if (photoUrl) {
+    photo.style.display = 'block';
+    fallback.style.display = 'none';
+    photo.onerror = function() {
+      this.style.display = 'none';
+      fallback.style.display = 'block';
+    };
+    photo.src = photoUrl;
+  } else {
+    photo.style.display = 'none';
     fallback.style.display = 'block';
-  };
-  
+  }
+
+  // Status badge
   const badgeWrap = document.getElementById('sl_status_badge');
   badgeWrap.innerHTML = '';
   if (statusBadge) {
@@ -707,32 +729,8 @@ function openStudModalLive(nfcId, name, studentId, enrollment) {
     statusBadge.style.padding = '4px 12px';
     badgeWrap.appendChild(statusBadge);
   }
-  
-  modal.classList.add('show');
 
-  // Fetch full details from all_students via API if possible, or use current list
-  fetch('/api/students/all')
-    .then(r => r.json())
-    .then(data => {
-      const s = data.find(x => x.nfcId === nfcId);
-      if (s) {
-        document.getElementById('sl_semester').textContent = s.semester || '—';
-        document.getElementById('sl_admission').textContent = s.date_registered || '—';
-        document.getElementById('sl_sy').textContent = s.school_year || '—';
-        document.getElementById('sl_year').textContent = s.year_level || '—';
-        document.getElementById('sl_adviser').textContent = s.adviser || '—';
-        document.getElementById('sl_email').textContent = s.email || '—';
-      } else {
-        ['sl_semester','sl_admission','sl_sy','sl_year','sl_adviser','sl_email'].forEach(id=>{
-          document.getElementById(id).textContent = '—';
-        });
-      }
-    })
-    .catch(() => {
-      ['sl_semester','sl_admission','sl_sy','sl_year','sl_adviser','sl_email'].forEach(id=>{
-        document.getElementById(id).textContent = 'Error loading';
-      });
-    });
+  modal.classList.add('show');
 }
 
 function closeStudModalLive() {

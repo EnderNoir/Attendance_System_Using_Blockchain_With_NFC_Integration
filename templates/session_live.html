@@ -14,9 +14,12 @@
 <div class="tap-modal-overlay" id="tapModalOverlay">
   <div class="tap-modal" id="tapModal">
     <div class="modal-icon-ring" id="modalIcon">✔</div>
-    <div class="modal-photo-wrap" id="modalPhotoWrap" style="display:none; position:relative; margin-bottom:15px;">
-      <img id="modalStudentPhoto" src="" alt="" style="width:120px; height:120px; border-radius:50%; object-fit:cover; border:4px solid var(--accent); box-shadow: 0 0 20px rgba(0,0,0,0.3);">
-      <div id="modalStatusBadge" style="position:absolute; bottom:0; right:0; background:var(--accent); color:white; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid var(--surface); font-size:18px;">✔</div>
+    <div class="modal-photo-wrap" id="modalPhotoWrap" style="display:none; position:relative; margin-bottom:15px; width:120px; height:120px; margin-left:auto; margin-right:auto;">
+      <img id="modalStudentPhoto" src="" alt="" style="width:120px; height:120px; border-radius:50%; object-fit:cover; border:4px solid var(--accent); box-shadow: 0 0 20px rgba(0,0,0,0.3); cursor:pointer;" onclick="window.open(this.src.split('?')[0], '_blank')">
+      <div id="modalStatusBadge" style="position:absolute; bottom:0; right:0; background:var(--accent); color:white; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid var(--surface); font-size:18px; z-index:2;">✔</div>
+      <div onclick="window.open(document.getElementById('modalStudentPhoto').src.split('?')[0], '_blank')" style="position:absolute; bottom:0; left:0; width:32px; height:32px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); border:3px solid var(--surface); z-index:2;" title="View full photo">
+        <i class="bi bi-zoom-in" style="color:#000; font-size:14px;"></i>
+      </div>
     </div>
     <div class="modal-status" id="modalStatus">PRESENT</div>
     <div class="modal-name" id="modalName">Student Name</div>

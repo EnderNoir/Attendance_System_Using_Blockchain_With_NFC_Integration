@@ -5444,6 +5444,7 @@ def teacher_sessions_students():
         datetime_cls=datetime,
         fmt_time=fmt_time,
         fmt_time_short=fmt_time_short,
+        photos_db=db_get_all_photos(),
     )
 
 @app.route('/teacher/create-session')

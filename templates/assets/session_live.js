@@ -146,12 +146,24 @@ function showModal(type, name, studentId, message, time) {
     photoWrap.style.display = 'none';
   }
 
-  modal.classList.add(c.cls); icon.className = 'modal-icon-ring ' + c.cls;
+  modal.classList.add(c.cls);
+  if (type !== 'present' && type !== 'late' && type !== 'warning') {
+    icon.className = 'modal-icon-ring ' + c.cls;
+  }
   status.className = 'modal-status ' + c.cls; status.textContent = c.label;
   mMsg.className = 'modal-message ' + c.cls; mMsg.textContent = c.msg;
   mName.textContent = name || '—';
   mId.textContent = studentId ? 'ID: ' + studentId : '';
-  mTime.innerHTML = time ? `<span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:700;display:block;margin-bottom:2px;">Tapped time</span><span style="font-size:24px;font-weight:800;font-family:'Space Mono',monospace;">${time}</span>` : '';
+  const fmtTime = (function(raw) {
+    if (!raw) return '';
+    const parts = String(raw).split(':');
+    let h = parseInt(parts[0], 10);
+    const m = parts[1] || '00';
+    const ampm = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12;
+    return h + ':' + m + ampm;
+  })(time);
+  mTime.innerHTML = fmtTime ? '<span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;font-weight:700;display:block;margin-bottom:4px;">Tapped time</span><span style="font-size:28px;font-weight:800;font-family:\'Space Mono\',monospace;">' + fmtTime + '</span>' : '';
   overlay.classList.add('show');
   clearTimeout(modalTimer);
   modalTimer = setTimeout(() => overlay.classList.remove('show'), 3500);

@@ -913,3 +913,74 @@
     }
   }
 
+  /* ── Student Info Popup Overlay (Live Session) ────────────────── */
+  .stud-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 15000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease;
+    padding: 16px;
+  }
+
+  .stud-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .stud-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    width: 100%;
+    max-width: 550px;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: scale(.9) translateY(20px);
+    transition: transform .28s cubic-bezier(.34,1.56,.64,1);
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+  }
+
+  .stud-overlay.show .stud-modal {
+    transform: scale(1) translateY(0);
+  }
+
+  .stud-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 1;
+    border-radius: 18px 18px 0 0;
+  }
+
+  .sm-back {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .2s;
+    flex-shrink: 0;
+  }
+
+  .sm-back:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }

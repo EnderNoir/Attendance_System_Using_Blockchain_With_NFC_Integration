@@ -237,9 +237,23 @@ function renderAll(data) {
 }
 
 function renderTrend(data) {
-  const keys = Object.keys(data.trend || {});
+  let rawTrend = data.trend || {};
+  let keys;
+
+  // For 'today', always show full hourly range (06:00–22:00) as skeleton
+  if (curPeriod === 'today') {
+    keys = [];
+    for (let h = 6; h <= 22; h++) keys.push(String(h).padStart(2, '0') + ':00');
+    // Merge in any actual data
+    const merged = {};
+    keys.forEach(k => merged[k] = rawTrend[k] || { present: 0, late: 0, absent: 0, excused: 0 });
+    rawTrend = merged;
+  } else {
+    keys = Object.keys(rawTrend);
+  }
+
   const tc = document.getElementById('trendChart');
-  if (!keys.length) {
+  if (!keys.length || (curPeriod !== 'today' && !Object.values(rawTrend).some(v => v.present || v.late || v.absent || v.excused))) {
     document.getElementById('trendNoData').classList.add('show');
     tc.style.display = 'none';
     return;
@@ -248,7 +262,7 @@ function renderTrend(data) {
   tc.style.display = 'block';
   trendChart.data.labels = keys;
   ['present', 'late', 'absent', 'excused'].forEach((k, i) => {
-    trendChart.data.datasets[i].data = keys.map((key) => (data.trend[key] || {})[k] || 0);
+    trendChart.data.datasets[i].data = keys.map((key) => (rawTrend[key] || {})[k] || 0);
   });
   trendChart.update('active');
 }

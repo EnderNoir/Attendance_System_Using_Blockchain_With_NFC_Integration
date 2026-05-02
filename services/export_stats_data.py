@@ -27,6 +27,7 @@ def build_stats_export_dataset(
     fmt_time_fn,
     db_get_session_attendance_fn,
     get_db_fn,
+    f_enrollment=None,
 ):
     if period == 'today':
         start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -63,6 +64,9 @@ def build_stats_export_dataset(
         if _ov.get('student_id'):
             _st['student_id'] = _ov['student_id']
         _st['section'] = (_st.get('section') or '').strip().upper()
+
+    if f_enrollment:
+        all_stud = [st for st in all_stud if st.get('enrollment_status', 'Regular').lower() == f_enrollment.lower()]
 
     filtered = {}
     f_section_norm = normalize_section_key_fn(f_section) if f_section else ''

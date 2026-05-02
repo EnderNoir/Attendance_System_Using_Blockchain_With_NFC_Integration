@@ -82,17 +82,16 @@ def attendance_stats_impl(
     if f_semester:
         where.append('LOWER(s.semester) = ?')
         params.append(f_semester.lower())
-    if f_tod == 'morning':
-        where.append(f"EXTRACT(HOUR FROM {ts_cast}) < 12")
-    elif f_tod == 'afternoon':
-        where.append(f"EXTRACT(HOUR FROM {ts_cast}) >= 12")
-    elif f_tod and ':' in f_tod:
+    if f_tod and ':' in f_tod:
         where.append('s.time_slot = ?')
         params.append(f_tod)
 
+    # enrollment_type is handled separately (only applies to attendance_log queries, not session counts)
+    enroll_where_clause = ''
+    enroll_params_extra = []
     if f_enrollment:
-        where.append("LOWER(COALESCE(st.enrollment_status, 'Irregular')) = ?")
-        params.append(f_enrollment.lower())
+        enroll_where_clause = "AND LOWER(COALESCE(st.enrollment_status, 'regular')) = ?"
+        enroll_params_extra = [f_enrollment.lower()]
 
     wsql = ' AND '.join(where)
 
@@ -113,27 +112,27 @@ def attendance_stats_impl(
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "LEFT JOIN students st ON al.nfc_id = st.nfc_id "
-            "WHERE " + wsql + ' GROUP BY al.status',
-            tuple(params),
+            "WHERE " + wsql + ' ' + enroll_where_clause + ' GROUP BY al.status',
+            tuple(params) + tuple(enroll_params_extra),
         ).fetchall()
         trend_rows = conn.execute(
             "SELECT " + tkey_expr + " as tkey, al.status, COUNT(*) as cnt "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "LEFT JOIN students st ON al.nfc_id = st.nfc_id "
-            "WHERE " + wsql + ' GROUP BY tkey, al.status ORDER BY tkey',
-            tuple(params),
+            "WHERE " + wsql + ' ' + enroll_where_clause + ' GROUP BY tkey, al.status ORDER BY tkey',
+            tuple(params) + tuple(enroll_params_extra),
         ).fetchall()
         subj_rows = conn.execute(
             "SELECT s.subject_name, s.course_code, al.status, COUNT(*) as cnt "
             "FROM attendance_logs al "
             "JOIN sessions s ON al.sess_id = s.sess_id "
             "LEFT JOIN students st ON al.nfc_id = st.nfc_id "
-            "WHERE " + wsql + ' GROUP BY s.subject_name, s.course_code, al.status',
-            tuple(params),
+            "WHERE " + wsql + ' ' + enroll_where_clause + ' GROUP BY s.subject_name, s.course_code, al.status',
+            tuple(params) + tuple(enroll_params_extra),
         ).fetchall()
-        
-        # Fixed: sessions count query must join students if wsql uses st
+
+        # Session count and subject labels use base wsql only (no enrollment filter)
         count_sql = (
             "SELECT COUNT(DISTINCT s.sess_id) as cnt "
             "FROM sessions s "
@@ -143,8 +142,12 @@ def attendance_stats_impl(
         )
         sess_count_row = conn.execute(count_sql, tuple(params)).fetchone()
         sess_count = sess_count_row['cnt'] if sess_count_row else 0
+
+        # Fixed: subject labels query must join necessary tables for filtering
         subj_labels_rows = conn.execute(
             "SELECT DISTINCT s.subject_name, s.course_code FROM sessions s "
+            "LEFT JOIN attendance_logs al ON s.sess_id = al.sess_id "
+            "LEFT JOIN students st ON al.nfc_id = st.nfc_id "
             "WHERE " + wsql + ' ORDER BY s.subject_name',
             tuple(params),
         ).fetchall()

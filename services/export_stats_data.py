@@ -251,7 +251,7 @@ def build_stats_export_dataset(
         # Map all students for quick lookup
         stud_db_map = {st['nfcId']: st for st in all_stud}
         
-        for nid in sorted(all_session_stud_ids):
+        for nid in sorted(session_total_ids):
             st = stud_db_map.get(nid)
             lg = att_logs.get(nid, {})
             

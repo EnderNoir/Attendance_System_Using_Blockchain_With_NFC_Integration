@@ -48,12 +48,12 @@ def attendance_stats_impl(
         start_dt = datetime(2000, 1, 1)
         end_dt = None
 
-    # Comparison using string prefix to avoid timezone/casting issues on s.started_at
-    where = ["SUBSTR(s.started_at, 1, 10) >= ?"]
-    params = [start_dt.strftime('%Y-%m-%d')]
+    # Direct string comparison on s.started_at
+    where = ["s.started_at >= ?"]
+    params = [start_dt.strftime('%Y-%m-%d %H:%M:%S')]
     if end_dt:
-        where.append("SUBSTR(s.started_at, 1, 10) <= ?")
-        params.append(end_dt.strftime('%Y-%m-%d'))
+        where.append("s.started_at <= ?")
+        params.append(end_dt.strftime('%Y-%m-%d %H:%M:%S'))
     if role == 'teacher':
         where.append('s.teacher_username = ?')
         params.append(username)

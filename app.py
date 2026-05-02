@@ -4495,22 +4495,46 @@ def api_move_student_semester(nfc_id):
 @app.route('/api/students/move-up-all', methods=['POST'])
 @admin_required
 def api_move_up_all_students():
-    """Wizard-based Move Up logic: handles Summer, Next Year, and Graduated transitions."""
-    data = request.json or {}
-    prog_filter = data.get('program', '').strip()
-    year_filter = data.get('year_level', '').strip()
-    sem_filter  = data.get('semester', '').strip()
-    action      = data.get('action', '').strip() # 'summer', 'next_year', 'graduated'
+    """Wizard-based Move Up:
+      next_sem  → increment semester (First→Second, Second→next-year First, Summer→next-year First)
+      summer    → set semester=Summer (keep year_level)
+      graduated → mark student_status='graduated' (alumni, inactive for live sessions)
+    """
+    data            = request.json or {}
+    prog_filter     = data.get('program', '').strip()
+    year_filter     = data.get('year_level', '').strip()
+    sem_filter      = data.get('semester', '').strip()
+    action          = data.get('action', '').strip()       # next_sem | summer | graduated
+    enroll_filter   = data.get('enrollment_type', '').strip()  # Regular | Irregular | ''
 
-    print(f"[API] Move Up Action: {action} | Filter: {prog_filter} / {year_filter} / {sem_filter}")
+    print(f"[MoveUp] Action={action} | {prog_filter} / {year_filter} / {sem_filter} / {enroll_filter}")
+
+    YEAR_ORDER = ['1st Year', '2nd Year', '3rd Year', '4th Year']
+
+    def _next_sem(curr_yl, curr_sem, curr_sy):
+        """Return (new_year_level, new_semester, new_school_year)."""
+        if curr_sem == 'First':
+            return curr_yl, 'Second', curr_sy
+        # Second or Summer → bump to next year, First semester
+        idx = YEAR_ORDER.index(curr_yl) if curr_yl in YEAR_ORDER else -1
+        next_yl = YEAR_ORDER[idx + 1] if idx >= 0 and idx + 1 < len(YEAR_ORDER) else curr_yl
+        # Increment school year (e.g. 2025-2026 → 2026-2027)
+        next_sy = curr_sy
+        try:
+            parts = curr_sy.split('-')
+            if len(parts) == 2:
+                end = int(parts[1])
+                next_sy = f"{end}-{end + 1}"
+        except Exception:
+            pass
+        return next_yl, 'First', next_sy
 
     try:
         conn = get_db()
-        
-        # Build query based on filters
-        where = ["student_status='active'"]
+
+        # Build WHERE clause
+        where  = ["student_status = 'active'"]
         params = []
-        
         if prog_filter:
             where.append("program = ?")
             params.append(prog_filter)
@@ -4520,63 +4544,59 @@ def api_move_up_all_students():
         if sem_filter:
             where.append("semester = ?")
             params.append(sem_filter)
-            
+        if enroll_filter:
+            where.append("LOWER(COALESCE(enrollment_status,'regular')) = ?")
+            params.append(enroll_filter.lower())
+
         wsql = " AND ".join(where)
-        students = conn.execute(
+        rows = conn.execute(
             f"SELECT nfc_id, full_name, year_level, semester, school_year FROM students WHERE {wsql}",
             tuple(params)
         ).fetchall()
-        
-        print(f"[API] Found {len(students)} students to process")
-        
-        updated_count = 0
-        
-        for student in students:
-            nfc_id = student['nfc_id']
-            curr_yl = student['year_level']
-            curr_sy = student['school_year']
-            
-            if action == 'graduated':
-                conn.execute("UPDATE students SET student_status = ? WHERE nfc_id = ?", ('graduated', nfc_id))
-            
-            elif action == 'summer':
-                conn.execute("UPDATE students SET semester = ? WHERE nfc_id = ?", ('Summer', nfc_id))
-            
-            elif action == 'next_year':
-                # Map next year
-                yl_map = {
-                    '1st Year': '2nd Year',
-                    '2nd Year': '3rd Year',
-                    '3rd Year': '4th Year',
-                    '4th Year': '4th Year' # Stay at 4th if moving to next year sem 1
-                }
-                next_yl = yl_map.get(curr_yl, curr_yl)
-                
-                # Increment school year
-                next_sy = curr_sy
-                try:
-                    if '-' in curr_sy:
-                        [s, e] = curr_sy.split('-')
-                        next_sy = f"{int(e)}-{int(e)+1}"
-                except:
-                    pass
-                    
+
+        print(f"[MoveUp] Matched {len(rows)} students")
+        updated = 0
+
+        for row in rows:
+            nfc_id  = row['nfc_id']
+            curr_yl = (row['year_level'] or '').strip()
+            curr_sem= (row['semester']   or 'First').strip()
+            curr_sy = (row['school_year']or '').strip()
+
+            if action == 'next_sem':
+                new_yl, new_sem, new_sy = _next_sem(curr_yl, curr_sem, curr_sy)
                 conn.execute(
-                    "UPDATE students SET year_level = ?, semester = ?, school_year = ? WHERE nfc_id = ?",
-                    (next_yl, 'First', next_sy, nfc_id)
+                    "UPDATE students SET year_level=?, semester=?, school_year=? WHERE nfc_id=?",
+                    (new_yl, new_sem, new_sy, nfc_id)
                 )
-            
-            updated_count += 1
-            
+
+            elif action == 'summer':
+                # Keep year_level, just set semester = Summer
+                conn.execute(
+                    "UPDATE students SET semester=? WHERE nfc_id=?",
+                    ('Summer', nfc_id)
+                )
+
+            elif action == 'graduated':
+                # Mark as graduated/alumni — they stay at their current year/sem
+                # but become inactive and won't appear in live sessions
+                conn.execute(
+                    "UPDATE students SET student_status=? WHERE nfc_id=?",
+                    ('graduated', nfc_id)
+                )
+
+            else:
+                print(f"[MoveUp] Unknown action '{action}', skipping {nfc_id}")
+                continue
+
+            updated += 1
+
         conn._conn.commit()
-        return jsonify({
-            'ok': True,
-            'message': f'Successfully updated {updated_count} students.',
-            'count': updated_count
-        })
+        print(f"[MoveUp] Done. Updated {updated} students.")
+        return jsonify({'ok': True, 'count': updated,
+                        'message': f'Successfully updated {updated} students.'})
 
     except Exception as e:
-        print(f"[API] ERROR: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'ok': False, 'error': str(e)}), 500

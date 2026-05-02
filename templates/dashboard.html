@@ -175,21 +175,22 @@
 
 <!-- ══ MOVE UP WIZARD MODAL ══ -->
 <div class="upd-overlay" id="semesterModal" onclick="if(event.target===this)closeSemesterModal()">
-  <div class="upd-box" style="max-width:450px;">
+  <div class="upd-box" style="max-width:460px;">
     <div class="upd-topbar">
       <div>
         <h3 style="font-size:16px;font-weight:800;">Move Up Wizard</h3>
-        <p style="font-size:11px;color:var(--muted);margin-top:2px;">Automate student transitions and graduations.</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:2px;">Automate student semester transitions.</p>
       </div>
-      <button onclick="closeSemesterModal()" class="btn-vr" style="padding:5px 10px;background:rgba(255,255,255,.05);"><i class="bi bi-arrow-left"></i> Back</button>
+      <button onclick="closeSemesterModal()" class="btn-vr" style="padding:5px 10px;background:rgba(255,255,255,.05);"><i class="bi bi-x-lg"></i> Close</button>
     </div>
-    
-    <div style="padding:20px;display:flex;flex-direction:column;gap:20px;">
-      
+
+    <div style="padding:20px;display:flex;flex-direction:column;gap:18px;">
+
       <!-- Step 1 -->
-      <div>
-        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Step 1: Select Group</div>
-        <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+      <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:14px;">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Step 1: Select Group</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+
           <div class="upd-field">
             <label class="upd-label">Program</label>
             <select id="mu_program" class="upd-input">
@@ -200,6 +201,7 @@
               {% endfor %}
             </select>
           </div>
+
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div class="upd-field">
               <label class="upd-label">Year Level</label>
@@ -219,34 +221,61 @@
               </select>
             </div>
           </div>
+
+          <!-- Enrollment Type -->
+          <div class="upd-field">
+            <label class="upd-label" style="margin-bottom:8px;">Enrollment Type</label>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:500;">
+                <input type="radio" name="mu_enrollment" value="" checked style="accent-color:var(--accent);width:15px;height:15px;"> All Students
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:500;">
+                <input type="radio" name="mu_enrollment" value="Regular" style="accent-color:var(--accent);width:15px;height:15px;"> Regular Only
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:500;">
+                <input type="radio" name="mu_enrollment" value="Irregular" style="accent-color:var(--accent);width:15px;height:15px;"> Irregular Only
+              </label>
+            </div>
+          </div>
+
         </div>
       </div>
 
       <!-- Step 2 -->
-      <div>
-        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">Step 2: Select Action</div>
+      <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:14px;">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Step 2: Select Action</div>
         <div style="display:flex;flex-direction:column;gap:8px;">
-          <label style="display:flex;align-items:center;gap:10px;padding:10px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-            <input type="radio" name="mu_action" value="summer" checked style="accent-color:var(--accent);width:16px;height:16px;">
+
+          <!-- Radio 1: Move to Next Sem -->
+          <label class="mu-action-label" onclick="this.style.borderColor='var(--accent)'" onmouseout="if(!this.querySelector('input').checked)this.style.borderColor='var(--border)'">
+            <input type="radio" name="mu_action" value="next_sem" checked style="accent-color:var(--accent);width:16px;height:16px;flex-shrink:0;">
             <div style="flex:1;">
-              <div style="font-size:13px;font-weight:700;">Move to Summer</div>
-              <div style="font-size:11px;color:var(--muted);">For students taking OJT or advance classes.</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);">Move to Next Sem</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">For students not taking summer class next sem</div>
             </div>
+            <span style="font-size:10px;color:var(--accent);font-family:'Space Mono',monospace;background:rgba(45,106,39,.12);padding:3px 7px;border-radius:6px;white-space:nowrap;">+1 Sem</span>
           </label>
-          <label style="display:flex;align-items:center;gap:10px;padding:10px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-            <input type="radio" name="mu_action" value="next_year" style="accent-color:var(--accent);width:16px;height:16px;">
+
+          <!-- Radio 2: Move to Summer Class -->
+          <label class="mu-action-label" onclick="this.style.borderColor='var(--accent)'" onmouseout="if(!this.querySelector('input').checked)this.style.borderColor='var(--border)'">
+            <input type="radio" name="mu_action" value="summer" style="accent-color:var(--accent);width:16px;height:16px;flex-shrink:0;">
             <div style="flex:1;">
-              <div style="font-size:13px;font-weight:700;">Move to Next Year 1st Sem</div>
-              <div style="font-size:11px;color:var(--muted);">For students skipping summer classes.</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);">Move to Summer Class</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">For students taking summer classes</div>
             </div>
+            <span style="font-size:10px;color:#f59e0b;font-family:'Space Mono',monospace;background:rgba(245,158,11,.12);padding:3px 7px;border-radius:6px;white-space:nowrap;">→ Summer</span>
           </label>
-          <label style="display:flex;align-items:center;gap:10px;padding:10px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-            <input type="radio" name="mu_action" value="graduated" style="accent-color:var(--accent);width:16px;height:16px;">
+
+          <!-- Radio 3: Mark as Graduated -->
+          <label class="mu-action-label" onclick="this.style.borderColor='var(--accent)'" onmouseout="if(!this.querySelector('input').checked)this.style.borderColor='var(--border)'">
+            <input type="radio" name="mu_action" value="graduated" style="accent-color:var(--accent);width:16px;height:16px;flex-shrink:0;">
             <div style="flex:1;">
-              <div style="font-size:13px;font-weight:700;">Mark as Graduated</div>
-              <div style="font-size:11px;color:var(--muted);">For graduating seniors (marks status as Inactive).</div>
+              <div style="font-size:13px;font-weight:700;color:var(--text);">Mark as Graduated</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px;">For graduating students (mark status as inactive)</div>
             </div>
+            <span style="font-size:10px;color:#ef4444;font-family:'Space Mono',monospace;background:rgba(239,68,68,.12);padding:3px 7px;border-radius:6px;white-space:nowrap;">Alumni</span>
           </label>
+
         </div>
       </div>
 
@@ -254,12 +283,42 @@
 
     <div class="upd-footer" style="background:rgba(255,255,255,.02);">
       <button class="btn-rst" onclick="closeSemesterModal()" style="border:none;">Cancel</button>
-      <button class="btn-primary" onclick="confirmMoveUp()" id="muSubmitBtn" style="padding:10px 24px;border-radius:10px;">
+      <button class="btn-primary" onclick="submitMoveUp()" id="muSubmitBtn" style="padding:10px 24px;border-radius:10px;">
         <i class="bi bi-rocket-takeoff"></i> Submit Transition
       </button>
     </div>
   </div>
 </div>
+
+<!-- ══ MOVE UP CONFIRM MODAL ══ -->
+<div class="upd-overlay" id="muConfirmModal">
+  <div class="upd-box" style="max-width:400px;">
+    <div style="padding:24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px;">
+      <div style="width:52px;height:52px;border-radius:50%;background:rgba(245,158,11,.15);border:2px solid rgba(245,158,11,.4);display:flex;align-items:center;justify-content:center;font-size:24px;">⚠️</div>
+      <div>
+        <h3 style="font-size:16px;font-weight:800;margin:0 0 6px;">Confirm Transition</h3>
+        <p id="muConfirmText" style="font-size:13px;color:var(--muted);margin:0;line-height:1.6;"></p>
+      </div>
+      <div id="muConfirmDetails" style="width:100%;background:var(--bg-secondary);border-radius:10px;padding:12px;font-size:12px;color:var(--muted);text-align:left;line-height:1.7;"></div>
+      <div style="display:flex;gap:10px;width:100%;">
+        <button class="btn-rst" onclick="document.getElementById('muConfirmModal').classList.remove('show')" style="flex:1;padding:10px;border-radius:10px;font-size:13px;">Cancel</button>
+        <button class="btn-primary" id="muConfirmYesBtn" onclick="executeMoveUp()" style="flex:1;padding:10px;border-radius:10px;font-size:13px;">
+          <i class="bi bi-check-lg"></i> Yes, Proceed
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.mu-action-label {
+  display:flex;align-items:center;gap:10px;padding:11px 13px;
+  border:1.5px solid var(--border);border-radius:10px;
+  cursor:pointer;transition:border-color .2s, background .2s;
+}
+.mu-action-label:hover { border-color: var(--accent); background: rgba(45,106,39,.04); }
+</style>
+
 
 <!-- Stats row removed -->
 

@@ -62,6 +62,42 @@ let modalTimer = null;
 function openEndModal() { document.getElementById('endSessionModal').classList.add('show'); }
 function closeEndModal() { document.getElementById('endSessionModal').classList.remove('show'); }
 
+function openSkipModal() { document.getElementById('skipSessionModal').classList.add('show'); }
+function closeSkipModal() { document.getElementById('skipSessionModal').classList.remove('show'); }
+
+async function confirmSkipSession() {
+  const btn = document.getElementById('btnConfirmSkip');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing…';
+  }
+  try {
+    const r = await fetch(`/api/session/skip/${sessId}`, { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      if (typeof showAppSuccess === 'function') {
+        showAppSuccess('Session skipped successfully.');
+      } else {
+        alert('Session skipped successfully.');
+      }
+      setTimeout(() => { window.location.href = '/teacher'; }, 800);
+    } else {
+      alert(d.error || 'Failed to skip session.');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-skip-forward-fill"></i> Yes, Skip Session';
+      }
+    }
+  } catch (e) {
+    console.error(e);
+    alert('Network error while skipping session.');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-skip-forward-fill"></i> Yes, Skip Session';
+    }
+  }
+}
+
 function showModal(type, name, studentId, message, time) {
   const overlay = document.getElementById('tapModalOverlay');
   const modal = document.getElementById('tapModal');

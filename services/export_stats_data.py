@@ -30,7 +30,7 @@ def build_stats_export_dataset(
 ):
     if period == 'today':
         start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_dt = None
+        end_dt = now.replace(hour=23, minute=59, second=59, microsecond=999999)
         period_label = now.strftime('Today - %B %d, %Y')
     elif period == 'month':
         yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
@@ -213,6 +213,19 @@ def build_stats_export_dataset(
                 rate,
             ]
         )
+        excuse_details = {}
+        with get_db_fn() as _conn:
+            excuses = _conn.execute(
+                "SELECT nfc_id, reason_type, reason_detail, attachment_file FROM excuse_requests WHERE sess_id=? AND status='approved'",
+                (sid,),
+            ).fetchall()
+            for exc_row in excuses:
+                excuse_details[exc_row['nfc_id']] = {
+                    'reason': exc_row['reason_type'],
+                    'reason_detail': exc_row['reason_detail'],
+                    'attachment_file': exc_row['attachment_file'],
+                }
+
         # Map all students for quick lookup
         stud_db_map = {st['nfcId']: st for st in all_stud}
         

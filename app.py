@@ -1685,6 +1685,7 @@ def _student_row(row):
     d['tx_hash']  = d.get('reg_tx_hash', '')
     d['section']  = (d.get('section') or '').strip().upper()
     d['enrollment_status'] = d.get('enrollment_status', 'Regular')
+    d['created_at'] = d.get('created_at', '')
     return d
 
 def db_save_student(s):

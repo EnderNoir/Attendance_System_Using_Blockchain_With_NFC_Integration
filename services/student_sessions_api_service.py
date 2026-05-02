@@ -92,6 +92,11 @@ def student_sessions_api_impl(
                 continue
             if sess.get('sess_id') in seen_sessions:
                 continue
+            
+            # Smart logic: Don't show sessions that happened before student was enrolled
+            if student and student.get('created_at'):
+                if str(sess.get('started_at', '')) < str(student['created_at']):
+                    continue
 
             if nfc_id in sess.get('excused', []):
                 status = 'excused'

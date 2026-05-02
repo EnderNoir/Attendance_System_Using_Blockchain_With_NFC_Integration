@@ -436,6 +436,8 @@ function buildIEFields(s, i) {
       <input class="ie-input" id="ie_contact_${i}" value="${esc(s.contact)}" placeholder="09XX-XXX-XXXX"/></div>
     <div class="ie-field"><label class="ie-label">Major</label>
       <input class="ie-input" id="ie_major_${i}" value="${esc(s.major)}" placeholder="N/A"/></div>
+    <div class="ie-field"><label class="ie-label">Date of Admission</label>
+      <input type="date" class="ie-input" id="ie_datereg_${i}" value="${esc(s.date_registered)}"/></div>
     <div class="ie-field"><label class="ie-label">Enrollment Type</label>
       <select class="ie-input" id="ie_status_${i}">
         <option value="Regular" ${s.enrollment_status === 'Regular' ? 'selected' : ''}>Regular</option>
@@ -489,6 +491,7 @@ function saveInlineEdit(i) {
   s.adviser = g(`ie_adv_${i}`) || s.adviser;
   s.contact = g(`ie_contact_${i}`) || s.contact;
   s.major = g(`ie_major_${i}`) || s.major || 'N/A';
+  s.date_registered = g(`ie_datereg_${i}`) || s.date_registered;
   s.enrollment_status = g(`ie_status_${i}`) || 'Regular';
   // photo_base64 is handled by handleIEPhoto
   renderReviewTable();

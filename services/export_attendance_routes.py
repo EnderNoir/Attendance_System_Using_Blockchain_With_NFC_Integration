@@ -140,7 +140,7 @@ def export_student_sessions_impl(
                 "st.year_level, st.section "
                 "FROM attendance_logs al "
                 "JOIN sessions s ON al.sess_id = s.sess_id "
-                "LEFT JOIN students st ON al.nfc_id = st.nfcId "
+                "LEFT JOIN students st ON al.nfc_id = st.nfc_id "
                 "WHERE al.nfc_id=? ORDER BY s.started_at DESC",
                 (nfc_id,),
             ).fetchall()

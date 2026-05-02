@@ -385,7 +385,7 @@ function renderSessModal(sessId, data) {
 
   // ══ STUDENT MODAL ══
   const studCache = {};
-  function openStudModal(nfcId, name, course, yearLevel, section, studentId) {
+  function openStudModal(nfcId, name, course, yearLevel, section, studentId, semester, adviser, studentType) {
     currentStudNfc = nfcId;
     currentStudName = name;
     document.getElementById('stud_name').textContent = name;
@@ -393,6 +393,9 @@ function renderSessModal(sessId, data) {
     <div class="stud-meta-item"><i class="bi bi-mortarboard"></i> <strong>${course || '—'}</strong></div>
     <div class="stud-meta-item"><i class="bi bi-layers"></i> <strong>${yearLevel || '—'}</strong></div>
     <div class="stud-meta-item"><i class="bi bi-grid-1x2"></i> Section <strong>${section || '—'}</strong></div>
+    <div class="stud-meta-item"><i class="bi bi-calendar-range"></i> <strong>${semester || '—'}</strong></div>
+    <div class="stud-meta-item"><i class="bi bi-person-workspace"></i> Adviser: <strong>${adviser || '—'}</strong></div>
+    <div class="stud-meta-item"><i class="bi bi-person-check"></i> Type: <strong>${studentType || 'Regular'}</strong></div>
     ${studentId ? `<div class="stud-meta-item"><i class="bi bi-person-badge"></i> ID: <strong>${studentId}</strong></div>` : ''}
     <div class="stud-meta-item"><i class="bi bi-credit-card-2-front"></i> NFC: <code style="font-size:11px;">${nfcId}</code></div>`;
     document.getElementById('studModal').classList.add('show');

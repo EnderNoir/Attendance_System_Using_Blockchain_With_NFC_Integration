@@ -146,12 +146,12 @@ function showModal(type, name, studentId, message, time) {
     photoWrap.style.display = 'none';
   }
 
-  modal.classList.add(c.cls); icon.className = 'modal-icon-ring ' + c.cls; icon.textContent = c.icon;
+  modal.classList.add(c.cls); icon.className = 'modal-icon-ring ' + c.cls;
   status.className = 'modal-status ' + c.cls; status.textContent = c.label;
   mMsg.className = 'modal-message ' + c.cls; mMsg.textContent = c.msg;
   mName.textContent = name || '—';
   mId.textContent = studentId ? 'ID: ' + studentId : '';
-  mTime.textContent = time || '';
+  mTime.innerHTML = time ? `<span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:700;display:block;margin-bottom:2px;">Tapped time</span><span style="font-size:24px;font-weight:800;font-family:'Space Mono',monospace;">${time}</span>` : '';
   overlay.classList.add('show');
   clearTimeout(modalTimer);
   modalTimer = setTimeout(() => overlay.classList.remove('show'), 3500);
@@ -187,10 +187,12 @@ function updateStudentStatus(nfc_id, status, reason = '', extra = {}) {
 
       row.innerHTML = `
         <div class="student-avatar av-gray" id="savt_${nfc_id}">
-          <img src="/static/uploads/photos/${extra.student_id}.jpg" 
-               onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+          <img src="/static/uploads/photos/${extra.student_id}.jpg?t=${Date.now()}" 
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
                style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
-          <span style="display:none;">${(extra.name[0] || '?').toUpperCase()}</span>
+          <span style="display:none; align-items:center; justify-content:center; width:100%; height:100%; background:var(--bg-secondary); border-radius:50%;">
+            <i class="bi bi-person-fill" style="font-size:16px;color:var(--muted);"></i>
+          </span>
         </div>
         <div class="student-info">
           <div class="student-name">
@@ -664,13 +666,25 @@ function openStudModalLive(nfcId, name, studentId, enrollment) {
   const statusRow = document.getElementById('srow_' + nfcId);
   const statusBadge = statusRow ? statusRow.querySelector('.status-badge').cloneNode(true) : null;
   
+  // Set basic info immediately
   document.getElementById('sl_name').textContent = name;
   document.getElementById('sl_id').textContent = studentId || '—';
   document.getElementById('sl_nfc').textContent = nfcId;
   document.getElementById('sl_enroll').textContent = enrollment || 'Regular';
-  document.getElementById('sl_photo').src = `/static/uploads/photos/${studentId}.jpg`;
-  document.getElementById('sl_photo').onerror = function() {
-    this.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22150%22%20height%3D%22150%22%3E%3Crect%20fill%3D%22%23eee%22%20width%3D%22150%22%20height%3D%22150%22%2F%3E%3Ctext%20fill%3D%22%23aaa%22%20font-family%3D%22sans-serif%22%20font-size%3D%2260%22%20dy%3D%22.35em%22%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%3E%3F%3C%2Ftext%3E%3C%2Fsvg%3E';
+  
+  // Reset other fields
+  ['sl_semester','sl_admission','sl_sy','sl_year','sl_adviser','sl_email'].forEach(id=>{
+    document.getElementById(id).textContent = 'Loading...';
+  });
+
+  const photo = document.getElementById('sl_photo');
+  const fallback = document.getElementById('sl_photo_fallback');
+  photo.src = `/static/uploads/photos/${studentId}.jpg?t=${Date.now()}`;
+  photo.style.display = 'block';
+  fallback.style.display = 'none';
+  photo.onerror = function() {
+    this.style.display = 'none';
+    fallback.style.display = 'block';
   };
   
   const badgeWrap = document.getElementById('sl_status_badge');
@@ -683,6 +697,30 @@ function openStudModalLive(nfcId, name, studentId, enrollment) {
   }
   
   modal.classList.add('show');
+
+  // Fetch full details from all_students via API if possible, or use current list
+  fetch('/api/students/all')
+    .then(r => r.json())
+    .then(data => {
+      const s = data.find(x => x.nfcId === nfcId);
+      if (s) {
+        document.getElementById('sl_semester').textContent = s.semester || '—';
+        document.getElementById('sl_admission').textContent = s.date_registered || '—';
+        document.getElementById('sl_sy').textContent = s.school_year || '—';
+        document.getElementById('sl_year').textContent = s.year_level || '—';
+        document.getElementById('sl_adviser').textContent = s.adviser || '—';
+        document.getElementById('sl_email').textContent = s.email || '—';
+      } else {
+        ['sl_semester','sl_admission','sl_sy','sl_year','sl_adviser','sl_email'].forEach(id=>{
+          document.getElementById(id).textContent = '—';
+        });
+      }
+    })
+    .catch(() => {
+      ['sl_semester','sl_admission','sl_sy','sl_year','sl_adviser','sl_email'].forEach(id=>{
+        document.getElementById(id).textContent = 'Error loading';
+      });
+    });
 }
 
 function closeStudModalLive() {

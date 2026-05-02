@@ -6163,7 +6163,8 @@ def live_session(sess_id):
                            is_school_event=is_school_event,
                            session_meta=session_meta,
                            can_end_early=(not is_school_event),
-                           fmt_time=fmt_time, fmt_time_short=fmt_time_short)
+                           fmt_time=fmt_time, fmt_time_short=fmt_time_short,
+                           now_ts=int(time.time()))
 
 @app.route('/teacher/session/<sess_id>/end', methods=['POST'])
 @login_required

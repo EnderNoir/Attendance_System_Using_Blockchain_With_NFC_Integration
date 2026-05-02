@@ -5405,10 +5405,14 @@ def teacher_dashboard():
             _pre  = len(_ended.get('present', []))
             _late = len(_ended.get('late', []))
             _abs  = len(_ended.get('absent', []))
+            _tx = _ended.get('session_tx_hash') or _ended.get('bc_tx_hash') or _ended.get('blockchain_tx_hash') or ''
             if _tx:
-                flash(f"✅ Session ended. Blockchain TX: {_tx[:10]}... | {_pre} present, {_late} late, {_abs} absent.")
+                flash(f"✅ Session ended successfully. Blockchain TX: {str(_tx)[:10]}... | {_pre} present, {_late} late, {_abs} absent.")
+            elif _ended.get('bc_skipped') or _ended.get('skip'):
+                flash(f"✅ Session skipped. No blockchain record saved. | {_pre} present, {_late} late, {_abs} absent.")
             else:
-                flash(f"✅ Session ended, but Blockchain recording failed. | {_pre} present, {_late} late, {_abs} absent.")
+                # Check if any attendance was recorded — session may have saved without tx yet
+                flash(f"✅ Session ended. | {_pre} present, {_late} late, {_abs} absent.")
     return _teacher_dashboard_page_impl(
         session_obj=session,
         redirect=redirect,

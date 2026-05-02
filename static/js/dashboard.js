@@ -259,7 +259,7 @@ function openStudentRecord(idx){
   document.getElementById('updSub').textContent   = (s.course||'-')+' | '+(s.year||'-')+' | Section '+(s.section||'-');
 
   const photoHtml = s.photo
-    ? `<img src="/static/uploads/${s.photo}?t=${Date.now()}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);" id="infoPhotoWrap"/>`
+    ? `<img src="/static/uploads/${s.photo}?t=${Date.now()}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);" id="infoPhotoWrap" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<i class=\'bi bi-person\' style=\'font-size:32px;color:var(--muted);\'></i>'; this.parentElement.style.background='var(--bg-secondary)';"/>`
     : `<div id="infoPhotoWrap" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;">${s.name[0].toUpperCase()}</div>`;
 
   document.getElementById('infoContent').innerHTML = `
@@ -278,7 +278,7 @@ function openStudentRecord(idx){
     <div class="info-card-grid">
       ${infoRow('Semester', s.semester)}
       ${infoRow('School Year', s.sy)}
-      ${infoRow('Date of Admission', s.datereg)}
+      ${infoRow('Date of Admission', formatDateMonthDayYear(s.datereg))}
       ${infoRow('Year Level', s.year)}
       ${infoRow('Section', s.section)}
       ${infoRow('Enrollment Type', s.enrollment)}
@@ -300,7 +300,7 @@ function openStudentRecord(idx){
   const secOpts = ['A','B','C','D'].map(v=>`<option value="${v}" ${s.section===v?'selected':''}>${v}</option>`).join('');
 
   const editPhotoInner = s.photo
-    ? `<img src="/static/uploads/${s.photo}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+    ? `<img src="/static/uploads/${s.photo}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<i class=\'bi bi-person\' style=\'font-size:24px;color:var(--muted);\'></i>';"/>`
     : `<span style="font-size:22px;font-weight:700;color:#000;">${s.name[0].toUpperCase()}</span>`;
 
     const teacherOpts = Object.values(teacherData).map(t => 
@@ -341,7 +341,7 @@ function openStudentRecord(idx){
         <input class="upd-input" id="uf_sy" value="${s.sy}" placeholder="e.g. 2024-2025"/>
       </div>
       <div class="upd-field"><span class="upd-label">Date of Admission</span>
-        <input class="upd-input" id="uf_datereg" value="${s.datereg}" placeholder="e.g. March 2024"/>
+        <input class="upd-input" id="uf_datereg" type="date" value="${s.datereg}"/>
       </div>
     </div>
     <div class="sec-title">// Personal Information</div>
@@ -793,7 +793,7 @@ function openTeacherRecord(username){
     : '<span style="color:var(--muted);font-size:12px;">No sections assigned</span>';
 
   const tPhotoHtml = u.photo
-    ? `<img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);" id="infoPhotoWrap"/>`
+    ? `<img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);" id="infoPhotoWrap" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<i class=\'bi bi-person\' style=\'font-size:32px;color:var(--muted);\'></i>'; this.parentElement.style.background='var(--bg-secondary)';"/>`
     : `<div id="infoPhotoWrap" style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;">${u.name[0].toUpperCase()}</div>`;
 
   document.getElementById('infoContent').innerHTML = `
@@ -819,7 +819,7 @@ function openTeacherRecord(username){
   const canChangeRole = CURRENT_ROLE === 'super_admin';
 
   const tEditPhotoInner = u.photo
-    ? `<img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`
+    ? `<img src="/static/uploads/${u.photo}?t=${Date.now()}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.onerror=null; this.src=''; this.parentElement.innerHTML='<i class=\'bi bi-person\' style=\'font-size:24px;color:var(--muted);\'></i>';"/>`
     : `<span style="font-size:22px;font-weight:700;color:#000;">${u.name[0].toUpperCase()}</span>`;
 
   document.getElementById('editContent').innerHTML = `
@@ -1340,6 +1340,15 @@ function submitMoveUp() {
   const semester   = document.getElementById('mu_semester').value;
   const action     = document.querySelector('input[name="mu_action"]:checked').value;
   const enrollment = document.querySelector('input[name="mu_enrollment"]:checked').value;
+
+  if (action === 'graduated') {
+    if (year !== '4th Year' || semester !== 'Second') {
+      showAppSuccess('Error: Only 4th Year 2nd Semester students can be marked as Graduated.', 'error');
+      // Re-style success to look like error if possible, or just alert
+      alert('Eligibility Error: Marking as Graduated is only available for 4th Year, Second Semester students.');
+      return;
+    }
+  }
 
   _muPending = { program, year_level: year, semester, action, enrollment_type: enrollment };
 

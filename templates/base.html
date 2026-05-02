@@ -414,7 +414,7 @@
   {% block extra_scripts %}{% endblock %}
 
   <script>
-    function showAppSuccess(message) {
+    function showAppSuccess(message, type = 'success') {
       const existing = document.getElementById('successModal');
       if (existing) existing.remove();
       const modal = document.createElement('div');

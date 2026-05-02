@@ -34,7 +34,7 @@ def attendance_stats_impl(
 
     if period == 'today':
         start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_dt = None
+        end_dt = now.replace(hour=23, minute=59, second=59, microsecond=999999)
     elif period == 'month':
         yr = int(f_year_num) if f_year_num and f_year_num.isdigit() else now.year
         mo = int(f_month) if f_month and f_month.isdigit() else now.month

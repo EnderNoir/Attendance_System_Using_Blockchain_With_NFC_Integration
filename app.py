@@ -6204,6 +6204,40 @@ def end_session(sess_id):
               f"{result.get('late_count', 0)} late, {result.get('absent_count', 0)} absent.")
     return redirect(url_for('teacher_dashboard'))
 
+@app.route('/api/session/skip/<sess_id>', methods=['POST'])
+@login_required
+def api_skip_session(sess_id):
+    """Permanently discard a session without saving to blockchain or marking attendance."""
+    if sess_id not in sessions_db:
+        # Fallback to DB check
+        with get_db() as conn:
+            exists = conn.execute("SELECT sess_id FROM sessions WHERE sess_id=?", (sess_id,)).fetchone()
+            if not exists:
+                return jsonify({'ok': False, 'error': 'Session not found'}), 404
+    
+    sess = load_session(sess_id)
+    if not _is_my_session(sess):
+        return jsonify({'ok': False, 'error': 'Access denied'}), 403
+        
+    # Mark as ended but KEEP the row so automation doesn't restart it today
+    now_str = _now_local().strftime('%Y-%m-%d %H:%M:%S')
+    with get_db() as conn:
+        # Clear logs first
+        conn.execute("DELETE FROM attendance_logs WHERE sess_id=?", (sess_id,))
+        # Update session to ended/skipped state
+        conn.execute(
+            "UPDATE sessions SET ended_at=?, total_enrolled=0 WHERE sess_id=?",
+            (now_str, sess_id)
+        )
+        
+    # Delete from active memory
+    if sess_id in sessions_db:
+        del sessions_db[sess_id]
+    
+    print(f"[SKIP] Session {sess_id} discarded by user.")
+    return jsonify({'ok': True})
+
+
 @app.route('/teacher/session/<sess_id>/delete', methods=['POST'])
 @login_required
 def teacher_delete_session(sess_id):

@@ -16,8 +16,8 @@ let cidElements = [
   { id:'school_year', label:'School Year', type:'text', side:'back', x:20, y:30, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
   { id:'contact_number', label:'Contact Number', type:'text', side:'back', x:20, y:45, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
   { id:'email', label:'Email Address', type:'text', side:'back', x:20, y:60, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
-  { id:'year_level', label:'Year Level (Back)', type:'text', side:'back', x:20, y:75, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
-  { id:'semester', label:'Semester (Back)', type:'text', side:'back', x:20, y:90, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true }
+  { id:'year_level', label:'Year Level', type:'text', side:'back', x:20, y:75, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
+  { id:'semester', label:'Semester', type:'text', side:'back', x:20, y:90, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true }
 ];
 let cidActiveElId = null;
 
@@ -190,7 +190,7 @@ function cidShowEditModal(el) {
   return new Promise(resolve => {
     const overlay = document.createElement('div');
     overlay.className = 'app-dialog-backdrop show';
-    overlay.style.zIndex = '99999';
+    overlay.style.zIndex = '100002';
     overlay.onclick = e => { if (e.target === overlay) close(); };
     
     const box = document.createElement('div');
@@ -271,13 +271,13 @@ function cidInjectElements() {
   const s = cidSelectedStudents[cidPreviewIdx] || {};
 
   cidElements.forEach(el => {
-    if (el.visible === false) return;
     const div = document.createElement('div');
     div.className = 'cid-draggable' + (el.type === 'text' ? ' cid-text' : '');
     div.id = 'view_el_' + el.id;
     div.style.left = el.x + 'px';
     div.style.top = el.y + 'px';
     div.style.position = 'absolute';
+    if (el.visible === false) div.style.opacity = '0.4';
 
     if (el.type === 'text') {
       div.style.fontSize = el.size + 'px';
@@ -297,18 +297,21 @@ function cidInjectElements() {
       }
       div.style.textAlign = el.align || 'left';
       div.style.boxSizing = 'border-box';
-      div.style.border = (cidActiveElId === el.id) ? '1px solid var(--accent)' : '1px dashed transparent';
+      div.style.border = '1.5px solid #F5C518';
+      if (cidActiveElId === el.id) div.style.boxShadow = '0 0 0 1px var(--accent)';
       
       div.textContent = cidGetVal(el.id, s);
     } else if (el.type === 'custom_img') {
       div.style.width = (el.w||60) + 'px'; div.style.height = (el.h||60) + 'px';
       div.style.borderRadius = '4px'; div.style.overflow = 'hidden';
-      div.style.border = (cidActiveElId === el.id) ? '1px solid var(--accent)' : '1px dashed transparent';
+      div.style.border = '1.5px solid #F5C518';
+      if (cidActiveElId === el.id) div.style.boxShadow = '0 0 0 1px var(--accent)';
       if (el.imgData) div.innerHTML = `<img src="${el.imgData}" style="width:100%;height:100%;object-fit:contain;pointer-events:none;">`;
     } else { // photo
       div.style.width = (el.w||80) + 'px'; div.style.height = (el.h||80) + 'px';
       div.style.borderRadius = el.shape === 'circle' ? '50%' : '6px'; div.style.background = 'rgba(0,0,0,.08)';
-      div.style.border = (cidActiveElId === el.id) ? '2px solid var(--accent)' : '1px dashed transparent';
+      div.style.border = '2px solid #F5C518';
+      if (cidActiveElId === el.id) div.style.boxShadow = '0 0 0 1px var(--accent)';
       const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
       if (pf) div.innerHTML = `<img src="/static/uploads/${pf}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;">`;
       else { div.style.display='flex'; div.style.alignItems='center'; div.style.justifyContent='center'; div.innerHTML='<i class="bi bi-person" style="font-size:20px;opacity:.3;"></i>'; }
@@ -682,18 +685,18 @@ document.addEventListener('mousemove', e => {
   });
   
   for (let pt of targetsX) {
-    if (!snappedX) {
-      if (Math.abs(myEdges.x.start - pt.val) < snapDist) { x = pt.val; snappedX = true; drawSnapLine('v', pt.line * actualScale); }
-      else if (Math.abs(myEdges.x.center - pt.val) < snapDist) { x = pt.val - divW/2; snappedX = true; drawSnapLine('v', pt.line * actualScale); }
-      else if (Math.abs(myEdges.x.end - pt.val) < snapDist) { x = pt.val - divW; snappedX = true; drawSnapLine('v', pt.line * actualScale); }
-    }
+    let matched = false;
+    if (Math.abs(myEdges.x.start - pt.val) < snapDist) { if (!snappedX) x = pt.val; snappedX = true; matched = true; }
+    else if (Math.abs(myEdges.x.center - pt.val) < snapDist) { if (!snappedX) x = pt.val - divW/2; snappedX = true; matched = true; }
+    else if (Math.abs(myEdges.x.end - pt.val) < snapDist) { if (!snappedX) x = pt.val - divW; snappedX = true; matched = true; }
+    if (matched) drawSnapLine('v', pt.line * actualScale);
   }
   for (let pt of targetsY) {
-    if (!snappedY) {
-      if (Math.abs(myEdges.y.start - pt.val) < snapDist) { y = pt.val; snappedY = true; drawSnapLine('h', pt.line * actualScale); }
-      else if (Math.abs(myEdges.y.center - pt.val) < snapDist) { y = pt.val - divH/2; snappedY = true; drawSnapLine('h', pt.line * actualScale); }
-      else if (Math.abs(myEdges.y.end - pt.val) < snapDist) { y = pt.val - divH; snappedY = true; drawSnapLine('h', pt.line * actualScale); }
-    }
+    let matched = false;
+    if (Math.abs(myEdges.y.start - pt.val) < snapDist) { if (!snappedY) y = pt.val; snappedY = true; matched = true; }
+    else if (Math.abs(myEdges.y.center - pt.val) < snapDist) { if (!snappedY) y = pt.val - divH/2; snappedY = true; matched = true; }
+    else if (Math.abs(myEdges.y.end - pt.val) < snapDist) { if (!snappedY) y = pt.val - divH; snappedY = true; matched = true; }
+    if (matched) drawSnapLine('h', pt.line * actualScale);
   }
 
   if (data) { data.x = x; data.y = y; }

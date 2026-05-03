@@ -466,9 +466,10 @@
                       <option value="Source Code Pro">Source Code Pro</option><option value="Space Mono">Space Mono</option><option value="Arial">Arial</option>
                       <option value="Times New Roman">Times New Roman</option><option value="cursive">Cursive</option><option value="_custom">Custom...</option>
                     </select>
-                    <input type="text" id="cid_st_font_custom" class="upd-input" placeholder="e.g. Nunito" style="display:none;margin-top:4px;font-size:11px;" oninput="cidLoadGoogleFont()">
+                    <input type="text" id="cid_st_font_custom" class="upd-input" placeholder="e.g. Playwrite Norge" style="display:none;margin-top:4px;font-size:11px;" oninput="cidLoadGoogleFont()">
                   </div>
                   <div class="upd-field"><label class="upd-label">Size (px)</label><input type="number" class="upd-input" id="cid_st_size" style="font-size:11px;" oninput="cidApplyStyle()"></div>
+                  <div class="upd-field"><label class="upd-label">Max Width (px)</label><input type="number" class="upd-input" id="cid_st_text_width" placeholder="Auto" style="font-size:11px;" oninput="cidApplyStyle()"></div>
                   <div class="upd-field"><label class="upd-label">Weight</label>
                     <select class="upd-input" id="cid_st_weight" style="font-size:11px;" onchange="cidApplyStyle()">
                       <option value="400">Normal</option><option value="600">Semi-Bold</option><option value="700">Bold</option><option value="800">Extra Bold</option>
@@ -823,6 +824,7 @@
 {% endblock %}
 {% block extra_scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
   window.DASHBOARD_BOOTSTRAP = {
     students: {{ students | tojson }},

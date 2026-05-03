@@ -341,14 +341,14 @@ function cidZoom() {
     modal.style.display = 'block';
     zoomGrid.appendChild(preview);
     zoomGrid.appendChild(controls);
-    cidZoomScale = 1.6;
+    cidZoomScale = 2.2;
     document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
     btn.style.display = 'none';
   } else {
     modal.style.display = 'none';
     origGrid.insertBefore(preview, origGrid.firstChild);
     origGrid.appendChild(controls);
-    cidZoomScale = 0.9;
+    cidZoomScale = 1.0;
     document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
     btn.style.display = 'block';
   }
@@ -362,7 +362,7 @@ document.addEventListener('mousedown', e => {
   if (!el) return;
   cidDraggingId = el.id.replace('view_el_', '');
   const r = el.getBoundingClientRect();
-  const actualScale = cidIsZoomed ? cidZoomScale : 0.9;
+  const actualScale = cidIsZoomed ? cidZoomScale : 1.0;
   cidDragOff.x = (e.clientX - r.left) / actualScale;
   cidDragOff.y = (e.clientY - r.top) / actualScale;
   cidSelectElement(cidDraggingId);
@@ -374,7 +374,7 @@ document.addEventListener('mousemove', e => {
   if (!el) return;
   const parent = el.parentElement;
   const pR = parent.getBoundingClientRect();
-  const actualScale = cidIsZoomed ? cidZoomScale : 0.9;
+  const actualScale = cidIsZoomed ? cidZoomScale : 1.0;
   let x = (e.clientX - pR.left) / actualScale - cidDragOff.x;
   let y = (e.clientY - pR.top) / actualScale - cidDragOff.y;
   const data = cidElements.find(d => d.id === cidDraggingId);

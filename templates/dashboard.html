@@ -405,14 +405,6 @@
           <div id="cid_generate_status" style="font-size:11px;color:var(--accent);display:none;"><i class="bi bi-hourglass-split"></i> <span id="cid_progress">0%</span></div>
         </div>
 
-        <div id="cid_zoom_modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:var(--bg-body); z-index:20000; padding:20px; box-sizing:border-box;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h3 style="font-size:18px; margin:0; font-family:'Space Mono',monospace; color:var(--accent);">Fullscreen Editor</h3>
-            <button onclick="cidZoom()" class="btn-vr" style="padding:6px 14px;"><i class="bi bi-x-lg"></i> Exit Fullscreen</button>
-          </div>
-          <div id="cid_zoom_grid" style="display:grid; grid-template-columns:1fr 360px; gap:20px; height:calc(100vh - 80px);"></div>
-        </div>
-
         <div id="cid_step3_grid" style="display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start;">
 
           <!-- LEFT: Preview Canvas -->
@@ -813,6 +805,15 @@
   </div>
 </div>
 
+
+
+<div id="cid_zoom_modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:var(--bg-body); z-index:200000; padding:30px; box-sizing:border-box;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <h3 style="font-size:22px; margin:0; font-weight:800; color:var(--text);"><i class="bi bi-aspect-ratio"></i> Fullscreen PVC Studio</h3>
+    <button onclick="cidZoom()" class="btn-primary" style="padding:8px 20px; font-weight:700;"><i class="bi bi-arrows-collapse"></i> Exit Fullscreen</button>
+  </div>
+  <div id="cid_zoom_grid" style="display:grid; grid-template-columns:1fr 400px; gap:30px; height:calc(100vh - 100px); max-width: 1600px; margin: 0 auto;"></div>
+</div>
 
 {% endblock %}
 {% block extra_scripts %}

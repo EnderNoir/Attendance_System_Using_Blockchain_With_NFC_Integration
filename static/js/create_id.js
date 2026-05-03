@@ -329,30 +329,28 @@ let cidZoomScale = 1;
 
 // ── Zoom (renders current card in fullscreen overlay) ──
 function cidZoom() {
-  const grid = document.getElementById('cid_step3_grid');
+  const modal = document.getElementById('cid_zoom_modal');
+  const zoomGrid = document.getElementById('cid_zoom_grid');
+  const origGrid = document.getElementById('cid_step3_grid');
+  const preview = document.getElementById('cid_preview_col');
+  const controls = document.getElementById('cid_controls_col');
   const btn = document.getElementById('cid_zoom_btn');
+
   cidIsZoomed = !cidIsZoomed;
   if (cidIsZoomed) {
-    grid.style.position = 'fixed';
-    grid.style.top = '0'; grid.style.left = '0';
-    grid.style.width = '100vw'; grid.style.height = '100vh';
-    grid.style.zIndex = '100000';
-    grid.style.background = 'var(--bg-body)';
-    grid.style.padding = '30px';
-    grid.style.boxSizing = 'border-box';
-    grid.style.gridTemplateColumns = '1fr 400px';
+    modal.style.display = 'block';
+    zoomGrid.appendChild(preview);
+    zoomGrid.appendChild(controls);
     cidZoomScale = 1.6;
     document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
-    btn.innerHTML = '<i class="bi bi-zoom-out"></i> Exit Zoom';
+    btn.style.display = 'none';
   } else {
-    grid.style.position = 'static';
-    grid.style.width = 'auto'; grid.style.height = 'auto';
-    grid.style.zIndex = 'auto';
-    grid.style.padding = '0';
-    grid.style.gridTemplateColumns = '1fr 320px';
-    cidZoomScale = 1;
-    document.getElementById('cid_preview_container').style.transform = `scale(0.9)`;
-    btn.innerHTML = '<i class="bi bi-search"></i> Zoom';
+    modal.style.display = 'none';
+    origGrid.insertBefore(preview, origGrid.firstChild);
+    origGrid.appendChild(controls);
+    cidZoomScale = 0.9;
+    document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
+    btn.style.display = 'block';
   }
 }
 

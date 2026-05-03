@@ -13,9 +13,9 @@ let cidElements = [
   { id:'name', label:'Full Name', type:'text', side:'front', x:20, y:110, text_w:283.5, size:16, font:'Inter', color:'#000000', weight:'700', align:'center', visible:true },
   { id:'course', label:'Program', type:'text', side:'front', x:20, y:132, text_w:283.5, size:12, font:'Inter', color:'#333333', weight:'500', align:'center', visible:true },
   { id:'id_num', label:'Student ID', type:'text', side:'front', x:20, y:150, text_w:283.5, size:11, font:'Space Mono', color:'#555555', weight:'400', align:'center', visible:true },
-  { id:'school_year', label:'School Year (Back)', type:'text', side:'back', x:20, y:30, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
-  { id:'contact_number', label:'Contact Number (Back)', type:'text', side:'back', x:20, y:45, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
-  { id:'email', label:'Email Address (Back)', type:'text', side:'back', x:20, y:60, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
+  { id:'school_year', label:'School Year', type:'text', side:'back', x:20, y:30, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
+  { id:'contact_number', label:'Contact Number', type:'text', side:'back', x:20, y:45, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
+  { id:'email', label:'Email Address', type:'text', side:'back', x:20, y:60, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
   { id:'year_level', label:'Year Level (Back)', type:'text', side:'back', x:20, y:75, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
   { id:'semester', label:'Semester (Back)', type:'text', side:'back', x:20, y:90, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true }
 ];
@@ -186,13 +186,67 @@ function cidRenderElementList() {
   });
 }
 
+function cidShowEditModal(el) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'app-dialog-backdrop show';
+    overlay.style.zIndex = '99999';
+    overlay.onclick = e => { if (e.target === overlay) close(); };
+    
+    const box = document.createElement('div');
+    box.className = 'app-dialog-box';
+    
+    const head = document.createElement('div');
+    head.className = 'app-dialog-head';
+    head.innerHTML = '<div class="app-dialog-title">Edit Variable</div><button type="button" class="app-dialog-close"><i class="bi bi-x"></i></button>';
+    head.querySelector('button').onclick = close;
+    
+    const body = document.createElement('div');
+    body.className = 'app-dialog-body';
+    body.innerHTML = `
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text);">Variable Name</label>
+        <input type="text" id="edit_lbl_input" class="upd-input" style="width:100%;font-size:14px;padding:8px;" value="${el.label}" />
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text);">Static Content (Optional)</label>
+        <input type="text" id="edit_val_input" class="upd-input" style="width:100%;font-size:14px;padding:8px;" placeholder="Leave blank to use database value" value="${el.override_val || ''}" />
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">Set a static text value to override the dynamic data for all IDs.</div>
+      </div>
+    `;
+    
+    const actions = document.createElement('div');
+    actions.className = 'app-dialog-actions';
+    actions.innerHTML = '<button type="button" class="btn-outline">Cancel</button><button type="button" class="btn-primary">Save Changes</button>';
+    actions.querySelector('.btn-outline').onclick = close;
+    actions.querySelector('.btn-primary').onclick = () => {
+      const newLbl = body.querySelector('#edit_lbl_input').value.trim();
+      const newVal = body.querySelector('#edit_val_input').value.trim();
+      document.body.removeChild(overlay);
+      resolve({ label: newLbl, val: newVal });
+    };
+    
+    box.appendChild(head);
+    box.appendChild(body);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    
+    function close() {
+      document.body.removeChild(overlay);
+      resolve(null);
+    }
+  });
+}
+
 window.cidEditLabel = async function(id, e) {
   e.stopPropagation();
   const el = cidElements.find(d => d.id === id);
   if(!el) return;
-  const newVal = await showAppPrompt('Enter static text override (leave blank to use database value):', el.override_val || el.label);
-  if (newVal !== null) {
-    el.override_val = newVal.trim() !== '' ? newVal : null;
+  const res = await cidShowEditModal(el);
+  if (res) {
+    if (res.label) el.label = res.label;
+    el.override_val = res.val !== '' ? res.val : null;
     cidRenderElementList();
     cidInjectElements();
   }
@@ -261,26 +315,24 @@ function cidInjectElements() {
     }
     
     if (cidActiveElId === el.id) {
-      const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+      const handles = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
       handles.forEach(dir => {
         const handle = document.createElement('div');
         handle.className = 'cid-resize-handle';
         handle.style.position = 'absolute';
-        handle.style.width = '8px';
-        handle.style.height = '8px';
-        handle.style.background = '#fff';
-        handle.style.border = '1px solid var(--accent)';
         handle.style.zIndex = '10';
-        handle.style.borderRadius = '2px';
+        const size = '6px';
+        const offset = '-3px';
         
-        if (dir.includes('n')) handle.style.top = '-5px';
-        if (dir.includes('s')) handle.style.bottom = '-5px';
-        if (dir.includes('e')) handle.style.right = '-5px';
-        if (dir.includes('w')) handle.style.left = '-5px';
-        if (dir === 'n' || dir === 's') { handle.style.left = '50%'; handle.style.transform = 'translateX(-50%)'; handle.style.cursor = 'ns-resize'; }
-        if (dir === 'e' || dir === 'w') { handle.style.top = '50%'; handle.style.transform = 'translateY(-50%)'; handle.style.cursor = 'ew-resize'; }
-        if (dir === 'nw' || dir === 'se') handle.style.cursor = 'nwse-resize';
-        if (dir === 'ne' || dir === 'sw') handle.style.cursor = 'nesw-resize';
+        if (dir === 'n') { handle.style.top = offset; handle.style.left = '0'; handle.style.right = '0'; handle.style.height = size; handle.style.cursor = 'ns-resize'; }
+        if (dir === 's') { handle.style.bottom = offset; handle.style.left = '0'; handle.style.right = '0'; handle.style.height = size; handle.style.cursor = 'ns-resize'; }
+        if (dir === 'e') { handle.style.right = offset; handle.style.top = '0'; handle.style.bottom = '0'; handle.style.width = size; handle.style.cursor = 'ew-resize'; }
+        if (dir === 'w') { handle.style.left = offset; handle.style.top = '0'; handle.style.bottom = '0'; handle.style.width = size; handle.style.cursor = 'ew-resize'; }
+        
+        if (dir === 'nw') { handle.style.top = offset; handle.style.left = offset; handle.style.width = size; handle.style.height = size; handle.style.cursor = 'nwse-resize'; }
+        if (dir === 'ne') { handle.style.top = offset; handle.style.right = offset; handle.style.width = size; handle.style.height = size; handle.style.cursor = 'nesw-resize'; }
+        if (dir === 'sw') { handle.style.bottom = offset; handle.style.left = offset; handle.style.width = size; handle.style.height = size; handle.style.cursor = 'nesw-resize'; }
+        if (dir === 'se') { handle.style.bottom = offset; handle.style.right = offset; handle.style.width = size; handle.style.height = size; handle.style.cursor = 'nwse-resize'; }
         
         handle.onmousedown = (e) => {
           e.stopPropagation();
@@ -602,8 +654,8 @@ document.addEventListener('mousemove', e => {
   let y = (e.clientY - pR.top) / actualScale - cidDragOff.y;
   const data = cidElements.find(d => d.id === cidDraggingId);
   
-  const divW = el.type === 'text' ? (el.text_w || div.offsetWidth) : (el.w || div.offsetWidth);
-  const divH = el.type === 'text' ? div.offsetHeight : (el.h || div.offsetHeight);
+  const divW = data.type === 'text' ? (data.text_w || div.offsetWidth) : (data.w || div.offsetWidth);
+  const divH = data.type === 'text' ? div.offsetHeight : (data.h || div.offsetHeight);
   
   document.querySelectorAll('.cid-snap-line').forEach(e => e.remove());
   let snappedX = false, snappedY = false;

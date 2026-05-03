@@ -408,7 +408,7 @@
         <div id="cid_step3_grid" style="display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start;">
 
           <!-- LEFT: Preview Canvas -->
-          <div id="cid_preview_col" style="background:var(--bg-body);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:560px;height:100%;position:relative;overflow:hidden;">
+          <div id="cid_preview_col" style="background:var(--bg-body);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:480px;height:100%;position:relative;overflow:hidden;">
             <!-- Floating Controls Overlay -->
             <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:20;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;">
               <!-- Orientation -->
@@ -446,7 +446,7 @@
           </div>
 
           <!-- RIGHT: Controls Panel -->
-          <div id="cid_controls_col" style="display:flex;flex-direction:column;gap:10px;max-height:100%;height:100%;overflow-y:auto;">
+          <div id="cid_controls_col" style="display:flex;flex-direction:column;gap:10px;max-height:480px;height:100%;overflow-y:auto;">
 
             <!-- Elements & Styling -->
             <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;padding:12px;">
@@ -807,7 +807,7 @@
 
 
 
-<div id="cid_zoom_modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:var(--bg-body); z-index:200000; padding:30px; box-sizing:border-box;">
+<div id="cid_zoom_modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#0f1011; z-index:200000; padding:30px; box-sizing:border-box;">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
     <h3 style="font-size:22px; margin:0; font-weight:800; color:var(--text);"><i class="bi bi-aspect-ratio"></i> Fullscreen PVC Studio</h3>
     <button onclick="cidZoom()" class="btn-primary" style="padding:8px 20px; font-weight:700;"><i class="bi bi-arrows-collapse"></i> Exit Fullscreen</button>

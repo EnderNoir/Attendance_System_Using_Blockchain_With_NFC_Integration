@@ -9,7 +9,7 @@ let cidCustomImgData = null;
 let cidMode = 'batch';
 
 let cidElements = [
-  { id:'photo', label:'Student Photo', type:'photo', side:'front', x:20, y:20, w:80, h:80 },
+  { id:'photo', label:'Student Photo', type:'photo', side:'front', x:20, y:20, w:80, h:80, shape:'square' },
   { id:'name', label:'Full Name', type:'text', side:'front', x:20, y:110, size:16, font:'Inter', color:'#000000', weight:'700' },
   { id:'course', label:'Program', type:'text', side:'front', x:20, y:132, size:12, font:'Inter', color:'#333333', weight:'500' },
   { id:'id_num', label:'Student ID', type:'text', side:'front', x:20, y:150, size:11, font:'Space Mono', color:'#555555', weight:'400' },
@@ -168,7 +168,7 @@ function cidInjectElements() {
       if (el.imgData) div.innerHTML = `<img src="${el.imgData}" style="width:100%;height:100%;object-fit:contain;">`;
     } else { // photo
       div.style.width = (el.w||80) + 'px'; div.style.height = (el.h||80) + 'px';
-      div.style.borderRadius = '6px'; div.style.background = 'rgba(0,0,0,.08)';
+      div.style.borderRadius = el.shape === 'circle' ? '50%' : '6px'; div.style.background = 'rgba(0,0,0,.08)';
       div.style.border = '1px solid rgba(0,0,0,.15)';
       const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
       if (pf) div.innerHTML = `<img src="/static/uploads/${pf}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">`;
@@ -182,10 +182,10 @@ function cidInjectElements() {
 function cidGetVal(id, s) {
   if (id === 'name') return s.name || '[Name]';
   if (id === 'course') return s.course || s.program || '[Program]';
-  if (id === 'id_num') return 'ID: ' + (s.student_id || '[ID]');
-  if (id === 'program_full') return 'Program: ' + (s.course || s.program || '[Program]');
-  if (id === 'year_level') return 'Year Level: ' + (s.year_level || '[Year]');
-  if (id === 'semester') return 'Semester: ' + (s.semester || '[Semester]');
+  if (id === 'id_num') return s.student_id || '[ID]';
+  if (id === 'program_full') return s.course || s.program || '[Program]';
+  if (id === 'year_level') return s.year_level || '[Year]';
+  if (id === 'semester') return s.semester || '[Semester]';
   const cv = cidCustomVariables.find(v => v.id === id);
   return cv ? cv.val : '';
 }
@@ -214,8 +214,9 @@ function cidSelectElement(id) {
     document.getElementById('cid_st_color_text').value = el.color;
   } else {
     textFields.style.display = 'none';
-    photoField.style.display = 'block';
+    photoField.style.display = 'flex';
     document.getElementById('cid_st_photo_size').value = el.w || 80;
+    document.getElementById('cid_st_photo_shape').value = el.shape || 'square';
   }
 }
 
@@ -237,6 +238,7 @@ function cidApplyStyle() {
   } else {
     const v = parseInt(document.getElementById('cid_st_photo_size').value) || 80;
     el.w = v; el.h = v;
+    el.shape = document.getElementById('cid_st_photo_shape').value || 'square';
   }
   cidInjectElements();
 }
@@ -322,18 +324,36 @@ function cidViewFull(side) {
   w.document.write(`<html><head><title>${side} Template</title><style>body{margin:0;background:#111;display:flex;align-items:center;justify-content:center;height:100vh;}</style></head><body><img src="${cidTemplates[side]}" style="max-width:95vw;max-height:95vh;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);"></body></html>`);
 }
 
-// ── Zoom (renders current card to canvas for accurate preview) ──
+let cidIsZoomed = false;
+let cidZoomScale = 1;
+
+// ── Zoom (renders current card in fullscreen overlay) ──
 function cidZoom() {
-  const card = document.getElementById('cid_card_' + cidCurrentView);
-  if (!card) return;
-  const w = window.open('', '_blank');
-  w.document.write(`<html><head><title>ID Preview</title><style>body{margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh;}</style></head><body></body></html>`);
-  const clone = card.cloneNode(true);
-  clone.style.transform = 'scale(2.5)';
-  clone.style.transformOrigin = 'center center';
-  clone.style.position = 'relative';
-  clone.style.display = 'block';
-  w.document.body.appendChild(clone);
+  const grid = document.getElementById('cid_step3_grid');
+  const btn = document.getElementById('cid_zoom_btn');
+  cidIsZoomed = !cidIsZoomed;
+  if (cidIsZoomed) {
+    grid.style.position = 'fixed';
+    grid.style.top = '0'; grid.style.left = '0';
+    grid.style.width = '100vw'; grid.style.height = '100vh';
+    grid.style.zIndex = '100000';
+    grid.style.background = 'var(--bg-body)';
+    grid.style.padding = '30px';
+    grid.style.boxSizing = 'border-box';
+    grid.style.gridTemplateColumns = '1fr 400px';
+    cidZoomScale = 1.6;
+    document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
+    btn.innerHTML = '<i class="bi bi-zoom-out"></i> Exit Zoom';
+  } else {
+    grid.style.position = 'static';
+    grid.style.width = 'auto'; grid.style.height = 'auto';
+    grid.style.zIndex = 'auto';
+    grid.style.padding = '0';
+    grid.style.gridTemplateColumns = '1fr 320px';
+    cidZoomScale = 1;
+    document.getElementById('cid_preview_container').style.transform = `scale(0.9)`;
+    btn.innerHTML = '<i class="bi bi-search"></i> Zoom';
+  }
 }
 
 // ── Drag Logic ──
@@ -344,8 +364,9 @@ document.addEventListener('mousedown', e => {
   if (!el) return;
   cidDraggingId = el.id.replace('view_el_', '');
   const r = el.getBoundingClientRect();
-  cidDragOff.x = e.clientX - r.left;
-  cidDragOff.y = e.clientY - r.top;
+  const actualScale = cidIsZoomed ? cidZoomScale : 0.9;
+  cidDragOff.x = (e.clientX - r.left) / actualScale;
+  cidDragOff.y = (e.clientY - r.top) / actualScale;
   cidSelectElement(cidDraggingId);
 });
 
@@ -355,8 +376,9 @@ document.addEventListener('mousemove', e => {
   if (!el) return;
   const parent = el.parentElement;
   const pR = parent.getBoundingClientRect();
-  let x = e.clientX - pR.left - cidDragOff.x;
-  let y = e.clientY - pR.top - cidDragOff.y;
+  const actualScale = cidIsZoomed ? cidZoomScale : 0.9;
+  let x = (e.clientX - pR.left) / actualScale - cidDragOff.x;
+  let y = (e.clientY - pR.top) / actualScale - cidDragOff.y;
   const data = cidElements.find(d => d.id === cidDraggingId);
   if (data) { data.x = x; data.y = y; }
   el.style.left = x + 'px';
@@ -404,7 +426,7 @@ async function cidDrawEl(doc, el, s, ratio) {
   const x = el.x * ratio, y = el.y * ratio;
   if (el.type === 'photo') {
     const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
-    if (pf) { try { const d = await cidB64('/static/uploads/'+pf); doc.addImage(d,'JPEG',x,y,el.w*ratio,el.h*ratio); } catch(e){} }
+    if (pf) { try { const d = await cidB64('/static/uploads/'+pf, el.shape); doc.addImage(d,el.shape==='circle'?'PNG':'JPEG',x,y,el.w*ratio,el.h*ratio); } catch(e){} }
   } else if (el.type === 'custom_img') {
     if (el.imgData) { try { doc.addImage(el.imgData,'PNG',x,y,(el.w||60)*ratio,(el.h||60)*ratio); } catch(e){} }
   } else {
@@ -415,10 +437,24 @@ async function cidDrawEl(doc, el, s, ratio) {
   }
 }
 
-function cidB64(url) {
+function cidB64(url, shape) {
   return new Promise((res, rej) => {
     const img = new Image(); img.crossOrigin = 'Anonymous';
-    img.onload = () => { const c = document.createElement('canvas'); c.width=img.width; c.height=img.height; c.getContext('2d').drawImage(img,0,0); res(c.toDataURL('image/jpeg',0.9)); };
+    img.onload = () => { 
+      const c = document.createElement('canvas'); 
+      const size = Math.min(img.width, img.height);
+      c.width = size; c.height = size; 
+      const ctx = c.getContext('2d');
+      if (shape === 'circle') {
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, size/2, 0, Math.PI*2);
+        ctx.closePath();
+        ctx.clip();
+      }
+      const sx = (img.width - size)/2, sy = (img.height - size)/2;
+      ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size); 
+      res(c.toDataURL(shape === 'circle' ? 'image/png' : 'image/jpeg', 0.9)); 
+    };
     img.onerror = rej; img.src = url;
   });
 }

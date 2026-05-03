@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Students & Faculty - DAVS{% endblock %}
 {% block page_title %}STUDENTS & FACULTY{% endblock %}
 {% block extra_head %}
@@ -319,13 +319,13 @@
 .mu-action-label:hover { border-color: var(--accent); background: rgba(45,106,39,.04); }
 </style>
 
-<!-- â•â• CREATE ID MODAL â•â• -->
+<!-- CREATE ID MODAL -->
 <div class="upd-overlay" id="createIdModal" style="z-index:10000;overflow-y:auto;">
   <div class="upd-box" style="max-width:1200px;margin:20px auto;display:flex;flex-direction:column;max-height:calc(100vh - 40px);">
     <div class="upd-topbar">
       <div>
         <h3 style="font-size:16px;font-weight:800;">Create Student IDs</h3>
-        <p style="font-size:11px;color:var(--muted);margin-top:2px;">Advanced PVC ID Studio â€” CR80 Standard (85.6mm Ã— 54mm)</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:2px;">Advanced PVC ID Studio - CR80 Standard (85.6mm x 54mm)</p>
       </div>
       <button onclick="closeCreateIdModal()" class="btn-vr" style="padding:5px 12px;background:rgba(255,255,255,.05);"><i class="bi bi-x-lg"></i> Close</button>
     </div>
@@ -405,7 +405,7 @@
           <div id="cid_generate_status" style="font-size:11px;color:var(--accent);display:none;"><i class="bi bi-hourglass-split"></i> <span id="cid_progress">0%</span></div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start;">
+        <div id="cid_step3_grid" style="display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:start;">
 
           <!-- LEFT: Preview Canvas -->
           <div style="background:var(--bg-body);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;min-height:560px;position:relative;overflow:hidden;">
@@ -429,7 +429,7 @@
               <div id="cid_preview_container" style="display:none;position:relative;">
                 <div id="cid_card_front" class="cid-card-box"><img id="cid_card_front_bg" class="cid-card-bg" src=""><div id="cid_front_elements"></div></div>
                 <div id="cid_card_back" class="cid-card-box" style="display:none;"><img id="cid_card_back_bg" class="cid-card-bg" src=""><div id="cid_back_elements"></div></div>
-                <button onclick="cidZoom()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;z-index:10;"><i class="bi bi-search"></i> Zoom</button>
+                <button id="cid_zoom_btn" onclick="cidZoom()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,0.7);color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:10px;cursor:pointer;z-index:10;"><i class="bi bi-search"></i> Zoom</button>
               </div>
             </div>
 
@@ -482,12 +482,19 @@
                     </div>
                   </div>
                 </div>
-                <div id="cid_photo_size_field" style="display:none;margin-top:6px;">
+                <div id="cid_photo_size_field" style="display:none;margin-top:6px;gap:6px;flex-direction:column;">
                   <div class="upd-field"><label class="upd-label">Photo Size (px)</label><input type="number" class="upd-input" id="cid_st_photo_size" style="font-size:11px;" oninput="cidApplyStyle()"></div>
+                  <div class="upd-field">
+                    <label class="upd-label">Shape</label>
+                    <select class="upd-input" id="cid_st_photo_shape" style="font-size:11px;" onchange="cidApplyStyle()">
+                      <option value="square">Square</option>
+                      <option value="circle">Circle</option>
+                    </select>
+                  </div>
                 </div>
                 <div style="margin-top:8px;display:flex;gap:5px;">
-                  <button class="btn-vr" style="flex:1;font-size:10px;padding:5px;" onclick="cidMoveTo('front')">â†’ Front</button>
-                  <button class="btn-vr" style="flex:1;font-size:10px;padding:5px;" onclick="cidMoveTo('back')">â†’ Back</button>
+                  <button class="btn-vr" style="flex:1;font-size:10px;padding:5px;" onclick="cidMoveTo('front')">&rarr; Front</button>
+                  <button class="btn-vr" style="flex:1;font-size:10px;padding:5px;" onclick="cidMoveTo('back')">&rarr; Back</button>
                 </div>
               </div>
             </div>

@@ -649,12 +649,14 @@
     <button class="btn-primary" onclick="moveUpAllStudents()" style="align-self:flex-end;" title="Advance all active students to next semester">
       <i class="bi bi-arrow-up"></i> Move Up
     </button>
-    <button class="btn-primary" onclick="openCreateIdModal()" style="align-self:flex-end;" title="Generate Student IDs">
-      <i class="bi bi-person-badge"></i> Create ID
-    </button>
     {% endif %}
-    <button class="btn-rst" onclick="resetStudentFilters()"><i class="bi bi-x-circle"></i> Reset</button>
-    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="st_count"></span>
+    <div style="display:flex; gap:8px; align-self:flex-end;">
+      <button class="btn-primary" onclick="openCreateIdModal()" title="Generate Student IDs">
+        <i class="bi bi-person-badge"></i> Create ID
+      </button>
+      <button class="btn-rst" onclick="resetStudentFilters()"><i class="bi bi-x-circle"></i> Reset</button>
+    </div>
+    <span style="font-size:11px;color:var(--muted);align-self:flex-end;margin-bottom:8px;white-space:nowrap;" id="st_count"></span>
   </div>
 
   <div style="max-height:600px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="studentList">

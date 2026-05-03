@@ -319,6 +319,168 @@
 .mu-action-label:hover { border-color: var(--accent); background: rgba(45,106,39,.04); }
 </style>
 
+<!-- ══ CREATE ID MODAL ══ -->
+<div class="upd-overlay" id="createIdModal" style="z-index: 10000; overflow-y: auto;">
+  <div class="upd-box" style="max-width:850px; margin: 40px auto; display: flex; flex-direction: column;">
+    <div class="upd-topbar">
+      <div>
+        <h3 style="font-size:16px;font-weight:800;">Create Student IDs</h3>
+        <p style="font-size:11px;color:var(--muted);margin-top:2px;">Follow the steps to generate printable PVC ID cards (CR80: 85.6mm x 54mm)</p>
+      </div>
+      <button onclick="closeCreateIdModal()" class="btn-vr" style="padding:5px 10px;background:rgba(255,255,255,.05);"><i class="bi bi-x-lg"></i> Close</button>
+    </div>
+
+    <div style="padding:20px; display:flex; flex-direction:column; gap:18px;">
+      
+      <!-- Step 1: Filter -->
+      <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:14px;">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Step 1: Select Group</div>
+        <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;">
+          <div class="upd-field">
+            <label class="upd-label">Program</label>
+            <select id="cid_program" class="upd-input" onchange="cidUpdateCount()">
+              <option value="">All Programs</option>
+              {% for p in progs %}
+              <option value="{{ p }}">{{ p }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="upd-field">
+            <label class="upd-label">Year Level</label>
+            <select id="cid_year" class="upd-input" onchange="cidUpdateCount()">
+              <option value="">All</option>
+              <option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option>
+            </select>
+          </div>
+          <div class="upd-field">
+            <label class="upd-label">Semester</label>
+            <select id="cid_semester" class="upd-input" onchange="cidUpdateCount()">
+              <option value="">All</option>
+              <option value="First">First Semester</option>
+              <option value="Second">Second Semester</option>
+              <option value="Summer">Summer</option>
+            </select>
+          </div>
+          <div class="upd-field">
+            <label class="upd-label">Section</label>
+            <select id="cid_section" class="upd-input" onchange="cidUpdateCount()">
+              <option value="">All</option>
+              <option>A</option><option>B</option><option>C</option><option>D</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:var(--muted);"><span id="cid_count" style="font-weight:700;color:var(--text);">0</span> students selected</div>
+      </div>
+
+      <!-- Step 2: Upload Templates -->
+      <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:14px;">
+        <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Step 2: Upload Templates</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <!-- Front Template -->
+          <div>
+            <label class="upd-label">Front Image (PNG/JPG)</label>
+            <div id="cid_front_drop" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:rgba(0,0,0,0.1);position:relative;height:120px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('cid_front_file').click()">
+              <div id="cid_front_text" style="color:var(--muted);font-size:12px;"><i class="bi bi-cloud-arrow-up" style="font-size:20px;display:block;margin-bottom:5px;"></i> Click or drag Front Template</div>
+              <img id="cid_front_preview" style="display:none;max-height:100%;max-width:100%;position:absolute;border-radius:4px;" />
+            </div>
+            <input type="file" id="cid_front_file" accept="image/png, image/jpeg" style="display:none" onchange="cidHandleFile(this, 'front')">
+          </div>
+          <!-- Back Template -->
+          <div>
+            <label class="upd-label">Back Image (PNG/JPG)</label>
+            <div id="cid_back_drop" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:rgba(0,0,0,0.1);position:relative;height:120px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('cid_back_file').click()">
+              <div id="cid_back_text" style="color:var(--muted);font-size:12px;"><i class="bi bi-cloud-arrow-up" style="font-size:20px;display:block;margin-bottom:5px;"></i> Click or drag Back Template</div>
+              <img id="cid_back_preview" style="display:none;max-height:100%;max-width:100%;position:absolute;border-radius:4px;" />
+            </div>
+            <input type="file" id="cid_back_file" accept="image/png, image/jpeg" style="display:none" onchange="cidHandleFile(this, 'back')">
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Preview & Generate -->
+      <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:14px; flex-grow: 1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;">Step 3: Preview & Print</div>
+          <div id="cid_generate_status" style="font-size:11px;color:var(--muted);display:none;">
+            <i class="bi bi-hourglass-split"></i> Generating... <span id="cid_progress">0%</span>
+          </div>
+        </div>
+
+        <div style="display:flex; gap: 20px;">
+          <!-- Preview Canvas Area -->
+          <div style="flex:1; background:var(--bg-body); border-radius:8px; padding:20px; display:flex; flex-direction:column; align-items:center; gap: 20px; min-height: 250px; overflow: hidden; position: relative;">
+            <div id="cid_no_template_msg" style="color:var(--muted);font-size:12px;text-align:center;margin-top:50px;">Upload templates and select a group to see preview.</div>
+            
+            <div id="cid_preview_container" style="display:none; width: 100%; display:flex; flex-direction:column; align-items:center; gap:20px; transform-origin: top center; transform: scale(0.8);">
+              <!-- Front Card Preview -->
+              <div id="cid_card_front" class="cid-card-box">
+                <img id="cid_card_front_bg" class="cid-card-bg" src="" />
+                <div class="cid-draggable" id="cid_el_photo" style="width: 100px; height: 100px; border-radius: 8px; background: rgba(0,0,0,0.1); border: 2px dashed #666; display:flex; align-items:center; justify-content:center; color:#666; font-size:10px;"><i class="bi bi-person"></i> Photo</div>
+                <div class="cid-draggable cid-text" id="cid_el_name" style="font-size: 20px; font-weight: 800; color: #111;">[Student Name]</div>
+                <div class="cid-draggable cid-text" id="cid_el_course" style="font-size: 14px; font-weight: 600; color: #444;">[Program]</div>
+                <div class="cid-draggable cid-text" id="cid_el_id" style="font-size: 14px; font-weight: 500; color: #333;">ID: [Student ID]</div>
+              </div>
+
+              <!-- Back Card Preview -->
+              <div id="cid_card_back" class="cid-card-box">
+                <img id="cid_card_back_bg" class="cid-card-bg" src="" />
+                <div class="cid-draggable cid-text" id="cid_el_program_full" style="font-size: 12px; font-weight: 600; color: #111;">Program: [Program]</div>
+                <div class="cid-draggable cid-text" id="cid_el_year" style="font-size: 12px; font-weight: 500; color: #111;">Year Level: [Year]</div>
+                <div class="cid-draggable cid-text" id="cid_el_semester" style="font-size: 12px; font-weight: 500; color: #111;">Semester: [Semester]</div>
+                <div class="cid-draggable cid-text" id="cid_el_contact" style="font-size: 12px; font-weight: 500; color: #111;">Contact: [Contact]</div>
+              </div>
+            </div>
+            
+            <div id="cid_preview_nav" style="display:none; position:absolute; bottom: 10px; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; color: white; display:flex; align-items:center; gap: 10px;">
+              <button onclick="cidPrevPreview()" style="background:none;border:none;color:white;cursor:pointer;"><i class="bi bi-chevron-left"></i></button>
+              <span id="cid_preview_idx" style="font-size:12px;">1 / 1</span>
+              <button onclick="cidNextPreview()" style="background:none;border:none;color:white;cursor:pointer;"><i class="bi bi-chevron-right"></i></button>
+            </div>
+          </div>
+          
+          <!-- Instructions -->
+          <div style="width: 250px; display:flex; flex-direction:column; gap: 10px;">
+            <div style="font-size:12px;color:var(--muted);background:rgba(255,255,255,.05);padding:10px;border-radius:6px;line-height:1.5;">
+              <strong>Instructions:</strong><br/>
+              1. Upload templates.<br/>
+              2. <strong>Drag</strong> the text fields and photo box on the preview to position them.<br/>
+              3. Use the arrow keys below the preview to verify other students.<br/>
+              4. Click Generate PDF.
+            </div>
+            <button id="cid_generate_btn" class="btn-primary" onclick="cidGeneratePDF()" style="padding:12px;font-size:14px;border-radius:8px;margin-top:auto;" disabled>
+              <i class="bi bi-printer"></i> Generate PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+.cid-card-box {
+  width: 323.5px; /* 85.6mm * 3.78px/mm approx at 96dpi */
+  height: 204px; /* 54mm * 3.78 approx */
+  position: relative;
+  background: white;
+  border-radius: 8px; /* Physical cards have rounded corners */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+.cid-card-bg {
+  width: 100%; height: 100%; position: absolute; top:0; left:0; object-fit: cover; z-index: 1; pointer-events: none;
+}
+.cid-draggable {
+  position: absolute; z-index: 2; cursor: move; border: 1px dashed transparent; padding: 2px;
+  text-shadow: 1px 1px 0px rgba(255,255,255,0.8), -1px -1px 0px rgba(255,255,255,0.8), 1px -1px 0px rgba(255,255,255,0.8), -1px 1px 0px rgba(255,255,255,0.8);
+}
+.cid-draggable:hover {
+  border: 1px dashed var(--accent); background: rgba(0,0,0,0.05);
+}
+.cid-draggable.dragging {
+  opacity: 0.7; border: 1px solid var(--accent);
+}
+</style>
+
 
 <!-- Stats row removed -->
 
@@ -410,6 +572,9 @@
     </a>
     <button class="btn-primary" onclick="moveUpAllStudents()" style="align-self:flex-end;" title="Advance all active students to next semester">
       <i class="bi bi-arrow-up"></i> Move Up
+    </button>
+    <button class="btn-primary" onclick="openCreateIdModal()" style="align-self:flex-end;" title="Generate Student IDs">
+      <i class="bi bi-person-badge"></i> Create ID
     </button>
     {% endif %}
     <button class="btn-rst" onclick="resetStudentFilters()"><i class="bi bi-x-circle"></i> Reset</button>
@@ -556,6 +721,7 @@
 
 {% endblock %}
 {% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
   window.DASHBOARD_BOOTSTRAP = {
     students: {{ students | tojson }},
@@ -566,6 +732,7 @@
   };
 </script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=1.1"></script>
+<script src="{{ url_for('static', filename='js/create_id.js') }}?v=1.0"></script>
 <script>
   // Filter listeners
   document.addEventListener('click', (e) => {

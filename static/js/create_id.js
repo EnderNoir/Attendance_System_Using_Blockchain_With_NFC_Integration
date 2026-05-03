@@ -183,6 +183,26 @@ function cidInjectElements() {
       div.style.textAlign = el.align || 'left';
       if (el.align === 'center') div.style.transform = 'translateX(-50%)';
       else if (el.align === 'right') div.style.transform = 'translateX(-100%)';
+      
+      div.style.boxSizing = 'border-box';
+      if (cidActiveElId === el.id) {
+        div.style.border = '1px solid var(--accent)';
+        div.style.resize = 'horizontal';
+        div.style.overflow = 'hidden';
+        const ro = new ResizeObserver(entries => {
+          for (let entry of entries) {
+            const newW = entry.borderBoxSize ? entry.borderBoxSize[0].inlineSize : entry.contentRect.width;
+            if (newW > 0 && Math.abs(newW - (el.text_w || 0)) > 2) {
+               el.text_w = newW;
+               div.style.whiteSpace = 'normal';
+            }
+          }
+        });
+        ro.observe(div);
+      } else {
+        div.style.border = '1px solid transparent';
+      }
+      
       div.textContent = cidGetVal(el.id, s);
     } else if (el.type === 'custom_img') {
       div.style.width = (el.w||60) + 'px'; div.style.height = (el.h||60) + 'px';
@@ -231,9 +251,16 @@ function cidSelectElement(id) {
     photoField.style.display = 'none';
     document.getElementById('cid_st_font').value = el.font;
     const fontSel = document.getElementById('cid_st_font');
-    if (!Array.from(fontSel.options).some(o => o.value === el.font)) fontSel.value = '_custom';
+    if (!Array.from(fontSel.options).some(o => o.value === el.font)) {
+      const opt = document.createElement('option');
+      opt.value = el.font; opt.textContent = el.font;
+      fontSel.insertBefore(opt, fontSel.lastElementChild);
+    }
+    fontSel.value = el.font;
+    if (el.font === '_custom') document.getElementById('cid_st_font_custom_group').style.display = 'flex';
+    else document.getElementById('cid_st_font_custom_group').style.display = 'none';
+    
     document.getElementById('cid_st_size').value = el.size;
-    document.getElementById('cid_st_text_width').value = el.text_w || '';
     document.getElementById('cid_st_weight').value = el.weight || '400';
     document.getElementById('cid_st_align').value = el.align || 'left';
     document.getElementById('cid_st_color_picker').value = el.color.startsWith('#') ? el.color : '#000000';
@@ -251,14 +278,13 @@ function cidApplyStyle() {
   const el = cidElements.find(e => e.id === cidActiveElId);
   if (el.type === 'text') {
     let font = document.getElementById('cid_st_font').value;
-    const customInput = document.getElementById('cid_st_font_custom');
+    const customGrp = document.getElementById('cid_st_font_custom_group');
     if (font === '_custom') {
-      customInput.style.display = 'block';
-      font = customInput.value || 'Inter';
-    } else { customInput.style.display = 'none'; }
+      customGrp.style.display = 'flex';
+      font = document.getElementById('cid_st_font_custom').value || 'Inter';
+    } else { customGrp.style.display = 'none'; }
     el.font = font;
     el.size = parseInt(document.getElementById('cid_st_size').value) || 12;
-    el.text_w = parseInt(document.getElementById('cid_st_text_width').value) || null;
     el.weight = document.getElementById('cid_st_weight').value;
     el.align = document.getElementById('cid_st_align').value;
     el.color = document.getElementById('cid_st_color_text').value || '#000000';
@@ -279,6 +305,21 @@ function cidSyncColorFromPicker() {
 function cidSyncColorFromText() {
   const c = document.getElementById('cid_st_color_text').value;
   if (/^#[0-9a-f]{6}$/i.test(c)) document.getElementById('cid_st_color_picker').value = c;
+  cidApplyStyle();
+}
+
+function cidAddCustomFont() {
+  const fontName = document.getElementById('cid_st_font_custom').value.trim();
+  if (!fontName) return;
+  const sel = document.getElementById('cid_st_font');
+  let exists = Array.from(sel.options).find(o => o.value.toLowerCase() === fontName.toLowerCase());
+  if (!exists) {
+    const opt = document.createElement('option');
+    opt.value = fontName; opt.textContent = fontName;
+    sel.insertBefore(opt, sel.lastElementChild);
+    exists = opt;
+  }
+  sel.value = exists.value;
   cidApplyStyle();
 }
 
@@ -433,6 +474,15 @@ async function cidGeneratePDF() {
   const backContainer = document.getElementById('cid_card_back');
   const wasBackVisible = backContainer.style.display !== 'none';
   backContainer.style.display = 'block';
+  
+  // FIX: html2canvas text scattering bug caused by transform scale
+  const previewCont = document.getElementById('cid_preview_container');
+  const oldTransform = previewCont.style.transform;
+  previewCont.style.transform = 'none';
+
+  // FIX: hide UI selection borders during capture
+  const oldActive = cidActiveElId;
+  cidActiveElId = null;
 
   // Wait a moment for fonts to fully settle
   await new Promise(r => setTimeout(r, 200));
@@ -455,6 +505,9 @@ async function cidGeneratePDF() {
     doc.addImage(canvasBack.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
   }
 
+  // Restore state
+  previewCont.style.transform = oldTransform;
+  cidActiveElId = oldActive;
   cidPreviewIdx = 0;
   cidInjectElements();
   if (!wasBackVisible) backContainer.style.display = 'none';

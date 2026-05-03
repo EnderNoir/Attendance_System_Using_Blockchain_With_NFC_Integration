@@ -178,11 +178,11 @@ function cidRenderElementList() {
   });
 }
 
-window.cidEditLabel = function(id, e) {
+window.cidEditLabel = async function(id, e) {
   e.stopPropagation();
   const el = cidElements.find(d => d.id === id);
   if(!el) return;
-  const newVal = prompt('Enter static text override (leave blank to use database value):', el.override_val || el.label);
+  const newVal = await showAppPrompt('Enter static text override (leave blank to use database value):', el.override_val || el.label);
   if (newVal !== null) {
     el.override_val = newVal.trim() !== '' ? newVal : null;
     cidRenderElementList();
@@ -190,9 +190,9 @@ window.cidEditLabel = function(id, e) {
   }
 };
 
-window.cidDeleteElement = function(id, e) {
+window.cidDeleteElement = async function(id, e) {
   e.stopPropagation();
-  if(confirm('Delete this variable from the ID?')) {
+  if(await showAppConfirm('Delete this variable from the ID?')) {
     cidElements = cidElements.filter(d => d.id !== id);
     if (cidActiveElId === id) cidActiveElId = null;
     cidRenderElementList();
@@ -239,42 +239,53 @@ function cidInjectElements() {
       
       div.style.boxSizing = 'border-box';
       div.style.border = (cidActiveElId === el.id) ? '1px solid var(--accent)' : '1px solid transparent';
-      if (cidActiveElId === el.id) {
-        div.style.resize = 'horizontal';
-        div.style.overflow = 'hidden';
-        const ro = new ResizeObserver(entries => {
-          for (let entry of entries) {
-            const newW = entry.borderBoxSize ? entry.borderBoxSize[0].inlineSize : entry.contentRect.width;
-            if (newW > 0 && Math.abs(newW - (el.text_w || 0)) > 2) {
-               el.text_w = newW;
-               div.style.whiteSpace = 'normal';
-            }
-          }
-        });
-        ro.observe(div);
-      }
       
       div.textContent = cidGetVal(el.id, s);
     } else if (el.type === 'custom_img') {
       div.style.width = (el.w||60) + 'px'; div.style.height = (el.h||60) + 'px';
       div.style.borderRadius = '4px'; div.style.overflow = 'hidden';
-      div.style.border = (cidActiveElId === el.id) ? '1px solid var(--accent)' : 'none';
-      if (el.imgData) div.innerHTML = `<img src="${el.imgData}" style="width:100%;height:100%;object-fit:contain;">`;
-      if(cidActiveElId === el.id) {
-        div.style.resize = 'both';
-        const ro = new ResizeObserver(entries => {
-            const entry = entries[0];
-            el.w = entry.contentRect.width; el.h = entry.contentRect.height;
-        });
-        ro.observe(div);
-      }
+      div.style.border = (cidActiveElId === el.id) ? '1px solid var(--accent)' : '1px dashed transparent';
+      if (el.imgData) div.innerHTML = `<img src="${el.imgData}" style="width:100%;height:100%;object-fit:contain;pointer-events:none;">`;
     } else { // photo
       div.style.width = (el.w||80) + 'px'; div.style.height = (el.h||80) + 'px';
       div.style.borderRadius = el.shape === 'circle' ? '50%' : '6px'; div.style.background = 'rgba(0,0,0,.08)';
-      div.style.border = (cidActiveElId === el.id) ? '2px solid var(--accent)' : '1px solid rgba(0,0,0,.15)';
+      div.style.border = (cidActiveElId === el.id) ? '2px solid var(--accent)' : '1px dashed transparent';
       const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
-      if (pf) div.innerHTML = `<img src="/static/uploads/${pf}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">`;
+      if (pf) div.innerHTML = `<img src="/static/uploads/${pf}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;">`;
       else { div.style.display='flex'; div.style.alignItems='center'; div.style.justifyContent='center'; div.innerHTML='<i class="bi bi-person" style="font-size:20px;opacity:.3;"></i>'; }
+    }
+    
+    if (cidActiveElId === el.id) {
+      const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+      handles.forEach(dir => {
+        const handle = document.createElement('div');
+        handle.className = 'cid-resize-handle';
+        handle.style.position = 'absolute';
+        handle.style.width = '8px';
+        handle.style.height = '8px';
+        handle.style.background = '#fff';
+        handle.style.border = '1px solid var(--accent)';
+        handle.style.zIndex = '10';
+        handle.style.borderRadius = '2px';
+        
+        if (dir.includes('n')) handle.style.top = '-5px';
+        if (dir.includes('s')) handle.style.bottom = '-5px';
+        if (dir.includes('e')) handle.style.right = '-5px';
+        if (dir.includes('w')) handle.style.left = '-5px';
+        if (dir === 'n' || dir === 's') { handle.style.left = '50%'; handle.style.transform = 'translateX(-50%)'; handle.style.cursor = 'ns-resize'; }
+        if (dir === 'e' || dir === 'w') { handle.style.top = '50%'; handle.style.transform = 'translateY(-50%)'; handle.style.cursor = 'ew-resize'; }
+        if (dir === 'nw' || dir === 'se') handle.style.cursor = 'nwse-resize';
+        if (dir === 'ne' || dir === 'sw') handle.style.cursor = 'nesw-resize';
+        
+        handle.onmousedown = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          cidResizingId = el.id;
+          cidResizeDir = dir;
+          cidResizeStart = { x: e.clientX, y: e.clientY, w: div.offsetWidth, h: div.offsetHeight, top: el.y, left: el.x };
+        };
+        div.appendChild(handle);
+      });
     }
     div.onclick = e => { e.stopPropagation(); cidSelectElement(el.id); };
     (el.side === 'front' ? front : back).appendChild(div);
@@ -500,12 +511,13 @@ function cidZoom() {
   }
 }
 
-// ── Drag Logic ──
+// ── Drag & Resize Logic ──
 let cidDraggingId = null, cidDragOff = {x:0,y:0};
+let cidResizingId = null, cidResizeDir = null, cidResizeStart = null;
 
 document.addEventListener('mousedown', e => {
   const el = e.target.closest('.cid-draggable');
-  if (!el) return;
+  if (!el || e.target.classList.contains('cid-resize-handle')) return;
   
   const r = el.getBoundingClientRect();
   const isResize = el.style.resize === 'horizontal' && (e.clientX > r.right - 18) && (e.clientY > r.bottom - 18);
@@ -535,15 +547,75 @@ function drawSnapLine(dir, pos) {
 }
 
 document.addEventListener('mousemove', e => {
+  if (cidResizingId) {
+    const el = cidElements.find(d => d.id === cidResizingId);
+    if (!el) return;
+    const actualScale = cidIsZoomed ? cidZoomScale : 1.0;
+    let dx = (e.clientX - cidResizeStart.x) / actualScale;
+    let dy = (e.clientY - cidResizeStart.y) / actualScale;
+    
+    let newW = cidResizeStart.w;
+    let newH = cidResizeStart.h;
+    let newX = cidResizeStart.left;
+    let newY = cidResizeStart.top;
+
+    if (el.type === 'text') {
+      if (el.align === 'center') {
+        if (cidResizeDir.includes('e')) newW += dx * 2;
+        if (cidResizeDir.includes('w')) newW -= dx * 2;
+      } else if (el.align === 'right') {
+        if (cidResizeDir.includes('e')) { newW += dx; newX += dx; }
+        if (cidResizeDir.includes('w')) { newW -= dx; }
+      } else {
+        if (cidResizeDir.includes('e')) newW += dx;
+        if (cidResizeDir.includes('w')) { newW -= dx; newX += dx; }
+      }
+    } else {
+      if (cidResizeDir.includes('e')) newW += dx;
+      if (cidResizeDir.includes('w')) { newW -= dx; newX += dx; }
+      if (cidResizeDir.includes('s')) newH += dy;
+      if (cidResizeDir.includes('n')) { newH -= dy; newY += dy; }
+    }
+    
+    if (newW < 20) {
+      if (el.type !== 'text' || el.align === 'left') {
+        newX += (newW - 20) * (cidResizeDir.includes('w') ? 1 : 0);
+      } else if (el.type === 'text' && el.align === 'right') {
+        newX += (newW - 20) * (cidResizeDir.includes('e') ? 1 : 0);
+      }
+      newW = 20;
+    }
+    if (newH < 20) { newY += (newH - 20) * (cidResizeDir.includes('n') ? 1 : 0); newH = 20; }
+    
+    el.x = newX;
+    el.y = newY;
+    if (el.type === 'text') {
+      el.text_w = newW;
+    } else {
+      el.w = newW;
+      el.h = newH;
+    }
+    
+    const div = document.getElementById('view_el_' + cidResizingId);
+    div.style.left = newX + 'px';
+    div.style.top = newY + 'px';
+    if (el.type === 'text') div.style.width = newW + 'px';
+    else { div.style.width = newW + 'px'; div.style.height = newH + 'px'; }
+    return;
+  }
+
   if (!cidDraggingId) return;
-  const el = document.getElementById('view_el_' + cidDraggingId);
-  if (!el) return;
-  const parent = el.parentElement;
+  const div = document.getElementById('view_el_' + cidDraggingId);
+  if (!div) return;
+  const parent = div.parentElement;
   const pR = parent.getBoundingClientRect();
   const actualScale = cidIsZoomed ? cidZoomScale : 1.0;
   let x = (e.clientX - pR.left) / actualScale - cidDragOff.x;
   let y = (e.clientY - pR.top) / actualScale - cidDragOff.y;
   const data = cidElements.find(d => d.id === cidDraggingId);
+  
+  const divW = div.offsetWidth;
+  const divH = div.offsetHeight;
   
   document.querySelectorAll('.cid-snap-line').forEach(e => e.remove());
   let snappedX = false, snappedY = false;
@@ -551,8 +623,25 @@ document.addEventListener('mousemove', e => {
   const centerY = pR.height / actualScale / 2;
   const snapDist = 6;
   
-  if (Math.abs(x - centerX) < snapDist) { x = centerX; snappedX = true; drawSnapLine('v', centerX * actualScale); }
-  if (Math.abs(y - centerY) < snapDist) { y = centerY; snappedY = true; drawSnapLine('h', centerY * actualScale); }
+  // X axis snap points: left edge, center, right edge
+  const snapXPoints = [
+    { target: 0, line: 0 },
+    { target: centerX - divW / 2, line: centerX },
+    { target: pR.width / actualScale - divW, line: pR.width / actualScale }
+  ];
+  // Y axis snap points: top edge, center, bottom edge
+  const snapYPoints = [
+    { target: 0, line: 0 },
+    { target: centerY - divH / 2, line: centerY },
+    { target: pR.height / actualScale - divH, line: pR.height / actualScale }
+  ];
+  
+  for (let pt of snapXPoints) {
+    if (!snappedX && Math.abs(x - pt.target) < snapDist) { x = pt.target; snappedX = true; drawSnapLine('v', pt.line * actualScale); }
+  }
+  for (let pt of snapYPoints) {
+    if (!snappedY && Math.abs(y - pt.target) < snapDist) { y = pt.target; snappedY = true; drawSnapLine('h', pt.line * actualScale); }
+  }
   
   cidElements.forEach(other => {
     if (other.id === cidDraggingId || other.side !== data.side) return;
@@ -561,12 +650,13 @@ document.addEventListener('mousemove', e => {
   });
 
   if (data) { data.x = x; data.y = y; }
-  el.style.left = x + 'px';
-  el.style.top = y + 'px';
+  div.style.left = x + 'px';
+  div.style.top = y + 'px';
 });
 
 document.addEventListener('mouseup', () => { 
   cidDraggingId = null; 
+  cidResizingId = null;
   document.querySelectorAll('.cid-snap-line').forEach(e => e.remove());
 });
 

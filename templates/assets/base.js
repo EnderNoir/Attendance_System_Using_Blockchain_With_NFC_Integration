@@ -92,6 +92,53 @@
       return showAppDialog({ message: message, title: title || 'Confirmation', confirm: true, okText: okText || 'Confirm', cancelText: cancelText || 'Cancel' });
     }
 
+    function showAppPrompt(message, defaultVal) {
+      return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'app-dialog-backdrop show';
+        overlay.style.zIndex = '99999';
+        overlay.onclick = e => { if (e.target === overlay) close(); };
+        
+        const box = document.createElement('div');
+        box.className = 'app-dialog-box';
+        
+        const head = document.createElement('div');
+        head.className = 'app-dialog-head';
+        head.innerHTML = '<div class="app-dialog-title">Input Required</div><button type="button" class="app-dialog-close"><i class="bi bi-x"></i></button>';
+        head.querySelector('button').onclick = close;
+        
+        const body = document.createElement('div');
+        body.className = 'app-dialog-body';
+        body.innerHTML = `<div style="margin-bottom:10px;font-size:14px;color:var(--text);">${message}</div><input type="text" class="upd-input" style="width:100%;font-size:14px;padding:8px;" value="${defaultVal || ''}" />`;
+        
+        const actions = document.createElement('div');
+        actions.className = 'app-dialog-actions';
+        actions.innerHTML = '<button type="button" class="btn-outline">Cancel</button><button type="button" class="btn-primary">OK</button>';
+        actions.querySelector('.btn-outline').onclick = close;
+        actions.querySelector('.btn-primary').onclick = () => {
+          const val = body.querySelector('input').value;
+          document.body.removeChild(overlay);
+          resolve(val);
+        };
+        
+        box.appendChild(head);
+        box.appendChild(body);
+        box.appendChild(actions);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        
+        const input = body.querySelector('input');
+        input.focus();
+        input.setSelectionRange(0, input.value.length);
+        input.onkeydown = e => { if (e.key === 'Enter') actions.querySelector('.btn-primary').click(); if (e.key === 'Escape') close(); };
+        
+        function close() {
+          document.body.removeChild(overlay);
+          resolve(null);
+        }
+      });
+    }
+
     function showAppSuccess(msg) {
       const overlay = document.createElement('div');
       overlay.className = 'app-success-overlay';

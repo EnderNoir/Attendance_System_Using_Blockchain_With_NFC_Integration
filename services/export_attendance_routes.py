@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 import traceback
 import json
@@ -128,7 +128,7 @@ def export_student_sessions_impl(
         f_class_type = request.args.get('class_type', '').strip().lower()
         f_semester = request.args.get('semester', '').strip()
         stud_name = request.args.get('name', 'Student').strip()
-        now = datetime.now()
+        now = datetime.utcnow() + timedelta(hours=8)
 
         all_students = get_all_students_fn()
         student = next((x for x in all_students if x['nfcId'] == nfc_id), None)
@@ -461,7 +461,7 @@ def export_session_attendance_impl(
             flash('Access denied.')
             return redirect(url_for('teacher_sessions'))
 
-        now = datetime.now()
+        now = datetime.utcnow() + timedelta(hours=8)
         section_key = normalize_section_key_fn(sess.get('section_key', ''))
         class_type_norm = str(sess.get('class_type', 'lecture') or 'lecture').strip().lower()
         is_school_event = class_type_norm == 'school_event'
@@ -614,7 +614,7 @@ def export_session_attendance_impl(
                     'year': st.get('year_level', ''),
                     'status': status,
                     'enrollment_status': st.get('enrollment_status', 'Regular'),
-                    'tap_date': '-' if status.lower() in ('absent', 'excused') else _fmt_date_dash(lg.get('tap_time', '') or ''),
+                    'tap_date': _fmt_date_dash(lg.get('tap_time', '') or sess.get('started_at', '')),
                     'tap_time': '-' if status.lower() in ('absent', 'excused') else _fmt_time_hms_ampm(lg.get('tap_time', '') or ''),
                     'tx_hash': lg.get('tx_hash', '') or '—',
                     'block': str(lg.get('block_number', '')) if lg.get('block_number') else '—',

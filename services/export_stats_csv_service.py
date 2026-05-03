@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import calendar as _cal
 import csv
 import io
@@ -25,7 +25,7 @@ def export_stats_csv_impl(
     f_tod = request_obj.args.get('time_of_day', '').strip()
     role = session_obj.get('role')
     username = session_obj.get('username')
-    now = datetime.now()
+    now = datetime.utcnow() + timedelta(hours=8)
 
     if not f_year_num:
         f_year_num = request_obj.args.get('year', '').strip() if period in ('month', 'year') else ''

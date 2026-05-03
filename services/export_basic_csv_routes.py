@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import csv
 import io
 import re
@@ -178,7 +178,7 @@ def export_csv_all_impl(*, get_all_students_fn, get_attendance_records_fn, get_s
     return Response(
         out.getvalue(),
         mimetype='text/csv',
-        headers={'Content-Disposition': f'attachment; filename=attendance_all_{datetime.now().strftime("%Y%m%d")}.csv'},
+        headers={'Content-Disposition': f'attachment; filename=attendance_all_{(datetime.utcnow() + timedelta(hours=8)).strftime("%Y%m%d")}.csv'},
     )
 
 
@@ -305,5 +305,5 @@ def teacher_export_section_csv_impl(
     return Response(
         out.getvalue(),
         mimetype='text/csv',
-        headers={'Content-Disposition': f'attachment; filename=section_{datetime.now().strftime("%Y%m%d")}.csv'},
+        headers={'Content-Disposition': f'attachment; filename=section_{(datetime.utcnow() + timedelta(hours=8)).strftime("%Y%m%d")}.csv'},
     )

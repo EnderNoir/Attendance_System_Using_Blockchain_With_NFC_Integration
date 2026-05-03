@@ -388,12 +388,15 @@ function renderSessModal(sessId, data) {
   function openStudModal(nfcId, name, course, yearLevel, section, studentId, semester, adviser, studentType) {
     currentStudNfc = nfcId;
     currentStudName = name;
+    let semDisplay = semester || '—';
+    if (semDisplay === 'First') semDisplay = '1st Semester';
+    if (semDisplay === 'Second') semDisplay = '2nd Semester';
     document.getElementById('stud_name').textContent = name;
     document.getElementById('stud_meta').innerHTML = `
     <div class="stud-meta-item"><i class="bi bi-mortarboard"></i> <strong>${course || '—'}</strong></div>
     <div class="stud-meta-item"><i class="bi bi-layers"></i> <strong>${yearLevel || '—'}</strong></div>
     <div class="stud-meta-item"><i class="bi bi-grid-1x2"></i> Section <strong>${section || '—'}</strong></div>
-    <div class="stud-meta-item"><i class="bi bi-calendar-range"></i> <strong>${semester || '—'}</strong></div>
+    <div class="stud-meta-item"><i class="bi bi-calendar-range"></i> <strong>${semDisplay}</strong></div>
     <div class="stud-meta-item"><i class="bi bi-person-workspace"></i> Adviser: <strong>${adviser || '—'}</strong></div>
     <div class="stud-meta-item"><i class="bi bi-person-check"></i> Type: <strong>${studentType || 'Regular'}</strong></div>
     ${studentId ? `<div class="stud-meta-item"><i class="bi bi-person-badge"></i> ID: <strong>${studentId}</strong></div>` : ''}
@@ -538,9 +541,6 @@ function renderSessModal(sessId, data) {
               <span>${sem} <span style="font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 8px;">(${semSessions.length} sessions)</span></span>
               <i class="bi bi-chevron-${sIdx === 0 ? 'up' : 'down'}" style="margin-left: 8px;"></i>
             </div>
-            <button class="btn-export-xl" style="padding: 4px 10px; font-size: 11px; margin-left: 12px; border-radius: 4px;" onclick="exportStudentSemester('${sem}')">
-              <i class="bi bi-file-earmark-excel"></i> Export
-            </button>
           </div>
           <div class="sem-accordion-body" style="display: ${sIdx === 0 ? 'block' : 'none'}; padding: 0; overflow-x: auto;">
             <table class="hist-table" style="margin: 0; border: none; border-radius: 0; width: 100%; min-width: 800px;">
@@ -571,7 +571,7 @@ function renderSessModal(sessId, data) {
                     <td><span style="font-weight:600;">${s.subject_name || '—'}</span></td>
                     <td><span class="att-status st-excused">${classTypeLabel(s.class_type || 'lecture')}</span></td>
                     <td><span class="att-status ${stCls[s.status] || 'st-absent'}">${stLbl[s.status] || '—'}</span></td>
-                    <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${s.tap_time ? parseTapDateTime(s.tap_time).time : '-'}</td>
+                    <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${(s.status === 'absent' || s.status === 'excused') ? '-' : (s.tap_time ? parseTapDateTime(s.tap_time).time : '-')}</td>
                     <td style="font-family:'Space Mono',monospace;font-size:11px;white-space:nowrap;">${pickHistoryDate(s)}</td>
                     <td style="font-size:11px;color:var(--muted);white-space:nowrap;">${normalizeTimeSlot(s.time_slot || s.tap_time || '')}</td>
                     <td style="font-family:'Space Mono',monospace;font-size:11px;">${s.tx_hash ? `<a href="https://sepolia.etherscan.io/tx/${s.tx_hash}" target="_blank" style="color:var(--accent);text-decoration:none;" title="View on Etherscan">${s.tx_hash.slice(0, 10)}...</a>` : '<span style="color:var(--muted);">—</span>'}</td>

@@ -10,9 +10,9 @@ let cidMode = 'batch';
 
 let cidElements = [
   { id:'photo', label:'Student Photo', type:'photo', side:'front', x:20, y:20, w:80, h:80, shape:'square', visible:true },
-  { id:'name', label:'Full Name', type:'text', side:'front', x:161.75, y:110, size:16, font:'Inter', color:'#000000', weight:'700', align:'center', visible:true },
-  { id:'course', label:'Program', type:'text', side:'front', x:161.75, y:132, size:12, font:'Inter', color:'#333333', weight:'500', align:'center', visible:true },
-  { id:'id_num', label:'Student ID', type:'text', side:'front', x:161.75, y:150, size:11, font:'Space Mono', color:'#555555', weight:'400', align:'center', visible:true },
+  { id:'name', label:'Full Name', type:'text', side:'front', x:20, y:110, text_w:283.5, size:16, font:'Inter', color:'#000000', weight:'700', align:'center', visible:true },
+  { id:'course', label:'Program', type:'text', side:'front', x:20, y:132, text_w:283.5, size:12, font:'Inter', color:'#333333', weight:'500', align:'center', visible:true },
+  { id:'id_num', label:'Student ID', type:'text', side:'front', x:20, y:150, text_w:283.5, size:11, font:'Space Mono', color:'#555555', weight:'400', align:'center', visible:true },
   { id:'school_year', label:'School Year (Back)', type:'text', side:'back', x:20, y:30, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
   { id:'contact_number', label:'Contact Number (Back)', type:'text', side:'back', x:20, y:45, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
   { id:'email', label:'Email Address (Back)', type:'text', side:'back', x:20, y:60, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
@@ -162,13 +162,21 @@ function cidRenderElementList() {
     const div = document.createElement('div');
     div.className = 'cid-el-item';
     if (cidActiveElId === el.id) div.classList.add('active');
+    div.style.display = 'flex';
+    div.style.alignItems = 'center';
+    div.style.padding = '6px 8px';
+    div.style.border = '1px solid ' + (cidActiveElId === el.id ? 'var(--accent)' : 'transparent');
+    div.style.borderRadius = '6px';
+    div.style.background = cidActiveElId === el.id ? 'rgba(245,158,11,.05)' : 'transparent';
+    div.style.marginBottom = '4px';
+    div.style.cursor = 'pointer';
+    div.onclick = () => cidSelectElement(el.id);
+    
     div.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;flex:1;" onclick="cidSelectElement('${el.id}')">
-        <i class="bi bi-${el.type==='photo'||el.type==='custom_img'?'image':'fonts'}" style="opacity:0.5;font-size:12px;"></i>
-        <span style="font-size:12px;font-weight:600;flex:1;opacity:${isVis?1:0.4}">${el.label}</span>
-      </div>
-      <div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;width:30px;text-align:right;">${el.side}</div>
-      <div style="display:flex;gap:4px;margin-left:8px;">
+      <i class="bi bi-${el.type==='photo'||el.type==='custom_img'?'image':'fonts'}" style="opacity:0.5;font-size:12px;margin-right:8px;"></i>
+      <span style="font-size:12px;font-weight:600;flex:1;opacity:${isVis?1:0.4}">${el.label}</span>
+      <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-right:8px;background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">${el.side}</span>
+      <div style="display:flex;gap:4px;">
         ${el.type==='text' ? `<button onclick="cidEditLabel('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;" title="Edit Text"><i class="bi bi-pencil"></i></button>` : ''}
         <button onclick="cidToggleVisible('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;"><i class="bi bi-eye${isVis?'':'-slash'}"></i></button>
         <button onclick="cidDeleteElement('${el.id}', event)" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0 3px;" title="Delete"><i class="bi bi-trash"></i></button>
@@ -234,11 +242,8 @@ function cidInjectElements() {
         div.style.whiteSpace = 'nowrap';
       }
       div.style.textAlign = el.align || 'left';
-      if (el.align === 'center') div.style.transform = 'translateX(-50%)';
-      else if (el.align === 'right') div.style.transform = 'translateX(-100%)';
-      
       div.style.boxSizing = 'border-box';
-      div.style.border = (cidActiveElId === el.id) ? '1px solid var(--accent)' : '1px solid transparent';
+      div.style.border = (cidActiveElId === el.id) ? '1px solid var(--accent)' : '1px dashed transparent';
       
       div.textContent = cidGetVal(el.id, s);
     } else if (el.type === 'custom_img') {
@@ -534,14 +539,14 @@ function drawSnapLine(dir, pos) {
   const line = document.createElement('div');
   line.className = 'cid-snap-line';
   line.style.position = 'absolute';
-  line.style.background = '#0d6efd';
   line.style.zIndex = '9999';
+  line.style.border = '1px dashed var(--accent)';
   if (dir === 'v') {
     line.style.left = pos + 'px';
-    line.style.top = '0'; line.style.bottom = '0'; line.style.width = '1px';
+    line.style.top = '0'; line.style.bottom = '0'; line.style.width = '0px';
   } else {
     line.style.top = pos + 'px';
-    line.style.left = '0'; line.style.right = '0'; line.style.height = '1px';
+    line.style.left = '0'; line.style.right = '0'; line.style.height = '0px';
   }
   document.getElementById('cid_preview_container').appendChild(line);
 }
@@ -559,30 +564,13 @@ document.addEventListener('mousemove', e => {
     let newX = cidResizeStart.left;
     let newY = cidResizeStart.top;
 
-    if (el.type === 'text') {
-      if (el.align === 'center') {
-        if (cidResizeDir.includes('e')) newW += dx * 2;
-        if (cidResizeDir.includes('w')) newW -= dx * 2;
-      } else if (el.align === 'right') {
-        if (cidResizeDir.includes('e')) { newW += dx; newX += dx; }
-        if (cidResizeDir.includes('w')) { newW -= dx; }
-      } else {
-        if (cidResizeDir.includes('e')) newW += dx;
-        if (cidResizeDir.includes('w')) { newW -= dx; newX += dx; }
-      }
-    } else {
-      if (cidResizeDir.includes('e')) newW += dx;
-      if (cidResizeDir.includes('w')) { newW -= dx; newX += dx; }
-      if (cidResizeDir.includes('s')) newH += dy;
-      if (cidResizeDir.includes('n')) { newH -= dy; newY += dy; }
-    }
+    if (cidResizeDir.includes('e')) newW += dx;
+    if (cidResizeDir.includes('w')) { newW -= dx; newX += dx; }
+    if (cidResizeDir.includes('s')) newH += dy;
+    if (cidResizeDir.includes('n')) { newH -= dy; newY += dy; }
     
     if (newW < 20) {
-      if (el.type !== 'text' || el.align === 'left') {
-        newX += (newW - 20) * (cidResizeDir.includes('w') ? 1 : 0);
-      } else if (el.type === 'text' && el.align === 'right') {
-        newX += (newW - 20) * (cidResizeDir.includes('e') ? 1 : 0);
-      }
+      newX += (newW - 20) * (cidResizeDir.includes('w') ? 1 : 0);
       newW = 20;
     }
     if (newH < 20) { newY += (newH - 20) * (cidResizeDir.includes('n') ? 1 : 0); newH = 20; }
@@ -614,40 +602,47 @@ document.addEventListener('mousemove', e => {
   let y = (e.clientY - pR.top) / actualScale - cidDragOff.y;
   const data = cidElements.find(d => d.id === cidDraggingId);
   
-  const divW = div.offsetWidth;
-  const divH = div.offsetHeight;
+  const divW = el.type === 'text' ? (el.text_w || div.offsetWidth) : (el.w || div.offsetWidth);
+  const divH = el.type === 'text' ? div.offsetHeight : (el.h || div.offsetHeight);
   
   document.querySelectorAll('.cid-snap-line').forEach(e => e.remove());
   let snappedX = false, snappedY = false;
-  const centerX = pR.width / actualScale / 2;
-  const centerY = pR.height / actualScale / 2;
   const snapDist = 6;
   
-  // X axis snap points: left edge, center, right edge
-  const snapXPoints = [
-    { target: 0, line: 0 },
-    { target: centerX - divW / 2, line: centerX },
-    { target: pR.width / actualScale - divW, line: pR.width / actualScale }
-  ];
-  // Y axis snap points: top edge, center, bottom edge
-  const snapYPoints = [
-    { target: 0, line: 0 },
-    { target: centerY - divH / 2, line: centerY },
-    { target: pR.height / actualScale - divH, line: pR.height / actualScale }
-  ];
-  
-  for (let pt of snapXPoints) {
-    if (!snappedX && Math.abs(x - pt.target) < snapDist) { x = pt.target; snappedX = true; drawSnapLine('v', pt.line * actualScale); }
-  }
-  for (let pt of snapYPoints) {
-    if (!snappedY && Math.abs(y - pt.target) < snapDist) { y = pt.target; snappedY = true; drawSnapLine('h', pt.line * actualScale); }
-  }
+  const myEdges = {
+    x: { start: x, center: x + divW / 2, end: x + divW },
+    y: { start: y, center: y + divH / 2, end: y + divH }
+  };
+
+  const pR_W = pR.width / actualScale;
+  const pR_H = pR.height / actualScale;
+  const targetsX = [ {val: 0, line: 0}, {val: pR_W/2, line: pR_W/2}, {val: pR_W, line: pR_W} ];
+  const targetsY = [ {val: 0, line: 0}, {val: pR_H/2, line: pR_H/2}, {val: pR_H, line: pR_H} ];
   
   cidElements.forEach(other => {
-    if (other.id === cidDraggingId || other.side !== data.side) return;
-    if (!snappedX && Math.abs(x - other.x) < snapDist) { x = other.x; snappedX = true; drawSnapLine('v', x * actualScale); }
-    if (!snappedY && Math.abs(y - other.y) < snapDist) { y = other.y; snappedY = true; drawSnapLine('h', y * actualScale); }
+    if (other.id === cidDraggingId || other.side !== data.side || other.visible === false) return;
+    const oEl = document.getElementById('view_el_' + other.id);
+    if (!oEl) return;
+    const oW = other.type === 'text' ? (other.text_w || oEl.offsetWidth) : (other.w || oEl.offsetWidth);
+    const oH = other.type === 'text' ? oEl.offsetHeight : (other.h || oEl.offsetHeight);
+    targetsX.push( {val: other.x, line: other.x}, {val: other.x + oW/2, line: other.x + oW/2}, {val: other.x + oW, line: other.x + oW} );
+    targetsY.push( {val: other.y, line: other.y}, {val: other.y + oH/2, line: other.y + oH/2}, {val: other.y + oH, line: other.y + oH} );
   });
+  
+  for (let pt of targetsX) {
+    if (!snappedX) {
+      if (Math.abs(myEdges.x.start - pt.val) < snapDist) { x = pt.val; snappedX = true; drawSnapLine('v', pt.line * actualScale); }
+      else if (Math.abs(myEdges.x.center - pt.val) < snapDist) { x = pt.val - divW/2; snappedX = true; drawSnapLine('v', pt.line * actualScale); }
+      else if (Math.abs(myEdges.x.end - pt.val) < snapDist) { x = pt.val - divW; snappedX = true; drawSnapLine('v', pt.line * actualScale); }
+    }
+  }
+  for (let pt of targetsY) {
+    if (!snappedY) {
+      if (Math.abs(myEdges.y.start - pt.val) < snapDist) { y = pt.val; snappedY = true; drawSnapLine('h', pt.line * actualScale); }
+      else if (Math.abs(myEdges.y.center - pt.val) < snapDist) { y = pt.val - divH/2; snappedY = true; drawSnapLine('h', pt.line * actualScale); }
+      else if (Math.abs(myEdges.y.end - pt.val) < snapDist) { y = pt.val - divH; snappedY = true; drawSnapLine('h', pt.line * actualScale); }
+    }
+  }
 
   if (data) { data.x = x; data.y = y; }
   div.style.left = x + 'px';

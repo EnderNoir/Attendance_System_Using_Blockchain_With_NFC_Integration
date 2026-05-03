@@ -341,7 +341,7 @@ function cidZoom() {
     modal.style.display = 'block';
     zoomGrid.appendChild(preview);
     zoomGrid.appendChild(controls);
-    cidZoomScale = 1.6;
+    cidZoomScale = 2.2;
     document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
     btn.style.display = 'none';
   } else {

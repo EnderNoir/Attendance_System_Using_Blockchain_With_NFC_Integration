@@ -321,13 +321,19 @@
 
 <!-- ══ CREATE ID MODAL ══ -->
 <div class="upd-overlay" id="createIdModal" style="z-index: 10000; overflow-y: auto;">
-  <div class="upd-box" style="max-width:850px; margin: 40px auto; display: flex; flex-direction: column;">
+    <div class="upd-box" style="max-width:1100px; margin: 40px auto; display: flex; flex-direction: column;">
     <div class="upd-topbar">
       <div>
         <h3 style="font-size:16px;font-weight:800;">Create Student IDs</h3>
-        <p style="font-size:11px;color:var(--muted);margin-top:2px;">Follow the steps to generate printable PVC ID cards (CR80: 85.6mm x 54mm)</p>
+        <p style="font-size:11px;color:var(--muted);margin-top:2px;">Advanced PVC ID Studio (CR80: 85.6mm x 54mm)</p>
       </div>
-      <button onclick="closeCreateIdModal()" class="btn-vr" style="padding:5px 10px;background:rgba(255,255,255,.05);"><i class="bi bi-x-lg"></i> Close</button>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="display:flex;background:rgba(255,255,255,0.05);padding:4px 8px;border-radius:8px;gap:12px;font-size:11px;">
+           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="cid_orientation" value="landscape" checked onclick="cidUpdateOrientation()"> Landscape</label>
+           <label style="display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="radio" name="cid_orientation" value="portrait" onclick="cidUpdateOrientation()"> Portrait</label>
+        </div>
+        <button onclick="closeCreateIdModal()" class="btn-vr" style="padding:5px 10px;background:rgba(255,255,255,.05);"><i class="bi bi-x-lg"></i> Close</button>
+      </div>
     </div>
 
     <div style="padding:20px; display:flex; flex-direction:column; gap:18px;">
@@ -378,7 +384,10 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
           <!-- Front Template -->
           <div>
-            <label class="upd-label">Front Image (PNG/JPG)</label>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <label class="upd-label" style="margin:0;">Front Image (PNG/JPG)</label>
+                <button class="btn-vr" style="padding:2px 6px;font-size:10px;" onclick="cidViewFull('front')"><i class="bi bi-search"></i> View Full</button>
+            </div>
             <div id="cid_front_drop" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:rgba(0,0,0,0.1);position:relative;height:120px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('cid_front_file').click()">
               <div id="cid_front_text" style="color:var(--muted);font-size:12px;"><i class="bi bi-cloud-arrow-up" style="font-size:20px;display:block;margin-bottom:5px;"></i> Click or drag Front Template</div>
               <img id="cid_front_preview" style="display:none;max-height:100%;max-width:100%;position:absolute;border-radius:4px;" />
@@ -387,7 +396,10 @@
           </div>
           <!-- Back Template -->
           <div>
-            <label class="upd-label">Back Image (PNG/JPG)</label>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <label class="upd-label" style="margin:0;">Back Image (PNG/JPG)</label>
+                <button class="btn-vr" style="padding:2px 6px;font-size:10px;" onclick="cidViewFull('back')"><i class="bi bi-search"></i> View Full</button>
+            </div>
             <div id="cid_back_drop" style="border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:rgba(0,0,0,0.1);position:relative;height:120px;display:flex;align-items:center;justify-content:center;" onclick="document.getElementById('cid_back_file').click()">
               <div id="cid_back_text" style="color:var(--muted);font-size:12px;"><i class="bi bi-cloud-arrow-up" style="font-size:20px;display:block;margin-bottom:5px;"></i> Click or drag Back Template</div>
               <img id="cid_back_preview" style="display:none;max-height:100%;max-width:100%;position:absolute;border-radius:4px;" />
@@ -400,59 +412,123 @@
       <!-- Step 3: Preview & Generate -->
       <div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:14px; flex-grow: 1;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;">Step 3: Preview & Print</div>
+          <div style="font-family:'Space Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;">Step 3: Advanced PVC Studio</div>
           <div id="cid_generate_status" style="font-size:11px;color:var(--muted);display:none;">
             <i class="bi bi-hourglass-split"></i> Generating... <span id="cid_progress">0%</span>
           </div>
         </div>
 
-        <div style="display:flex; gap: 20px;">
-          <!-- Preview Canvas Area -->
-          <div style="flex:1; background:var(--bg-body); border-radius:8px; padding:20px; display:flex; flex-direction:column; align-items:center; gap: 20px; min-height: 250px; overflow: hidden; position: relative;">
-            <div id="cid_no_template_msg" style="color:var(--muted);font-size:12px;text-align:center;margin-top:50px;">Upload templates and select a group to see preview.</div>
+        <div style="display:grid; grid-template-columns: 360px 240px 1fr; gap: 20px; align-items: start;">
+          
+          <!-- Column 1: Preview Canvas -->
+          <div style="background:var(--bg-body); border-radius:8px; padding:15px; display:flex; flex-direction:column; align-items:center; min-height: 480px; position: relative; border: 1px solid var(--border);">
+            <div id="cid_no_template_msg" style="color:var(--muted);font-size:12px;text-align:center;margin-top:50px;">Upload templates and select a group.</div>
             
-            <div id="cid_preview_container" style="display:none; width: 100%; display:flex; flex-direction:column; align-items:center; gap:20px; transform-origin: top center; transform: scale(0.8);">
-              <!-- Front Card Preview -->
+            <div id="cid_preview_container" style="display:none; width: 100%; flex-direction:column; align-items:center; gap:20px; transform: scale(0.9); transform-origin: top center;">
+              <div style="display:flex;justify-content:space-between;width:100%;margin-bottom:-10px;">
+                 <span style="font-size:9px;color:var(--muted);text-transform:uppercase;">FRONT VIEW</span>
+                 <button class="btn-vr" style="padding:1px 5px;font-size:9px;" onclick="cidViewPreviewFull('front')"><i class="bi bi-search"></i> Zoom</button>
+              </div>
               <div id="cid_card_front" class="cid-card-box">
                 <img id="cid_card_front_bg" class="cid-card-bg" src="" />
-                <div class="cid-draggable" id="cid_el_photo" style="width: 100px; height: 100px; border-radius: 8px; background: rgba(0,0,0,0.1); border: 2px dashed #666; display:flex; align-items:center; justify-content:center; color:#666; font-size:10px;"><i class="bi bi-person"></i> Photo</div>
-                <div class="cid-draggable cid-text" id="cid_el_name" style="font-size: 20px; font-weight: 800; color: #111;">[Student Name]</div>
-                <div class="cid-draggable cid-text" id="cid_el_course" style="font-size: 14px; font-weight: 600; color: #444;">[Program]</div>
-                <div class="cid-draggable cid-text" id="cid_el_id" style="font-size: 14px; font-weight: 500; color: #333;">ID: [Student ID]</div>
+                <!-- Draggable elements are injected here via JS to allow styling -->
+                <div id="cid_front_elements"></div>
               </div>
 
-              <!-- Back Card Preview -->
+              <div style="display:flex;justify-content:space-between;width:100%;margin-top:10px;margin-bottom:-10px;">
+                 <span style="font-size:9px;color:var(--muted);text-transform:uppercase;">BACK VIEW</span>
+                 <button class="btn-vr" style="padding:1px 5px;font-size:9px;" onclick="cidViewPreviewFull('back')"><i class="bi bi-search"></i> Zoom</button>
+              </div>
               <div id="cid_card_back" class="cid-card-box">
                 <img id="cid_card_back_bg" class="cid-card-bg" src="" />
-                <div class="cid-draggable cid-text" id="cid_el_program_full" style="font-size: 12px; font-weight: 600; color: #111;">Program: [Program]</div>
-                <div class="cid-draggable cid-text" id="cid_el_year" style="font-size: 12px; font-weight: 500; color: #111;">Year Level: [Year]</div>
-                <div class="cid-draggable cid-text" id="cid_el_semester" style="font-size: 12px; font-weight: 500; color: #111;">Semester: [Semester]</div>
-                <div class="cid-draggable cid-text" id="cid_el_contact" style="font-size: 12px; font-weight: 500; color: #111;">Contact: [Contact]</div>
+                <div id="cid_back_elements"></div>
               </div>
             </div>
             
-            <div id="cid_preview_nav" style="display:none; position:absolute; bottom: 10px; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; color: white; display:flex; align-items:center; gap: 10px;">
+            <div id="cid_preview_nav" style="display:none; margin-top: auto; background: rgba(255,255,255,0.05); padding: 5px 15px; border-radius: 20px; color: white; display:flex; align-items:center; gap: 10px; border:1px solid var(--border);">
               <button onclick="cidPrevPreview()" style="background:none;border:none;color:white;cursor:pointer;"><i class="bi bi-chevron-left"></i></button>
-              <span id="cid_preview_idx" style="font-size:12px;">1 / 1</span>
+              <span id="cid_preview_idx" style="font-size:11px;font-family:'Space Mono',monospace;">1 / 1</span>
               <button onclick="cidNextPreview()" style="background:none;border:none;color:white;cursor:pointer;"><i class="bi bi-chevron-right"></i></button>
             </div>
           </div>
           
-          <!-- Instructions -->
-          <div style="width: 250px; display:flex; flex-direction:column; gap: 10px;">
-            <div style="font-size:12px;color:var(--muted);background:rgba(255,255,255,.05);padding:10px;border-radius:6px;line-height:1.5;">
-              <strong>Instructions:</strong><br/>
-              1. Upload templates.<br/>
-              2. <strong>Drag</strong> the text fields and photo box on the preview to position them.<br/>
-              3. Use the arrow keys below the preview to verify other students.<br/>
-              4. Click Generate PDF.
-            </div>
-            <button id="cid_generate_btn" class="btn-primary" onclick="cidGeneratePDF()" style="padding:12px;font-size:14px;border-radius:8px;margin-top:auto;" disabled>
-              <i class="bi bi-printer"></i> Generate PDF
-            </button>
+          <!-- Column 2: Drag & Drop Variables + Styling -->
+          <div style="display:flex; flex-direction:column; gap: 15px; background:rgba(255,255,255,0.02); padding:15px; border-radius:8px; border:1px solid var(--border); height: 100%; max-height: 520px; overflow-y: auto;">
+             <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase;">Elements & Styling</div>
+             <p style="font-size:10px; color:var(--muted);">Drag elements from here onto the card. Click an element to style it.</p>
+             
+             <div id="cid_element_list" style="display:flex; flex-direction:column; gap: 8px;">
+                <!-- Element items like Name, ID, Photo will be here -->
+             </div>
+
+             <div id="cid_style_panel" style="display:none; padding-top:10px; border-top: 1px solid var(--border);">
+                <div style="font-size:10px; font-weight:700; margin-bottom:10px;" id="cid_style_title">Styling: [Name]</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                   <div class="upd-field">
+                      <label class="upd-label">Font</label>
+                      <select class="upd-input" id="cid_st_font" style="font-size:11px; padding:4px;" onchange="cidApplyStyle()">
+                         <option value="Arial">Arial</option>
+                         <option value="'Space Mono',monospace">Space Mono</option>
+                         <option value="'Inter',sans-serif">Inter</option>
+                         <option value="Times New Roman">Serif</option>
+                         <option value="cursive">Cursive</option>
+                      </select>
+                   </div>
+                   <div class="upd-field">
+                      <label class="upd-label">Size</label>
+                      <input type="number" class="upd-input" id="cid_st_size" style="font-size:11px; padding:4px;" oninput="cidApplyStyle()">
+                   </div>
+                   <div class="upd-field">
+                      <label class="upd-label">Color</label>
+                      <input type="color" id="cid_st_color" style="width:100%; height:25px; border:none; padding:0; background:none; cursor:pointer;" oninput="cidApplyStyle()">
+                   </div>
+                   <div class="upd-field">
+                      <label class="upd-label">Weight</label>
+                      <select class="upd-input" id="cid_st_weight" style="font-size:11px; padding:4px;" onchange="cidApplyStyle()">
+                         <option value="400">Normal</option>
+                         <option value="700">Bold</option>
+                         <option value="800">Extra Bold</option>
+                      </select>
+                   </div>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:5px;">
+                   <button class="btn-vr" style="flex:1; font-size:10px;" onclick="cidMoveTo('front')">Move to Front</button>
+                   <button class="btn-vr" style="flex:1; font-size:10px;" onclick="cidMoveTo('back')">Move to Back</button>
+                </div>
+             </div>
           </div>
+
+          <!-- Column 3: Custom Variables & Actions -->
+          <div style="display:flex; flex-direction:column; gap: 15px;">
+             <div style="background:rgba(255,255,255,0.02); padding:15px; border-radius:8px; border:1px solid var(--border);">
+                <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; margin-bottom:12px;">Add Custom Variable</div>
+                <div class="upd-field">
+                   <label class="upd-label">Variable Name (Label)</label>
+                   <input type="text" id="cid_custom_name" class="upd-input" placeholder="e.g. Card Issue Date">
+                </div>
+                <div class="upd-field" style="margin-top:8px;">
+                   <label class="upd-label">Value / Static Text</label>
+                   <textarea id="cid_custom_val" class="upd-input" placeholder="Enter text to display..." style="height:60px; resize:none;"></textarea>
+                </div>
+                <button class="btn-primary" style="width:100%; margin-top:10px; font-size:12px; padding:8px;" onclick="cidAddCustomVariable()">
+                   <i class="bi bi-plus-circle"></i> Add to Center Part
+                </button>
+             </div>
+
+             <div style="margin-top:auto; background:rgba(45,106,39,0.05); padding:15px; border-radius:8px; border:1px solid rgba(45,106,39,0.2);">
+                <div style="font-size:11px; font-weight:600; margin-bottom:10px; color:var(--text);">Finalize & Export</div>
+                <button id="cid_generate_btn" class="btn-primary" onclick="cidGeneratePDF()" style="width:100%; padding:14px; font-size:15px; border-radius:10px; font-weight:700;" disabled>
+                   <i class="bi bi-printer-fill"></i> Generate PDF
+                </button>
+                <p style="font-size:9px; color:var(--muted); text-align:center; margin-top:8px;">The PDF will be CR80 standard sized per page.</p>
+             </div>
+          </div>
+
         </div>
       </div>
+    </div>
+  </div>
+</div>
     </div>
   </div>
 </div>

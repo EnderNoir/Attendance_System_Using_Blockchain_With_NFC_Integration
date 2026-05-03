@@ -173,6 +173,10 @@ function cidInjectElements() {
       div.style.fontFamily = el.font;
       div.style.color = el.color;
       div.style.fontWeight = el.weight;
+      div.style.lineHeight = '1.2';
+      div.style.padding = '0';
+      div.style.margin = '0';
+      
       if (el.text_w) {
         div.style.width = el.text_w + 'px';
         div.style.whiteSpace = 'normal';
@@ -431,8 +435,12 @@ let cidDraggingId = null, cidDragOff = {x:0,y:0};
 document.addEventListener('mousedown', e => {
   const el = e.target.closest('.cid-draggable');
   if (!el) return;
-  cidDraggingId = el.id.replace('view_el_', '');
+  
   const r = el.getBoundingClientRect();
+  const isResize = el.style.resize === 'horizontal' && (e.clientX > r.right - 18) && (e.clientY > r.bottom - 18);
+  if (isResize) return; // allow native resize to take over without dragging
+  
+  cidDraggingId = el.id.replace('view_el_', '');
   const actualScale = cidIsZoomed ? cidZoomScale : 1.0;
   cidDragOff.x = (e.clientX - r.left) / actualScale;
   cidDragOff.y = (e.clientY - r.top) / actualScale;
@@ -475,6 +483,10 @@ async function cidGeneratePDF() {
   const wasBackVisible = backContainer.style.display !== 'none';
   backContainer.style.display = 'block';
   
+  const loadingScrn = document.getElementById('cid_pdf_loading');
+  const loadingText = document.getElementById('cid_pdf_loading_text');
+  if (loadingScrn) loadingScrn.style.display = 'flex';
+  
   // FIX: html2canvas text scattering bug caused by transform scale
   const previewCont = document.getElementById('cid_preview_container');
   const oldTransform = previewCont.style.transform;
@@ -488,7 +500,9 @@ async function cidGeneratePDF() {
   await new Promise(r => setTimeout(r, 200));
 
   for (let i = 0; i < total; i++) {
-    progress.textContent = Math.round(((i+1)/total)*100) + '%';
+    const pct = Math.round(((i+1)/total)*100) + '%';
+    progress.textContent = pct;
+    if (loadingText) loadingText.textContent = `Processing student ${i+1} of ${total} (${pct})`;
     
     cidPreviewIdx = i;
     cidInjectElements();
@@ -514,4 +528,5 @@ async function cidGeneratePDF() {
 
   doc.save('DAVS_IDs_' + Date.now() + '.pdf');
   btn.disabled = false; status.style.display = 'none';
+  if (loadingScrn) loadingScrn.style.display = 'none';
 }

@@ -136,22 +136,70 @@ function cidToggleVisible(id, e) {
   const el = cidElements.find(d => d.id === id);
   if (el) el.visible = !(el.visible !== false);
   cidRenderElementList();
-}
-
-// ── Element List Rendering ──
-function cidRenderElementList() {
-  const list = document.getElementById('cid_element_list');
-  list.innerHTML = cidElements.map(el => {
-    const isVis = el.visible !== false;
-    return `<div class="mu-action-label" style="padding:5px 8px;font-size:11px;${cidActiveElId===el.id?'border-color:var(--accent);background:rgba(45,106,39,.06);':''}" onclick="cidSelectElement('${el.id}')">
-       <i class="bi bi-${el.type==='photo'?'image':el.type==='custom_img'?'image':'fonts'}" style="font-size:13px;opacity:${isVis?1:0.4}"></i>
-       <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:${isVis?1:0.4}">${el.label}</span>
-       <span style="font-size:8px;opacity:.5;text-transform:uppercase;">${el.side}</span>
-       <button onclick="cidToggleVisible('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 5px;opacity:${isVis?1:0.4}"><i class="bi bi-eye${isVis?'':'-slash'}"></i></button>
-    </div>`;
-  }).join('');
   cidInjectElements();
 }
+
+function cidGetVal(id, s) {
+  const el = cidElements.find(e => e.id === id);
+  if (el && el.override_val) return el.override_val;
+  if (id === 'name') return s.name || '[Name]';
+  if (id === 'course') return s.course || s.program || '[Program]';
+  if (id === 'id_num') return s.student_id || '[ID]';
+  if (id === 'school_year') return s.school_year || '[School Year]';
+  if (id === 'contact_number') return s.contact_number || s.guardian_contact || '[Contact]';
+  if (id === 'email') return s.email || '[Email]';
+  if (id === 'year_level') return s.year_level || '[Year]';
+  if (id === 'semester') return s.semester || '[Semester]';
+  const cv = cidCustomVariables.find(v => v.id === id);
+  return cv ? cv.val : '';
+}
+
+function cidRenderElementList() {
+  const list = document.getElementById('cid_element_list');
+  list.innerHTML = '';
+  cidElements.forEach(el => {
+    const isVis = el.visible !== false;
+    const div = document.createElement('div');
+    div.className = 'cid-el-item';
+    if (cidActiveElId === el.id) div.classList.add('active');
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;flex:1;" onclick="cidSelectElement('${el.id}')">
+        <i class="bi bi-${el.type==='photo'||el.type==='custom_img'?'image':'fonts'}" style="opacity:0.5;font-size:12px;"></i>
+        <span style="font-size:12px;font-weight:600;flex:1;opacity:${isVis?1:0.4}">${el.label}</span>
+      </div>
+      <div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;width:30px;text-align:right;">${el.side}</div>
+      <div style="display:flex;gap:4px;margin-left:8px;">
+        ${el.type==='text' ? `<button onclick="cidEditLabel('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;" title="Edit Text"><i class="bi bi-pencil"></i></button>` : ''}
+        <button onclick="cidToggleVisible('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;"><i class="bi bi-eye${isVis?'':'-slash'}"></i></button>
+        <button onclick="cidDeleteElement('${el.id}', event)" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0 3px;" title="Delete"><i class="bi bi-trash"></i></button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+window.cidEditLabel = function(id, e) {
+  e.stopPropagation();
+  const el = cidElements.find(d => d.id === id);
+  if(!el) return;
+  const newVal = prompt('Enter static text override (leave blank to use database value):', el.override_val || el.label);
+  if (newVal !== null) {
+    el.override_val = newVal.trim() !== '' ? newVal : null;
+    cidRenderElementList();
+    cidInjectElements();
+  }
+};
+
+window.cidDeleteElement = function(id, e) {
+  e.stopPropagation();
+  if(confirm('Delete this variable from the ID?')) {
+    cidElements = cidElements.filter(d => d.id !== id);
+    if (cidActiveElId === id) cidActiveElId = null;
+    cidRenderElementList();
+    cidInjectElements();
+    cidApplyStyle();
+  }
+};
 
 // ── Inject draggable elements into preview cards ──
 function cidInjectElements() {
@@ -167,10 +215,11 @@ function cidInjectElements() {
     div.id = 'view_el_' + el.id;
     div.style.left = el.x + 'px';
     div.style.top = el.y + 'px';
+    div.style.position = 'absolute';
 
     if (el.type === 'text') {
       div.style.fontSize = el.size + 'px';
-      div.style.fontFamily = el.font;
+      div.style.fontFamily = '"' + el.font + '"';
       div.style.color = el.color;
       div.style.fontWeight = el.weight;
       div.style.lineHeight = '1.2';
@@ -189,8 +238,8 @@ function cidInjectElements() {
       else if (el.align === 'right') div.style.transform = 'translateX(-100%)';
       
       div.style.boxSizing = 'border-box';
+      div.style.border = (cidActiveElId === el.id) ? '1px solid var(--accent)' : '1px solid transparent';
       if (cidActiveElId === el.id) {
-        div.style.border = '1px solid var(--accent)';
         div.style.resize = 'horizontal';
         div.style.overflow = 'hidden';
         const ro = new ResizeObserver(entries => {
@@ -203,19 +252,26 @@ function cidInjectElements() {
           }
         });
         ro.observe(div);
-      } else {
-        div.style.border = '1px solid transparent';
       }
       
       div.textContent = cidGetVal(el.id, s);
     } else if (el.type === 'custom_img') {
       div.style.width = (el.w||60) + 'px'; div.style.height = (el.h||60) + 'px';
       div.style.borderRadius = '4px'; div.style.overflow = 'hidden';
+      div.style.border = (cidActiveElId === el.id) ? '1px solid var(--accent)' : 'none';
       if (el.imgData) div.innerHTML = `<img src="${el.imgData}" style="width:100%;height:100%;object-fit:contain;">`;
+      if(cidActiveElId === el.id) {
+        div.style.resize = 'both';
+        const ro = new ResizeObserver(entries => {
+            const entry = entries[0];
+            el.w = entry.contentRect.width; el.h = entry.contentRect.height;
+        });
+        ro.observe(div);
+      }
     } else { // photo
       div.style.width = (el.w||80) + 'px'; div.style.height = (el.h||80) + 'px';
       div.style.borderRadius = el.shape === 'circle' ? '50%' : '6px'; div.style.background = 'rgba(0,0,0,.08)';
-      div.style.border = '1px solid rgba(0,0,0,.15)';
+      div.style.border = (cidActiveElId === el.id) ? '2px solid var(--accent)' : '1px solid rgba(0,0,0,.15)';
       const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
       if (pf) div.innerHTML = `<img src="/static/uploads/${pf}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">`;
       else { div.style.display='flex'; div.style.alignItems='center'; div.style.justifyContent='center'; div.innerHTML='<i class="bi bi-person" style="font-size:20px;opacity:.3;"></i>'; }
@@ -261,6 +317,8 @@ function cidSelectElement(id) {
       fontSel.insertBefore(opt, fontSel.lastElementChild);
     }
     fontSel.value = el.font;
+    const isCustom = fontSel.selectedIndex > 13 && fontSel.value !== '_custom';
+    document.getElementById('cid_st_font_remove').style.display = isCustom ? 'block' : 'none';
     if (el.font === '_custom') document.getElementById('cid_st_font_custom_group').style.display = 'flex';
     else document.getElementById('cid_st_font_custom_group').style.display = 'none';
     
@@ -281,7 +339,10 @@ function cidApplyStyle() {
   if (!cidActiveElId) return;
   const el = cidElements.find(e => e.id === cidActiveElId);
   if (el.type === 'text') {
-    let font = document.getElementById('cid_st_font').value;
+    const fontSel = document.getElementById('cid_st_font');
+    let font = fontSel.value;
+    const isCustom = fontSel.selectedIndex > 13 && font !== '_custom';
+    document.getElementById('cid_st_font_remove').style.display = isCustom ? 'block' : 'none';
     const customGrp = document.getElementById('cid_st_font_custom_group');
     if (font === '_custom') {
       customGrp.style.display = 'flex';
@@ -326,6 +387,16 @@ function cidAddCustomFont() {
   sel.value = exists.value;
   cidApplyStyle();
 }
+
+window.cidRemoveCustomFont = function() {
+  const sel = document.getElementById('cid_st_font');
+  const val = sel.value;
+  if (val !== '_custom' && sel.selectedIndex > 13) {
+    sel.options[sel.selectedIndex].remove();
+    sel.value = 'Inter';
+    cidApplyStyle();
+  }
+};
 
 function cidLoadGoogleFont(fontName) {
   if (!fontName || fontName === '_custom') return;
@@ -447,6 +518,22 @@ document.addEventListener('mousedown', e => {
   cidSelectElement(cidDraggingId);
 });
 
+function drawSnapLine(dir, pos) {
+  const line = document.createElement('div');
+  line.className = 'cid-snap-line';
+  line.style.position = 'absolute';
+  line.style.background = '#0d6efd';
+  line.style.zIndex = '9999';
+  if (dir === 'v') {
+    line.style.left = pos + 'px';
+    line.style.top = '0'; line.style.bottom = '0'; line.style.width = '1px';
+  } else {
+    line.style.top = pos + 'px';
+    line.style.left = '0'; line.style.right = '0'; line.style.height = '1px';
+  }
+  document.getElementById('cid_preview_container').appendChild(line);
+}
+
 document.addEventListener('mousemove', e => {
   if (!cidDraggingId) return;
   const el = document.getElementById('view_el_' + cidDraggingId);
@@ -457,12 +544,31 @@ document.addEventListener('mousemove', e => {
   let x = (e.clientX - pR.left) / actualScale - cidDragOff.x;
   let y = (e.clientY - pR.top) / actualScale - cidDragOff.y;
   const data = cidElements.find(d => d.id === cidDraggingId);
+  
+  document.querySelectorAll('.cid-snap-line').forEach(e => e.remove());
+  let snappedX = false, snappedY = false;
+  const centerX = pR.width / actualScale / 2;
+  const centerY = pR.height / actualScale / 2;
+  const snapDist = 6;
+  
+  if (Math.abs(x - centerX) < snapDist) { x = centerX; snappedX = true; drawSnapLine('v', centerX * actualScale); }
+  if (Math.abs(y - centerY) < snapDist) { y = centerY; snappedY = true; drawSnapLine('h', centerY * actualScale); }
+  
+  cidElements.forEach(other => {
+    if (other.id === cidDraggingId || other.side !== data.side) return;
+    if (!snappedX && Math.abs(x - other.x) < snapDist) { x = other.x; snappedX = true; drawSnapLine('v', x * actualScale); }
+    if (!snappedY && Math.abs(y - other.y) < snapDist) { y = other.y; snappedY = true; drawSnapLine('h', y * actualScale); }
+  });
+
   if (data) { data.x = x; data.y = y; }
   el.style.left = x + 'px';
   el.style.top = y + 'px';
 });
 
-document.addEventListener('mouseup', () => { cidDraggingId = null; });
+document.addEventListener('mouseup', () => { 
+  cidDraggingId = null; 
+  document.querySelectorAll('.cid-snap-line').forEach(e => e.remove());
+});
 
 // ── PDF Generation (via html2canvas for 1:1 exact matching) ──
 async function cidGeneratePDF() {
@@ -480,11 +586,14 @@ async function cidGeneratePDF() {
 
   const frontContainer = document.getElementById('cid_card_front');
   const backContainer = document.getElementById('cid_card_back');
+  const wasFrontVisible = frontContainer.style.display !== 'none';
   const wasBackVisible = backContainer.style.display !== 'none';
+  frontContainer.style.display = 'block';
   backContainer.style.display = 'block';
   
   const loadingScrn = document.getElementById('cid_pdf_loading');
   const loadingText = document.getElementById('cid_pdf_loading_text');
+  const loadingBar = document.getElementById('cid_pdf_progress_bar');
   if (loadingScrn) loadingScrn.style.display = 'flex';
   
   // FIX: html2canvas text scattering bug caused by transform scale
@@ -496,13 +605,15 @@ async function cidGeneratePDF() {
   const oldActive = cidActiveElId;
   cidActiveElId = null;
 
-  // Wait a moment for fonts to fully settle
+  // Await ALL fonts injected via <link> to fully download and parse before capturing!
+  await document.fonts.ready;
   await new Promise(r => setTimeout(r, 200));
 
   for (let i = 0; i < total; i++) {
-    const pct = Math.round(((i+1)/total)*100) + '%';
-    progress.textContent = pct;
-    if (loadingText) loadingText.textContent = `Processing student ${i+1} of ${total} (${pct})`;
+    const pctStr = Math.round(((i+1)/total)*100) + '%';
+    progress.textContent = pctStr;
+    if (loadingText) loadingText.textContent = `Processing student ${i+1} of ${total} (${pctStr})`;
+    if (loadingBar) loadingBar.style.width = pctStr;
     
     cidPreviewIdx = i;
     cidInjectElements();
@@ -524,6 +635,7 @@ async function cidGeneratePDF() {
   cidActiveElId = oldActive;
   cidPreviewIdx = 0;
   cidInjectElements();
+  if (!wasFrontVisible) frontContainer.style.display = 'none';
   if (!wasBackVisible) backContainer.style.display = 'none';
 
   doc.save('DAVS_IDs_' + Date.now() + '.pdf');

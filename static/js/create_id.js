@@ -9,13 +9,15 @@ let cidCustomImgData = null;
 let cidMode = 'batch';
 
 let cidElements = [
-  { id:'photo', label:'Student Photo', type:'photo', side:'front', x:20, y:20, w:80, h:80, shape:'square' },
-  { id:'name', label:'Full Name', type:'text', side:'front', x:20, y:110, size:16, font:'Inter', color:'#000000', weight:'700' },
-  { id:'course', label:'Program', type:'text', side:'front', x:20, y:132, size:12, font:'Inter', color:'#333333', weight:'500' },
-  { id:'id_num', label:'Student ID', type:'text', side:'front', x:20, y:150, size:11, font:'Space Mono', color:'#555555', weight:'400' },
-  { id:'program_full', label:'Full Program (Back)', type:'text', side:'back', x:20, y:30, size:11, font:'Inter', color:'#000000', weight:'400' },
-  { id:'year_level', label:'Year Level (Back)', type:'text', side:'back', x:20, y:48, size:11, font:'Inter', color:'#000000', weight:'400' },
-  { id:'semester', label:'Semester (Back)', type:'text', side:'back', x:20, y:66, size:11, font:'Inter', color:'#000000', weight:'400' }
+  { id:'photo', label:'Student Photo', type:'photo', side:'front', x:20, y:20, w:80, h:80, shape:'square', visible:true },
+  { id:'name', label:'Full Name', type:'text', side:'front', x:161.75, y:110, size:16, font:'Inter', color:'#000000', weight:'700', align:'center', visible:true },
+  { id:'course', label:'Program', type:'text', side:'front', x:161.75, y:132, size:12, font:'Inter', color:'#333333', weight:'500', align:'center', visible:true },
+  { id:'id_num', label:'Student ID', type:'text', side:'front', x:161.75, y:150, size:11, font:'Space Mono', color:'#555555', weight:'400', align:'center', visible:true },
+  { id:'school_year', label:'School Year (Back)', type:'text', side:'back', x:20, y:30, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
+  { id:'contact_number', label:'Contact Number (Back)', type:'text', side:'back', x:20, y:45, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
+  { id:'email', label:'Email Address (Back)', type:'text', side:'back', x:20, y:60, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
+  { id:'year_level', label:'Year Level (Back)', type:'text', side:'back', x:20, y:75, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true },
+  { id:'semester', label:'Semester (Back)', type:'text', side:'back', x:20, y:90, size:10, font:'Inter', color:'#000000', weight:'600', align:'left', visible:true }
 ];
 let cidActiveElId = null;
 
@@ -129,16 +131,25 @@ function cidCheckReady() {
   }
 }
 
+function cidToggleVisible(id, e) {
+  e.stopPropagation();
+  const el = cidElements.find(d => d.id === id);
+  if (el) el.visible = !(el.visible !== false);
+  cidRenderElementList();
+}
+
 // ── Element List Rendering ──
 function cidRenderElementList() {
   const list = document.getElementById('cid_element_list');
-  list.innerHTML = cidElements.map(el =>
-    `<div class="mu-action-label" style="padding:5px 8px;font-size:11px;${cidActiveElId===el.id?'border-color:var(--accent);background:rgba(45,106,39,.06);':''}" onclick="cidSelectElement('${el.id}')">
-       <i class="bi bi-${el.type==='photo'?'image':el.type==='custom_img'?'image':'fonts'}" style="font-size:13px;"></i>
-       <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${el.label}</span>
+  list.innerHTML = cidElements.map(el => {
+    const isVis = el.visible !== false;
+    return `<div class="mu-action-label" style="padding:5px 8px;font-size:11px;${cidActiveElId===el.id?'border-color:var(--accent);background:rgba(45,106,39,.06);':''}" onclick="cidSelectElement('${el.id}')">
+       <i class="bi bi-${el.type==='photo'?'image':el.type==='custom_img'?'image':'fonts'}" style="font-size:13px;opacity:${isVis?1:0.4}"></i>
+       <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:${isVis?1:0.4}">${el.label}</span>
        <span style="font-size:8px;opacity:.5;text-transform:uppercase;">${el.side}</span>
-    </div>`
-  ).join('');
+       <button onclick="cidToggleVisible('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 5px;opacity:${isVis?1:0.4}"><i class="bi bi-eye${isVis?'':'-slash'}"></i></button>
+    </div>`;
+  }).join('');
   cidInjectElements();
 }
 
@@ -150,6 +161,7 @@ function cidInjectElements() {
   const s = cidSelectedStudents[cidPreviewIdx] || {};
 
   cidElements.forEach(el => {
+    if (el.visible === false) return;
     const div = document.createElement('div');
     div.className = 'cid-draggable' + (el.type === 'text' ? ' cid-text' : '');
     div.id = 'view_el_' + el.id;
@@ -161,6 +173,10 @@ function cidInjectElements() {
       div.style.fontFamily = el.font;
       div.style.color = el.color;
       div.style.fontWeight = el.weight;
+      div.style.whiteSpace = 'nowrap';
+      div.style.textAlign = el.align || 'left';
+      if (el.align === 'center') div.style.transform = 'translateX(-50%)';
+      else if (el.align === 'right') div.style.transform = 'translateX(-100%)';
       div.textContent = cidGetVal(el.id, s);
     } else if (el.type === 'custom_img') {
       div.style.width = (el.w||60) + 'px'; div.style.height = (el.h||60) + 'px';
@@ -183,7 +199,9 @@ function cidGetVal(id, s) {
   if (id === 'name') return s.name || '[Name]';
   if (id === 'course') return s.course || s.program || '[Program]';
   if (id === 'id_num') return s.student_id || '[ID]';
-  if (id === 'program_full') return s.course || s.program || '[Program]';
+  if (id === 'school_year') return s.school_year || '[School Year]';
+  if (id === 'contact_number') return s.contact_number || s.guardian_contact || '[Contact]';
+  if (id === 'email') return s.email || '[Email]';
   if (id === 'year_level') return s.year_level || '[Year]';
   if (id === 'semester') return s.semester || '[Semester]';
   const cv = cidCustomVariables.find(v => v.id === id);
@@ -209,7 +227,8 @@ function cidSelectElement(id) {
     const fontSel = document.getElementById('cid_st_font');
     if (!Array.from(fontSel.options).some(o => o.value === el.font)) fontSel.value = '_custom';
     document.getElementById('cid_st_size').value = el.size;
-    document.getElementById('cid_st_weight').value = el.weight;
+    document.getElementById('cid_st_weight').value = el.weight || '400';
+    document.getElementById('cid_st_align').value = el.align || 'left';
     document.getElementById('cid_st_color_picker').value = el.color.startsWith('#') ? el.color : '#000000';
     document.getElementById('cid_st_color_text').value = el.color;
   } else {
@@ -233,6 +252,7 @@ function cidApplyStyle() {
     el.font = font;
     el.size = parseInt(document.getElementById('cid_st_size').value) || 12;
     el.weight = document.getElementById('cid_st_weight').value;
+    el.align = document.getElementById('cid_st_align').value;
     el.color = document.getElementById('cid_st_color_text').value || '#000000';
     cidLoadGoogleFont(el.font);
   } else {
@@ -260,7 +280,7 @@ function cidLoadGoogleFont(fontName) {
   if (document.getElementById(id)) return;
   const link = document.createElement('link');
   link.id = id; link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(fontName) + ':wght@400;600;700;800&display=swap';
+  link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(fontName) + '&display=swap';
   document.head.appendChild(link);
 }
 
@@ -343,6 +363,7 @@ function cidZoom() {
     zoomGrid.appendChild(controls);
     cidZoomScale = 2.2;
     document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
+    controls.style.maxHeight = 'none';
     btn.style.display = 'none';
   } else {
     modal.style.display = 'none';
@@ -350,6 +371,7 @@ function cidZoom() {
     origGrid.appendChild(controls);
     cidZoomScale = 1.0;
     document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
+    controls.style.maxHeight = '480px';
     btn.style.display = 'block';
   }
 }
@@ -421,6 +443,7 @@ async function cidGeneratePDF() {
 }
 
 async function cidDrawEl(doc, el, s, ratio) {
+  if (el.visible === false) return;
   const x = el.x * ratio, y = el.y * ratio;
   if (el.type === 'photo') {
     const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
@@ -429,9 +452,9 @@ async function cidDrawEl(doc, el, s, ratio) {
     if (el.imgData) { try { doc.addImage(el.imgData,'PNG',x,y,(el.w||60)*ratio,(el.h||60)*ratio); } catch(e){} }
   } else {
     doc.setTextColor(el.color || '#000');
-    doc.setFontSize((el.size||12) * 2.5);
+    doc.setFontSize((el.size||12) * 0.75);
     doc.setFont('helvetica', (el.weight||400) >= 700 ? 'bold' : 'normal');
-    doc.text(cidGetVal(el.id, s), x, y + (el.size||12)*ratio*0.8);
+    doc.text(cidGetVal(el.id, s), x, y + (el.size||12)*ratio*0.8, { align: el.align || 'left' });
   }
 }
 

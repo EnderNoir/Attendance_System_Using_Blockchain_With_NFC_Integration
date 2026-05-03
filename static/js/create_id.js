@@ -173,7 +173,13 @@ function cidInjectElements() {
       div.style.fontFamily = el.font;
       div.style.color = el.color;
       div.style.fontWeight = el.weight;
-      div.style.whiteSpace = 'nowrap';
+      if (el.text_w) {
+        div.style.width = el.text_w + 'px';
+        div.style.whiteSpace = 'normal';
+        div.style.wordBreak = 'break-word';
+      } else {
+        div.style.whiteSpace = 'nowrap';
+      }
       div.style.textAlign = el.align || 'left';
       if (el.align === 'center') div.style.transform = 'translateX(-50%)';
       else if (el.align === 'right') div.style.transform = 'translateX(-100%)';
@@ -227,6 +233,7 @@ function cidSelectElement(id) {
     const fontSel = document.getElementById('cid_st_font');
     if (!Array.from(fontSel.options).some(o => o.value === el.font)) fontSel.value = '_custom';
     document.getElementById('cid_st_size').value = el.size;
+    document.getElementById('cid_st_text_width').value = el.text_w || '';
     document.getElementById('cid_st_weight').value = el.weight || '400';
     document.getElementById('cid_st_align').value = el.align || 'left';
     document.getElementById('cid_st_color_picker').value = el.color.startsWith('#') ? el.color : '#000000';
@@ -251,6 +258,7 @@ function cidApplyStyle() {
     } else { customInput.style.display = 'none'; }
     el.font = font;
     el.size = parseInt(document.getElementById('cid_st_size').value) || 12;
+    el.text_w = parseInt(document.getElementById('cid_st_text_width').value) || null;
     el.weight = document.getElementById('cid_st_weight').value;
     el.align = document.getElementById('cid_st_align').value;
     el.color = document.getElementById('cid_st_color_text').value || '#000000';
@@ -280,7 +288,7 @@ function cidLoadGoogleFont(fontName) {
   if (document.getElementById(id)) return;
   const link = document.createElement('link');
   link.id = id; link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(fontName) + '&display=swap';
+  link.href = 'https://fonts.googleapis.com/css2?family=' + fontName.replace(/\s+/g, '+') + '&display=swap';
   document.head.appendChild(link);
 }
 
@@ -407,7 +415,7 @@ document.addEventListener('mousemove', e => {
 
 document.addEventListener('mouseup', () => { cidDraggingId = null; });
 
-// ── PDF Generation ──
+// ── PDF Generation (via html2canvas for 1:1 exact matching) ──
 async function cidGeneratePDF() {
   const { jsPDF } = window.jspdf;
   const ori = document.querySelector('input[name="cid_orientation"]:checked').value;
@@ -419,63 +427,38 @@ async function cidGeneratePDF() {
 
   const pw = ori === 'landscape' ? 85.6 : 54;
   const ph = ori === 'landscape' ? 54 : 85.6;
-  const cardW = ori === 'landscape' ? 323.5 : 204;
-  const ratio = pw / cardW;
   const total = cidSelectedStudents.length;
+
+  const frontContainer = document.getElementById('cid_card_front');
+  const backContainer = document.getElementById('cid_card_back');
+  const wasBackVisible = backContainer.style.display !== 'none';
+  backContainer.style.display = 'block';
+
+  // Wait a moment for fonts to fully settle
+  await new Promise(r => setTimeout(r, 200));
 
   for (let i = 0; i < total; i++) {
     progress.textContent = Math.round(((i+1)/total)*100) + '%';
-    const s = cidSelectedStudents[i];
+    
+    cidPreviewIdx = i;
+    cidInjectElements();
+    
+    // Wait for student photos to load into DOM
+    await new Promise(r => setTimeout(r, 150));
 
     if (i > 0) doc.addPage([85.6, 54], ori);
-    doc.addImage(cidTemplates.front, 'JPEG', 0, 0, pw, ph);
-    for (const el of cidElements.filter(e => e.side === 'front'))
-      await cidDrawEl(doc, el, s, ratio);
+    const canvasFront = await html2canvas(frontContainer, { scale: 3, useCORS: true, backgroundColor: null, logging: false });
+    doc.addImage(canvasFront.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
 
     doc.addPage([85.6, 54], ori);
-    doc.addImage(cidTemplates.back, 'JPEG', 0, 0, pw, ph);
-    for (const el of cidElements.filter(e => e.side === 'back'))
-      await cidDrawEl(doc, el, s, ratio);
+    const canvasBack = await html2canvas(backContainer, { scale: 3, useCORS: true, backgroundColor: null, logging: false });
+    doc.addImage(canvasBack.toDataURL('image/png'), 'PNG', 0, 0, pw, ph);
   }
+
+  cidPreviewIdx = 0;
+  cidInjectElements();
+  if (!wasBackVisible) backContainer.style.display = 'none';
 
   doc.save('DAVS_IDs_' + Date.now() + '.pdf');
   btn.disabled = false; status.style.display = 'none';
-}
-
-async function cidDrawEl(doc, el, s, ratio) {
-  if (el.visible === false) return;
-  const x = el.x * ratio, y = el.y * ratio;
-  if (el.type === 'photo') {
-    const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
-    if (pf) { try { const d = await cidB64('/static/uploads/'+pf, el.shape); doc.addImage(d,el.shape==='circle'?'PNG':'JPEG',x,y,el.w*ratio,el.h*ratio); } catch(e){} }
-  } else if (el.type === 'custom_img') {
-    if (el.imgData) { try { doc.addImage(el.imgData,'PNG',x,y,(el.w||60)*ratio,(el.h||60)*ratio); } catch(e){} }
-  } else {
-    doc.setTextColor(el.color || '#000');
-    doc.setFontSize((el.size||12) * 0.75);
-    doc.setFont('helvetica', (el.weight||400) >= 700 ? 'bold' : 'normal');
-    doc.text(cidGetVal(el.id, s), x, y + (el.size||12)*ratio*0.8, { align: el.align || 'left' });
-  }
-}
-
-function cidB64(url, shape) {
-  return new Promise((res, rej) => {
-    const img = new Image(); img.crossOrigin = 'Anonymous';
-    img.onload = () => { 
-      const c = document.createElement('canvas'); 
-      const size = Math.min(img.width, img.height);
-      c.width = size; c.height = size; 
-      const ctx = c.getContext('2d');
-      if (shape === 'circle') {
-        ctx.beginPath();
-        ctx.arc(size/2, size/2, size/2, 0, Math.PI*2);
-        ctx.closePath();
-        ctx.clip();
-      }
-      const sx = (img.width - size)/2, sy = (img.height - size)/2;
-      ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size); 
-      res(c.toDataURL(shape === 'circle' ? 'image/png' : 'image/jpeg', 0.9)); 
-    };
-    img.onerror = rej; img.src = url;
-  });
 }

@@ -466,10 +466,12 @@
                       <option value="Source Code Pro">Source Code Pro</option><option value="Space Mono">Space Mono</option><option value="Arial">Arial</option>
                       <option value="Times New Roman">Times New Roman</option><option value="cursive">Cursive</option><option value="_custom">Custom...</option>
                     </select>
-                    <input type="text" id="cid_st_font_custom" class="upd-input" placeholder="e.g. Playwrite Norge" style="display:none;margin-top:4px;font-size:11px;" oninput="cidLoadGoogleFont()">
+                    <div style="display:flex;gap:4px;margin-top:4px;display:none;" id="cid_st_font_custom_group">
+                      <input type="text" id="cid_st_font_custom" class="upd-input" placeholder="e.g. Playwrite Norge" style="font-size:11px;flex:1;">
+                      <button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="cidAddCustomFont()">Add</button>
+                    </div>
                   </div>
                   <div class="upd-field"><label class="upd-label">Size (px)</label><input type="number" class="upd-input" id="cid_st_size" style="font-size:11px;" oninput="cidApplyStyle()"></div>
-                  <div class="upd-field"><label class="upd-label">Max Width (px)</label><input type="number" class="upd-input" id="cid_st_text_width" placeholder="Auto" style="font-size:11px;" oninput="cidApplyStyle()"></div>
                   <div class="upd-field"><label class="upd-label">Weight</label>
                     <select class="upd-input" id="cid_st_weight" style="font-size:11px;" onchange="cidApplyStyle()">
                       <option value="400">Normal</option><option value="600">Semi-Bold</option><option value="700">Bold</option><option value="800">Extra Bold</option>

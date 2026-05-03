@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 
 from flask import Response
@@ -75,7 +75,7 @@ def export_stats_xlsx_impl(
         role = session_obj.get('role')
         username = session_obj.get('username')
         if now is None:
-            now = datetime.now()
+            now = datetime.utcnow() + timedelta(hours=8)
         if not f_year_num:
             f_year_num = (
                 qp('year') if request_obj.method == 'POST' else request_obj.args.get('year', '').strip()

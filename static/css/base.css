@@ -1514,7 +1514,7 @@
       position: fixed;
       inset: 0;
       background: rgba(15, 20, 25, .45);
-      z-index: 6000;
+      z-index: 100001;
       display: none;
       align-items: center;
       justify-content: center;

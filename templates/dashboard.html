@@ -459,13 +459,16 @@
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;" id="cid_text_style_fields">
                   <div class="upd-field" style="grid-column:1/-1;">
                     <label class="upd-label">Font Family (Google Fonts)</label>
-                    <select class="upd-input" id="cid_st_font" style="font-size:11px;" onchange="cidApplyStyle()">
-                      <option value="Inter">Inter</option><option value="Roboto">Roboto</option><option value="Open Sans">Open Sans</option>
-                      <option value="Lato">Lato</option><option value="Montserrat">Montserrat</option><option value="Poppins">Poppins</option>
-                      <option value="Raleway">Raleway</option><option value="Oswald">Oswald</option><option value="Playfair Display">Playfair Display</option>
-                      <option value="Source Code Pro">Source Code Pro</option><option value="Space Mono">Space Mono</option><option value="Arial">Arial</option>
-                      <option value="Times New Roman">Times New Roman</option><option value="cursive">Cursive</option><option value="_custom">Custom...</option>
-                    </select>
+                    <div style="display:flex;gap:4px;">
+                      <select class="upd-input" id="cid_st_font" style="font-size:11px;flex:1;" onchange="cidApplyStyle()">
+                        <option value="Inter">Inter</option><option value="Roboto">Roboto</option><option value="Open Sans">Open Sans</option>
+                        <option value="Lato">Lato</option><option value="Montserrat">Montserrat</option><option value="Poppins">Poppins</option>
+                        <option value="Raleway">Raleway</option><option value="Oswald">Oswald</option><option value="Playfair Display">Playfair Display</option>
+                        <option value="Source Code Pro">Source Code Pro</option><option value="Space Mono">Space Mono</option><option value="Arial">Arial</option>
+                        <option value="Times New Roman">Times New Roman</option><option value="cursive">Cursive</option><option value="_custom">Custom...</option>
+                      </select>
+                      <button class="btn-vr" id="cid_st_font_remove" onclick="cidRemoveCustomFont()" style="display:none;padding:4px 8px;" title="Remove Font"><i class="bi bi-trash"></i></button>
+                    </div>
                     <div style="display:flex;gap:4px;margin-top:4px;display:none;" id="cid_st_font_custom_group">
                       <input type="text" id="cid_st_font_custom" class="upd-input" placeholder="e.g. Playwrite Norge" style="font-size:11px;flex:1;">
                       <button class="btn-primary" style="padding:4px 8px;font-size:10px;" onclick="cidAddCustomFont()">Add</button>
@@ -818,7 +821,10 @@
 <div id="cid_pdf_loading" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(15,16,17,0.95); z-index:999999; justify-content:center; align-items:center; flex-direction:column;">
   <div style="width:50px; height:50px; border:4px solid rgba(255,255,255,0.1); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; margin-bottom:20px;"></div>
   <h3 style="color:#fff; font-weight:700; margin:0; font-size:18px;">Generating PDF</h3>
-  <p style="color:var(--muted); margin-top:8px; font-size:14px;" id="cid_pdf_loading_text">Please wait...</p>
+  <p style="color:var(--muted); margin-top:8px; font-size:14px; margin-bottom: 20px;" id="cid_pdf_loading_text">Please wait...</p>
+  <div style="width:300px; height:8px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden;">
+    <div id="cid_pdf_progress_bar" style="width:0%; height:100%; background:var(--accent); transition:width 0.2s;"></div>
+  </div>
 </div>
 <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
 

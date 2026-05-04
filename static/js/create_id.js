@@ -658,10 +658,18 @@ function cidZoom() {
     modal.style.display = 'block';
     zoomGrid.appendChild(preview);
     zoomGrid.appendChild(controls);
-    cidZoomScale = 2.2;
+    
+    // Smart scaling for mobile
+    const isMobile = window.innerWidth <= 768;
+    cidZoomScale = isMobile ? 1.0 : 2.2;
+    
     document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
     controls.style.maxHeight = 'none';
     btn.style.display = 'none';
+    
+    // Ensure scrolling works
+    document.body.style.overflow = 'hidden';
+    modal.scrollTop = 0;
   } else {
     modal.style.display = 'none';
     origGrid.insertBefore(preview, origGrid.firstChild);
@@ -670,6 +678,7 @@ function cidZoom() {
     document.getElementById('cid_preview_container').style.transform = `scale(${cidZoomScale})`;
     controls.style.maxHeight = '480px';
     btn.style.display = 'block';
+    document.body.style.overflow = '';
   }
 }
 

@@ -7,6 +7,8 @@ let cidCurrentView = 'front';
 let cidCustomType = 'text';
 let cidCustomImgData = null;
 let cidMode = 'batch';
+let cidPdfCancelled = false;
+
 
 let cidElements = [
   { id:'photo', label:'Student Photo', type:'photo', side:'front', x:20, y:20, w:80, h:80, shape:'square', visible:true },
@@ -190,7 +192,7 @@ function cidShowEditModal(el) {
   return new Promise(resolve => {
     const overlay = document.createElement('div');
     overlay.className = 'app-dialog-backdrop show';
-    overlay.style.zIndex = '100002';
+    overlay.style.zIndex = '2000000';
     overlay.onclick = e => { if (e.target === overlay) close(); };
     
     const box = document.createElement('div');
@@ -254,6 +256,9 @@ window.cidEditLabel = async function(id, e) {
 
 window.cidDeleteElement = async function(id, e) {
   e.stopPropagation();
+  const dialog = document.getElementById('appDialog');
+  const oldZ = dialog ? dialog.style.zIndex : '';
+  if (dialog) dialog.style.zIndex = '2000001';
   if(await showAppConfirm('Delete this variable from the ID?')) {
     cidElements = cidElements.filter(d => d.id !== id);
     if (cidActiveElId === id) cidActiveElId = null;
@@ -261,6 +266,7 @@ window.cidDeleteElement = async function(id, e) {
     cidInjectElements();
     cidApplyStyle();
   }
+  if (dialog) dialog.style.zIndex = oldZ;
 };
 
 // ── Inject draggable elements into preview cards ──
@@ -269,6 +275,9 @@ function cidInjectElements() {
   const back = document.getElementById('cid_back_elements');
   front.innerHTML = ''; back.innerHTML = '';
   const s = cidSelectedStudents[cidPreviewIdx] || {};
+
+  const actualScale = cidIsZoomed ? cidZoomScale : 1.0;
+  const borderW = (1.5 / actualScale) + 'px';
 
   cidElements.forEach(el => {
     const div = document.createElement('div');
@@ -297,49 +306,58 @@ function cidInjectElements() {
       }
       div.style.textAlign = el.align || 'left';
       div.style.boxSizing = 'border-box';
-      div.style.border = '1.5px solid #F5C518';
-      if (cidActiveElId === el.id) div.style.boxShadow = '0 0 0 1px var(--accent)';
+      div.style.border = `${borderW} solid #F5C518`;
+      if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
       
       div.textContent = cidGetVal(el.id, s);
     } else if (el.type === 'custom_img') {
       div.style.width = (el.w||60) + 'px'; div.style.height = (el.h||60) + 'px';
       div.style.borderRadius = '4px'; div.style.overflow = 'hidden';
-      div.style.border = '1.5px solid #F5C518';
-      if (cidActiveElId === el.id) div.style.boxShadow = '0 0 0 1px var(--accent)';
+      div.style.border = `${borderW} solid #F5C518`;
+      if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
       if (el.imgData) div.innerHTML = `<img src="${el.imgData}" style="width:100%;height:100%;object-fit:contain;pointer-events:none;">`;
     } else { // photo
       div.style.width = (el.w||80) + 'px'; div.style.height = (el.h||80) + 'px';
       div.style.borderRadius = el.shape === 'circle' ? '50%' : '6px'; div.style.background = 'rgba(0,0,0,.08)';
-      div.style.border = '2px solid #F5C518';
-      if (cidActiveElId === el.id) div.style.boxShadow = '0 0 0 1px var(--accent)';
+      div.style.border = `${(2/actualScale)}px solid #F5C518`;
+      if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
       const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
       if (pf) div.innerHTML = `<img src="/static/uploads/${pf}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;">`;
       else { div.style.display='flex'; div.style.alignItems='center'; div.style.justifyContent='center'; div.innerHTML='<i class="bi bi-person" style="font-size:20px;opacity:.3;"></i>'; }
     }
     
-    if (cidActiveElId === el.id) {
+    // Always show resize handles if visible
+    if (el.visible !== false) {
       const handles = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
       handles.forEach(dir => {
         const handle = document.createElement('div');
         handle.className = 'cid-resize-handle';
         handle.style.position = 'absolute';
         handle.style.zIndex = '10';
-        const size = '6px';
-        const offset = '-3px';
+        handle.style.background = cidActiveElId === el.id ? 'var(--accent)' : '#F5C518';
+        handle.style.border = '1px solid #000';
         
-        if (dir === 'n') { handle.style.top = offset; handle.style.left = '0'; handle.style.right = '0'; handle.style.height = size; handle.style.cursor = 'ns-resize'; }
-        if (dir === 's') { handle.style.bottom = offset; handle.style.left = '0'; handle.style.right = '0'; handle.style.height = size; handle.style.cursor = 'ns-resize'; }
-        if (dir === 'e') { handle.style.right = offset; handle.style.top = '0'; handle.style.bottom = '0'; handle.style.width = size; handle.style.cursor = 'ew-resize'; }
-        if (dir === 'w') { handle.style.left = offset; handle.style.top = '0'; handle.style.bottom = '0'; handle.style.width = size; handle.style.cursor = 'ew-resize'; }
+        const sizeVal = 6 / actualScale;
+        const size = sizeVal + 'px';
+        const offset = -(sizeVal / 2) + 'px';
         
-        if (dir === 'nw') { handle.style.top = offset; handle.style.left = offset; handle.style.width = size; handle.style.height = size; handle.style.cursor = 'nwse-resize'; }
-        if (dir === 'ne') { handle.style.top = offset; handle.style.right = offset; handle.style.width = size; handle.style.height = size; handle.style.cursor = 'nesw-resize'; }
-        if (dir === 'sw') { handle.style.bottom = offset; handle.style.left = offset; handle.style.width = size; handle.style.height = size; handle.style.cursor = 'nesw-resize'; }
-        if (dir === 'se') { handle.style.bottom = offset; handle.style.right = offset; handle.style.width = size; handle.style.height = size; handle.style.cursor = 'nwse-resize'; }
+        handle.style.width = size;
+        handle.style.height = size;
+
+        if (dir === 'n') { handle.style.top = offset; handle.style.left = '50%'; handle.style.marginLeft = offset; handle.style.cursor = 'ns-resize'; }
+        if (dir === 's') { handle.style.bottom = offset; handle.style.left = '50%'; handle.style.marginLeft = offset; handle.style.cursor = 'ns-resize'; }
+        if (dir === 'e') { handle.style.right = offset; handle.style.top = '50%'; handle.style.marginTop = offset; handle.style.cursor = 'ew-resize'; }
+        if (dir === 'w') { handle.style.left = offset; handle.style.top = '50%'; handle.style.marginTop = offset; handle.style.cursor = 'ew-resize'; }
+        
+        if (dir === 'nw') { handle.style.top = offset; handle.style.left = offset; handle.style.cursor = 'nwse-resize'; }
+        if (dir === 'ne') { handle.style.top = offset; handle.style.right = offset; handle.style.cursor = 'nesw-resize'; }
+        if (dir === 'sw') { handle.style.bottom = offset; handle.style.left = offset; handle.style.cursor = 'nesw-resize'; }
+        if (dir === 'se') { handle.style.bottom = offset; handle.style.right = offset; handle.style.cursor = 'nwse-resize'; }
         
         handle.onmousedown = (e) => {
           e.stopPropagation();
           e.preventDefault();
+          cidSelectElement(el.id);
           cidResizingId = el.id;
           cidResizeDir = dir;
           cidResizeStart = { x: e.clientX, y: e.clientY, w: div.offsetWidth, h: div.offsetHeight, top: el.y, left: el.x };
@@ -352,18 +370,6 @@ function cidInjectElements() {
   });
 }
 
-function cidGetVal(id, s) {
-  if (id === 'name') return s.name || '[Name]';
-  if (id === 'course') return s.course || s.program || '[Program]';
-  if (id === 'id_num') return s.student_id || '[ID]';
-  if (id === 'school_year') return s.school_year || '[School Year]';
-  if (id === 'contact_number') return s.contact_number || s.guardian_contact || '[Contact]';
-  if (id === 'email') return s.email || '[Email]';
-  if (id === 'year_level') return s.year_level || '[Year]';
-  if (id === 'semester') return s.semester || '[Semester]';
-  const cv = cidCustomVariables.find(v => v.id === id);
-  return cv ? cv.val : '';
-}
 
 // ── Select & Style Element ──
 function cidSelectElement(id) {
@@ -483,6 +489,8 @@ function cidMoveTo(side) {
   if (!cidActiveElId) return;
   cidElements.find(e => e.id === cidActiveElId).side = side;
   cidRenderElementList();
+  cidInjectElements();
+  cidSetView(side);
 }
 
 // ── Custom Variable ──
@@ -595,7 +603,9 @@ function drawSnapLine(dir, pos) {
   line.className = 'cid-snap-line';
   line.style.position = 'absolute';
   line.style.zIndex = '9999';
-  line.style.border = '1px dashed var(--accent)';
+  const actualScale = cidIsZoomed ? cidZoomScale : 1.0;
+  const borderW = (1 / actualScale) + 'px';
+  line.style.border = `${borderW} dashed var(--accent)`;
   if (dir === 'v') {
     line.style.left = pos + 'px';
     line.style.top = '0'; line.style.bottom = '0'; line.style.width = '0px';
@@ -719,6 +729,7 @@ async function cidGeneratePDF() {
   const status = document.getElementById('cid_generate_status');
   const progress = document.getElementById('cid_progress');
   btn.disabled = true; status.style.display = 'inline';
+  cidPdfCancelled = false;
 
   const pw = ori === 'landscape' ? 85.6 : 54;
   const ph = ori === 'landscape' ? 54 : 85.6;
@@ -750,6 +761,7 @@ async function cidGeneratePDF() {
   await new Promise(r => setTimeout(r, 200));
 
   for (let i = 0; i < total; i++) {
+    if (cidPdfCancelled) break;
     const pctStr = Math.round(((i+1)/total)*100) + '%';
     progress.textContent = pctStr;
     if (loadingText) loadingText.textContent = `Processing student ${i+1} of ${total} (${pctStr})`;
@@ -778,7 +790,15 @@ async function cidGeneratePDF() {
   if (!wasFrontVisible) frontContainer.style.display = 'none';
   if (!wasBackVisible) backContainer.style.display = 'none';
 
-  doc.save('DAVS_IDs_' + Date.now() + '.pdf');
+  if (!cidPdfCancelled) {
+    doc.save('DAVS_IDs_' + Date.now() + '.pdf');
+  }
   btn.disabled = false; status.style.display = 'none';
   if (loadingScrn) loadingScrn.style.display = 'none';
+}
+
+function cidCancelPDF() {
+  cidPdfCancelled = true;
+  const loadingText = document.getElementById('cid_pdf_loading_text');
+  if (loadingText) loadingText.textContent = 'Cancelling...';
 }

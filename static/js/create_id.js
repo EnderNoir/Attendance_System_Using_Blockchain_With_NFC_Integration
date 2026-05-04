@@ -133,13 +133,24 @@ function cidCheckReady() {
   }
 }
 
-function cidToggleVisible(id, e) {
+window.cidToggleVisible = function(id, e) {
   e.stopPropagation();
   const el = cidElements.find(d => d.id === id);
-  if (el) el.visible = !(el.visible !== false);
+  el.visible = !el.visible;
+  
+  // Rescue logic: if element is visible but way out of bounds, reset it
+  if (el.visible) {
+    const isLandscape = document.querySelector('input[name="cid_orientation"]:checked')?.value === 'landscape';
+    const limitX = isLandscape ? 324 : 204;
+    const limitY = isLandscape ? 204 : 324;
+    if (el.x < -50 || el.y < -50 || el.x > limitX + 50 || el.y > limitY + 50) {
+      el.x = 20; el.y = 20;
+    }
+  }
+  
   cidRenderElementList();
   cidInjectElements();
-}
+};
 
 function cidGetVal(id, s) {
   const el = cidElements.find(e => e.id === id);
@@ -648,7 +659,8 @@ document.addEventListener('mousemove', e => {
     if (el.type === 'text') {
       el.text_w = newW;
       if (cidResizeDir.includes('n') || cidResizeDir.includes('s')) {
-        el.size = Math.max(6, Math.round(newH * 0.85));
+        // Use decimal for smoother "gradual" font scaling
+        el.size = Math.max(4, Number((newH * 0.82).toFixed(2)));
       }
     } else {
       el.w = newW;

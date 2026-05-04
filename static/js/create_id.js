@@ -699,14 +699,14 @@ document.addEventListener('mousemove', e => {
     if (Math.abs(myEdges.x.start - pt.val) < snapDist) { if (!snappedX) x = pt.val; snappedX = true; matched = true; }
     else if (Math.abs(myEdges.x.center - pt.val) < snapDist) { if (!snappedX) x = pt.val - divW/2; snappedX = true; matched = true; }
     else if (Math.abs(myEdges.x.end - pt.val) < snapDist) { if (!snappedX) x = pt.val - divW; snappedX = true; matched = true; }
-    if (matched) drawSnapLine('v', pt.line * actualScale);
+    if (matched) drawSnapLine('v', pt.line);
   }
   for (let pt of targetsY) {
     let matched = false;
     if (Math.abs(myEdges.y.start - pt.val) < snapDist) { if (!snappedY) y = pt.val; snappedY = true; matched = true; }
     else if (Math.abs(myEdges.y.center - pt.val) < snapDist) { if (!snappedY) y = pt.val - divH/2; snappedY = true; matched = true; }
     else if (Math.abs(myEdges.y.end - pt.val) < snapDist) { if (!snappedY) y = pt.val - divH; snappedY = true; matched = true; }
-    if (matched) drawSnapLine('h', pt.line * actualScale);
+    if (matched) drawSnapLine('h', pt.line);
   }
 
   if (data) { data.x = x; data.y = y; }

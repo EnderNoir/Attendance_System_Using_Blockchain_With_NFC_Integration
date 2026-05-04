@@ -232,35 +232,7 @@
 </div>
 
 {% if is_active %}
-<!-- NFC Active indicator -->
-<div class="scan-indicator">
-  <span class="scan-icon">📡</span>
-  <div>
-    <div style="font-weight:600;font-size:14px;color:var(--success);">{% if is_school_event %}NFC Reader Active —
-      Accepting Event Attendance Taps{% else %}NFC Reader Active — Accepting Student Taps{% endif %}</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:2px;">
-      {% if is_school_event %}
-      Students in the assigned event sections can tap their NFC card to mark attendance.
-      {% else %}
-      Students in <strong style="color:var(--text);">{{ (sess.section_key or '').replace('|',' · ') }}</strong>
-      can tap their NFC card to mark their classroom attendance.
-      {% endif %}
-      {% if is_school_event %}
-      Attendance mode: <strong style="color:var(--success);">Present / Absent only</strong>.
-      {% else %}
-      Students are marked <strong style="color:var(--warning);">Late</strong> after {{ sess.grace_period or 15 }}
-      minutes.
-      {% endif %}
-    </div>
-    {% if session.get('role') not in ('admin', 'super_admin') %}
-    <div style="margin-top:8px;">
-      <button type="button" class="btn-outline-sm" id="mobileNfcSessionBtn">
-        <i class="bi bi-phone"></i> Use Phone NFC Reader
-      </button>
-    </div>
-    {% endif %}
-  </div>
-</div>
+
 
 <!--
   HIDDEN NFC HID INPUT

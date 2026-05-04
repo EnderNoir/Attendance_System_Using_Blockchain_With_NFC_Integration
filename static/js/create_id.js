@@ -138,18 +138,22 @@ window.cidToggleVisible = function(id, e) {
   const el = cidElements.find(d => d.id === id);
   el.visible = !el.visible;
   
-  // Rescue logic: if element is visible but way out of bounds, reset it
   if (el.visible) {
-    const isLandscape = document.querySelector('input[name="cid_orientation"]:checked')?.value === 'landscape';
-    const limitX = isLandscape ? 324 : 204;
-    const limitY = isLandscape ? 204 : 324;
-    if (el.x < -50 || el.y < -50 || el.x > limitX + 50 || el.y > limitY + 50) {
-      el.x = 20; el.y = 20;
-    }
+    cidResetPosition(id);
   }
   
   cidRenderElementList();
   cidInjectElements();
+};
+
+window.cidResetPosition = function(id, e) {
+  if (e) e.stopPropagation();
+  const el = cidElements.find(d => d.id === id);
+  if (el) {
+    el.x = 20; el.y = 20;
+    cidInjectElements();
+    if (!e) cidRenderElementList(); // If called from toggle
+  }
 };
 
 function cidGetVal(id, s) {
@@ -190,6 +194,7 @@ function cidRenderElementList() {
       <span style="font-size:12px;font-weight:600;flex:1;opacity:${isVis?1:0.4}">${el.label}</span>
       <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-right:8px;background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">${el.side}</span>
       <div style="display:flex;gap:4px;">
+        <button onclick="cidResetPosition('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;" title="Reset Position"><i class="bi bi-arrow-counterclockwise"></i></button>
         ${el.type==='text' ? `<button onclick="cidEditLabel('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;" title="Edit Text"><i class="bi bi-pencil"></i></button>` : ''}
         <button onclick="cidToggleVisible('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;"><i class="bi bi-eye${isVis?'':'-slash'}"></i></button>
         <button onclick="cidDeleteElement('${el.id}', event)" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0 3px;" title="Delete"><i class="bi bi-trash"></i></button>
@@ -304,9 +309,10 @@ function cidInjectElements() {
       div.style.fontFamily = '"' + el.font + '"';
       div.style.color = el.color;
       div.style.fontWeight = el.weight;
-      div.style.lineHeight = '1.2';
+      div.style.lineHeight = '1';
       div.style.padding = '0';
       div.style.margin = '0';
+      div.style.overflow = 'hidden';
       
       if (el.text_w) {
         div.style.width = el.text_w + 'px';

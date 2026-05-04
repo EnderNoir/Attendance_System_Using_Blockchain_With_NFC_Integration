@@ -39,9 +39,12 @@
       <div class="pm-pane active" id="pm-info">
         <div class="pm-body">
           <div class="pm-avatar-block">
-            <div id="pmInfoAvatarWrap"
-              style="width:72px;height:72px;margin:0 auto;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;border:3px solid var(--accent);">
-              {{ (session.get('full_name') or '?')[0].upper() }}</div>
+            <div style="position:relative; width:72px; height:72px; margin:0 auto;">
+              <div id="pmInfoAvatarWrap"
+                style="width:100%;height:100%;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;border:3px solid var(--accent);">
+                {{ (session.get('full_name') or '?')[0].upper() }}</div>
+              <div class="zoom-hint" onclick="var img=document.querySelector('#pmInfoAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')" style="position:absolute; bottom:0; right:0; width:22px; height:22px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); border:2px solid #fff; color:#000; font-size:10px;"><i class="bi bi-zoom-in"></i></div>
+            </div>
             <div class="pm-display-name" id="pmDisplayName">{{ session.get('full_name','') }}</div>
             <div class="pm-display-sub">System Administrator · CvSU Silang DAVS</div>
           </div>
@@ -60,9 +63,12 @@
       <div class="pm-pane" id="pm-edit">
         <div class="pm-body">
           <div class="pm-photo-block">
-            <div id="pmEditAvatarWrap"
-              style="width:58px;height:58px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
-              {{ (session.get('full_name') or '?')[0].upper() }}</div>
+            <div style="position:relative;">
+              <div id="pmEditAvatarWrap"
+                style="width:58px;height:58px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
+                {{ (session.get('full_name') or '?')[0].upper() }}</div>
+              <div class="zoom-hint" onclick="var img=document.querySelector('#pmEditAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')" style="position:absolute; bottom:-2px; right:-2px; width:18px; height:18px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.3); border:1.5px solid #fff; color:#000; font-size:9px;"><i class="bi bi-zoom-in"></i></div>
+            </div>
             <div>
               <div
                 style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
@@ -154,9 +160,12 @@
       <div class="pm-pane active" id="tpm-info">
         <div class="pm-body">
           <div class="pm-avatar-block">
-            <div id="tpmInfoAvatarWrap"
-              style="width:72px;height:72px;margin:0 auto;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;border:3px solid var(--accent);">
-              {{ (session.get('full_name') or '?')[0].upper() }}</div>
+            <div style="position:relative; width:72px; height:72px; margin:0 auto;">
+              <div id="tpmInfoAvatarWrap"
+                style="width:100%;height:100%;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;border:3px solid var(--accent);">
+                {{ (session.get('full_name') or '?')[0].upper() }}</div>
+              <div class="zoom-hint" onclick="var img=document.querySelector('#tpmInfoAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')" style="position:absolute; bottom:0; right:0; width:22px; height:22px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); border:2px solid #fff; color:#000; font-size:10px;"><i class="bi bi-zoom-in"></i></div>
+            </div>
             <div class="pm-display-name" id="tpmDisplayName">{{ session.get('full_name','') }}</div>
             <div class="pm-display-sub">Faculty · CvSU Silang DAVS</div>
           </div>
@@ -177,9 +186,12 @@
       <div class="pm-pane" id="tpm-edit">
         <div class="pm-body">
           <div class="pm-photo-block">
-            <div id="tpmEditAvatarWrap"
-              style="width:58px;height:58px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
-              {{ (session.get('full_name') or '?')[0].upper() }}</div>
+            <div style="position:relative;">
+              <div id="tpmEditAvatarWrap"
+                style="width:58px;height:58px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
+                {{ (session.get('full_name') or '?')[0].upper() }}</div>
+              <div class="zoom-hint" onclick="var img=document.querySelector('#tpmEditAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')" style="position:absolute; bottom:-2px; right:-2px; width:18px; height:18px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.3); border:1.5px solid #fff; color:#000; font-size:9px;"><i class="bi bi-zoom-in"></i></div>
+            </div>
             <div>
               <div
                 style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">

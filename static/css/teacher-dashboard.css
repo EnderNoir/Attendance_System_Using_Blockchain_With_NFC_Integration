@@ -82,21 +82,46 @@
 .sb-nlbl{font-size:10px;color:var(--muted);text-align:right;}
 
 @media(max-width:768px){
-  .ap-head{padding:14px 12px;}
-  .filter-row{padding:12px;}
-  .sum-grid{padding:12px;gap:8px;}
-  .showing-bar{margin:0 12px 12px;padding:10px 12px;}
-  .cpane{padding:14px 12px 16px;}
-  .ctabs{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .ctab{flex:0 0 auto;padding:10px 12px;}
-  #donutContent>div{display:block !important;}
-  #donutContent>div>div:first-child{margin:0 auto 12px;}
-  #donutChart{display:block;margin:0 auto;width:190px !important;height:190px !important;}
-  #donutContent>div>div:last-child{width:100%;min-width:0 !important;}
+  .hide-on-mobile { display: none !important; }
+  .welcome-bar { padding: 16px; margin-bottom: 20px; }
+  .welcome-name { font-size: 18px; }
+  
+  .filter-row { 
+    display: grid !important; 
+    grid-template-columns: 1fr 1fr !important; 
+    gap: 12px 10px !important; 
+    padding: 16px !important;
+  }
+  .fg-program, .fg-year { grid-row: 1; }
+  .fg-section, .fg-semester { grid-row: 2; }
+  .fg-subject { grid-row: 3; grid-column: 1 / span 2; }
+  .fg-btns { 
+    grid-row: 4; 
+    grid-column: 1 / span 2; 
+    display: flex !important; 
+    gap: 8px !important; 
+    margin-top: 4px;
+  }
+  .fg-btns > button { flex: 1; justify-content: center; }
+  .btn-reset-f { padding: 9px 12px; }
+
+  .showing-bar { 
+    margin: 0 16px 16px; 
+    padding: 12px 16px; 
+    flex-direction: column; 
+    align-items: flex-start;
+  }
+  .sb-right { width: 100%; margin-top: 4px; }
+  .sb-num-wrap { display: flex; align-items: baseline; gap: 6px; }
+  .sb-nlbl { text-align: left; }
+  
+  .ap-head { padding: 16px; }
+  .sum-grid { padding: 16px; gap: 8px; }
+  .cpane { padding: 16px; }
 }
 
 @media(max-width:480px){
-  .sum-grid{grid-template-columns:1fr;padding:10px;}
+  .sum-grid{grid-template-columns:1fr;padding:12px;}
   .sum-box{padding:12px 10px;}
   .sum-box .sn{font-size:30px;}
   .stats-row{grid-template-columns:1fr;}

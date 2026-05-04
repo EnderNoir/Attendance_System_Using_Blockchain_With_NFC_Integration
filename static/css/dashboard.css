@@ -123,19 +123,29 @@
   
   /* Dashboard Main Directory Fixes */
   #student_filter_bar { flex-direction: column !important; align-items: stretch !important; gap: 16px !important; }
-  .filter-row { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; width: 100% !important; }
-  .filter-row .fg:first-child { grid-column: 1 / -1 !important; }
   
-  .action-row { 
-    flex-direction: column !important; 
-    align-items: stretch !important; 
-    gap: 12px !important; 
+  .filter-row-main { display: flex; gap: 10px; align-items: flex-end; width: 100%; flex-wrap: wrap; }
+  .fg-search { flex: 1.5; min-width: 180px; display: flex; flex-direction: column; gap: 4px; }
+  .fg-filter { flex: 1; min-width: 120px; display: flex; flex-direction: column; gap: 4px; }
+
+  .action-row-main { 
+    display: flex; 
+    gap: 10px; 
+    align-items: center; 
+    padding-top: 14px; 
     border-top: 1px solid var(--border);
-    padding-top: 12px;
+    flex-wrap: wrap;
   }
-  .action-btns { display: flex !important; flex-direction: column !important; gap: 8px !important; }
-  .action-btns > * { width: 100% !important; justify-content: center !important; }
-  .action-meta { display: flex !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; }
+  .action-row-main > * { flex-shrink: 0; }
+
+  @media(max-width:768px){
+    .filter-row-main { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+    .fg-search { grid-column: 1 / -1 !important; }
+    .fg-filter { min-width: 0 !important; }
+    
+    .action-row-main { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+    .action-row-main > * { width: 100% !important; justify-content: center !important; }
+  }
 
   /* Create ID Modal */
   #createIdModal .upd-box {

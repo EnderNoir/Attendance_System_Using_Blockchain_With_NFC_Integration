@@ -149,14 +149,14 @@ const state = {
       {
         key: 'tokens',
         tab: 'tokens',
-        title: 'Tokens Tab',
-        text: 'This project focuses on transaction-based proof, not token transfers by students.',
-        why: 'The goal is attendance auditability, not payments.',
+        title: 'Audit Proof Tab',
+        text: 'This page shows how attendance events are packed into blocks. We use blockchain for record integrity, not as a currency.',
+        why: 'The goal is to provide a verifiable trail that proves attendance was recorded at a specific time.',
         tryItems: [
           'Read transaction density bars per block.',
-          'Review glossary terms to reinforce core concepts.'
+          'Review the glossary to understand how DAVS anchors its data.'
         ],
-        learn: 'The difference between token economics and record verification usage.',
+        learn: 'How to interpret the scale of recorded data on the chain.',
       },
       {
         key: 'wrap',
@@ -261,7 +261,12 @@ const state = {
     function runTourAction() {
       const step = TOUR_STEPS[state.tour.stepIndex];
       if (!step) return;
-      if (step.key === 'hash') {
+      if (step.key === 'intro') {
+        document.querySelectorAll('.chip').forEach(el => {
+          el.classList.add('pulse-new');
+          setTimeout(() => el.classList.remove('pulse-new'), 2000);
+        });
+      } else if (step.key === 'hash') {
         ui.hashInput.value = `NFC Tap | ${new Date().toISOString()} | Updated`;
         ui.nonceInput.value = String(Number(ui.nonceInput.value || 0) + 1);
         updateHashDemo();
@@ -275,13 +280,17 @@ const state = {
       } else if (step.key === 'blockchain') {
         setTabs('blockchain');
         const card = document.querySelector('.chain-card');
-        card?.click();
+        if (card) {
+          card.click();
+          // Switching to 'block' tab is handled by the click listener itself now
+        }
       } else if (step.key === 'distributed') {
         setTabs('distributed');
         ui.syncDemoBtn.click();
       } else if (step.key === 'tokens') {
         setTabs('tokens');
       } else if (step.key === 'wrap') {
+        document.querySelector('.flow')?.scrollIntoView({ behavior: 'smooth' });
         ui.autoRefresh.checked = true;
       }
     }
@@ -387,7 +396,8 @@ const state = {
           state.selectedBlock = Number(el.dataset.block);
           renderChain();
           renderBlockDetails();
-          setTabs('blockchain');
+          // Swich to Block tab to show the details of the selected block
+          setTabs('block');
         });
       });
     }

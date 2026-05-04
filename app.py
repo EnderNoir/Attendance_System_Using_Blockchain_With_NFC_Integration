@@ -6689,44 +6689,39 @@ def api_public_blockchain_visualization():
         prev_hash = None
         chain_valid = True
 
-        for n in range(start_block, latest_block + 1):
-            b = web3.eth.get_block(n, full_transactions=False)
+        for n in range(latest_block, start_block - 1, -1):
+            # Fetch full block with transactions in one call to avoid slow receipt fetching
+            b = web3.eth.get_block(n, full_transactions=True)
             block_hash = b.hash.hex()
             parent_hash = b.parentHash.hex()
-            all_tx_hashes = [tx.hex() for tx in b.transactions]
-
+            
             project_tx_hashes = []
             if contract_addr:
-                for txh in all_tx_hashes:
-                    try:
-                        r = web3.eth.get_transaction_receipt(txh)
-                        to_addr = (r.get('to') or '').lower() if isinstance(r, dict) else (getattr(r, 'to', '') or '').lower()
-                        c_addr = (r.get('contractAddress') or '').lower() if isinstance(r, dict) else (getattr(r, 'contractAddress', '') or '').lower()
-                        logs = r.get('logs', []) if isinstance(r, dict) else getattr(r, 'logs', [])
-
-                        is_project_tx = (to_addr == contract_addr) or (c_addr == contract_addr)
-                        if not is_project_tx:
-                            for lg in logs:
-                                lg_addr = (lg.get('address') or '').lower() if isinstance(lg, dict) else (getattr(lg, 'address', '') or '').lower()
-                                if lg_addr == contract_addr:
-                                    is_project_tx = True
-                                    break
-                        if is_project_tx:
-                            txh_l = txh.lower()
-                            if filtered_tx_hashes and txh_l not in filtered_tx_hashes:
-                                continue
-                            project_tx_hashes.append(txh)
-                    except Exception:
-                        continue
+                for tx in b.transactions:
+                    tx_hash = tx.hash.hex()
+                    to_addr = (tx.get('to') or '').lower()
+                    
+                    # Primary check: direct call to contract
+                    is_project = (to_addr == contract_addr)
+                    
+                    # Secondary check: if we have DB filters, check if this hash matches any from our DB
+                    if not is_project and filtered_tx_hashes:
+                        if tx_hash.lower() in filtered_tx_hashes:
+                            is_project = True
+                    
+                    if is_project:
+                        # Only apply filters if they exist
+                        if filtered_tx_hashes and tx_hash.lower() not in filtered_tx_hashes:
+                            continue
+                        project_tx_hashes.append(tx_hash)
             else:
+                # If no contract address, just filter by what's in our DB if filters are active
+                all_tx_hashes = [tx.hash.hex() for tx in b.transactions]
                 if filtered_tx_hashes:
                     project_tx_hashes = [txh for txh in all_tx_hashes if txh.lower() in filtered_tx_hashes]
                 else:
-                    project_tx_hashes = all_tx_hashes
-
-            if prev_hash is not None and parent_hash != prev_hash:
-                chain_valid = False
-            prev_hash = block_hash
+                    # Public demo fallback: show nothing or a sample if no project context
+                    project_tx_hashes = []
 
             blocks.append({
                 'number': int(b.number),

@@ -1,4 +1,4 @@
-﻿const state = {
+const state = {
       blocks: [],
       context: {},
       selectedBlock: null,
@@ -267,7 +267,7 @@
         updateHashDemo();
       } else if (step.key === 'block') {
         setTabs('block');
-        mineDemoBlock();
+        mineDemoBlock(2); // Use lower difficulty for tour speed
       } else if (step.key === 'tamper') {
         setTabs('block');
         ui.tamperInput.value = `Tampered value ${Date.now()}`;
@@ -444,8 +444,8 @@
         return;
       }
 
-      const current = state.blocks[bIndex];
-      const next = state.blocks[bIndex + 1] || null;
+      // Since blocks are sorted DESCENDING (latest first), the 'next' chronological block is at bIndex - 1
+      const next = state.blocks[bIndex - 1] || null;
       const tamperText = (ui.tamperInput.value || '').trim();
 
       ui.tamperOrigHash.textContent = current.hash || '--';
@@ -517,24 +517,32 @@
       }).join('');
     }
 
-    async function mineDemoBlock() {
+    async function mineDemoBlock(forcedDifficulty) {
       ui.mineBtn.disabled = true;
       ui.mineStatus.textContent = 'Mining in progress...';
       const blockNo = Number(ui.simBlockNumber.value || 1);
       const prev = ui.simPrevHash.value || '';
       const data = ui.simData.value || '';
-      const difficulty = Number(ui.simDifficulty.value || 3);
+      const difficulty = forcedDifficulty || Number(ui.simDifficulty.value || 3);
       const target = '0'.repeat(difficulty);
 
       let nonce = 0;
       let hash = '';
       const start = performance.now();
       const maxTry = 180000;
+      const batchSize = 500; // Batching avoids long-running microtasks that freeze UI
 
-      for (; nonce < maxTry; nonce += 1) {
-        const payload = `${blockNo}|${prev}|${data}|${nonce}`;
-        hash = await sha256(payload);
+      while (nonce < maxTry) {
+        for (let i = 0; i < batchSize && nonce < maxTry; i++, nonce++) {
+          const payload = `${blockNo}|${prev}|${data}|${nonce}`;
+          // Since subtle.digest is async, we still have to await, 
+          // but batching helps with UI responsiveness between checks
+          hash = await sha256(payload);
+          if (hash.startsWith(target)) break;
+        }
         if (hash.startsWith(target)) break;
+        // Yield to event loop
+        await new Promise(r => setTimeout(r, 0));
       }
 
       ui.simNonce.value = String(nonce);

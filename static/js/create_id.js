@@ -308,6 +308,7 @@ function cidInjectElements() {
       div.style.boxSizing = 'border-box';
       div.style.border = `${borderW} solid #F5C518`;
       if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
+      div.classList.add('cid-render-el');
       
       div.textContent = cidGetVal(el.id, s);
     } else if (el.type === 'custom_img') {
@@ -315,12 +316,14 @@ function cidInjectElements() {
       div.style.borderRadius = '4px'; div.style.overflow = 'hidden';
       div.style.border = `${borderW} solid #F5C518`;
       if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
+      div.classList.add('cid-render-el');
       if (el.imgData) div.innerHTML = `<img src="${el.imgData}" style="width:100%;height:100%;object-fit:contain;pointer-events:none;">`;
     } else { // photo
       div.style.width = (el.w||80) + 'px'; div.style.height = (el.h||80) + 'px';
       div.style.borderRadius = el.shape === 'circle' ? '50%' : '6px'; div.style.background = 'rgba(0,0,0,.08)';
       div.style.border = `${(2/actualScale)}px solid #F5C518`;
       if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
+      div.classList.add('cid-render-el');
       const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
       if (pf) div.innerHTML = `<img src="/static/uploads/${pf}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;">`;
       else { div.style.display='flex'; div.style.alignItems='center'; div.style.justifyContent='center'; div.innerHTML='<i class="bi bi-person" style="font-size:20px;opacity:.3;"></i>'; }
@@ -337,7 +340,7 @@ function cidInjectElements() {
         handle.style.background = cidActiveElId === el.id ? 'var(--accent)' : '#F5C518';
         handle.style.border = '1px solid #000';
         
-        const sizeVal = 6 / actualScale;
+        const sizeVal = 3.5 / actualScale;
         const size = sizeVal + 'px';
         const offset = -(sizeVal / 2) + 'px';
         
@@ -644,16 +647,35 @@ document.addEventListener('mousemove', e => {
     el.y = newY;
     if (el.type === 'text') {
       el.text_w = newW;
+      if (cidResizeDir.includes('n') || cidResizeDir.includes('s')) {
+        el.size = Math.max(6, Math.round(newH * 0.85));
+      }
     } else {
       el.w = newW;
       el.h = newH;
     }
     
     const div = document.getElementById('view_el_' + cidResizingId);
-    div.style.left = newX + 'px';
-    div.style.top = newY + 'px';
-    if (el.type === 'text') div.style.width = newW + 'px';
-    else { div.style.width = newW + 'px'; div.style.height = newH + 'px'; }
+    if (div) {
+      div.style.left = newX + 'px';
+      div.style.top = newY + 'px';
+      if (el.type === 'text') {
+        div.style.width = newW + 'px';
+        div.style.fontSize = el.size + 'px';
+      } else {
+        div.style.width = newW + 'px'; 
+        div.style.height = newH + 'px';
+      }
+    }
+    
+    // Update style panel inputs if this is the active element
+    if (cidActiveElId === cidResizingId && el.type === 'text') {
+      const sizeInput = document.getElementById('cid_st_size');
+      if (sizeInput) sizeInput.value = el.size;
+    } else if (cidActiveElId === cidResizingId) {
+      const sizeInput = document.getElementById('cid_st_photo_size');
+      if (sizeInput) sizeInput.value = el.w;
+    }
     return;
   }
 
@@ -760,6 +782,9 @@ async function cidGeneratePDF() {
   await document.fonts.ready;
   await new Promise(r => setTimeout(r, 200));
 
+  frontContainer.classList.add('cid-exporting');
+  backContainer.classList.add('cid-exporting');
+
   for (let i = 0; i < total; i++) {
     if (cidPdfCancelled) break;
     const pctStr = Math.round(((i+1)/total)*100) + '%';
@@ -783,6 +808,8 @@ async function cidGeneratePDF() {
   }
 
   // Restore state
+  frontContainer.classList.remove('cid-exporting');
+  backContainer.classList.remove('cid-exporting');
   previewCont.style.transform = oldTransform;
   cidActiveElId = oldActive;
   cidPreviewIdx = 0;

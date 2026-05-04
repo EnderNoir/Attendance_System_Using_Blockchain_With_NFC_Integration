@@ -829,7 +829,11 @@
     <i class="bi bi-x-circle"></i> Cancel Generation
   </button>
 </div>
-<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .cid-exporting .cid-render-el { border: none !important; box-shadow: none !important; }
+  .cid-exporting .cid-resize-handle { display: none !important; }
+</style>
 
 <div id="cid_zoom_modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#0f1011; z-index:200000; padding:30px; box-sizing:border-box;">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">

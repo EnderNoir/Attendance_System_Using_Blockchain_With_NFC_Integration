@@ -760,26 +760,35 @@
 <!-- FACULTY TAB -->
 <div class="tab-pane" id="tab-faculty">
   <div class="filter-bar">
-    <div class="fg" style="flex:2;min-width:180px;">
-      <span class="fl"><i class="bi bi-search"></i> Search</span>
-      <input type="text" class="fs" id="tc_search" placeholder="Name or username..." oninput="filterTeachers()" style="appearance:none;"/>
+    <div style="margin-bottom: 8px; font-size: 11px; color: var(--muted); font-weight: 600;">
+      show results: <span id="tc_count">{{ teachers|length }} faculty</span>
     </div>
-    <div class="fg">
-      <span class="fl">Role</span>
-      <select class="fs" id="tc_role" onchange="filterTeachers()">
-        <option value="">All Roles</option>
-        <option value="admin">Admin</option>
-        <option value="teacher">Teacher</option>
-      </select>
+
+    <div class="filter-row-main">
+      <div class="fg-search">
+        <span class="fl"><i class="bi bi-search"></i> Search</span>
+        <input type="text" class="fs" id="tc_search" placeholder="Name or username..." oninput="filterTeachers()"/>
+      </div>
+      <div class="fg-filter">
+        <span class="fl">Role</span>
+        <select class="fs" id="tc_role" onchange="filterTeachers()">
+          <option value="">All Roles</option>
+          <option value="admin">Admin</option>
+          <option value="teacher">Teacher</option>
+        </select>
+      </div>
     </div>
-    {% if session.get('role') in ('admin', 'super_admin') %}
-    <a class="btn-primary" href="{{ url_for('superadmin_create_user') if session.get('role') == 'super_admin' else url_for('admin_create_instructor') }}" style="align-self:flex-end;">
-      <i class="bi bi-person-plus"></i> Create Account
-    </a>
-    {% endif %}
-    <button class="btn-rst" onclick="resetTeacherFilters()"><i class="bi bi-x-circle"></i> Reset</button>
-    <span style="font-size:11px;color:var(--muted);align-self:flex-end;" id="tc_count">{{ teachers|length }} faculty</span>
+
+    <div class="action-row-main">
+      <button class="btn-rst" onclick="resetTeacherFilters()" style="padding: 10px 16px;"><i class="bi bi-x-circle"></i> Reset</button>
+      {% if session.get('role') in ('admin', 'super_admin') %}
+      <a class="btn-primary" href="{{ url_for('superadmin_create_user') if session.get('role') == 'super_admin' else url_for('admin_create_instructor') }}">
+        <i class="bi bi-person-plus"></i> Create Account
+      </a>
+      {% endif %}
+    </div>
   </div>
+
 
   <div style="max-height:600px;overflow-y:auto;padding-right:4px;" class="scroll-container" id="facultyList">
     {% for username, u in teachers.items() %}

@@ -8,20 +8,60 @@ let cidCustomType = 'text';
 let cidCustomImgData = null;
 let cidMode = 'batch';
 let cidPdfCancelled = false;
+let cidShowBorders = true;
 let cidHistory = [];
 const cidMaxHistory = 30;
 
 function cidPushHistory() {
+  // Capture global state
   const state = JSON.stringify({
-    elements: cidElements,
+    elements: cidElements.map(e => {
+      const { history, ...rest } = e; // Don't include history in the snapshot
+      return rest;
+    }),
     vars: cidCustomVariables
   });
   if (cidHistory.length > 0 && cidHistory[cidHistory.length - 1] === state) return;
   cidHistory.push(state);
   if (cidHistory.length > cidMaxHistory) cidHistory.shift();
+  
+  // Also push to per-element history
+  cidElements.forEach(el => {
+    if (!el.history) el.history = [];
+    const propState = JSON.stringify({
+      x: el.x, y: el.y, w: el.w, h: el.h, size: el.size, color: el.color, font: el.font, weight: el.weight, align: el.align, text_w: el.text_w, side: el.side, visible: el.visible
+    });
+    if (el.history.length === 0 || el.history[el.history.length - 1] !== propState) {
+      el.history.push(propState);
+      if (el.history.length > 20) el.history.shift();
+    }
+  });
+
   const undoBtn = document.getElementById('cid_undo_btn');
   if (undoBtn) undoBtn.disabled = false;
 }
+
+window.cidUndoElement = function(id, e) {
+  if (e) e.stopPropagation();
+  const el = cidElements.find(d => d.id === id);
+  if (!el || !el.history || el.history.length < 2) return;
+  
+  el.history.pop(); // Remove current
+  const last = JSON.parse(el.history[el.history.length - 1]);
+  Object.assign(el, last);
+  
+  cidRenderElementList();
+  cidInjectElements();
+};
+
+window.cidToggleBorders = function() {
+  cidShowBorders = !cidShowBorders;
+  const btn = document.getElementById('cid_border_toggle_btn');
+  if (btn) {
+    btn.innerHTML = `<i class="bi bi-eye${cidShowBorders?'-slash':''}"></i> ${cidShowBorders?'Hide':'Show'} Borders`;
+  }
+  cidInjectElements();
+};
 
 window.cidUndo = function() {
   if (cidHistory.length < 2) {
@@ -187,14 +227,8 @@ window.cidToggleVisible = function(id, e) {
 };
 
 window.cidResetPosition = function(id, e) {
-  if (e) e.stopPropagation();
-  cidPushHistory();
-  const el = cidElements.find(d => d.id === id);
-  if (el) {
-    el.x = 20; el.y = 20;
-    cidInjectElements();
-    if (!e) cidRenderElementList();
-  }
+  // Now behaves as Per-Element Undo
+  cidUndoElement(id, e);
 };
 
 function cidGetVal(id, s) {
@@ -217,6 +251,7 @@ function cidRenderElementList() {
   list.innerHTML = '';
   cidElements.forEach(el => {
     const isVis = el.visible !== false;
+    const isCustom = el.id.startsWith('cv_') || el.id.startsWith('custom_');
     const div = document.createElement('div');
     div.className = 'cid-el-item';
     if (cidActiveElId === el.id) div.classList.add('active');
@@ -230,15 +265,17 @@ function cidRenderElementList() {
     div.style.cursor = 'pointer';
     div.onclick = () => cidSelectElement(el.id);
     
+    const canUndo = el.history && el.history.length >= 2;
+
     div.innerHTML = `
       <i class="bi bi-${el.type==='photo'||el.type==='custom_img'?'image':'fonts'}" style="opacity:0.5;font-size:12px;margin-right:8px;"></i>
       <span style="font-size:12px;font-weight:600;flex:1;opacity:${isVis?1:0.4}">${el.label}</span>
       <span style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-right:8px;background:rgba(255,255,255,0.05);padding:2px 6px;border-radius:4px;">${el.side}</span>
       <div style="display:flex;gap:4px;">
-        <button onclick="cidResetPosition('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;" title="Reset Position"><i class="bi bi-arrow-counterclockwise"></i></button>
-        ${el.type==='text' ? `<button onclick="cidEditLabel('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;" title="Edit Text"><i class="bi bi-pencil"></i></button>` : ''}
+        <button onclick="cidUndoElement('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;opacity:${canUndo?1:0.2}" title="Undo changes for this element" ${canUndo?'':'disabled'}><i class="bi bi-arrow-counterclockwise"></i></button>
+        ${isCustom && el.type==='text' ? `<button onclick="cidEditLabel('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;" title="Edit Text"><i class="bi bi-pencil"></i></button>` : ''}
         <button onclick="cidToggleVisible('${el.id}', event)" style="background:none;border:none;color:var(--text);cursor:pointer;padding:0 3px;"><i class="bi bi-eye${isVis?'':'-slash'}"></i></button>
-        <button onclick="cidDeleteElement('${el.id}', event)" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0 3px;" title="Delete"><i class="bi bi-trash"></i></button>
+        ${isCustom ? `<button onclick="cidDeleteElement('${el.id}', event)" style="background:none;border:none;color:var(--danger);cursor:pointer;padding:0 3px;" title="Delete"><i class="bi bi-trash"></i></button>` : ''}
       </div>
     `;
     list.appendChild(div);
@@ -365,32 +402,26 @@ function cidInjectElements() {
         div.style.whiteSpace = 'nowrap';
       }
       div.style.textAlign = el.align || 'left';
-      div.style.boxSizing = 'border-box';
-      div.style.border = `${borderW} solid #F5C518`;
-      if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
       div.classList.add('cid-render-el');
-      
       div.textContent = cidGetVal(el.id, s);
     } else if (el.type === 'custom_img') {
       div.style.width = (el.w||60) + 'px'; div.style.height = (el.h||60) + 'px';
       div.style.borderRadius = '4px'; div.style.overflow = 'hidden';
-      div.style.border = `${borderW} solid #F5C518`;
-      if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
       div.classList.add('cid-render-el');
       if (el.imgData) div.innerHTML = `<img src="${el.imgData}" style="width:100%;height:100%;object-fit:contain;pointer-events:none;">`;
     } else { // photo
       div.style.width = (el.w||80) + 'px'; div.style.height = (el.h||80) + 'px';
       div.style.borderRadius = el.shape === 'circle' ? '50%' : '6px'; div.style.background = 'rgba(0,0,0,.08)';
-      div.style.border = `${(2/actualScale)}px solid #F5C518`;
-      if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
       div.classList.add('cid-render-el');
       const pf = (window.DASHBOARD_BOOTSTRAP.photos||{})[s.nfc_id];
       if (pf) div.innerHTML = `<img src="/static/uploads/${pf}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;pointer-events:none;">`;
       else { div.style.display='flex'; div.style.alignItems='center'; div.style.justifyContent='center'; div.innerHTML='<i class="bi bi-person" style="font-size:20px;opacity:.3;"></i>'; }
     }
     
-    // Always show resize handles if visible
-    if (el.visible !== false) {
+    if (cidShowBorders && el.visible !== false) {
+      div.style.border = `${borderW} solid #F5C518`;
+      if (cidActiveElId === el.id) div.style.boxShadow = `0 0 0 ${1/actualScale}px var(--accent)`;
+
       const handles = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
       handles.forEach(dir => {
         const handle = document.createElement('div');
@@ -399,29 +430,22 @@ function cidInjectElements() {
         handle.style.zIndex = '10';
         handle.style.background = cidActiveElId === el.id ? 'var(--accent)' : '#F5C518';
         handle.style.border = '1px solid #000';
-        
-        // Even larger handles for better recognition on small elements
         const sizeVal = 12 / actualScale;
         const size = sizeVal + 'px';
         const offset = -(sizeVal / 2) + 'px';
-        
-        handle.style.width = size;
-        handle.style.height = size;
 
-        if (dir === 'n') { handle.style.top = offset; handle.style.left = '50%'; handle.style.marginLeft = offset; handle.style.cursor = 'ns-resize'; }
-        if (dir === 's') { handle.style.bottom = offset; handle.style.left = '50%'; handle.style.marginLeft = offset; handle.style.cursor = 'ns-resize'; }
-        if (dir === 'e') { handle.style.right = offset; handle.style.top = '50%'; handle.style.marginTop = offset; handle.style.cursor = 'ew-resize'; }
-        if (dir === 'w') { handle.style.left = offset; handle.style.top = '50%'; handle.style.marginTop = offset; handle.style.cursor = 'ew-resize'; }
-        
-        if (dir === 'nw') { handle.style.top = offset; handle.style.left = offset; handle.style.cursor = 'nwse-resize'; }
-        if (dir === 'ne') { handle.style.top = offset; handle.style.right = offset; handle.style.cursor = 'nesw-resize'; }
-        if (dir === 'sw') { handle.style.bottom = offset; handle.style.left = offset; handle.style.cursor = 'nesw-resize'; }
-        if (dir === 'se') { handle.style.bottom = offset; handle.style.right = offset; handle.style.cursor = 'nwse-resize'; }
-        
-        handle.onmousedown = (e) => {
+        if (dir.includes('n')) handle.style.top = offset;
+        else if (dir.includes('s')) handle.style.bottom = offset;
+        else { handle.style.top = '50%'; handle.style.marginTop = offset; }
+
+        if (dir.includes('w')) handle.style.left = offset;
+        else if (dir.includes('e')) handle.style.right = offset;
+        else { handle.style.left = '50%'; handle.style.marginLeft = offset; }
+
+        handle.style.width = size; handle.style.height = size;
+        handle.style.cursor = dir + '-resize';
+        handle.onmousedown = e => {
           e.stopPropagation();
-          e.preventDefault();
-          cidSelectElement(el.id);
           cidResizingId = el.id;
           cidResizeDir = dir;
           cidResizeStart = { x: e.clientX, y: e.clientY, w: div.offsetWidth, h: div.offsetHeight, top: el.y, left: el.x };
@@ -434,6 +458,7 @@ function cidInjectElements() {
     (el.side === 'front' ? front : back).appendChild(div);
   });
 }
+
 
 
 // ── Select & Style Element ──

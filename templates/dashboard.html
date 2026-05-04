@@ -452,9 +452,14 @@
             <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:8px;padding:12px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <h3 style="font-size:12px; font-weight:800; color:var(--accent2); text-transform:uppercase; letter-spacing:1px; margin:0;">Elements & Styling</h3>
-                <button id="cid_undo_btn" onclick="cidUndo()" disabled class="btn-rst" style="padding:4px 10px; font-size:11px; border:1px solid var(--border); color:var(--text); border-radius:6px; background:rgba(255,255,255,0.05); cursor:pointer;">
-                  <i class="bi bi-arrow-counterclockwise"></i> Undo
-                </button>
+                <div style="display:flex; gap:6px;">
+                  <button id="cid_border_toggle_btn" onclick="cidToggleBorders()" class="btn-rst" style="padding:4px 10px; font-size:11px; border:1px solid var(--border); color:var(--text); border-radius:6px; background:rgba(255,255,255,0.05); cursor:pointer;">
+                    <i class="bi bi-eye-slash"></i> Hide Borders
+                  </button>
+                  <button id="cid_undo_btn" onclick="cidUndo()" disabled class="btn-rst" style="padding:4px 10px; font-size:11px; border:1px solid var(--border); color:var(--text); border-radius:6px; background:rgba(255,255,255,0.05); cursor:pointer;">
+                    <i class="bi bi-arrow-counterclockwise"></i> Undo
+                  </button>
+                </div>
               </div>
               <p style="font-size:11px; color:var(--muted); margin-bottom:20px;">Click an element to select & style it. Drag it on the card to reposition.</p>
               <div id="cid_element_list" style="display:flex;flex-direction:column;gap:5px;"></div>

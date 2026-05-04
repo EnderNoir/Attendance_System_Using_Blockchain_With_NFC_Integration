@@ -10,7 +10,7 @@
 <div class="welcome-bar">
   <div>
     <div class="welcome-name">Welcome back, {{ (user.full_name or 'Teacher').split(' ')[0] }}! 👋</div>
-    <div class="welcome-sub">
+    <div class="welcome-sub hide-on-mobile">
       {{ sections|length }} section{{ 's' if sections|length != 1 }} assigned
       &nbsp;·&nbsp; {{ my_subjects|length }} subject{{ 's' if my_subjects|length != 1 }} in schedule
     </div>
@@ -74,9 +74,9 @@
   <div class="ap-head">
     <div>
       <h2>Attendance Analytics</h2>
-      <p id="showingSub">Select a period and click Apply Filters to load data.</p>
+      <p id="showingSub" class="hide-on-mobile">Select a period and click Apply Filters to load data.</p>
     </div>
-    <span style="font-size:11px;color:var(--muted);" id="sessCountLabel"></span>
+    <span style="font-size:11px;color:var(--muted);" id="sessCountLabel" class="hide-on-mobile"></span>
   </div>
 
   <div style="padding:14px 22px;border-bottom:1px solid var(--border);">
@@ -110,7 +110,7 @@
   </div>
 
   <div class="filter-row">
-    <div class="fg">
+    <div class="fg fg-program">
       <span class="fl">Program</span>
       <div class="search-select-wrap" id="wrap_f_program">
         <div class="search-select-display" id="disp_f_program" onclick="toggleSSD('f_program')">
@@ -126,7 +126,7 @@
         </div>
       </div>
     </div>
-    <div class="fg">
+    <div class="fg fg-year">
       <span class="fl">Year Level</span>
       <div class="search-select-wrap" id="wrap_f_year">
         <div class="search-select-display" id="disp_f_year" onclick="toggleSSD('f_year')">
@@ -144,7 +144,7 @@
         </div>
       </div>
     </div>
-    <div class="fg">
+    <div class="fg fg-section">
       <span class="fl">Section</span>
       <div class="search-select-wrap" id="wrap_f_section">
         <div class="search-select-display" id="disp_f_section" onclick="toggleSSD('f_section')">
@@ -162,7 +162,7 @@
         </div>
       </div>
     </div>
-    <div class="fg">
+    <div class="fg fg-subject">
       <span class="fl">Subject</span>
       <div class="search-select-wrap" id="wrap_f_subject">
         <div class="search-select-display" id="disp_f_subject" onclick="toggleSSD('f_subject')">
@@ -179,7 +179,7 @@
         </div>
       </div>
     </div>
-    <div class="fg">
+    <div class="fg fg-semester">
       <span class="fl">Semester</span>
       <div class="search-select-wrap" id="wrap_f_semester">
         <div class="search-select-display" id="disp_f_semester" onclick="toggleSSD('f_semester')">
@@ -196,9 +196,9 @@
         </div>
       </div>
     </div>
-    <div style="display:flex;gap:6px;align-self:flex-end;flex-wrap:wrap;">
+    <div class="fg-btns">
       <button class="btn-apply" onclick="applyFilters()"><i class="bi bi-search"></i> Apply</button>
-      <button class="btn-reset-f" onclick="resetFilters()" title="Reset filters"><i class="bi bi-x-circle"></i></button>
+      <button class="btn-reset-f" onclick="resetFilters()" title="Reset filters">Reset</button>
       <button class="btn-export" onclick="exportDashboard()" id="btnExport" title="Export to Excel">
         <i class="bi bi-file-earmark-excel"></i> Export
       </button>
@@ -206,13 +206,15 @@
   </div>
 
   <div class="showing-bar" id="showingBar" style="display:none;">
-    <div>
-      <div class="sb-main" id="sb_main">—</div>
-      <div class="sb-sub"  id="sb_sub">—</div>
+    <div class="sb-left">
+      <div class="sb-main" id="sb_main">Today</div>
+      <div class="sb-sub hide-on-mobile" id="sb_sub">Showing all your sessions</div>
     </div>
-    <div style="text-align:right;">
-      <div class="sb-num"  id="sb_num">—</div>
-      <div class="sb-nlbl">sessions</div>
+    <div class="sb-right">
+      <div class="sb-num-wrap">
+        <span class="sb-num" id="sb_num">0</span>
+        <span class="sb-nlbl">sessions found</span>
+      </div>
     </div>
   </div>
 

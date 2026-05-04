@@ -619,13 +619,18 @@
   </div>
 
   <div class="filter-bar" id="student_filter_bar">
-    <!-- Top Row: Main Filters -->
-    <div class="filter-row">
-      <div class="fg" style="flex:2; min-width:200px;">
+    <!-- Results metadata above search -->
+    <div style="margin-bottom: 8px; font-size: 11px; color: var(--muted); font-weight: 600;">
+      show results: <span id="st_count">0 of 0 students</span>
+    </div>
+
+    <!-- Top Row: Main Filters (One single row on laptop) -->
+    <div class="filter-row-main">
+      <div class="fg-search">
         <span class="fl"><i class="bi bi-search"></i> Search</span>
         <input type="text" class="fs" id="st_search" placeholder="Search by name or ID..." oninput="filterStudents()"/>
       </div>
-      <div class="fg">
+      <div class="fg-filter">
         <span class="fl">Program</span>
         <select class="fs" id="st_course" onchange="filterStudents()">
           <option value="">All Programs</option>
@@ -633,21 +638,21 @@
           <option value="BS Information Technology">BS Information Technology</option>
         </select>
       </div>
-      <div class="fg">
+      <div class="fg-filter">
         <span class="fl">Year Level</span>
         <select class="fs" id="st_year" onchange="filterStudents()">
           <option value="">All Years</option>
           <option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option>
         </select>
       </div>
-      <div class="fg">
+      <div class="fg-filter">
         <span class="fl">Section</span>
         <select class="fs" id="st_section" onchange="filterStudents()">
           <option value="">All</option>
           <option>A</option><option>B</option><option>C</option><option>D</option>
         </select>
       </div>
-      <div class="fg">
+      <div class="fg-filter">
         <span class="fl">Semester</span>
         <select class="fs" id="st_semester" onchange="filterStudents()">
           <option value="">All Semesters</option>
@@ -656,7 +661,7 @@
           <option value="Summer">Summer</option>
         </select>
       </div>
-      <div class="fg">
+      <div class="fg-filter">
         <span class="fl">Status</span>
         <select class="fs" id="st_status" onchange="filterStudents()">
           <option value="">All Statuses</option>
@@ -667,25 +672,20 @@
       </div>
     </div>
 
-    <!-- Bottom Row: Action Buttons -->
-    <div class="action-row">
-      <div class="action-btns">
-        {% if session.get('role') in ('admin', 'super_admin') %}
-        <a class="btn-primary" href="{{ url_for('register') }}">
-          <i class="bi bi-person-plus"></i> Enroll Student
-        </a>
-        <button class="btn-primary" onclick="moveUpAllStudents()" title="Advance all active students to next semester">
-          <i class="bi bi-arrow-up"></i> Move Up
-        </button>
-        <button class="btn-primary" onclick="openCreateIdModal()" title="Generate Student IDs">
-          <i class="bi bi-person-badge"></i> Create ID
-        </button>
-        {% endif %}
-      </div>
-      <div class="action-meta">
-        <span style="font-size:11px;color:var(--muted);white-space:nowrap;" id="st_count"></span>
-        <button class="btn-rst" onclick="resetStudentFilters()"><i class="bi bi-x-circle"></i> Reset</button>
-      </div>
+    <!-- Bottom Row: Action Buttons (One single row) -->
+    <div class="action-row-main">
+      <button class="btn-rst" onclick="resetStudentFilters()" style="padding: 10px 16px;"><i class="bi bi-x-circle"></i> Reset</button>
+      {% if session.get('role') in ('admin', 'super_admin') %}
+      <a class="btn-primary" href="{{ url_for('register') }}">
+        <i class="bi bi-person-plus"></i> Enroll Student
+      </a>
+      <button class="btn-primary" onclick="moveUpAllStudents()" title="Advance all active students to next semester">
+        <i class="bi bi-arrow-up"></i> Move Up
+      </button>
+      <button class="btn-primary" onclick="openCreateIdModal()" title="Generate Student IDs">
+        <i class="bi bi-person-badge"></i> Create ID
+      </button>
+      {% endif %}
     </div>
   </div>
 

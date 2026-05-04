@@ -113,45 +113,84 @@
 .sec-cb-wrap label:hover{border-color:var(--accent);color:var(--text);}
 .sec-cb-wrap input:checked + label{border-color:var(--accent);background:rgba(45,106,39,.12);color:var(--accent);}
 
+/* Mobile Responsiveness & Fixes */
 @media(max-width:768px){
-  .tab-row{overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
-  .tab-btn{flex:0 0 auto;}
-  .filter-bar{padding:10px;}
-  .person-row{flex-direction:column;align-items:flex-start;gap:8px;padding:12px;}
-  .person-row>div{width:100%;}
-  .prow-name{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35;}
-  .btn-vr{width:100%;justify-content:center;}
+  /* Dashboard Main */
+  .tab-row { display: flex; width: 100%; gap: 4px; }
+  .tab-btn { flex: 1; padding: 10px 5px; font-size: 12px; text-align: center; justify-content: center; }
+  
+  #studentStatsRow { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+  
+  /* Dashboard Main Directory Fixes */
+  #student_filter_bar { flex-direction: column !important; align-items: stretch !important; gap: 16px !important; }
+  .filter-row { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; width: 100% !important; }
+  .filter-row .fg:first-child { grid-column: 1 / -1 !important; }
+  
+  .action-row { 
+    flex-direction: column !important; 
+    align-items: stretch !important; 
+    gap: 12px !important; 
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .action-btns { display: flex !important; flex-direction: column !important; gap: 8px !important; }
+  .action-btns > * { width: 100% !important; justify-content: center !important; }
+  .action-meta { display: flex !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; }
 
-  /* ID Studio Mobile Fixes */
+  /* Create ID Modal */
   #createIdModal .upd-box {
-    width: 98% !important;
-    margin: 5px auto !important;
-    max-height: calc(100vh - 10px) !important;
+    width: 96% !important;
+    margin: 8px auto !important;
+    max-height: calc(100vh - 16px) !important;
+    border-radius: 16px !important;
   }
-  #cid_step3_grid {
-    grid-template-columns: 1fr !important;
+  
+  .upd-topbar { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; padding: 16px !important; }
+  .cid-close-btn { width: 100% !important; justify-content: center !important; background: rgba(255,255,255,.05) !important; padding: 10px !important; }
+  
+  /* Step 1 & 2 Grids */
+  .cid-step-grid { display: grid !important; grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  
+  #createIdModal .upd-box div[style*="display:flex;gap:8px;margin-bottom:12px;"] {
+    flex-direction: column !important;
   }
-  #cid_preview_col {
-    min-height: 400px !important;
+  #cid_btn_batch, #cid_btn_single { width: 100% !important; }
+
+  /* Step 2 Templates Custom */
+  .cid-step-grid div[style*="background:rgba(0,0,0,0.15)"] {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center;
+    padding: 16px !important;
+    grid-column: 1 / -1 !important;
   }
-  #cid_controls_col {
-    max-height: none !important;
-    overflow-y: visible !important;
+  .cid-step-grid div[style*="flex:1;min-width:0"] { margin: 8px 0 !important; width: 100%; }
+  .cid-step-grid button { width: 100% !important; margin-bottom: 4px; }
+
+  /* Step 3 Studio */
+  #cid_step3_grid { grid-template-columns: 1fr !important; }
+  #cid_preview_col { min-height: 380px !important; height: auto !important; }
+  #cid_preview_col > div:last-child { flex-direction: column !important; gap: 12px !important; }
+  #cid_generate_btn { width: 100% !important; margin: 0 !important; }
+  #cid_controls_col { max-height: none !important; }
+  
+  /* Zoom Modal */
+  #cid_zoom_modal { padding: 8px !important; overflow-y: auto !important; }
+  #cid_zoom_modal > div:first-child { flex-direction: column !important; gap: 12px !important; align-items: stretch !important; }
+  #cid_zoom_grid { 
+    grid-template-columns: 1fr !important; 
+    height: auto !important; 
+    gap: 16px !important;
+    display: block !important; 
   }
-  #cid_zoom_modal {
-    padding: 10px !important;
-  }
-  #cid_zoom_grid {
-    grid-template-columns: 1fr !important;
-    height: auto !important;
-    overflow-y: auto !important;
-  }
+  #cid_zoom_controls_area { max-height: none !important; margin-top: 20px; }
+  .cid-card-box { transform: scale(0.8); transform-origin: center; margin: -20px 0; }
 }
 
 @media(max-width:480px){
-  .upd-topbar,.modal-tabs,.mpane,.upd-footer{padding-left:12px;padding-right:12px;}
-  .modal-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;}
-  .mtab{flex:0 0 auto;padding:10px 12px;}
+  #cid_batch_fields > div { grid-template-columns: 1fr !important; }
+  .upd-topbar h3 { font-size: 18px !important; }
+  .info-card-field { grid-template-columns: 1fr !important; gap: 4px !important; }
 }
 /* Success Popup */
 .app-success-popup {

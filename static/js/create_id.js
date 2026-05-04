@@ -234,13 +234,13 @@ window.cidResetPosition = function(id, e) {
 function cidGetVal(id, s) {
   const el = cidElements.find(e => e.id === id);
   if (el && el.override_val) return el.override_val;
-  if (id === 'name') return s.name || '[Name]';
+  if (id === 'name') return s.name || '[Full Name]';
   if (id === 'course') return s.course || s.program || '[Program]';
-  if (id === 'id_num') return s.student_id || '[ID]';
+  if (id === 'id_num') return s.student_id || '[Student ID]';
   if (id === 'school_year') return s.school_year || '[School Year]';
-  if (id === 'contact_number') return s.contact_number || s.guardian_contact || '[Contact]';
-  if (id === 'email') return s.email || '[Email]';
-  if (id === 'year_level') return s.year_level || '[Year]';
+  if (id === 'contact_number') return s.contact || s.contact_number || s.guardian_contact || '[Contact Number]';
+  if (id === 'email') return s.email || '[Email Address]';
+  if (id === 'year_level') return s.year_level || '[Year Level]';
   if (id === 'semester') return s.semester || '[Semester]';
   const cv = cidCustomVariables.find(v => v.id === id);
   return cv ? cv.val : '';

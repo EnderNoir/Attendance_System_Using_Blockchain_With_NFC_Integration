@@ -121,6 +121,31 @@
   .person-row>div{width:100%;}
   .prow-name{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35;}
   .btn-vr{width:100%;justify-content:center;}
+
+  /* ID Studio Mobile Fixes */
+  #createIdModal .upd-box {
+    width: 98% !important;
+    margin: 5px auto !important;
+    max-height: calc(100vh - 10px) !important;
+  }
+  #cid_step3_grid {
+    grid-template-columns: 1fr !important;
+  }
+  #cid_preview_col {
+    min-height: 400px !important;
+  }
+  #cid_controls_col {
+    max-height: none !important;
+    overflow-y: visible !important;
+  }
+  #cid_zoom_modal {
+    padding: 10px !important;
+  }
+  #cid_zoom_grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+    overflow-y: auto !important;
+  }
 }
 
 @media(max-width:480px){

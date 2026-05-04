@@ -8,6 +8,43 @@ let cidCustomType = 'text';
 let cidCustomImgData = null;
 let cidMode = 'batch';
 let cidPdfCancelled = false;
+let cidHistory = [];
+const cidMaxHistory = 30;
+
+function cidPushHistory() {
+  const state = JSON.stringify({
+    elements: cidElements,
+    vars: cidCustomVariables
+  });
+  if (cidHistory.length > 0 && cidHistory[cidHistory.length - 1] === state) return;
+  cidHistory.push(state);
+  if (cidHistory.length > cidMaxHistory) cidHistory.shift();
+  const undoBtn = document.getElementById('cid_undo_btn');
+  if (undoBtn) undoBtn.disabled = false;
+}
+
+window.cidUndo = function() {
+  if (cidHistory.length < 2) {
+    if (cidHistory.length === 1) {
+      // Just one state, can't really "undo" to anything earlier
+    }
+    return;
+  }
+  // Pop the current state (the one we just pushed before calling undo)
+  cidHistory.pop();
+  const lastState = JSON.parse(cidHistory[cidHistory.length - 1]);
+  cidElements = lastState.elements;
+  cidCustomVariables = lastState.vars;
+  
+  cidRenderElementList();
+  cidInjectElements();
+  if (cidActiveElId) cidSelectElement(cidActiveElId);
+  
+  if (cidHistory.length <= 1) {
+    const undoBtn = document.getElementById('cid_undo_btn');
+    if (undoBtn) undoBtn.disabled = true;
+  }
+};
 
 
 let cidElements = [
@@ -28,6 +65,8 @@ function openCreateIdModal() {
   document.getElementById('createIdModal').classList.add('show');
   cidUpdateCount();
   cidRenderElementList();
+  // Initial state for undo
+  if (cidHistory.length === 0) cidPushHistory();
 }
 function closeCreateIdModal() {
   document.getElementById('createIdModal').classList.remove('show');
@@ -135,6 +174,7 @@ function cidCheckReady() {
 
 window.cidToggleVisible = function(id, e) {
   e.stopPropagation();
+  cidPushHistory();
   const el = cidElements.find(d => d.id === id);
   el.visible = !el.visible;
   
@@ -148,11 +188,12 @@ window.cidToggleVisible = function(id, e) {
 
 window.cidResetPosition = function(id, e) {
   if (e) e.stopPropagation();
+  cidPushHistory();
   const el = cidElements.find(d => d.id === id);
   if (el) {
     el.x = 20; el.y = 20;
     cidInjectElements();
-    if (!e) cidRenderElementList(); // If called from toggle
+    if (!e) cidRenderElementList();
   }
 };
 
@@ -258,11 +299,12 @@ function cidShowEditModal(el) {
 }
 
 window.cidEditLabel = async function(id, e) {
-  e.stopPropagation();
+  if (e) e.stopPropagation();
   const el = cidElements.find(d => d.id === id);
-  if(!el) return;
+  if (!el) return;
   const res = await cidShowEditModal(el);
   if (res) {
+    cidPushHistory();
     if (res.label) el.label = res.label;
     el.override_val = res.val !== '' ? res.val : null;
     cidRenderElementList();
@@ -276,6 +318,7 @@ window.cidDeleteElement = async function(id, e) {
   const oldZ = dialog ? dialog.style.zIndex : '';
   if (dialog) dialog.style.zIndex = '2000001';
   if(await showAppConfirm('Delete this variable from the ID?')) {
+    cidPushHistory();
     cidElements = cidElements.filter(d => d.id !== id);
     if (cidActiveElId === id) cidActiveElId = null;
     cidRenderElementList();
@@ -357,7 +400,8 @@ function cidInjectElements() {
         handle.style.background = cidActiveElId === el.id ? 'var(--accent)' : '#F5C518';
         handle.style.border = '1px solid #000';
         
-        const sizeVal = 3.5 / actualScale;
+        // Even larger handles for better recognition on small elements
+        const sizeVal = 12 / actualScale;
         const size = sizeVal + 'px';
         const offset = -(sizeVal / 2) + 'px';
         
@@ -381,6 +425,7 @@ function cidInjectElements() {
           cidResizingId = el.id;
           cidResizeDir = dir;
           cidResizeStart = { x: e.clientX, y: e.clientY, w: div.offsetWidth, h: div.offsetHeight, top: el.y, left: el.x };
+          cidPushHistory();
         };
         div.appendChild(handle);
       });
@@ -434,6 +479,7 @@ function cidSelectElement(id) {
 
 function cidApplyStyle() {
   if (!cidActiveElId) return;
+  cidPushHistory();
   const el = cidElements.find(e => e.id === cidActiveElId);
   if (el.type === 'text') {
     const fontSel = document.getElementById('cid_st_font');
@@ -507,6 +553,7 @@ function cidLoadGoogleFont(fontName) {
 
 function cidMoveTo(side) {
   if (!cidActiveElId) return;
+  cidPushHistory();
   cidElements.find(e => e.id === cidActiveElId).side = side;
   cidRenderElementList();
   cidInjectElements();
@@ -531,19 +578,21 @@ function cidCustomImgSelected(input) {
 }
 
 function cidAddCustomVariable() {
-  const id = 'custom_' + Date.now();
+  const name = document.getElementById('cid_custom_name').value.trim();
+  const val = document.getElementById('cid_custom_val').value.trim();
+  if (!name) return;
+  
+  cidPushHistory();
+  const id = 'cv_' + Date.now();
   if (cidCustomType === 'text') {
-    const name = document.getElementById('cid_custom_name').value.trim();
-    const val = document.getElementById('cid_custom_val').value.trim();
-    if (!name || !val) return;
     cidCustomVariables.push({ id, label: name, val });
     cidElements.push({ id, label: name, type:'text', side:'front', x:50, y:50, size:12, font:'Inter', color:'#000000', weight:'400' });
     document.getElementById('cid_custom_name').value = '';
     document.getElementById('cid_custom_val').value = '';
   } else {
-    const name = document.getElementById('cid_custom_img_name').value.trim();
-    if (!name || !cidCustomImgData) return;
-    cidElements.push({ id, label: name, type:'custom_img', side:'front', x:50, y:50, w:60, h:60, imgData: cidCustomImgData });
+    const imgName = document.getElementById('cid_custom_img_name').value.trim();
+    if (!imgName || !cidCustomImgData) return;
+    cidElements.push({ id, label: id, label_alias: imgName, type:'custom_img', side:'front', x:50, y:50, w:60, h:60, imgData: cidCustomImgData });
     document.getElementById('cid_custom_img_name').value = '';
     document.getElementById('cid_custom_img_filename').textContent = 'No file chosen';
     cidCustomImgData = null;
@@ -607,11 +656,12 @@ document.addEventListener('mousedown', e => {
   const el = e.target.closest('.cid-draggable');
   if (!el || e.target.classList.contains('cid-resize-handle')) return;
   
+  cidPushHistory();
+  cidDraggingId = el.id.replace('view_el_', '');
   const r = el.getBoundingClientRect();
   const isResize = el.style.resize === 'horizontal' && (e.clientX > r.right - 18) && (e.clientY > r.bottom - 18);
   if (isResize) return; // allow native resize to take over without dragging
   
-  cidDraggingId = el.id.replace('view_el_', '');
   const actualScale = cidIsZoomed ? cidZoomScale : 1.0;
   cidDragOff.x = (e.clientX - r.left) / actualScale;
   cidDragOff.y = (e.clientY - r.top) / actualScale;

@@ -55,8 +55,9 @@ def attendance_stats_impl(
         where.append("s.started_at <= ?")
         params.append(end_dt.strftime('%Y-%m-%d %H:%M:%S'))
     if role == 'teacher':
-        where.append('s.teacher_username = ?')
+        where.append('(s.teacher_username = ? OR s.teacher_name = ?)')
         params.append(username)
+        params.append(session_obj.get('full_name', ''))
     if f_section:
         where.append('s.section_key = ?')
         params.append(normalize_section_key_fn(f_section))

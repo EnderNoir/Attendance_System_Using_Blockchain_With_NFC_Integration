@@ -167,8 +167,11 @@
           <div class="mb-3">
             <label class="form-label-sm">Section *</label>
             <div class="section-fields">
-              <div><label class="form-label-sm" style="margin-top:0;">Program</label><input class="ac-input"
-                  name="program" id="editProgram" required></div>
+              <div><label class="form-label-sm" style="margin-top:0;">Program</label>
+                <select class="ac-input" name="program" id="editProgram" required>
+                  <option value="">-- Select Program --</option>
+                </select>
+              </div>
               <div><label class="form-label-sm" style="margin-top:0;">Year Level</label>
                 <select class="ac-input" name="year_level" id="editYear" required>
                   <option>1st Year</option>
@@ -177,8 +180,11 @@
                   <option>4th Year</option>
                 </select>
               </div>
-              <div><label class="form-label-sm" style="margin-top:0;">Section</label><input class="ac-input"
-                  name="section" id="editSection" required></div>
+              <div><label class="form-label-sm" style="margin-top:0;">Section</label>
+                <select class="ac-input" name="section" id="editSection" required>
+                  <option value="">-- Select Section --</option>
+                </select>
+              </div>
             </div>
           </div>
           <div class="mb-3">
@@ -358,7 +364,9 @@
           <div class="section-fields">
             <div>
               <label class="form-label-sm" style="margin-top:0;">Program</label>
-              <input class="ac-input" name="program" id="addProgram" placeholder="e.g. BSCS" required>
+              <select class="ac-input" name="program" id="addProgram" required>
+                <option value="">-- Select Program --</option>
+              </select>
             </div>
             <div>
               <label class="form-label-sm" style="margin-top:0;">Year Level</label>
@@ -372,7 +380,9 @@
             </div>
             <div>
               <label class="form-label-sm" style="margin-top:0;">Section</label>
-              <input class="ac-input" name="section" id="addSection" placeholder="e.g. A" required>
+              <select class="ac-input" name="section" id="addSection" required>
+                <option value="">-- Select Section --</option>
+              </select>
             </div>
           </div>
         </div>
@@ -556,24 +566,9 @@
           <div style="display:flex;gap:8px;">
             <button type="button" class="btn-outline" onclick="addEventSection()">Add</button>
           </div>
-          <datalist id="eventProgramOptions">
-            {% for sk in sections %}
-            {% set sp = sk.split('|') %}
-            <option value="{{ sp[0] if sp|length > 0 else '' }}"></option>
-            {% endfor %}
-          </datalist>
-          <datalist id="eventYearOptions">
-            {% for sk in sections %}
-            {% set sp = sk.split('|') %}
-            <option value="{{ sp[1] if sp|length > 1 else '' }}"></option>
-            {% endfor %}
-          </datalist>
-          <datalist id="eventSectionOptions">
-            {% for sk in sections %}
-            {% set sp = sk.split('|') %}
-            <option value="{{ sp[2] if sp|length > 2 else '' }}"></option>
-            {% endfor %}
-          </datalist>
+          <datalist id="eventProgramOptions"></datalist>
+          <datalist id="eventYearOptions"></datalist>
+          <datalist id="eventSectionOptions"></datalist>
           <input type="hidden" name="selected_sections" id="eventSectionsHidden">
           <div id="eventSectionsTableWrap" style="margin-top:10px;"></div>
         </div>
@@ -617,4 +612,3 @@
 </script>
 <script src="{{ url_for('static', filename='js/admin-schedules.js') }}"></script>
 {% endblock %}
-

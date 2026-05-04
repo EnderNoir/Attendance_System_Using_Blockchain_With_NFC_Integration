@@ -1121,6 +1121,55 @@
       makeAC('editTeacherInput', 'editTeacherHidden', 'editTeacherBody', 'editTeacherDrop', teacherDataFn, 'label', 'role');
       makeAC('editSemesterInput', 'editSemesterInput', 'editSemesterBody', 'editSemesterDrop', semesterDataFn, 'id', 'label');
     }
+
+    /* -- SECTION DROPDOWNS: populate Program & Section from students table data -- */
+    (function populateSectionDropdowns() {
+      const sections = Array.isArray(SECTION_KEYS) ? SECTION_KEYS : [];
+      const programs = [];
+      const yearLevels = [];
+      const sectionLetters = [];
+      sections.forEach(function (sk) {
+        const parts = String(sk || '').split('|');
+        if (parts[0] && programs.indexOf(parts[0]) === -1) programs.push(parts[0]);
+        if (parts[1] && yearLevels.indexOf(parts[1]) === -1) yearLevels.push(parts[1]);
+        if (parts[2] && sectionLetters.indexOf(parts[2]) === -1) sectionLetters.push(parts[2]);
+      });
+      programs.sort();
+      yearLevels.sort();
+      sectionLetters.sort();
+
+      // Populate <select> dropdowns (Add / Edit schedule forms)
+      function fillSelect(id, values, placeholder) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        let html = '<option value="">' + placeholder + '</option>';
+        values.forEach(function (v) {
+          html += '<option value="' + v.replace(/"/g, '&quot;') + '">' + v + '</option>';
+        });
+        el.innerHTML = html;
+      }
+
+      // Populate <datalist> elements (Event schedule form — free text + suggestions)
+      function fillDatalist(id, values) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = values.map(function (v) {
+          return '<option value="' + v.replace(/"/g, '&quot;') + '"></option>';
+        }).join('');
+      }
+
+      // Add / Edit schedule selects
+      fillSelect('addProgram',  programs,       '-- Select Program --');
+      fillSelect('addSection',  sectionLetters, '-- Select Section --');
+      fillSelect('editProgram', programs,       '-- Select Program --');
+      fillSelect('editSection', sectionLetters, '-- Select Section --');
+
+      // Event schedule combo-box datalists
+      fillDatalist('eventProgramOptions',  programs);
+      fillDatalist('eventYearOptions',     yearLevels);
+      fillDatalist('eventSectionOptions',  sectionLetters);
+    })();
+
     checkPresessions();
     setInterval(checkRecurringSessions, 60000);
   });

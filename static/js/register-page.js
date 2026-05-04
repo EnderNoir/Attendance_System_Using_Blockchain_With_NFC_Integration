@@ -181,6 +181,8 @@ function applyUID(uid) {
   const err = hiddenInput.parentNode.querySelector('.reg-err');
   if (err) err.remove();
 }
+window.s_applyUID = applyUID;
+
 
 nfcHid.addEventListener('keydown', function onNfcKeydown(e) {
   clearTimeout(nfcTimer);
@@ -208,87 +210,7 @@ nfcHid.addEventListener('blur', () => setTimeout(refocusNFC, 150));
 window.addEventListener('load', () => nfcHid.focus());
 nfcHid.focus();
 
-async function startMobileRegistrationNfc() {
-  const btn = document.getElementById('mobileNfcRegisterBtn');
-  const sub = document.getElementById('nfcStripSub');
-  const title = document.getElementById('nfcStripTitle');
-  if (btn.dataset.scanning === '1') {
-    btn.dataset.scanning = '0';
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-phone"></i> Use Phone NFC Reader';
-    title.textContent = 'Phone NFC stopped';
-    sub.textContent = 'Tap "Use Phone NFC Reader" to start scanning again.';
-    return;
-  }
 
-  const decodeRecordPayload = (record) => {
-    try {
-      const decoder = new TextDecoder();
-      const bytes = new Uint8Array(record.data.buffer || record.data);
-      if (!bytes.length) return '';
-      if (record.recordType === 'text') {
-        const langLen = bytes[0] & 0x3f;
-        return decoder.decode(bytes.slice(1 + langLen)).trim();
-      }
-      if (record.recordType === 'url') {
-        const prefixes = ['', 'http://www.', 'https://www.', 'http://', 'https://'];
-        const prefix = prefixes[bytes[0]] || '';
-        return (prefix + decoder.decode(bytes.slice(1))).trim();
-      }
-      return decoder.decode(bytes).trim();
-    } catch (_) {
-      return '';
-    }
-  };
-
-  const extractUid = (event) => {
-    const fromSerial = String(event.serialNumber || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    if (fromSerial) return fromSerial;
-    const records = (event.message && event.message.records) ? Array.from(event.message.records) : [];
-    for (const rec of records) {
-      const raw = decodeRecordPayload(rec);
-      const normalized = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-      if (normalized.length >= 4) return normalized;
-    }
-    return '';
-  };
-
-  if (!('NDEFReader' in window)) {
-    title.textContent = 'Phone NFC not supported here';
-    sub.textContent = 'Use Android Chrome with NFC enabled, then try again.';
-    return;
-  }
-  try {
-    btn.disabled = true;
-    btn.dataset.scanning = '1';
-    const ndef = new NDEFReader();
-    await ndef.scan();
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-stop-circle"></i> Stop Phone NFC';
-    title.textContent = 'Phone NFC active';
-    sub.textContent = 'Tap the student card on your phone.';
-    ndef.addEventListener('readingerror', () => {
-      sub.textContent = 'Read error. Tap the card again.';
-    });
-    ndef.addEventListener('reading', (event) => {
-      if (btn.dataset.scanning !== '1') return;
-      const uid = extractUid(event);
-      if (!uid) return;
-      applyUID(uid);
-    });
-  } catch (err) {
-    title.textContent = 'Could not start phone NFC';
-    sub.textContent = 'Check browser permission and NFC setting, then retry.';
-    btn.dataset.scanning = '0';
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-phone"></i> Use Phone NFC Reader';
-  }
-}
-
-const mobileNfcRegisterBtn = document.getElementById('mobileNfcRegisterBtn');
-if (mobileNfcRegisterBtn) {
-  mobileNfcRegisterBtn.addEventListener('click', startMobileRegistrationNfc);
-}
 
 function previewStudentPhoto(input) {
   if (!input.files || !input.files[0]) return;

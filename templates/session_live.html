@@ -264,7 +264,7 @@
   </div>
   <div class="nfc-strip-status" id="nfcStripStatus" style="color:var(--muted); margin-right: 12px;">—</div>
   {% if session.get('role') not in ('admin', 'super_admin') %}
-  <button type="button" class="btn-outline" id="mobileNfcStripBtn" style="margin-left: auto; white-space: nowrap;" onclick="startMobileSessionNfc()">
+  <button type="button" class="btn-outline" id="mobileNfcStripBtn" style="margin-left: auto; white-space: nowrap;" onclick="startPhoneNFC()">
     <i class="bi bi-phone"></i> Use Phone's NFC
   </button>
   {% endif %}

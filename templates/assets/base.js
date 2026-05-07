@@ -396,7 +396,7 @@ function nfcHexToDec(hex, reverse = false) {
     finalHex = pairs.reverse().join('');
   }
   try {
-    return BigInt('0x' + finalHex).toString();
+    return BigInt('0x' + finalHex).toString().padStart(10, '0');
   } catch (e) {
     console.error("NFC Conversion Error:", e);
     return finalHex;

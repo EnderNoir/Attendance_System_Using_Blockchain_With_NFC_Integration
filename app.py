@@ -4,6 +4,7 @@ from datetime import datetime
 from functools import wraps
 from threading import Thread, Lock
 import json, os, secrets, time, hashlib, uuid, re, base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import deque
 from zoneinfo import ZoneInfo
 from werkzeug.utils import secure_filename
@@ -4921,25 +4922,21 @@ def parse_batch_pdfs():
  
     students = []
     errors   = []
- 
-    for f in pdf_files:
+
+    def process_one_file(f):
         filename = f.filename or 'unknown.pdf'
         try:
             raw_bytes = f.read()
             if not raw_bytes:
-                errors.append(f'Empty file: {filename}')
-                continue
- 
+                return None, f'Empty file: {filename}'
+
             full = _parse_cvsu_pdf_text(raw_bytes)
             if not full.strip():
-                errors.append(f'Could not extract text from: {filename}')
-                continue
- 
+                return None, f'Could not extract text from: {filename}'
+
             result = _extract_cvsu_fields(full)
- 
+
             # Fallback: derive name from filename if PDF gave nothing
-            # Handles:  LASTNAME_FIRSTNAME MIDDLE.pdf
-            #           AMBATA_JHAY VIC_GUILLERMO.pdf
             if not result['name']:
                 base = re.sub(r'\.pdf$', '', filename, flags=re.IGNORECASE)
                 if '_' in base:
@@ -4949,27 +4946,32 @@ def parse_batch_pdfs():
                     result['name'] = f"{first} {last}"
                 else:
                     result['name'] = base.replace('-', ' ').replace('_', ' ').strip().title()
- 
+
                 if result['name']:
-                    print(f'[BATCH PDF] Name from filename: "{result["name"]}"')
                     if not result['email']:
                         result['email'] = _generate_cvsu_email(result['name'])
- 
+
             if not result['name'] and not result['student_id']:
-                errors.append(f'No usable data extracted from: {filename}')
-                continue
- 
+                return None, f'No usable data extracted from: {filename}'
+
             result['filename'] = filename
-            students.append(result)
- 
-            print(f'[BATCH PDF] OK  "{filename}" -> "{result["name"]}" '
-                  f'id="{result["student_id"]}" yr="{result["year_level"]}" '
-                  f'sec="{result["section"]}" subj={len(result["subjects"])}')
- 
+            return result, None
+
         except Exception as e:
+            import traceback
             tb = traceback.format_exc()
             print(f'[BATCH PDF ERROR] {filename}\n{tb}')
-            errors.append(f'{filename}: {type(e).__name__} — {str(e)}')
+            return None, f'{filename}: {type(e).__name__} — {str(e)}'
+
+    # Use ThreadPoolExecutor for parallel parsing (fast!)
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_file = {executor.submit(process_one_file, f): f for f in pdf_files}
+        for future in as_completed(future_to_file):
+            res, err = future.result()
+            if res:
+                students.append(res)
+            if err:
+                errors.append(err)
  
     if not students:
         return jsonify({

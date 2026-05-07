@@ -280,18 +280,36 @@
 
     <div id="reviewPanel" style="display:none;">
       <!-- Global Batch Settings -->
+      <div class="batch-global-settings" style="background:rgba(255,255,255,.02); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px; display:flex; align-items:flex-end; gap:20px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:250px;">
+          <label style="display:block; font-size:11px; font-weight:700; color:var(--accent); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;">
+            <i class="bi bi-person-badge"></i> Adviser Name
+          </label>
+          <select class="form-control" id="batchGlobalAdviser" style="background:var(--input-bg); color:var(--text); border-color:var(--border); font-weight:600; padding:10px 14px;">
+            <option value="">— Use individual advisers from PDFs —</option>
+            {% for u, d in users_db.items() %}{% if d.role in ('teacher','admin') %}
+            <option value="{{ d.full_name }}">{{ d.full_name }}</option>
+            {% endif %}{% endfor %}
+          </select>
+          <div style="font-size:11px; color:var(--muted); margin-top:8px; display:flex; align-items:center; gap:6px;">
+            <i class="bi bi-info-circle"></i> <span>Selecting an adviser here will override all students in this batch.</span>
+          </div>
+        </div>
+        <div style="padding-left:20px; border-left:1px solid var(--border); display:flex; flex-direction:column; gap:8px;">
+          <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Batch Actions</div>
+          <button type="button" class="btn-outline" style="font-size:12px; padding:9px 16px; background:transparent; border-color:var(--border); color:var(--muted); height:42px;" onclick="b_resetAll()">
+            <i class="bi bi-trash"></i> Clear Batch
+          </button>
         </div>
       </div>
 
-      <!-- Subject Summary moved to Phase 1 -->
+      <!-- Subject Summary -->
       <div id="subjectSummaryBox" style="display:none; margin-bottom:20px; background:rgba(255,255,255,.01); border:1px solid var(--border); border-radius:12px; padding:16px;">
         <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
           <i class="bi bi-book"></i> // Subjects Found in PDFs — Will Be Added to Catalogue
         </div>
         <div id="subjectList" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
       </div>
-
-      <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
 
       <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
         <span>// Parsed Students — Sorted by Surname</span>

@@ -5592,66 +5592,68 @@ def api_session_attendance(sess_id):
                 'enrollment_status': st.get('enrollment_status', 'Regular'),
             }
 
-        # Primary approach: use get_all_students() and match by section_key
-        # This is more reliable as it handles both blockchain-sourced and database students
-        all_students = get_all_students()
-        all_students = get_all_students()
-        sess_semester = normalize_semester(sess.get('semester') or '')
-        if is_school_event:
-            enrolled = [
-                s for s in all_students 
-                if build_student_section_key(s) in section_keys 
-                and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
-            ]
-        else:
-            enrolled = [
-                s for s in all_students 
-                if build_student_section_key(s) == section_key 
-                and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
-            ]
+        # For live sessions, we supplement the logs with the currently enrolled students 
+        # so we can see who is 'absent' in real-time.
+        # For COMPLETED sessions, we strictly only show students from the attendance logs 
+        # (which already include the captured absent students) and excuse records.
+        if not sess.get('ended_at'):
+            all_students = get_all_students()
+            sess_semester = normalize_semester(sess.get('semester') or '')
+            if is_school_event:
+                enrolled = [
+                    s for s in all_students 
+                    if build_student_section_key(s) in section_keys 
+                    and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
+                ]
+            else:
+                enrolled = [
+                    s for s in all_students 
+                    if build_student_section_key(s) == section_key 
+                    and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
+                ]
 
-        # Fallback: if no students found via section_key, try exact database query
-        if (not is_school_event) and (not enrolled) and program and year_level and section_val:
-            with get_db() as _conn:
-                if sess_semester:
-                    _rows = _conn.execute(
-                        "SELECT * FROM students WHERE program=? AND year_level=? AND section=? AND lower(trim(semester))=?",
-                        (program, year_level, section_val, sess_semester)
-                    ).fetchall()
-                else:
-                    _rows = _conn.execute(
-                        "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
-                        (program, year_level, section_val)
-                    ).fetchall()
-            enrolled = [_student_row(r) for r in _rows]
+            # Fallback: if no students found via section_key, try exact database query
+            if (not is_school_event) and (not enrolled) and program and year_level and section_val:
+                with get_db() as _conn:
+                    if sess_semester:
+                        _rows = _conn.execute(
+                            "SELECT * FROM students WHERE program=? AND year_level=? AND section=? AND lower(trim(semester))=?",
+                            (program, year_level, section_val, sess_semester)
+                        ).fetchall()
+                    else:
+                        _rows = _conn.execute(
+                            "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
+                            (program, year_level, section_val)
+                        ).fetchall()
+                enrolled = [_student_row(r) for r in _rows]
 
-        for s in enrolled:
-            nid = s['nfcId']
-            if nid in students_map:
-                continue
-            section_origin = '-'.join([
-                str(s.get('course') or '').strip(),
-                str(s.get('year_level') or '').strip(),
-                str(s.get('section') or '').strip(),
-            ]).strip('-') or '-'
-            students_map[nid] = {
-                'nfc_id':     nid,
-                'name':       s.get('name', nid),
-                'student_id': s.get('student_id', ''),
-                'section_origin': section_origin,
-                'program': s.get('course', ''),
-                'year_level': s.get('year_level', ''),
-                'section': s.get('section', ''),
-                'status':     'absent',
-                'class_type': str(sess.get('class_type', 'lecture')).lower(),
-                'tx_hash':    '',
-                'block':      '',
-                'time':       '',
-                'reason':     '',
-                'reason_detail': '',
-                'attachment_url': '',
-                'enrollment_status': s.get('enrollment_status', 'Regular'),
-            }
+            for s in enrolled:
+                nid = s['nfcId']
+                if nid in students_map:
+                    continue
+                section_origin = '-'.join([
+                    str(s.get('course') or '').strip(),
+                    str(s.get('year_level') or '').strip(),
+                    str(s.get('section') or '').strip(),
+                ]).strip('-') or '-'
+                students_map[nid] = {
+                    'nfc_id':     nid,
+                    'name':       s.get('name', nid),
+                    'student_id': s.get('student_id', ''),
+                    'section_origin': section_origin,
+                    'program': s.get('course', ''),
+                    'year_level': s.get('year_level', ''),
+                    'section': s.get('section', ''),
+                    'status':     'absent',
+                    'class_type': str(sess.get('class_type', 'lecture')).lower(),
+                    'tx_hash':    '',
+                    'block':      '',
+                    'time':       '',
+                    'reason':     '',
+                    'reason_detail': '',
+                    'attachment_url': '',
+                    'enrollment_status': s.get('enrollment_status', 'Regular'),
+                }
 
         students_out = sorted(students_map.values(), key=lambda x: (x.get('name') or 'Unknown').lower())
         return jsonify({

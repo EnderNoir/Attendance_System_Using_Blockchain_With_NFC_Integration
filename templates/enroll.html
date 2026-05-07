@@ -279,7 +279,34 @@
     </div>
 
     <div id="reviewPanel" style="display:none;">
-      <div class="section-title">// Parsed Students — Sorted by Surname</div>
+      <!-- Global Batch Settings -->
+      <div class="batch-global-settings" style="background:rgba(45,106,39,.05); border:1px solid rgba(45,106,39,.1); border-radius:12px; padding:16px; margin-bottom:20px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:250px;">
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--accent); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">
+            <i class="bi bi-person-badge"></i> Global Batch Adviser
+          </label>
+          <select class="form-control" id="batchGlobalAdviser" style="background:#fff; border-color:rgba(45,106,39,.2); font-weight:600;">
+            <option value="">— Use individual advisers from PDFs —</option>
+            {% for u, d in users_db.items() %}{% if d.role in ('teacher','admin') %}
+            <option value="{{ d.full_name }}">{{ d.full_name }}</option>
+            {% endif %}{% endfor %}
+          </select>
+          <p style="font-size:11px; color:var(--muted); margin-top:6px;">
+            <i class="bi bi-info-circle"></i> Selecting an adviser here will override all students in this batch.
+          </p>
+        </div>
+        <div style="padding-left:20px; border-left:1px solid rgba(45,106,39,.1);">
+          <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:4px;">Batch Actions</div>
+          <button type="button" class="btn-outline" style="font-size:12px; padding:6px 12px; background:#fff;" onclick="b_resetAll()">
+            <i class="bi bi-trash"></i> Clear Batch
+          </button>
+        </div>
+      </div>
+
+      <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
+        <span>// Parsed Students — Sorted by Surname</span>
+        <span id="batchCountBadge" class="order-badge" style="background:var(--accent); color:#fff; font-size:12px; padding:4px 10px;">0 Students</span>
+      </div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">
         <i class="bi bi-pencil-square"></i>
         Click <strong>Edit</strong> on any row to fill in missing fields.

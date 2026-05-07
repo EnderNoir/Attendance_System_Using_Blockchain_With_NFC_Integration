@@ -34,8 +34,17 @@ def _generate_cvsu_email(name: str) -> str:
     clean = re.sub(r'\s+', ' ', clean)
     words = clean.split()
     if len(words) >= 2:
-        first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
-        last_slug = re.sub(r'[^a-z]', '', words[-1].lower())
+        # Handle multi-part surnames like "De Gala" or "San Agustin"
+        prefixes = {'de', 'dela', 'delos', 'san', 'santa', 'santo', 'mc', 'mac', 'van', 'von'}
+        surname_index = len(words) - 1
+        if len(words) >= 3:
+            second_last = words[-2].lower()
+            if second_last in prefixes:
+                surname_index = len(words) - 2
+
+        first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:surname_index])
+        last_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[surname_index:])
+        
         if first_slug and last_slug:
             return f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
     return ''

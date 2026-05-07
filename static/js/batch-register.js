@@ -45,7 +45,7 @@ function handleFileSelect(input) {
   if (input.files && input.files.length > 0) processPDFFiles(input.files);
 }
 
-function processPDFFiles(files) {
+async function processPDFFiles(files) {
   const pdfs = Array.from(files).filter((f) =>
     f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
   if (!pdfs.length) {
@@ -53,39 +53,75 @@ function processPDFFiles(files) {
     return;
   }
 
-  setBanner('loading', '⏳',
-    `Processing ${pdfs.length} PDF(s)…`,
-    'Extracting student data and sorting alphabetically…');
+  // We no longer reset students = []; here to allow appending.
+  let allErrors = [];
+  const CHUNK_SIZE = 5; // Process 5 PDFs at a time to avoid server timeouts
+  const total = pdfs.length;
 
-  const fd = new FormData();
-  pdfs.forEach((f) => fd.append('files', f));
+  // Reset UI but don't clear students array
+  // document.getElementById('studentTbody').innerHTML = ''; 
 
-  fetch('/parse_batch_pdfs', { method: 'POST', credentials: 'same-origin', body: fd })
-    .then((r) => {
+  for (let i = 0; i < total; i += CHUNK_SIZE) {
+    const chunk = pdfs.slice(i, i + CHUNK_SIZE);
+    const end = Math.min(i + CHUNK_SIZE, total);
+    
+    setBanner('loading', '⏳',
+      `Processing ${i + 1}-${end} of ${total} PDF(s)…`,
+      'Extracting student data and sorting…');
+
+    const fd = new FormData();
+    chunk.forEach((f) => fd.append('files', f));
+
+    try {
+      const r = await fetch('/parse_batch_pdfs', { method: 'POST', credentials: 'same-origin', body: fd });
       if (!r.ok) throw new Error('Server error ' + r.status);
-      return r.json();
-    })
-    .then((data) => {
-      if (data.error) {
+      const data = await r.json();
+      
+      if (data.error && (!data.students || data.students.length === 0)) {
         setBanner('error', '❌', 'Could not parse PDFs', data.error);
         (data.details || []).forEach((e) => showMsg(e, 'error'));
         return;
       }
-      students = (data.students || []).map((s) => ({ ...s, nfc_id: null, _skipped: false }));
-      if (!students.length) {
-        setBanner('error', '❌', 'No student data found', 'Check that the PDFs are CvSU registration forms.');
-        return;
-      }
-      setBanner('success', '✅',
-        `Found ${students.length} student(s) — sorted alphabetically`,
-        'Review data below. Click Edit on any row to fill missing fields.');
-      renderReviewTable();
-      document.getElementById('reviewPanel').style.display = 'block';
-      (data.errors || []).forEach((e) => showMsg('⚠ ' + e, 'info'));
-    })
-    .catch((err) => {
+      
+      const chunkStudents = (data.students || []).map((s) => ({ ...s, nfc_id: null, _skipped: false }));
+      students = students.concat(chunkStudents);
+      if (data.errors) allErrors = allErrors.concat(data.errors);
+      
+    } catch (err) {
       setBanner('error', '❌', 'Upload failed', err.message);
-    });
+      return;
+    }
+  }
+
+  if (!students.length) {
+    setBanner('error', '❌', 'No student data found', 'Check that the PDFs are CvSU registration forms.');
+    return;
+  }
+
+  // Global sort by surname
+  students.sort((a, b) => {
+    const nameA = (a.name || '').toLowerCase();
+    const nameB = (b.name || '').toLowerCase();
+    // Simple surname sort: split by space and take last word
+    const getSurname = (n) => {
+      const p = n.trim().split(/\s+/);
+      return p[p.length - 1] || '';
+    };
+    const surA = getSurname(nameA);
+    const surB = getSurname(nameB);
+    if (surA !== surB) return surA.localeCompare(surB);
+    return nameA.localeCompare(nameB);
+  });
+
+  setBanner('success', '✅',
+    `Found ${students.length} student(s) — sorted alphabetically`,
+    'Review data below. Click Edit on any row to fill missing fields.');
+  renderReviewTable();
+  if (document.getElementById('batchCountBadge')) {
+    document.getElementById('batchCountBadge').textContent = `${students.length} Student(s)`;
+  }
+  document.getElementById('reviewPanel').style.display = 'block';
+  allErrors.forEach((e) => showMsg('⚠ ' + e, 'info'));
 }
 
 /* Phase 1: review table */
@@ -445,6 +481,16 @@ function doRegister() {
     showMsg('No students with NFC cards assigned. Nothing to register.', 'error');
     return;
   }
+
+  // Apply Global Batch Adviser if selected
+  const globalAdviserEl = document.getElementById('batchGlobalAdviser');
+  const globalAdviser = globalAdviserEl ? globalAdviserEl.value : '';
+  if (globalAdviser) {
+    toRegister.forEach(s => {
+      s.adviser = globalAdviser;
+    });
+  }
+
   const btn = document.getElementById('registerBtn');
   btn.disabled = true;
   btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Registering…';

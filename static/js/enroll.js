@@ -23,8 +23,20 @@ function cvsuEmail(name) {
   clean = clean.replace(/\s+/g, ' ').trim();
   const words = clean.split(' ').filter(Boolean);
   if (words.length < 2) return '';
-  const firstSlug = words.slice(0, -1).map(w => w.toLowerCase().replace(/[^a-z]/g, '')).join('');
-  const lastSlug = words[words.length - 1].toLowerCase().replace(/[^a-z]/g, '');
+
+  // Handle multi-part surnames like "De Gala" or "San Agustin"
+  const prefixes = ['de', 'dela', 'delos', 'san', 'santa', 'santo', 'mc', 'mac', 'van', 'von'];
+  let surnameIndex = words.length - 1;
+  if (words.length >= 3) {
+    const secondLast = words[words.length - 2].toLowerCase();
+    if (prefixes.includes(secondLast)) {
+      surnameIndex = words.length - 2;
+    }
+  }
+
+  const firstSlug = words.slice(0, surnameIndex).map(w => w.toLowerCase().replace(/[^a-z]/g, '')).join('');
+  const lastSlug = words.slice(surnameIndex).map(w => w.toLowerCase().replace(/[^a-z]/g, '')).join('');
+  
   if (!firstSlug || !lastSlug) return '';
   return `sc.${firstSlug}.${lastSlug}@cvsu.edu.ph`;
 }
@@ -292,39 +304,80 @@ function b_handleFileSelect(input) {
   if (input.files && input.files.length > 0) b_processPDFFiles(input.files);
 }
 
-function b_processPDFFiles(files) {
+async function b_processPDFFiles(files) {
   const pdfs = Array.from(files).filter(f =>
     f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
   if (!pdfs.length) { showMsg('Please select PDF files only.', 'error'); return; }
-  b_setBanner('loading', '⏳',
-    `Processing ${pdfs.length} PDF(s)…`, 'Extracting student data and sorting alphabetically…');
-  const fd = new FormData();
-  pdfs.forEach(f => fd.append('files', f));
-  fetch('/parse_batch_pdfs', { method: 'POST', credentials: 'same-origin', body: fd })
-    .then(r => { if (!r.ok) throw new Error('Server error ' + r.status); return r.json(); })
-    .then(data => {
-      if (data.error) {
+
+  let allErrors = [];
+  const CHUNK_SIZE = 5;
+  const total = pdfs.length;
+
+  // We no longer reset b_students to [] here to allow appending.
+  // document.getElementById('studentTbody').innerHTML = ''; // Keep previous rows
+
+  for (let i = 0; i < total; i += CHUNK_SIZE) {
+    const chunk = pdfs.slice(i, i + CHUNK_SIZE);
+    const end = Math.min(i + CHUNK_SIZE, total);
+
+    b_setBanner('loading', '⏳',
+      `Processing ${i + 1}-${end} of ${total} PDF(s)…`, 
+      'Extracting student data and sorting…');
+
+    const fd = new FormData();
+    chunk.forEach(f => fd.append('files', f));
+
+    try {
+      const r = await fetch('/parse_batch_pdfs', { method: 'POST', credentials: 'same-origin', body: fd });
+      if (!r.ok) throw new Error('Server error ' + r.status);
+      const data = await r.json();
+
+      if (data.error && (!data.students || data.students.length === 0)) {
         b_setBanner('error', '❌', 'Could not parse PDFs', data.error);
         (data.details || []).forEach(e => showMsg(e, 'error'));
         return;
       }
-      // ── FIX: ensure email is generated for every student ──────────
-      b_students = (data.students || []).map(s => {
+
+      const chunkStudents = (data.students || []).map(s => {
         if (!s.email && s.name) s.email = cvsuEmail(s.name);
         return { ...s, nfc_id: null, _skipped: false, enrollment_status: 'Regular' };
       });
-      if (!b_students.length) {
-        b_setBanner('error', '❌', 'No student data found', 'Check that the PDFs are CvSU registration forms.');
-        return;
-      }
-      b_setBanner('success', '✅',
-        `Found ${b_students.length} student(s) — sorted alphabetically`,
-        'Review data below. Click Edit on any row to fill missing fields.');
-      renderReviewTable();
-      document.getElementById('reviewPanel').style.display = 'block';
-      (data.errors || []).forEach(e => showMsg('⚠ ' + e, 'info'));
-    })
-    .catch(err => b_setBanner('error', '❌', 'Upload failed', err.message));
+      
+      b_students = b_students.concat(chunkStudents);
+      if (data.errors) allErrors = allErrors.concat(data.errors);
+
+    } catch (err) {
+      b_setBanner('error', '❌', 'Upload failed', err.message);
+      return;
+    }
+  }
+
+  if (!b_students.length) {
+    b_setBanner('error', '❌', 'No student data found', 'Check that the PDFs are CvSU registration forms.');
+    return;
+  }
+
+  // Global sort by surname
+  b_students.sort((a, b) => {
+    const nameA = (a.name || '').toLowerCase();
+    const nameB = (b.name || '').toLowerCase();
+    const getSurname = (n) => {
+      const p = n.trim().split(/\s+/);
+      return p[p.length - 1] || '';
+    };
+    const surA = getSurname(nameA);
+    const surB = getSurname(nameB);
+    if (surA !== surB) return surA.localeCompare(surB);
+    return nameA.localeCompare(nameB);
+  });
+
+  b_setBanner('success', '✅',
+    `Found ${b_students.length} student(s) — sorted alphabetically`,
+    'Review data below. Click Edit on any row to fill missing fields.');
+  renderReviewTable();
+  document.getElementById('batchCountBadge').textContent = `${b_students.length} Student(s)`;
+  document.getElementById('reviewPanel').style.display = 'block';
+  allErrors.forEach(e => showMsg('⚠ ' + e, 'info'));
 }
 
 /* ── Review table ─────────────────────────────────────────────────── */
@@ -700,6 +753,15 @@ function renderSummary() {
 function doRegister() {
   const toRegister = b_students.filter(s => s.nfc_id);
   if (!toRegister.length) { showMsg('No students with NFC cards assigned. Nothing to register.', 'error'); return; }
+  
+  // Apply Global Batch Adviser if selected
+  const globalAdviser = document.getElementById('batchGlobalAdviser').value;
+  if (globalAdviser) {
+    toRegister.forEach(s => {
+      s.adviser = globalAdviser;
+    });
+  }
+
   const btn = document.getElementById('registerBtn');
   btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Registering…';
   document.getElementById('studentsDataInput').value = JSON.stringify(toRegister);
@@ -725,6 +787,13 @@ function b_resetAll() {
   document.getElementById('reviewPanel').style.display = 'none';
   document.getElementById('studentTbody').innerHTML = '';
   document.getElementById('msgBox').innerHTML = '';
+  
+  const globalAdv = document.getElementById('batchGlobalAdviser');
+  if (globalAdv) globalAdv.value = '';
+  
+  const badge = document.getElementById('batchCountBadge');
+  if (badge) badge.textContent = '0 Students';
+
   b_setBanner('', '📄',
     'Upload Multiple CvSU Registration PDFs',
     'Drop PDF files here or click to browse — students will be sorted alphabetically by surname');

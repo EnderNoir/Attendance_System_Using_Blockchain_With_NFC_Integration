@@ -5592,66 +5592,68 @@ def api_session_attendance(sess_id):
                 'enrollment_status': st.get('enrollment_status', 'Regular'),
             }
 
-        # Primary approach: use get_all_students() and match by section_key
-        # This is more reliable as it handles both blockchain-sourced and database students
-        all_students = get_all_students()
-        all_students = get_all_students()
-        sess_semester = normalize_semester(sess.get('semester') or '')
-        if is_school_event:
-            enrolled = [
-                s for s in all_students 
-                if build_student_section_key(s) in section_keys 
-                and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
-            ]
-        else:
-            enrolled = [
-                s for s in all_students 
-                if build_student_section_key(s) == section_key 
-                and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
-            ]
+        # For live sessions, we supplement the logs with the currently enrolled students 
+        # so we can see who is 'absent' in real-time.
+        # For COMPLETED sessions, we strictly only show students from the attendance logs 
+        # (which already include the captured absent students) and excuse records.
+        if not sess.get('ended_at'):
+            all_students = get_all_students()
+            sess_semester = normalize_semester(sess.get('semester') or '')
+            if is_school_event:
+                enrolled = [
+                    s for s in all_students 
+                    if build_student_section_key(s) in section_keys 
+                    and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
+                ]
+            else:
+                enrolled = [
+                    s for s in all_students 
+                    if build_student_section_key(s) == section_key 
+                    and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
+                ]
 
-        # Fallback: if no students found via section_key, try exact database query
-        if (not is_school_event) and (not enrolled) and program and year_level and section_val:
-            with get_db() as _conn:
-                if sess_semester:
-                    _rows = _conn.execute(
-                        "SELECT * FROM students WHERE program=? AND year_level=? AND section=? AND lower(trim(semester))=?",
-                        (program, year_level, section_val, sess_semester)
-                    ).fetchall()
-                else:
-                    _rows = _conn.execute(
-                        "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
-                        (program, year_level, section_val)
-                    ).fetchall()
-            enrolled = [_student_row(r) for r in _rows]
+            # Fallback: if no students found via section_key, try exact database query
+            if (not is_school_event) and (not enrolled) and program and year_level and section_val:
+                with get_db() as _conn:
+                    if sess_semester:
+                        _rows = _conn.execute(
+                            "SELECT * FROM students WHERE program=? AND year_level=? AND section=? AND lower(trim(semester))=?",
+                            (program, year_level, section_val, sess_semester)
+                        ).fetchall()
+                    else:
+                        _rows = _conn.execute(
+                            "SELECT * FROM students WHERE program=? AND year_level=? AND section=?",
+                            (program, year_level, section_val)
+                        ).fetchall()
+                enrolled = [_student_row(r) for r in _rows]
 
-        for s in enrolled:
-            nid = s['nfcId']
-            if nid in students_map:
-                continue
-            section_origin = '-'.join([
-                str(s.get('course') or '').strip(),
-                str(s.get('year_level') or '').strip(),
-                str(s.get('section') or '').strip(),
-            ]).strip('-') or '-'
-            students_map[nid] = {
-                'nfc_id':     nid,
-                'name':       s.get('name', nid),
-                'student_id': s.get('student_id', ''),
-                'section_origin': section_origin,
-                'program': s.get('course', ''),
-                'year_level': s.get('year_level', ''),
-                'section': s.get('section', ''),
-                'status':     'absent',
-                'class_type': str(sess.get('class_type', 'lecture')).lower(),
-                'tx_hash':    '',
-                'block':      '',
-                'time':       '',
-                'reason':     '',
-                'reason_detail': '',
-                'attachment_url': '',
-                'enrollment_status': s.get('enrollment_status', 'Regular'),
-            }
+            for s in enrolled:
+                nid = s['nfcId']
+                if nid in students_map:
+                    continue
+                section_origin = '-'.join([
+                    str(s.get('course') or '').strip(),
+                    str(s.get('year_level') or '').strip(),
+                    str(s.get('section') or '').strip(),
+                ]).strip('-') or '-'
+                students_map[nid] = {
+                    'nfc_id':     nid,
+                    'name':       s.get('name', nid),
+                    'student_id': s.get('student_id', ''),
+                    'section_origin': section_origin,
+                    'program': s.get('course', ''),
+                    'year_level': s.get('year_level', ''),
+                    'section': s.get('section', ''),
+                    'status':     'absent',
+                    'class_type': str(sess.get('class_type', 'lecture')).lower(),
+                    'tx_hash':    '',
+                    'block':      '',
+                    'time':       '',
+                    'reason':     '',
+                    'reason_detail': '',
+                    'attachment_url': '',
+                    'enrollment_status': s.get('enrollment_status', 'Regular'),
+                }
 
         students_out = sorted(students_map.values(), key=lambda x: (x.get('name') or 'Unknown').lower())
         return jsonify({
@@ -6558,202 +6560,6 @@ def api_block_number():
     try: return jsonify({'block':web3.eth.block_number})
     except: return jsonify({'block':None})
 
-
-def _network_name_from_chain_id(chain_id: int) -> str:
-    if chain_id == 31337:
-        return 'Hardhat Local'
-    if chain_id == 1337:
-        return 'Local Dev Chain'
-    if chain_id == 1:
-        return 'Ethereum Mainnet'
-    if chain_id == 11155111:
-        return 'Sepolia Testnet'
-    return f'Chain {chain_id}'
-
-
-@app.route('/blockchain-visualization')
-def public_blockchain_visualization():
-    return render_template('public_blockchain_visualization.html')
-
-
-@app.route('/api/public/blockchain/visualization')
-def api_public_blockchain_visualization():
-    """
-    Public-safe blockchain visualization payload.
-
-    IMPORTANT: exposes no student identities or attendance payload details.
-    Only block metadata and transaction hashes are returned.
-    """
-    limit = request.args.get('limit', type=int, default=20) or 20
-    limit = max(5, min(limit, 100))
-    subject = (request.args.get('subject') or '').strip()
-    year = (request.args.get('year') or '').strip()
-
-    available_subjects = []
-    available_years = []
-    filtered_tx_hashes = set()
-    context_summary = {
-        'subject': subject or 'All Subjects',
-        'year': year or 'All Years',
-        'attendance_logs': 0,
-        'attendance_logs_on_chain': 0,
-        'subject_options': [],
-        'year_options': [],
-        'is_filtered': bool(subject or year),
-        'note': 'This blockchain view uses the same DAVS smart contract used to anchor attendance transaction hashes.',
-    }
-
-    try:
-        with get_db() as conn:
-            available_subjects = [
-                r['subject_name'] for r in conn.execute(
-                    "SELECT DISTINCT subject_name FROM sessions WHERE TRIM(subject_name) <> '' ORDER BY subject_name"
-                ).fetchall()
-            ]
-            available_years = [
-                r['year'] for r in conn.execute(
-                    "SELECT DISTINCT substr(tap_time,1,4) AS year "
-                    "FROM attendance_logs "
-                    "WHERE LENGTH(tap_time) >= 4 AND tap_time GLOB '[0-9][0-9][0-9][0-9]*' "
-                    "ORDER BY year DESC"
-                ).fetchall()
-                if r['year']
-            ]
-
-            where_parts = ["1=1"]
-            params = []
-            if subject:
-                where_parts.append("s.subject_name = ?")
-                params.append(subject)
-            if year:
-                where_parts.append("substr(a.tap_time,1,4) = ?")
-                params.append(year)
-            where_sql = " AND ".join(where_parts)
-
-            totals = conn.execute(
-                "SELECT COUNT(*) AS total_logs, "
-                "SUM(CASE WHEN TRIM(COALESCE(a.tx_hash,'')) <> '' THEN 1 ELSE 0 END) AS onchain_logs "
-                "FROM attendance_logs a "
-                "JOIN sessions s ON s.sess_id = a.sess_id "
-                "WHERE " + where_sql,
-                params,
-            ).fetchone()
-
-            context_summary['attendance_logs'] = int((totals['total_logs'] or 0) if totals else 0)
-            context_summary['attendance_logs_on_chain'] = int((totals['onchain_logs'] or 0) if totals else 0)
-
-            context_summary['subject_options'] = available_subjects
-            context_summary['year_options'] = available_years
-
-            if subject or year:
-                tx_rows = conn.execute(
-                    "SELECT DISTINCT lower(TRIM(COALESCE(a.tx_hash,''))) AS tx_hash "
-                    "FROM attendance_logs a "
-                    "JOIN sessions s ON s.sess_id = a.sess_id "
-                    "WHERE " + where_sql + " AND TRIM(COALESCE(a.tx_hash,'')) <> ''",
-                    params,
-                ).fetchall()
-                filtered_tx_hashes = {r['tx_hash'] for r in tx_rows if r['tx_hash']}
-    except Exception:
-        # Keep this endpoint resilient for public access.
-        context_summary['subject_options'] = []
-        context_summary['year_options'] = []
-
-    if not web3.is_connected():
-        return jsonify({
-            'ok': False,
-            'online': False,
-            'message': 'Blockchain node is offline.',
-            'network': 'Offline',
-            'latest_block': None,
-            'chain_valid': False,
-            'blocks': [],
-            'context': context_summary,
-        }), 200
-
-    try:
-        chain_id = int(web3.eth.chain_id)
-        latest_block = int(web3.eth.block_number)
-        start_block = max(0, latest_block - limit + 1)
-
-        contract_addr = ''
-        try:
-            if contract is not None:
-                contract_addr = (contract.address or '').lower()
-            else:
-                cdata = globals().get('contract_data')
-                if isinstance(cdata, dict):
-                    contract_addr = (cdata.get('address') or '').lower()
-        except Exception:
-            contract_addr = ''
-
-        blocks = []
-        prev_hash = None
-        chain_valid = True
-
-        for n in range(latest_block, start_block - 1, -1):
-            # Fetch full block with transactions in one call to avoid slow receipt fetching
-            b = web3.eth.get_block(n, full_transactions=True)
-            block_hash = b.hash.hex()
-            parent_hash = b.parentHash.hex()
-            
-            project_tx_hashes = []
-            if contract_addr:
-                for tx in b.transactions:
-                    tx_hash = tx.hash.hex()
-                    to_addr = (tx.get('to') or '').lower()
-                    
-                    # Primary check: direct call to contract
-                    is_project = (to_addr == contract_addr)
-                    
-                    # Secondary check: if we have DB filters, check if this hash matches any from our DB
-                    if not is_project and filtered_tx_hashes:
-                        if tx_hash.lower() in filtered_tx_hashes:
-                            is_project = True
-                    
-                    if is_project:
-                        # Only apply filters if they exist
-                        if filtered_tx_hashes and tx_hash.lower() not in filtered_tx_hashes:
-                            continue
-                        project_tx_hashes.append(tx_hash)
-            else:
-                # If no contract address, just filter by what's in our DB if filters are active
-                all_tx_hashes = [tx.hash.hex() for tx in b.transactions]
-                if filtered_tx_hashes:
-                    project_tx_hashes = [txh for txh in all_tx_hashes if txh.lower() in filtered_tx_hashes]
-                else:
-                    # Public demo fallback: show nothing or a sample if no project context
-                    project_tx_hashes = []
-
-            blocks.append({
-                'number': int(b.number),
-                'timestamp': datetime.fromtimestamp(int(b.timestamp)).strftime('%Y-%m-%d %H:%M:%S'),
-                'hash': block_hash,
-                'previous_hash': parent_hash,
-                'tx_hashes': project_tx_hashes,
-                'tx_count': len(project_tx_hashes),
-            })
-
-        return jsonify({
-            'ok': True,
-            'online': True,
-            'network': _network_name_from_chain_id(chain_id),
-            'latest_block': latest_block,
-            'chain_valid': chain_valid,
-            'blocks': blocks,
-            'context': context_summary,
-        })
-    except Exception as e:
-        return jsonify({
-            'ok': False,
-            'online': False,
-            'message': f'Unable to load blockchain data: {e}',
-            'network': 'Unknown',
-            'latest_block': None,
-            'chain_valid': False,
-            'blocks': [],
-            'context': context_summary,
-        }), 500
 
 # ── MARK PICO (NFC tap handler) ───────────────────────────────────────────────
 

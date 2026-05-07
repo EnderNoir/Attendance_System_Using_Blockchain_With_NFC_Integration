@@ -120,8 +120,9 @@
           <input class="ssd-input" type="text" placeholder="Search program…" oninput="filterSSDOpts('f_program',this.value)" autocomplete="off"/>
           <div class="ssd-opts" id="opts_f_program">
             <div class="ssd-opt selected" data-value="" onclick="selectSSD('f_program','','All Programs')">All Programs</div>
-            <div class="ssd-opt" data-value="BS Computer Science" onclick="selectSSD('f_program','BS Computer Science','BS Computer Science')">BS Computer Science</div>
-            <div class="ssd-opt" data-value="BS Information Technology" onclick="selectSSD('f_program','BS Information Technology','BS Information Technology')">BS Information Technology</div>
+            {% for p in filter_programs %}
+            <div class="ssd-opt" data-value="{{ p }}" onclick="selectSSD('f_program','{{ p|e }}','{{ p|e }}')">{{ p }}</div>
+            {% endfor %}
           </div>
         </div>
       </div>
@@ -136,10 +137,9 @@
           <input class="ssd-input" type="text" placeholder="Search year…" oninput="filterSSDOpts('f_year',this.value)" autocomplete="off"/>
           <div class="ssd-opts" id="opts_f_year">
             <div class="ssd-opt selected" data-value="" onclick="selectSSD('f_year','','All Years')">All Years</div>
-            <div class="ssd-opt" data-value="1st Year" onclick="selectSSD('f_year','1st Year','1st Year')">1st Year</div>
-            <div class="ssd-opt" data-value="2nd Year" onclick="selectSSD('f_year','2nd Year','2nd Year')">2nd Year</div>
-            <div class="ssd-opt" data-value="3rd Year" onclick="selectSSD('f_year','3rd Year','3rd Year')">3rd Year</div>
-            <div class="ssd-opt" data-value="4th Year" onclick="selectSSD('f_year','4th Year','4th Year')">4th Year</div>
+            {% for y in filter_years %}
+            <div class="ssd-opt" data-value="{{ y }}" onclick="selectSSD('f_year','{{ y|e }}','{{ y|e }}')">{{ y }}</div>
+            {% endfor %}
           </div>
         </div>
       </div>
@@ -154,10 +154,9 @@
           <input class="ssd-input" type="text" placeholder="Search section…" oninput="filterSSDOpts('f_section',this.value)" autocomplete="off"/>
           <div class="ssd-opts" id="opts_f_section">
             <div class="ssd-opt selected" data-value="" onclick="selectSSD('f_section','','All Sections')">All Sections</div>
-            <div class="ssd-opt" data-value="A" onclick="selectSSD('f_section','A','Section A')">Section A</div>
-            <div class="ssd-opt" data-value="B" onclick="selectSSD('f_section','B','Section B')">Section B</div>
-            <div class="ssd-opt" data-value="C" onclick="selectSSD('f_section','C','Section C')">Section C</div>
-            <div class="ssd-opt" data-value="D" onclick="selectSSD('f_section','D','Section D')">Section D</div>
+            {% for s in filter_sections %}
+            <div class="ssd-opt" data-value="{{ s }}" onclick="selectSSD('f_section','{{ s|e }}','Section {{ s|e }}')">Section {{ s }}</div>
+            {% endfor %}
           </div>
         </div>
       </div>
@@ -172,8 +171,8 @@
           <input class="ssd-input" type="text" placeholder="Search subject…" oninput="filterSSDOpts('f_subject',this.value)" autocomplete="off"/>
           <div class="ssd-opts" id="opts_f_subject">
             <div class="ssd-opt selected" data-value="" onclick="selectSSD('f_subject','','All Subjects')">All Subjects</div>
-            {% for ms in my_subjects %}
-            <div class="ssd-opt" data-value="{{ ms.subject_name }}" onclick="selectSSD('f_subject','{{ ms.subject_name|e }}','{{ ms.subject_name|e }}')">{{ ms.subject_name }}</div>
+            {% for s in subjects %}
+            <div class="ssd-opt" data-value="{{ s }}" onclick="selectSSD('f_subject','{{ s|e }}','{{ s|e }}')">{{ s }}</div>
             {% endfor %}
           </div>
         </div>
@@ -189,8 +188,8 @@
           <input class="ssd-input" type="text" placeholder="Search semester…" oninput="filterSSDOpts('f_semester',this.value)" autocomplete="off"/>
           <div class="ssd-opts" id="opts_f_semester">
             <div class="ssd-opt selected" data-value="" onclick="selectSSD('f_semester','','All Semesters')">All Semesters</div>
-            <div class="ssd-opt" data-value="First" onclick="selectSSD('f_semester','First','First Semester')">First Semester</div>
-            <div class="ssd-opt" data-value="Second" onclick="selectSSD('f_semester','Second','Second Semester')">Second Semester</div>
+            <div class="ssd-opt" data-value="1st Semester" onclick="selectSSD('f_semester','1st Semester','1st Semester')">1st Semester</div>
+            <div class="ssd-opt" data-value="2nd Semester" onclick="selectSSD('f_semester','2nd Semester','2nd Semester')">2nd Semester</div>
             <div class="ssd-opt" data-value="Summer" onclick="selectSSD('f_semester','Summer','Summer')">Summer</div>
           </div>
         </div>

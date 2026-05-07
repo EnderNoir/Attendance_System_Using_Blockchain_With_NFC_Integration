@@ -400,8 +400,14 @@ function renderReviewTable() {
     const courseHtml = `<div>${s.course || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.major || 'N/A'}</div>`;
     const yearSec = [s.year_level, s.section].filter(Boolean).join(' / ') || '<em style="color:var(--muted)">—</em>';
     const semSy = `<div style="font-size:11px;">${s.semester || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.school_year || '—'}</div>`;
-    const contactHtml = `<div style="font-size:11px;">${s.contact || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.email || '—'}</div>`;
-    const adviserHtml = `<div style="font-size:11px;">${s.adviser || '—'}</div>`;
+    const contactHtml = `<div style="font-size:11px;">${s.contact || '—'}</div>`;
+    const emailHtml = `<div style="font-size:11px;">${s.email || '—'}</div>`;
+    
+    // Global adviser override for display
+    const globalAdv = document.getElementById('batchGlobalAdviser')?.value;
+    const displayAdviser = globalAdv || s.adviser || '—';
+    const adviserHtml = `<div style="font-size:11px;">${displayAdviser}</div>`;
+
     const statusHtml = s.enrollment_status === 'Irregular' 
       ? '<span style="color:var(--danger);font-weight:700;font-size:10px;background:rgba(220,53,69,.1);padding:2px 6px;border-radius:4px;text-transform:uppercase;">Irregular</span>'
       : '<span style="color:var(--success);font-weight:700;font-size:10px;background:rgba(40,167,69,.1);padding:2px 6px;border-radius:4px;text-transform:uppercase;">Regular</span>';
@@ -416,6 +422,7 @@ function renderReviewTable() {
       <td>${yearSec}${missYear ? '<span class="miss-badge">!</span>' : ''}</td>
       <td>${semSy}</td>
       <td>${contactHtml}</td>
+      <td>${emailHtml}</td>
       <td>${adviserHtml}</td>
       <td>${statusHtml}</td>
       <td>
@@ -741,6 +748,10 @@ function renderSummary() {
       ? `<span class="status-tag st-assigned">Will Register</span>`
       : `<span class="status-tag st-skipped">${s._skipped ? 'Skipped' : 'No Card'}</span>`;
     
+    // Global adviser override for summary display
+    const globalAdv = document.getElementById('batchGlobalAdviser')?.value;
+    const displayAdviser = globalAdv || s.adviser || '—';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><span class="order-badge">${i + 1}</span></td>
@@ -749,8 +760,9 @@ function renderSummary() {
       <td><div style="font-size:11px;">${s.course || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.major || 'N/A'}</div></td>
       <td style="font-size:11px;">${[s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
       <td><div style="font-size:11px;">${s.semester || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.school_year || '—'}</div></td>
-      <td><div style="font-size:11px;">${s.contact || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.email || '—'}</div></td>
-      <td style="font-size:11px;">${s.adviser || '—'}</td>
+      <td><div style="font-size:11px;">${s.contact || '—'}</div></td>
+      <td><div style="font-size:11px;">${s.email || '—'}</div></td>
+      <td style="font-size:11px;">${displayAdviser}</td>
       <td>${s.nfc_id ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
       <td>${statusHtml}</td>`;
     tbody.appendChild(tr);

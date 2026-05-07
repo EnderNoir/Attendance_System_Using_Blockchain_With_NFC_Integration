@@ -285,7 +285,7 @@
           <label style="display:block; font-size:11px; font-weight:700; color:var(--accent); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;">
             <i class="bi bi-person-badge"></i> Adviser Name
           </label>
-          <select class="form-control" id="batchGlobalAdviser" style="background:var(--input-bg); color:var(--text); border-color:var(--border); font-weight:600; padding:10px 14px;">
+          <select class="form-control" id="batchGlobalAdviser" style="background:var(--input-bg); color:var(--text); border-color:var(--border); font-weight:600; padding:10px 14px;" onchange="renderReviewTable()">
             <option value="">— Use individual advisers from PDFs —</option>
             {% for u, d in users_db.items() %}{% if d.role in ('teacher','admin') %}
             <option value="{{ d.full_name }}">{{ d.full_name }}</option>
@@ -294,12 +294,6 @@
           <div style="font-size:11px; color:var(--muted); margin-top:8px; display:flex; align-items:center; gap:6px;">
             <i class="bi bi-info-circle"></i> <span>Selecting an adviser here will override all students in this batch.</span>
           </div>
-        </div>
-        <div style="padding-left:20px; border-left:1px solid var(--border); display:flex; flex-direction:column; gap:8px;">
-          <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;">Batch Actions</div>
-          <button type="button" class="btn-outline" style="font-size:12px; padding:9px 16px; background:transparent; border-color:var(--border); color:var(--muted); height:42px;" onclick="b_resetAll()">
-            <i class="bi bi-trash"></i> Clear Batch
-          </button>
         </div>
       </div>
 
@@ -313,7 +307,7 @@
 
       <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
         <span>// Parsed Students — Sorted by Surname</span>
-        <span id="batchCountBadge" class="order-badge" style="background:var(--accent); color:#fff; font-size:12px; padding:4px 10px;">0 Students</span>
+        <span id="batchCountBadge" style="background:var(--accent); color:#000; font-size:10px; font-weight:800; padding:4px 12px; border-radius:20px; text-transform:uppercase; letter-spacing:1px;">0 Students</span>
       </div>
       <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">
         <i class="bi bi-pencil-square"></i>
@@ -331,6 +325,7 @@
               <th>Year / Sec</th>
               <th>Sem / SY</th>
               <th>Contact</th>
+              <th>Email Address</th>
               <th>Adviser</th>
               <th>Status</th>
               <th>Actions</th>
@@ -445,6 +440,7 @@
             <th>Year / Sec</th>
             <th>Sem / SY</th>
             <th>Contact</th>
+            <th>Email</th>
             <th>Adviser</th>
             <th>NFC Card</th>
             <th>Status</th>

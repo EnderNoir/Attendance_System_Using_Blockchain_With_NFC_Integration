@@ -397,25 +397,27 @@ function renderReviewTable() {
     const fullName = s.full_name || s.name || `${s.first_name || ''} ${s.middle_initial || ''} ${s.last_name || ''}`.trim();
     const nameHtml = (fullName || '<em style="color:var(--muted)">—</em>') + (missName ? '<span class="miss-badge">!</span>' : '');
     const sidHtml = (s.student_id || '<em style="color:var(--muted)">—</em>') + (missSid ? '<span class="miss-badge">!</span>' : '');
-    const courseHtml = (s.course || '<em style="color:var(--muted)">—</em>') + (missCourse ? '<span class="miss-badge">!</span>' : '');
+    const courseHtml = `<div>${s.course || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.major || 'N/A'}</div>`;
     const yearSec = [s.year_level, s.section].filter(Boolean).join(' / ') || '<em style="color:var(--muted)">—</em>';
-    const emailHtml = s.email || '<em style="color:var(--muted)">—</em>';
+    const semSy = `<div style="font-size:11px;">${s.semester || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.school_year || '—'}</div>`;
+    const contactHtml = `<div style="font-size:11px;">${s.contact || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.email || '—'}</div>`;
+    const adviserHtml = `<div style="font-size:11px;">${s.adviser || '—'}</div>`;
     const statusHtml = s.enrollment_status === 'Irregular' 
       ? '<span style="color:var(--danger);font-weight:700;font-size:10px;background:rgba(220,53,69,.1);padding:2px 6px;border-radius:4px;text-transform:uppercase;">Irregular</span>'
       : '<span style="color:var(--success);font-weight:700;font-size:10px;background:rgba(40,167,69,.1);padding:2px 6px;border-radius:4px;text-transform:uppercase;">Regular</span>';
-    const file = (s.filename || '').replace(/\.pdf$/i, '');
 
     const mainRow = document.createElement('tr');
     mainRow.id = `strow_${i}`;
     mainRow.innerHTML = `
       <td><span class="order-badge">${i + 1}</span></td>
       <td style="font-weight:600;">${nameHtml}</td>
-      <td>${sidHtml}</td>
+      <td style="font-family:monospace;">${sidHtml}</td>
       <td>${courseHtml}</td>
       <td>${yearSec}${missYear ? '<span class="miss-badge">!</span>' : ''}</td>
+      <td>${semSy}</td>
+      <td>${contactHtml}</td>
+      <td>${adviserHtml}</td>
       <td>${statusHtml}</td>
-      <td style="font-size:11px;">${s.date_registered || '<em style="color:var(--muted)">—</em>'}</td>
-      <td style="font-size:11px;color:var(--muted);">${esc(file)}</td>
       <td>
         <button class="btn-edit-row" id="editbtn_${i}" onclick="toggleInlineEdit(${i})">
           <i class="bi bi-pencil-fill"></i> Edit
@@ -437,6 +439,27 @@ function renderReviewTable() {
     tbody.appendChild(mainRow);
     tbody.appendChild(editRow);
   });
+
+  // Render Subject Summary here (Phase 1)
+  const allSubjects = {};
+  b_students.forEach(s => {
+    (s.subjects || []).forEach(subj => {
+      if (subj.course_code && !allSubjects[subj.course_code]) allSubjects[subj.course_code] = subj;
+    });
+  });
+  const subjKeys = Object.keys(allSubjects);
+  const box = document.getElementById('subjectSummaryBox');
+  if (subjKeys.length) {
+    box.style.display = '';
+    const tableRows = subjKeys.map(k => {
+      const s = allSubjects[k];
+      return `<tr><td style="padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.15);font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;">${s.course_code}</td>
+              <td style="padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.15);font-size:12px;">${s.name}</td></tr>`;
+    }).join('');
+    document.getElementById('subjectList').innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.3);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Code</th><th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.3);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Subject</th></tr></thead><tbody>${tableRows}</tbody></table>`;
+  } else {
+    box.style.display = 'none';
+  }
 }
 
 function buildIEFields(s, i) {
@@ -623,7 +646,6 @@ function renderQueue() {
       <td><span class="order-badge">${i + 1}</span></td>
       <td style="font-weight:${isCurrent ? 700 : 500};">${s.name || '—'}</td>
       <td style="font-size:12px;color:var(--muted);">${[s.course, s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
-      <td style="font-size:11px;color:var(--muted);">${s.date_registered || '—'}</td>
       <td>${isAssigned ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
       <td>${statusHtml}</td>`;
     tbody.appendChild(tr);
@@ -711,23 +733,6 @@ function renderSummary() {
     <div class="sum-chip skipped"><div style="font-size:28px;">⏭</div>
       <div><div class="sum-val" style="color:var(--danger);">${skipped + nocard}</div><div class="sum-lab">Skipped / No Card</div></div></div>`;
 
-  const allSubjects = {};
-  b_students.filter(s => s.nfc_id).forEach(s => {
-    (s.subjects || []).forEach(subj => {
-      if (subj.course_code && !allSubjects[subj.course_code]) allSubjects[subj.course_code] = subj;
-    });
-  });
-  const subjKeys = Object.keys(allSubjects);
-  if (subjKeys.length) {
-    document.getElementById('subjectSummaryBox').style.display = '';
-    const tableRows = subjKeys.map(k => {
-      const s = allSubjects[k];
-      return `<tr><td style="padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.15);font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);font-weight:700;">${s.course_code}</td>
-              <td style="padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.15);font-size:12px;">${s.name}</td></tr>`;
-    }).join('');
-    document.getElementById('subjectList').innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr><th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.3);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Code</th><th style="text-align:left;padding:8px 10px;border-bottom:1px solid rgba(45,106,39,.3);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;">Subject</th></tr></thead><tbody>${tableRows}</tbody></table>`;
-  }
-
   const tbody = document.getElementById('resultTbody');
   tbody.innerHTML = '';
   b_students.forEach((s, i) => {
@@ -735,15 +740,17 @@ function renderSummary() {
     const statusHtml = isAssigned
       ? `<span class="status-tag st-assigned">Will Register</span>`
       : `<span class="status-tag st-skipped">${s._skipped ? 'Skipped' : 'No Card'}</span>`;
+    
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><span class="order-badge">${i + 1}</span></td>
       <td style="font-weight:600;">${s.name || '—'}</td>
-      <td style="font-size:11px;font-family:monospace;">${s.student_id || '—'}</td>
-      <td style="font-size:11px;">${s.course || '—'}</td>
+      <td style="font-family:monospace;font-size:11px;">${s.student_id || '—'}</td>
+      <td><div style="font-size:11px;">${s.course || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.major || 'N/A'}</div></td>
       <td style="font-size:11px;">${[s.year_level, s.section].filter(Boolean).join(' / ') || '—'}</td>
-      <td style="font-size:11px;">${s.enrollment_status || 'Regular'}</td>
-      <td style="font-size:11px;color:var(--muted);">${s.date_registered || '—'}</td>
+      <td><div style="font-size:11px;">${s.semester || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.school_year || '—'}</div></td>
+      <td><div style="font-size:11px;">${s.contact || '—'}</div><div style="font-size:10px;color:var(--muted);">${s.email || '—'}</div></td>
+      <td style="font-size:11px;">${s.adviser || '—'}</td>
       <td>${s.nfc_id ? `<span class="nfc-chip">${s.nfc_id}</span>` : '—'}</td>
       <td>${statusHtml}</td>`;
     tbody.appendChild(tr);

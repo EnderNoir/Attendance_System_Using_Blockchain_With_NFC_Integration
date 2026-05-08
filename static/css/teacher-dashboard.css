@@ -126,3 +126,4 @@
 .chart-wrap.tall{height:160px;}
 .filter-row{grid-template-columns:1fr;padding:14px 12px;}
 }
+#showingBar{display:none;}

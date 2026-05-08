@@ -10,7 +10,7 @@
     top: 0;
     background: var(--background);
     z-index: 10;
-    padding: 24px 0 12px 0;
+    padding: 12px 0 8px 0;
     margin-bottom: 0;
   }
 
@@ -991,13 +991,13 @@
   /* Responsive header adjustments */
   @media(max-width:1023px) {
     .tss-header {
-      padding: 16px 0 12px 0;
+      padding: 10px 0 8px 0;
     }
   }
 
   @media(max-width:639px) {
     .tss-header {
-      padding: 12px 0 12px 0;
+      padding: 8px 0 6px 0;
     }
   }
 

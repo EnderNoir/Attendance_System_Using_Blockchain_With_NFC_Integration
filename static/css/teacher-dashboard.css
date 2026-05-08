@@ -211,52 +211,40 @@
 .sb-num{font-size:14px;}
 }
 
-@media(max-width:768px){
-  .hide-on-mobile { display: none !important; }
-  .welcome-bar { padding: 16px; margin-bottom: 20px; }
-  .welcome-name { font-size: 18px; }
-  
+@media(max-width:480px){
   .filter-row { 
-    display: grid !important; 
-    grid-template-columns: 1fr 1fr !important; 
-    gap: 12px 10px !important; 
-    padding: 16px !important;
-  }
-  .fg-program, .fg-year { grid-row: 1; }
-  .fg-section, .fg-semester { grid-row: 2; }
-  .fg-subject { grid-row: 3; grid-column: 1 / span 2; }
-  .fg-btns { 
-    grid-row: 4; 
-    grid-column: 1 / span 2; 
     display: flex !important; 
+    flex-direction: column !important;
+    grid-template-columns: unset !important; 
+    gap: 10px !important; 
+    padding: 10px !important;
+  }
+  .fg-program, .fg-year, .fg-section, .fg-semester, .fg-subject { 
+    grid-row: unset !important;
+    grid-column: unset !important;
+    width: 100% !important;
+  }
+  .fg-btns { 
+    grid-row: unset !important; 
+    grid-column: unset !important; 
+    display: flex !important; 
+    flex-direction: column !important;
     gap: 8px !important; 
-    margin-top: 4px;
+    margin-top: 0;
+    width: 100% !important;
   }
-  .fg-btns > button { flex: 1; justify-content: center; }
-  .btn-reset-f { padding: 9px 12px; }
-
-  .showing-bar { 
-    margin: 0 16px 16px; 
-    padding: 12px 16px; 
-    flex-direction: column; 
-    align-items: flex-start;
+  .fg-btns > button { 
+    width: 100% !important;
+    justify-content: center; 
   }
-  .sb-right { width: 100%; margin-top: 4px; }
-  .sb-num-wrap { display: flex; align-items: baseline; gap: 6px; }
-  .sb-nlbl { text-align: left; }
-  
-  .ap-head { padding: 16px; }
-  .sum-grid { padding: 16px; gap: 8px; }
-  .cpane { padding: 16px; }
 }
 
 @media(max-width:480px){
-  .ap { margin: 0; padding: 0; border: 0; }
-  .ap-head { padding: 0; }
-  .sum-grid { padding: 0; }
-  .cpane { padding: 0; }
-  .showing-bar { margin: 0; padding: 0; }
-  .filter-row { padding: 0; }
+  .ap { margin: 0; padding: 0; border: 0; border-radius: 0; }
+  .ap-head { padding: 12px 10px; }
+  .sum-grid { padding: 12px 10px; }
+  .cpane { padding: 12px 10px; }
+  .showing-bar { margin: 0; padding: 10px; border-radius: 0; }
 }
 
 @media(max-width:480px){

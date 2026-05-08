@@ -326,7 +326,6 @@
       transition: margin-left .3s;
       min-width: 0;
       max-width: calc(100vw - var(--sidebar-w));
-      padding: 24px;
     }
 
     .topbar {
@@ -440,7 +439,7 @@
         max-width: 200px;
       }
 
-      .main-content {
+      .page-body {
         padding: 16px;
       }
     }
@@ -450,7 +449,7 @@
         --topbar-h: 50px;
       }
 
-      .main-content {
+      .page-body {
         padding: 12px;
       }
 

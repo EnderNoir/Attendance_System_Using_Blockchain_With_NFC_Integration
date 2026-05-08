@@ -251,7 +251,7 @@
 }
 
 @media(max-width:480px){
-  .ap-head { padding: 12px 8px; }
+  .ap-head { padding: 8px; }
   .sum-grid { padding: 10px 8px; }
   .showing-bar { margin: 0 4px 10px; padding: 8px 4px; }
 }

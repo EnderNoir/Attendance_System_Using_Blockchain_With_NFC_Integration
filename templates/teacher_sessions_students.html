@@ -6,32 +6,6 @@
 {% endblock %}
 {% block page_body_class %}tss-body{% endblock %}
 {% block content %}
-<style>
-  /* Sessions & Students page layout */
-  .tss-body {
-    padding: 24px;
-    flex: 1;
-    min-width: 0;
-  }
-  .main-pane {
-    display: none;
-  }
-  .main-pane.active {
-    display: block;
-  }
-  #sessions_list {
-    padding-bottom: 24px;
-  }
-  #students_accordion {
-    padding-bottom: 24px;
-  }
-  @media(max-width:1023px) {
-    .tss-body { padding: 0 16px 16px 16px; }
-  }
-  @media(max-width:639px) {
-    .tss-body { padding: 0 12px 12px 12px; }
-  }
-</style>
 
 <!-- SESSION MODAL -->
 <div class="sess-overlay" id="sessModal" onclick="if(event.target===this)closeSessModal()">
@@ -171,7 +145,7 @@
 </div>
 
 <!-- Page header -->
-<div style="margin-bottom:12px; flex-shrink: 0;">
+<div class="tss-header">
   <div class="sec-mono">// CLASS MANAGEMENT</div>
   <h2 style="font-size:20px;font-weight:600;margin:0;">Sessions &amp; Students</h2>
   <p style="font-size:12px;color:var(--muted);margin-top:2px;">

@@ -1,11 +1,4 @@
 /* ── Page layout & positioning ── */
-  .tss-body {
-    padding: 0 24px 24px 24px;
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-  }
 
   .tss-header {
     position: sticky;

@@ -81,6 +81,8 @@
 @media(max-width:480px){
 .search-select-display{padding:6px 24px 6px 8px;font-size:10px;}
 }
+.search-select-dropdown{position:absolute;top:calc(100% + 4px);left:0;min-width:180px;width:max-content;max-width:280px;background:var(--surface);border:1px solid var(--accent);border-radius:9px;z-index:999999;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.28);display:none;}
+.search-select-dropdown.open{display:block;}
 .ssd-input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding:9px 12px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;}
 .ssd-input::placeholder{color:var(--muted);}
 .ssd-opts{max-height:200px;overflow-y:auto;scrollbar-width:thin;}

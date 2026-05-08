@@ -360,21 +360,19 @@
         <span class="topbar-time" id="clock"></span>
       </div>
     </div>
-    <div class="{% block page_body_class %}page-body{% endblock %}">
-        {% with messages = get_flashed_messages() %}
-        {% if messages %}
-        <div class="flash-wrap">
-          {% for message in messages %}
-          {% if '✅' in message %}<div class="flash-item success"><i class="bi bi-check-circle"></i> {{ message }}</div>
-          {% elif '❌' in message %}<div class="flash-item error"><i class="bi bi-x-circle"></i> {{ message }}</div>
-          {% else %}<div class="flash-item info"><i class="bi bi-info-circle"></i> {{ message }}</div>
-          {% endif %}
-          {% endfor %}
-        </div>
-        {% endif %}
-        {% endwith %}
-      {% block content %}{% endblock %}
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="flash-wrap">
+      {% for message in messages %}
+      {% if '✅' in message %}<div class="flash-item success"><i class="bi bi-check-circle"></i> {{ message }}</div>
+      {% elif '❌' in message %}<div class="flash-item error"><i class="bi bi-x-circle"></i> {{ message }}</div>
+      {% else %}<div class="flash-item info"><i class="bi bi-info-circle"></i> {{ message }}</div>
+      {% endif %}
+      {% endfor %}
     </div>
+    {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
   </div>
   <div class="toast-stack" id="toastStack"></div>
 

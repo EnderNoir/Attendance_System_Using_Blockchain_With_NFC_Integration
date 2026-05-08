@@ -81,8 +81,10 @@ def build_stats_export_dataset(
             continue
         if end_dt and sess_dt > end_dt:
             continue
-        if role == 'teacher' and s.get('teacher') != username:
-            continue
+        if role == 'teacher':
+            # Check if teacher_username or teacher_name matches the current user
+            if s.get('teacher_username') != username and s.get('teacher_name') != username:
+                continue
         sk = s.get('section_key', '')
         sk_parts = sk.split('|')
         if f_section_norm and normalize_section_key_fn(sk) != f_section_norm:

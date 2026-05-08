@@ -215,41 +215,28 @@
   .filter-row { 
     display: flex !important; 
     flex-direction: column !important;
-    grid-template-columns: unset !important; 
     gap: 10px !important; 
     padding: 10px !important;
+    border-bottom: 1px solid var(--border);
   }
   .fg-program, .fg-year, .fg-section, .fg-semester, .fg-subject { 
-    grid-row: unset !important;
-    grid-column: unset !important;
     width: 100% !important;
   }
   .fg-btns { 
-    grid-row: unset !important; 
-    grid-column: unset !important; 
     display: flex !important; 
     flex-direction: column !important;
     gap: 8px !important; 
-    margin-top: 0;
     width: 100% !important;
   }
   .fg-btns > button { 
     width: 100% !important;
     justify-content: center; 
   }
-}
-
-@media(max-width:480px){
   .ap { margin: 0; padding: 0; border: 0; border-radius: 0; }
   .ap-head { padding: 12px 10px; }
-  .sum-grid { padding: 12px 10px; }
+  .sum-grid { padding: 12px 10px; grid-template-columns: 1fr !important; }
+  .sum-box { padding: 12px 8px; }
   .cpane { padding: 12px 10px; }
   .showing-bar { margin: 0; padding: 10px; border-radius: 0; }
-}
-
-@media(max-width:480px){
-  .sum-grid{grid-template-columns:1fr;padding:0;}
-  .sum-box{padding:12px 8px;}
-  .sum-box .sn{font-size:30px;}
-  .stats-row{grid-template-columns:1fr;}
+  .ctab { padding: 7px 10px; font-size: 10px; flex: 1; text-align: center; white-space: normal; }
 }

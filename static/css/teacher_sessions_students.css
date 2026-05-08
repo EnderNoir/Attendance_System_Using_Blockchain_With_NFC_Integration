@@ -1,4 +1,9 @@
 /* ── Page layout & positioning ── */
+  
+  /* Remove page-body wrapper for this page */
+  .page-body {
+    display: contents;
+  }
 
   .tss-header {
     position: sticky;

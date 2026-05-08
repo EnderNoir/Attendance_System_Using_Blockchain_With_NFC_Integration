@@ -364,6 +364,7 @@ function renderAll(data, subj, sec, sem) {
   if (!keys.length) {
     document.getElementById('trendNoData').classList.add('show');
   } else {
+    document.getElementById('trendNoData').classList.remove('show');
     const tc = document.getElementById('trendChart');
     tc.style.display = 'block';
     trendChart.data.labels = keys;
@@ -377,6 +378,7 @@ function renderAll(data, subj, sec, sem) {
   if (!entries.length) {
     document.getElementById('subjNoData').classList.add('show');
   } else {
+    document.getElementById('subjNoData').classList.remove('show');
     const sc = document.getElementById('subjScroll');
     sc.style.display = 'block';
     const labels = entries.map(([k]) => (k.length > 28 ? k.substring(0, 26) + '…' : k));

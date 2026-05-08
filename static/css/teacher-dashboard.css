@@ -96,7 +96,7 @@
 .fg{min-width:100px;}
 }
 @media(max-width:480px){
-.filter-row{flex-direction:column;padding:10px 12px;gap:8px;}
+.filter-row{flex-direction:column;padding:10px 8px;gap:8px;}
 .fg{min-width:auto;width:100%;}
 }
 .fl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
@@ -180,7 +180,7 @@
 .chart-wrap.tall{height:180px;}
 }
 @media(max-width:480px){
-.cpane{padding:10px 12px}
+.cpane{padding:10px 8px}
 .chart-wrap{height:160px;}
 .chart-wrap.tall{height:140px;}
 }
@@ -204,7 +204,7 @@
 .sb-nlbl{font-size:9px;}
 }
 @media(max-width:480px){
-.showing-bar{padding:8px;margin:0 8px 10px;}
+.showing-bar{padding:8px 4px;margin:0 4px 10px;}
 .sb-main{font-size:11px;}
 .sb-sub{font-size:9px;}
 .sb-num{font-size:14px;}

@@ -2592,7 +2592,8 @@ def check_and_start_scheduled_sessions():
                         'subject_id': f"event:{ev.get('event_id')}",
                         'subject_name': ev.get('title', 'School Event'),
                         'course_code': 'EVENT',
-                        'semester': ev.get('semester', '1st Semester'),
+                        # Events are cross-section; avoid semester filtering downstream.
+                        'semester': '',
                         'class_type': 'school_event',
                         'units': 0,
                         'time_slot': f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}",
@@ -5600,6 +5601,9 @@ def api_session_attendance(sess_id):
             all_students = get_all_students()
             sess_semester = normalize_semester(sess.get('semester') or '')
             if is_school_event:
+                # Do not filter event attendance by semester.
+                sess_semester = ''
+            if is_school_event:
                 enrolled = [
                     s for s in all_students 
                     if build_student_section_key(s) in section_keys 
@@ -6006,6 +6010,9 @@ def live_session(sess_id):
                 section_keys_for_view = set(section_keys)
 
     sess_semester = normalize_semester(sess.get('semester') or '')
+    if is_school_event:
+        # School events can span multiple sections/semesters.
+        sess_semester = ''
     section_students = [
         s for s in all_students
         if build_student_section_key(s) in section_keys_for_view

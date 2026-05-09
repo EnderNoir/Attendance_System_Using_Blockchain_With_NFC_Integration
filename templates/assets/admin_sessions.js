@@ -89,6 +89,14 @@ function parseTapDateTime(dtStr, fallbackDateStr = '') {
   }
 }
 
+function normalizeClassType(raw) {
+  const val = String(raw || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (val === 'school_event' || val === 'event') return 'school_event';
+  if (val === 'laboratory' || val === 'lab') return 'laboratory';
+  if (val === 'lecture') return 'lecture';
+  return 'lecture';
+}
+
 function switchTab(id, btn) {
   document.querySelectorAll('.tab-pane').forEach((p) => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
@@ -202,8 +210,8 @@ function openSessModal(sessId) {
 function renderSessModal(sessId, data) {
   const s = sessionsData[sessId];
   const sts = data.students || [];
-  const classType = String(s.class_type || data.class_type || 'lecture').toLowerCase();
-  const classTypeLabel = (classType === 'school_event' || classType === 'school event') ? 'School Event' : (classType === 'laboratory' ? 'Laboratory' : 'Lecture');
+  const classType = normalizeClassType(s.class_type || data.class_type || 'lecture');
+  const classTypeLabel = classType === 'school_event' ? 'School Event' : (classType === 'laboratory' ? 'Laboratory' : 'Lecture');
   const teachersInvolved = (data.teachers_involved || []).join(', ') || (s.teacher_name || '-');
   const sectionsInvolved = (data.sections_involved || []).map((x) => String(x || '').replace(/\|/g, ' | ')).join(', ') || ((s.section_key || '').replace(/\|/g, ' | '));
 

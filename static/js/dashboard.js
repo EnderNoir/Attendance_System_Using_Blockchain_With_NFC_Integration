@@ -521,6 +521,14 @@ function pickSessionDate(sessionObj) {
   return '-';
 }
 
+function normalizeClassType(raw) {
+  const val = String(raw || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (val === 'school_event' || val === 'event') return 'school_event';
+  if (val === 'laboratory' || val === 'lab') return 'laboratory';
+  if (val === 'lecture') return 'lecture';
+  return 'lecture';
+}
+
 function toAmPm(input) {
   if (!input) return '-';
   const raw = String(input).trim();
@@ -661,8 +669,10 @@ function renderSessions(sessions){
               ${semSessions.map((s) => {
                 const sbClass = `sb-${s.status}`;
                 const statusLabel = s.status ? s.status.charAt(0).toUpperCase() + s.status.slice(1) : '-';
-                const classType = String(s.class_type || 'lecture').toLowerCase();
-                const classTypeLabel = classType === 'laboratory' ? 'Laboratory' : 'Lecture';
+                const classType = normalizeClassType(s.class_type || 'lecture');
+                const classTypeLabel = classType === 'school_event'
+                  ? 'School Event'
+                  : (classType === 'laboratory' ? 'Laboratory' : 'Lecture');
                 const doc = s.attachment_url
                   ? `<a href="${s.attachment_url}" target="_blank" class="sess-doc-link"><i class="bi bi-paperclip"></i> View</a>`
                   : '<span class="muted-dash">-</span>';
@@ -707,7 +717,7 @@ function filterSessions(){
     (!q    || s.subject_name.toLowerCase().includes(q) || (s.teacher_name||'').toLowerCase().includes(q)) &&
     (!st   || s.status === st) &&
     (!subj || s.subject_name === subj) &&
-    (!classType || (String(s.class_type || 'lecture').toLowerCase() === classType))
+    (!classType || (normalizeClassType(s.class_type || 'lecture') === classType))
   );
   renderSessions(filtered);
 }

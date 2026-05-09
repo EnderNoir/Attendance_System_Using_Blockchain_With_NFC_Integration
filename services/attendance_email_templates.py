@@ -268,6 +268,165 @@ def send_student_attendance_receipt(
     )
 
 
+def send_student_attendance_receipt_initial_tap(
+    student_name,
+    student_email,
+    student_id,
+    subject_name,
+    section_key,
+    teacher_name,
+    tap_time,
+    status,
+    send_email_fn: Optional[Callable] = None,
+    semester=None,
+    time_slot=None,
+    enrollment_status='Regular',
+):
+    """Send initial attendance receipt email to student immediately after tap (WITHOUT blockchain TX info)."""
+    if not student_email or '@' not in student_email or send_email_fn is None:
+        return
+    status_colors = {
+        'present': ('#2D6A27', '#E8F5E9', '✓ Present'),
+        'late': ('#D4A017', '#FFF8E1', '⏱ Late'),
+        'absent': ('#C0392B', '#FFEBEE', '✕ Absent'),
+        'excused': ('#2980B9', '#E3F2FD', '◎ Excused'),
+    }
+    clr, bg, label = status_colors.get(status, ('#333333', '#F5F5F5', status.capitalize()))
+    
+    # Section + Semester formatting
+    section_display = (section_key.replace('|', ' · ') if section_key else '—')
+    if semester:
+        section_display += f" · {semester}"
+
+    html = f'''<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Calibri,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr><td align="center" style="padding:32px 16px;">
+    <table width="560" cellpadding="0" cellspacing="0"
+           style="background:#fff;border-radius:12px;overflow:hidden;
+                  box-shadow:0 2px 12px rgba(0,0,0,.1);">
+      <!-- Header -->
+      <tr>
+        <td style="background:#1E4A1A;padding:24px 32px;">
+          <div style="font-size:20px;font-weight:700;color:#F5C518;
+                      letter-spacing:1px;">DAVS</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
+            Decentralized Attendance Verification System
+          </div>
+          <div style="font-size:11px;color:#94a3b8;">
+            Cavite State University - Silang Campus
+          </div>
+        </td>
+      </tr>
+      <!-- Status banner -->
+      <tr>
+        <td style="background:{bg};padding:20px 32px;
+                   border-left:4px solid {clr};">
+          <div style="font-size:28px;font-weight:700;color:{clr};">
+            {label}
+          </div>
+          <div style="font-size:13px;color:#555;margin-top:4px;">
+            Your attendance has been recorded for today's class.
+          </div>
+        </td>
+      </tr>
+      <!-- Details table -->
+      <tr>
+        <td style="padding:24px 32px 8px;">
+          <div style="font-size:13px;font-weight:700;color:#1E4A1A;
+                      text-transform:uppercase;letter-spacing:1px;
+                      margin-bottom:12px;">Attendance Details</div>
+          <table width="100%" cellpadding="0" cellspacing="0"
+                 style="border:1px solid #eee;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;width:140px;">Student</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:600;
+                         color:#333;border-bottom:1px solid #eee;">
+                {student_name}
+                {f'<span style="color:#999;font-size:11px;"> - ID: {student_id}</span>'
+                 if student_id else ''}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Subject</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:600;
+                         color:#333;border-bottom:1px solid #eee;">
+                {subject_name}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Section</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{section_display}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Instructor</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{teacher_name}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Date</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{_fmt_date(tap_time)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Tapped Time</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                          border-bottom:1px solid #eee;">{"-" if status.lower() in ("absent", "excused") else _fmt_time(tap_time)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Time Slot</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{_fmt_slot(time_slot)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Enrollment Type</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{enrollment_status}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Status</td>
+              <td style="padding:8px 12px;">
+                <span style="background:{bg};color:{clr};font-weight:700;
+                             font-size:12px;padding:3px 10px;border-radius:20px;
+                             border:1px solid {clr};">{label}</span>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <!-- Footer -->
+      <tr>
+        <td style="padding:20px 32px 28px;">
+          <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
+            This is an automated attendance receipt from the DAVS system.<br>
+            Your attendance is being permanently recorded on the blockchain.<br>
+            You will receive a second email with your blockchain transaction hash shortly.<br>
+            Please do not reply to this email.
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>'''
+    send_email_fn(
+        [student_email],
+        f'[DAVS] Attendance Recorded - {subject_name} ({label})',
+        html,
+    )
+
+
 def send_teacher_session_summary(
     teacher_email,
     teacher_name,

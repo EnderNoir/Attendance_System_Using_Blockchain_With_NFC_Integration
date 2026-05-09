@@ -21,6 +21,7 @@ contract Attendance {
 
     struct SessionRecord {
         string sessionId;
+        string classType;           // 'lecture', 'laboratory', 'school_event'
         string subjectName;
         string teacherName;
         uint256 startTime;
@@ -113,6 +114,7 @@ contract Attendance {
     // Record an entire session's attendance data (called by admin at session end)
     function recordSession(
         string memory _sessionId,
+        string memory _classType,
         string memory _subjectName,
         string memory _teacherName,
         uint256 _startTime,
@@ -141,6 +143,7 @@ contract Attendance {
         // Store the complete session record immutably on blockchain
         SessionRecord storage newSession = sessionRecords[_sessionId];
         newSession.sessionId = _sessionId;
+        newSession.classType = _classType;
         newSession.subjectName = _subjectName;
         newSession.teacherName = _teacherName;
         newSession.startTime = _startTime;

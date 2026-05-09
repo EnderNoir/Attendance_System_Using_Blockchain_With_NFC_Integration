@@ -41,6 +41,7 @@ from services.cvsu_parsing import (
 )
 from services.attendance_email_templates import (
     send_student_attendance_receipt as _send_student_attendance_receipt_template,
+    send_student_attendance_receipt_initial_tap as _send_student_attendance_receipt_initial_tap_template,
     send_teacher_session_summary as _send_teacher_session_summary_template,
 )
 from services.attendance_view_routes_service import (
@@ -158,7 +159,29 @@ def send_student_attendance_receipt(
                 time_slot=time_slot,
                 enrollment_status=enrollment_status,
         )
- 
+
+def send_student_attendance_receipt_initial_tap(
+        student_name, student_email, student_id,
+        subject_name, section_key, teacher_name,
+        tap_time, status,
+        semester=None, time_slot=None,
+        enrollment_status='Regular'):
+        """Send INITIAL attendance receipt email to student (immediately after tap, without blockchain TX info)."""
+        _send_student_attendance_receipt_initial_tap_template(
+                student_name=student_name,
+                student_email=student_email,
+                student_id=student_id,
+                subject_name=subject_name,
+                section_key=section_key,
+                teacher_name=teacher_name,
+                tap_time=tap_time,
+                status=status,
+                send_email_fn=_send_email,
+                semester=semester,
+                time_slot=time_slot,
+                enrollment_status=enrollment_status,
+        )
+
 def send_teacher_session_summary(
         teacher_email, teacher_name,
         subject_name, section_key, time_slot,
@@ -505,6 +528,114 @@ def normalize_semester(sem):
     if 'SECOND' in s or '2ND' in s: return 'Second'
     if 'SUMMER' in s: return 'Summer'
     return s.title()
+
+
+def mask_name(name):
+    """Mask a person's name for privacy - format: F***T O**** L***Z"""
+    if not name or len(name.strip()) == 0:
+        return "***"
+    
+    parts = str(name).strip().split()
+    masked_parts = []
+    
+    for part in parts:
+        if len(part) <= 2:
+            # If part is 1-2 chars, show all (usually middle initials or short names)
+            masked_parts.append(part)
+        else:
+            # First char + asterisks + Last char
+            masked = part[0] + '*' * (len(part) - 2) + part[-1]
+            masked_parts.append(masked)
+    
+    return ' '.join(masked_parts)
+
+
+def format_session_log_data(class_type, session, student_records, is_school_event=False):
+    """
+    Format session data for blockchain logging.
+    Returns formatted string according to class type specification.
+    """
+    class_type_norm = str(class_type or 'lecture').strip().lower()
+    
+    if class_type_norm in ('school_event', 'event'):
+        # SCHOOL EVENT FORMAT
+        teachers = session.get('teacher_names', [session.get('teacher_name', '')])
+        if isinstance(teachers, str):
+            teachers = [teachers]
+        
+        # Get unique program-section combinations from students
+        programs_sections = set()
+        for sr in student_records:
+            prog_sec = sr.get('program_section', '')
+            if prog_sec:
+                programs_sections.add(prog_sec)
+        
+        instructor_lines = ', '.join([f"{mask_name(t.strip())}" for t in teachers if t.strip()])
+        program_lines = ', '.join(sorted(programs_sections)) if programs_sections else ''
+        
+        log_data = f"""CLASS TYPE: SCHOOL EVENT
+EVENT NAME: {session.get('subject_name', 'UNNAMED EVENT').upper()}
+INSTRUCTOR NAME(S):
+{instructor_lines}
+PROGRAM(S) AND SECTION(S):
+{program_lines}
+SESSION DATE: {session.get('session_date', 'UNKNOWN')}
+TIME SLOT: {session.get('time_slot', '—')}
+
+ATTENDANCE RECORDS:
+"""
+        for sr in student_records:
+            status_label = 'PRESENT' if sr.get('status') == 'present' else (
+                'LATE' if sr.get('status') == 'late' else (
+                    'EXCUSED' if sr.get('status') == 'excused' else 'ABSENT'
+                )
+            )
+            tapped_time = '—' if sr.get('status') in ('absent', 'excused') else sr.get('tap_time', '—')
+            
+            log_data += f"""
+STUDENT NAME: {mask_name(sr.get('student_name', 'UNKNOWN'))}
+STUDENT NUMBER: {sr.get('student_id', '—')}
+STUDENT TYPE: {sr.get('enrollment_status', 'REGULAR STUDENT').upper()}
+PROGRAM AND SECTION: {sr.get('program_section', '—')}
+ATTENDANCE REMARKS: {status_label}
+EXCUSED REASON: {'NONE' if sr.get('status') != 'excused' else sr.get('excuse_reason', 'NONE')}
+TAPPED TIME: {tapped_time}
+"""
+    else:
+        # LECTURE/LABORATORY FORMAT
+        class_label = 'LABORATORY' if class_type_norm == 'laboratory' else 'LECTURE'
+        
+        log_data = f"""CLASS TYPE: {class_label}
+SUBJECT NAME: {session.get('subject_name', 'UNNAMED')}
+COURSE CODE: {session.get('course_code', '—')}
+INSTRUCTOR NAME: {mask_name(session.get('teacher_name', 'UNKNOWN'))}
+PROGRAM: {session.get('program', '—')}
+YEAR LEVEL: {session.get('year_level', '—')}
+SECTION: {session.get('section', '—')}
+SEMESTER: {session.get('semester', '—')}
+SESSION DATE: {session.get('session_date', 'UNKNOWN')}
+TIME SLOT: {session.get('time_slot', '—')}
+
+ATTENDANCE RECORDS:
+"""
+        for sr in student_records:
+            status_label = 'PRESENT' if sr.get('status') == 'present' else (
+                'LATE' if sr.get('status') == 'late' else (
+                    'EXCUSED' if sr.get('status') == 'excused' else 'ABSENT'
+                )
+            )
+            tapped_time = '—' if sr.get('status') in ('absent', 'excused') else sr.get('tap_time', '—')
+            
+            log_data += f"""
+STUDENT NAME: {mask_name(sr.get('student_name', 'UNKNOWN'))}
+STUDENT NUMBER: {sr.get('student_id', '—')}
+STUDENT TYPE: {sr.get('enrollment_status', 'REGULAR STUDENT').upper()}
+ATTENDANCE REMARKS: {status_label}
+EXCUSED REASON: {'NONE' if sr.get('status') != 'excused' else sr.get('excuse_reason', 'NONE')}
+TAPPED TIME: {tapped_time}
+"""
+    
+    return log_data.strip()
 
 
 def _canonical_role(role_value):
@@ -3342,38 +3473,38 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         if end_ts <= start_ts:
             end_ts = start_ts + 1
         
-        # ── Build logData for blockchain event ─────────────────────────
-        m_teacher = mask_teacher_name(teacher_name)
-        log_date = ""
+        # ── Build logData using new format ─────────────────────────
+        class_type_norm = str(class_type or 'lecture').strip().lower()
+        
+        # Get session details for formatting
+        session_data = {
+            'subject_name': subject_name,
+            'course_code': course_code,
+            'teacher_name': teacher_name,
+            'program': section_key.split('|')[0] if section_key else '—',
+            'year_level': section_key.split('|')[1] if section_key and len(section_key.split('|')) > 1 else '—',
+            'section': section_key.split('|')[2] if section_key and len(section_key.split('|')) > 2 else '—',
+            'semester': semester or '—',
+            'session_date': '',
+            'time_slot': '—',
+        }
+        
+        # Get date
         try:
             if isinstance(start_val, str):
                 dt = datetime.strptime(start_val, '%Y-%m-%d %H:%M:%S')
-                log_date = dt.strftime('%B %d %Y')
+                session_data['session_date'] = dt.strftime('%B %d %Y').upper()
             else:
                 dt = datetime.fromtimestamp(start_val)
-                log_date = dt.strftime('%B %d %Y')
+                session_data['session_date'] = dt.strftime('%B %d %Y').upper()
         except:
-            log_date = _now_local().strftime('%B %d %Y')
-
-        # Include course code and subject in the first line of logData
-        # Instructor Name: J***s N****o,
-        # Course Code: COSC80,
-        # Class Type: (lab or lecture),
-        # Program, Year, Sem, Section,
-        # April 21 2026 (Date of the session),
+            session_data['session_date'] = _now_local().strftime('%B %d %Y').upper()
         
-        sec_parts = section_key.replace('|', ', ') if section_key else "—"
-        log_lines = [
-            f"Instructor Name: {m_teacher}",
-            f"Course Code: {course_code or '—'}",
-            f"Class Type: {(class_type or 'lecture').upper()}",
-            f"{sec_parts}{', ' + semester if semester else ''}",
-            f"{log_date}",
-            "Attendance Log (ID - NFC - STATUS):"
-        ]
-        
+        # Format student records
+        student_records = []
         nfc_ids = []
         status_codes = []
+        
         for item in students_data:
             if not isinstance(item, (list, tuple)) or len(item) < 2:
                 print(f"[BLOCKCHAIN ERROR] Invalid student data item: {item}")
@@ -3383,18 +3514,32 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
             nfc_ids.append(nfc_id)
             status_codes.append(chain_status_code(status))
             
-            # Fetch student_id if possible for the log
+            # Get student info
             st = get_student_by_nfc_cached(nfc_id)
-            sid = st.get('student_id', 'N/A') if st else 'N/A'
-            log_lines.append(f"{sid}({nfc_id} - {status.upper()})")
+            student_name = st.get('full_name', 'Unknown') if st else 'Unknown'
+            student_id = st.get('student_id', '—') if st else '—'
+            enrollment_status = st.get('enrollment_status', 'Regular') if st else 'Regular'
+            program_section = build_student_section_key(st) if st else '—'
             
-        log_data = "\n".join(log_lines)
+            student_records.append({
+                'student_name': student_name,
+                'student_id': student_id,
+                'enrollment_status': enrollment_status,
+                'program_section': program_section,
+                'status': status.lower(),
+                'tap_time': '—',
+                'excuse_reason': 'NONE',
+            })
         
-        print(f"[BLOCKCHAIN] Recording session {session_id}: {len(nfc_ids)} students")
+        # Use the new format_session_log_data function
+        log_data = format_session_log_data(class_type_norm, session_data, student_records)
+        
+        print(f"[BLOCKCHAIN] Recording session {session_id}: {len(nfc_ids)} students, Class Type: {class_type_norm}")
         
         tx_hash_obj = send_contract_tx(
             contract.functions.recordSession(
                 session_id,
+                class_type_norm,
                 subject_name,
                 teacher_name,
                 start_ts,
@@ -5002,7 +5147,7 @@ def parse_batch_pdfs():
     })
 
 def _mark_attendance_async(nfc_id, sess_id=None):
-    """Background task: submit attendance to blockchain and update DB with tx_hash."""
+    """Background task: submit attendance to blockchain, update DB with tx_hash, and send 2nd email."""
     if not (BLOCKCHAIN_ONLINE and contract and admin_account):
         return
     try:
@@ -5021,6 +5166,44 @@ def _mark_attendance_async(nfc_id, sess_id=None):
                     "WHERE sess_id=? AND nfc_id=?",
                     (tx_hash, block_num, sess_id, nfc_id)
                 )
+            
+            # ── Send SECOND email with blockchain TX info ──────────────────────────
+            # Get all the details needed for the email
+            try:
+                with get_db() as conn:
+                    log_row = conn.execute(
+                        "SELECT al.*, s.subject_name, s.section_key, s.teacher_name, "
+                        "s.time_slot, s.semester FROM attendance_logs al "
+                        "JOIN sessions s ON al.sess_id = s.sess_id "
+                        "WHERE al.sess_id=? AND al.nfc_id=?",
+                        (sess_id, nfc_id)
+                    ).fetchone()
+                
+                if log_row:
+                    all_s = get_all_students()
+                    student_info = next((s for s in all_s if s['nfcId']==nfc_id), {})
+                    student_email = student_info.get('email', '')
+                    
+                    if student_email:
+                        send_student_attendance_receipt(
+                            student_name=log_row['student_name'],
+                            student_email=student_email,
+                            student_id=log_row['student_id'],
+                            subject_name=log_row['subject_name'],
+                            section_key=log_row['section_key'],
+                            teacher_name=log_row['teacher_name'],
+                            tap_time=log_row['tap_time'],
+                            status=log_row['status'],
+                            tx_hash=tx_hash,
+                            block_num=block_num,
+                            sess_id=sess_id,
+                            nfc_id=nfc_id,
+                            semester=log_row['semester'],
+                            time_slot=log_row['time_slot'],
+                            enrollment_status=student_info.get('enrollment_status', 'Regular'),
+                        )
+            except Exception as e:
+                print(f"[WARN] Failed to send 2nd email for {nfc_id}: {e}")
     except Exception as e:
         print(f"[WARN] Async blockchain write failed for {nfc_id}: {e}")
 
@@ -6666,7 +6849,8 @@ def mark_pico():
         sess_id=sess_id, nfc_id=nfc_id,
         student_name=name, student_id=student_id,
         status=status_label, tap_time=tap_time_db,
-        tx_hash='', block_number=0
+        tx_hash='', block_number=0,
+        class_type=sess.get('class_type', 'lecture')
     )
     
     # Submit blockchain write in background (non-blocking)
@@ -6759,9 +6943,9 @@ def mark_pico():
         'is_late':   is_late,
     })
     
-    # ── Email: send attendance receipt to student ─────────────────────────
+    # ── Email: send INITIAL attendance receipt to student (immediately, without TX hash) ─────────────────────────
     student_email = student_info.get('email', '')
-    send_student_attendance_receipt(
+    send_student_attendance_receipt_initial_tap(
         student_name   = name,
         student_email  = student_email,
         student_id     = student_id,
@@ -6770,10 +6954,6 @@ def mark_pico():
         teacher_name   = sess.get('teacher_name', ''),
         tap_time       = tap_time_db,
         status         = status_label,
-        tx_hash        = tx_hash or '',
-        block_num      = block_num or '',
-        sess_id        = sess_id,
-        nfc_id         = nfc_id,
         semester       = sess.get('semester'),
         time_slot      = sess.get('time_slot'),
         enrollment_status = student_info.get('enrollment_status', 'Regular'),

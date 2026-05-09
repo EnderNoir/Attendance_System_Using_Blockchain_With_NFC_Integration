@@ -3631,6 +3631,10 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     all_students_list = get_all_students()
     section_key = normalize_section_key(sess.get('section_key', ''))
     sess_semester = normalize_semester(sess.get('semester') or '')
+    is_school_event = str(sess.get('class_type', 'lecture')).strip().lower() == 'school_event'
+    if is_school_event:
+        # Events should not filter by semester.
+        sess_semester = ''
     
     # Filter students belonging to this section & semester
     section_students = [

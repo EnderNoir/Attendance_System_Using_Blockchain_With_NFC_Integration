@@ -3925,7 +3925,16 @@ def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
                 # Normal schedules must match both student's section AND semester.
                 # IRREGULAR student bypass: if student is irregular, they can join the preferred session regardless of section/semester match
                 is_irregular = (student.get('enrollment_status') == 'Irregular')
-                if is_irregular or (pref_section == student_key and (not pref_semester or not student_semester or pref_semester == student_semester)):
+                if is_irregular:
+                    s = _session_row_with_logs(get_db(), pref_row)
+                    return pref_row['sess_id'], s
+
+                # For school events, allow by section only (semester is not enforced).
+                if pref_class_type == 'school_event' and pref_section == student_key:
+                    s = _session_row_with_logs(get_db(), pref_row)
+                    return pref_row['sess_id'], s
+
+                if pref_section == student_key and (not pref_semester or not student_semester or pref_semester == student_semester):
                     s = _session_row_with_logs(get_db(), pref_row)
                     return pref_row['sess_id'], s
 
@@ -3941,13 +3950,9 @@ def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
                             (pattern,),
                         ).fetchone()
                         if sibling:
-                            # For school events, we might be more lenient with semester, 
-                            # but let's check it anyway if it's available.
-                            sib_dict = dict(sibling)
-                            sib_semester = normalize_semester(sib_dict.get('semester'))
-                            if not student_semester or not sib_semester or student_semester == sib_semester:
-                                s = _session_row_with_logs(get_db(), sibling)
-                                return sibling['sess_id'], s
+                            # For school events, do not enforce semester.
+                            s = _session_row_with_logs(get_db(), sibling)
+                            return sibling['sess_id'], s
 
                 # Preferred session provided but doesn't match this student's context.
                 return None, None

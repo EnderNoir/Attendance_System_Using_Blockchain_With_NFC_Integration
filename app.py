@@ -2119,21 +2119,21 @@ def db_save_override(nfc_id, fields):
 
 # ── Schedule DB helpers ────────────────────────────────────────────────────
 
-def _event_schedule_to_rows(event_row):
+def _event_schedule_to_rows(ev):
     """Expand one event_schedules row into calendar-like schedule rows (teacher x section)."""
-    title = str(event_row.get('title', 'School Event') or 'School Event').strip()
-    desc = str(event_row.get('description', '') or '').strip()
-    event_id = str(event_row.get('event_id', '') or '').strip()
-    start_at = str(event_row.get('start_at', '') or '').strip()
-    end_at = str(event_row.get('end_at', '') or '').strip()
-    teacher_usernames = list(event_row.get('teacher_usernames', []) or [])
-    raw_sections = event_row.get('section_keys', []) or []
+    title = str(ev.get('title', 'School Event') or 'School Event').strip()
+    desc = str(ev.get('description', '') or '').strip()
+    event_id = str(ev.get('event_id', '') or '').strip()
+    start_at = str(ev.get('start_at', '') or '').strip()
+    end_at = str(ev.get('end_at', '') or '').strip()
+    teacher_usernames = list(ev.get('teacher_usernames', []) or [])
+    raw_sections = ev.get('section_keys', []) or []
     section_data = []
     for s in raw_sections:
         if isinstance(s, dict):
             section_data.append(s)
         elif isinstance(s, str) and s.strip():
-            section_data.append({"key": normalize_section_key(s), "semester": event_row.get('semester', '1st Semester')})
+            section_data.append({"key": normalize_section_key(s), "semester": ev.get('semester', '1st Semester')})
     
     if not start_at or not end_at or not event_id or not section_data:
         return []

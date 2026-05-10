@@ -524,7 +524,7 @@ def send_teacher_session_summary(
                          border:1px solid {clr};">{lbl}</span>
           </td>
         </tr>'''
-    
+    session_blockchain_info = f'''
       <!-- Session Blockchain Info -->
       <tr>
         <td style="background:#E8F5E9;padding:20px 32px;border-top:1px solid #ddd;">

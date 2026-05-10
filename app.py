@@ -5276,10 +5276,8 @@ def _mark_attendance_async(nfc_id, sess_id=None):
             
             # (Removed redundant per-tap student email to ensure only 2 emails total)
             pass
-        except Exception as e:
-            print(f"[WARN] Async blockchain update failed for {nfc_id}: {e}")
     except Exception as e:
-        print(f"[WARN] Async blockchain write failed for {nfc_id}: {e}")
+        print(f"[WARN] Async blockchain write/update failed for {nfc_id}: {e}")
 
 @app.route('/mark', methods=['POST'])
 @login_required

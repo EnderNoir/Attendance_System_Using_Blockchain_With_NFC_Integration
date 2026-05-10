@@ -7519,13 +7519,10 @@ def admin_event_schedule_create():
             return redirect(url_for('admin_schedules'))
 
         teacher_usernames = list(dict.fromkeys(teacher_usernames))
-        section_keys = list(dict.fromkeys(
-            normalize_section_key(s.strip()) for s in section_keys_raw if s.strip()
-        ))
         if not teacher_usernames:
             flash('Please add at least one teacher for the event.', 'danger')
             return redirect(url_for('admin_schedules'))
-        if not section_keys:
+        if not section_data:
             flash('Please add at least one section for the event.', 'danger')
             return redirect(url_for('admin_schedules'))
 

@@ -91,9 +91,30 @@ def teacher_dashboard_page_impl(
 
     live_sessions = {}
     seen_event_groups = set()
+    username = session_obj.get('username', '')
+    full_name = session_obj.get('full_name', '')
+
     for sess_id, sess in get_active_sessions().items():
-        if not (sess.get('teacher') == session_obj['username'] or sess.get('teacher_name') == session_obj.get('full_name')):
+        is_mine = (sess.get('teacher') == username or sess.get('teacher_name') == full_name)
+        
+        # Check if teacher is involved in school event
+        if not is_mine and str(sess.get('class_type')).lower() == 'school_event':
+            schedule_id = sess.get('schedule_id', '')
+            if schedule_id.startswith('event:'):
+                ev_id = schedule_id.split(':', 1)[1]
+                with get_db() as conn:
+                    ev = conn.execute("SELECT teacher_usernames FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
+                    if ev:
+                        import json
+                        try:
+                            involved = json.loads(ev['teacher_usernames'])
+                            if username in involved:
+                                is_mine = True
+                        except: pass
+        
+        if not is_mine:
             continue
+
         grp = _event_group_key(sess)
         if grp:
             if grp in seen_event_groups:
@@ -171,13 +192,35 @@ def teacher_sessions_students_page_impl(
 
     user = get_current_user()
     with get_db() as conn:
-        rows = conn.execute(
+        all_rows = conn.execute(
             "SELECT * FROM sessions "
-            "WHERE teacher_username=? OR teacher_name=? "
+            "WHERE (teacher_username=? OR teacher_name=?) "
+            "OR (class_type='school_event') "
             "ORDER BY started_at DESC",
             (session_obj['username'], session_obj.get('full_name', '')),
         ).fetchall()
-        raw_sessions = [session_row_with_logs(conn, row) for row in rows]
+        
+        raw_sessions = []
+        username = session_obj.get('username', '')
+        full_name = session_obj.get('full_name', '')
+        
+        for row in all_rows:
+            is_mine = (row['teacher_username'] == username or row['teacher_name'] == full_name)
+            if not is_mine and str(row['class_type']).lower() == 'school_event':
+                schedule_id = row['schedule_id'] or ''
+                if schedule_id.startswith('event:'):
+                    ev_id = schedule_id.split(':', 1)[1]
+                    ev = conn.execute("SELECT teacher_usernames FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
+                    if ev:
+                        import json
+                        try:
+                            involved = json.loads(ev['teacher_usernames'])
+                            if username in involved:
+                                is_mine = True
+                        except: pass
+            
+            if is_mine:
+                raw_sessions.append(session_row_with_logs(conn, row))
 
     def _event_group_key(sess):
         if str((sess or {}).get('class_type', 'lecture') or 'lecture').strip().lower() != 'school_event':
@@ -302,11 +345,35 @@ def teacher_records_page_impl(
 
     user = get_current_user()
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM sessions WHERE teacher_username=? AND ended_at IS NOT NULL ORDER BY started_at DESC",
-            (session_obj['username'],),
+        all_rows = conn.execute(
+            "SELECT * FROM sessions "
+            "WHERE (teacher_username=? OR teacher_name=?) "
+            "OR (class_type='school_event') "
+            "ORDER BY started_at DESC",
+            (session_obj['username'], session_obj.get('full_name', '')),
         ).fetchall()
-        raw_sessions = [session_row_with_logs(conn, row) for row in rows]
+        
+        raw_sessions = []
+        username = session_obj.get('username', '')
+        full_name = session_obj.get('full_name', '')
+        
+        for row in all_rows:
+            is_mine = (row['teacher_username'] == username or row['teacher_name'] == full_name)
+            if not is_mine and str(row['class_type']).lower() == 'school_event':
+                schedule_id = row['schedule_id'] or ''
+                if schedule_id.startswith('event:'):
+                    ev_id = schedule_id.split(':', 1)[1]
+                    ev = conn.execute("SELECT teacher_usernames FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
+                    if ev:
+                        import json
+                        try:
+                            involved = json.loads(ev['teacher_usernames'])
+                            if username in involved:
+                                is_mine = True
+                        except: pass
+            
+            if is_mine:
+                raw_sessions.append(session_row_with_logs(conn, row))
 
     def _event_group_key(sess):
         if str((sess or {}).get('class_type', 'lecture') or 'lecture').strip().lower() != 'school_event':

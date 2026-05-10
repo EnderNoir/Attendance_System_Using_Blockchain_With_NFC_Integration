@@ -14,6 +14,9 @@ const sessionsData = {
     units: "{{ s.get('units','3') }}",
     session_tx_hash: "{{ s.session_tx_hash|e if s.session_tx_hash else '' }}",
     session_block_number: "{{ s.session_block_number|e if s.session_block_number else '' }}",
+    event_description: "{{ (s.get('event_description','') or '')|e }}",
+    teachers_involved: {{ s.get('teachers_involved', [])|tojson }},
+    section_keys_involved: {{ s.get('section_keys_involved', [])|tojson }},
   },
   {% endfor %}
   {% for sid, s in ended.items() %}
@@ -30,6 +33,9 @@ const sessionsData = {
     units: "{{ s.get('units','3') }}",
     session_tx_hash: "{{ s.session_tx_hash|e if s.session_tx_hash else '' }}",
     session_block_number: "{{ s.session_block_number|e if s.session_block_number else '' }}",
+    event_description: "{{ (s.get('event_description','') or '')|e }}",
+    teachers_involved: {{ s.get('teachers_involved', [])|tojson }},
+    section_keys_involved: {{ s.get('section_keys_involved', [])|tojson }},
   },
   {% endfor %}
 };
@@ -212,8 +218,8 @@ function renderSessModal(sessId, data) {
   const sts = data.students || [];
   const classType = normalizeClassType(s.class_type || data.class_type || 'lecture');
   const classTypeLabel = classType === 'school_event' ? 'School Event' : (classType === 'laboratory' ? 'Laboratory' : 'Lecture');
-  const teachersInvolved = (data.teachers_involved || []).join(', ') || (s.teacher_name || '-');
-  const sectionsInvolved = (data.sections_involved || []).map((x) => String(x || '').replace(/\|/g, ' | ')).join(', ') || ((s.section_key || '').replace(/\|/g, ' | '));
+  const teachersInvolved = (data.teachers_involved || s.teachers_involved || []).join(', ') || (s.teacher_name || '-');
+  const sectionsInvolved = (data.sections_involved || s.section_keys_involved || []).map((x) => String(x || '').replace(/\|/g, ' ')).join(', ') || ((s.section_key || '').replace(/\|/g, ' '));
 
   const cnt = { present: 0, late: 0, absent: 0, excused: 0 };
   sts.forEach((st) => {

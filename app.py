@@ -2203,6 +2203,7 @@ def _event_schedule_to_rows(ev):
                 'years_involved': years_involved,
                 'sections_involved': sections_involved,
                 'section_keys_involved': all_keys,
+                'section_details_involved': section_data,
             }
         )
     return rows
@@ -2612,18 +2613,18 @@ def _normalize_hhmm(value):
 
 
 def _parse_event_schedule_id(schedule_id):
-    """Parse schedule ids in form event:<event_id>:<teacher_username>:<section_key>."""
-    raw = str(schedule_id or '').strip()
-    if not raw.startswith('event:'):
+    if not schedule_id or not str(schedule_id).startswith('event:'):
         return None
-    parts = raw.split(':', 3)
-    if len(parts) != 4:
-        return None
-    return {
-        'event_id': parts[1],
-        'teacher_username': parts[2],
-        'section_key': normalize_section_key(parts[3]),
-    }
+    parts = str(schedule_id).split(':', 3)
+    if len(parts) == 2:
+        return {'event_id': parts[1]}
+    if len(parts) == 4:
+        return {
+            'event_id': parts[1],
+            'teacher_username': parts[2],
+            'section_key': normalize_section_key(parts[3]),
+        }
+    return None
 
 
 def _event_related_session_ids(schedule_id, include_ended=False):

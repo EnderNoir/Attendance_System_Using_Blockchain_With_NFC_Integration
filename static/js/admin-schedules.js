@@ -400,28 +400,33 @@
         ? s.teachers_involved
         : [s.teacher_name || '-'];
       document.getElementById('infoTeacherName').innerHTML = teachers.map((t) => esc(t)).join('<br>');
+      document.querySelector('#infoTeacherName').previousElementSibling.textContent = 'Teachers Involved';
 
-      const sectionKeys = Array.isArray(s.section_keys_involved) && s.section_keys_involved.length
-        ? s.section_keys_involved
-        : (s.section_key ? [s.section_key] : []);
+      const sectionDetails = Array.isArray(s.section_details_involved) && s.section_details_involved.length
+        ? s.section_details_involved
+        : (s.section_key ? [{key: s.section_key, semester: s.semester}] : []);
       
-      const scopeLines = sectionKeys
+      const scopeLines = sectionDetails
         .filter(Boolean)
         .map((sec) => {
-          if (typeof sec === 'object') {
-            const p = String(sec.key || '').split('|');
-            return (p[0] || '-') + '-' + (p[1] || '-') + '-' + (p[2] || '-') + (sec.semester ? ' · ' + sec.semester : '');
-          }
-          const p = String(sec).split('|');
-          return (p[0] || '-') + '-' + (p[1] || '-') + '-' + (p[2] || '-');
+          const p = String(sec.key || '').split('|');
+          const disp = (p[0] || '-') + ' ' + (p[1] || '-') + ' ' + (p[2] || '-');
+          return disp + (sec.semester ? ' (' + sec.semester + ')' : '');
         });
       document.getElementById('infoSectionName').innerHTML = scopeLines.length
         ? scopeLines.map((x) => esc(x)).join('<br>')
         : '-';
+      document.querySelector('#infoSectionName').previousElementSibling.textContent = 'Program(s) and Section(s) Involved';
+      document.getElementById('infoGraceRow').style.display = 'none';
+      document.getElementById('infoSemesterRow').style.display = 'none';
     } else {
       document.getElementById('infoTeacherName').textContent = s.teacher_name || '-';
+      document.querySelector('#infoTeacherName').previousElementSibling.textContent = 'Teacher';
       document.getElementById('infoSectionName').textContent = (s.section_key || '').split('|').join(' - ');
+      document.querySelector('#infoSectionName').previousElementSibling.textContent = 'Section';
       document.getElementById('infoSemester').textContent = s.semester || 'Any Semester';
+      document.getElementById('infoGraceRow').style.display = 'flex';
+      document.getElementById('infoSemesterRow').style.display = 'flex';
     }
     if (isSchoolEvent(s)) {
       document.getElementById('infoDayTime').textContent = (fmtEventDate(s.event_date) || DOW_NAMES[dayIdx]) + ' @ ' + fmtTime(to24h(s.start_time)) + ' - ' + fmtTime(to24h(s.end_time));

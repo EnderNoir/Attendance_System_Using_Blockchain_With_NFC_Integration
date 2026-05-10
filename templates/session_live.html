@@ -156,12 +156,28 @@
     <table style="width:100%; border-collapse:collapse; font-size:12px; table-layout:fixed; min-width:320px;">
       <tbody>
         <tr>
-          <td style="width:160px; background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Instructor</td>
-          <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">{{ sess.teacher_name or '—' }}</td>
+          <td style="width:160px; background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">
+            {% if is_school_event %}Teachers Involved{% else %}Instructor{% endif %}
+          </td>
+          <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">
+            {% if is_school_event and session_meta and session_meta.teachers %}
+              {{ session_meta.teachers|join(', ') }}
+            {% else %}
+              {{ sess.teacher_name or '—' }}
+            {% endif %}
+          </td>
         </tr>
         <tr>
-          <td style="background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Section(s)</td>
-          <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">{{ (sess.section_key or '').replace('|',' · ') }}</td>
+          <td style="background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">
+            {% if is_school_event %}Program(s) and Section(s) Involved{% else %}Section{% endif %}
+          </td>
+          <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">
+            {% if is_school_event and session_meta and session_meta.section_keys %}
+              {% for k in session_meta.section_keys %}{{ k.replace('|', ' ') }}{% if not loop.last %}, {% endif %}{% endfor %}
+            {% else %}
+              {{ (sess.section_key or '').replace('|',' · ') }}
+            {% endif %}
+          </td>
         </tr>
         <tr>
           <td style="background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Semester</td>
@@ -179,7 +195,7 @@
           <td style="background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Started At</td>
           <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">{{ fmt_time(sess.started_at) }}</td>
         </tr>
-        {% if sess.late_cutoff %}
+        {% if not is_school_event and sess.late_cutoff %}
         <tr>
           <td style="background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Late After</td>
           <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">{{ fmt_time_short(sess.late_cutoff) }}</td>
@@ -191,10 +207,10 @@
           <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">{{ fmt_time(sess.ended_at) }}</td>
         </tr>
         {% endif %}
-        {% if is_school_event and session_meta and session_meta.description %}
+        {% if is_school_event %}
         <tr>
-          <td style="background:rgba(255,255,255,.03); padding:9px 12px; color:var(--muted); font-weight:700; vertical-align:top;">Description</td>
-          <td style="padding:9px 12px; word-break:break-word;">{{ session_meta.description }}</td>
+          <td style="background:rgba(255,255,255,.03); padding:9px 12px; color:var(--muted); font-weight:700; vertical-align:top;">Event Description</td>
+          <td style="padding:9px 12px; word-break:break-word;">{{ sess.event_description or (session_meta.description if session_meta else '-') or '-' }}</td>
         </tr>
         {% endif %}
       </tbody>

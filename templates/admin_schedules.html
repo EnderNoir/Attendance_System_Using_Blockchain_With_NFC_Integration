@@ -556,7 +556,7 @@
           <select class="ac-input" name="semester" id="eventSemester" required>
             <option value="1st Semester">1st Semester</option>
             <option value="2nd Semester">2nd Semester</option>
-            <option value="Short Session">Short Session</option>
+            <option value="Summer">Summer</option>
           </select>
         </div>
         <div class="mb-3">
@@ -564,23 +564,26 @@
           <div class="section-fields" style="margin-bottom:8px;">
             <div>
               <label class="form-label-sm" style="margin-top:0;">Program</label>
-              <input list="eventProgramOptions" class="ac-input" id="eventProgramInput" placeholder="Search program">
+              <select class="ac-input" id="eventProgramInput">
+                <option value="">-- Select Program --</option>
+              </select>
             </div>
             <div>
               <label class="form-label-sm" style="margin-top:0;">Year Level</label>
-              <input list="eventYearOptions" class="ac-input" id="eventYearInput" placeholder="Search year level">
+              <select class="ac-input" id="eventYearInput">
+                <option value="">-- Select Year Level --</option>
+              </select>
             </div>
             <div>
               <label class="form-label-sm" style="margin-top:0;">Section</label>
-              <input list="eventSectionOptions" class="ac-input" id="eventSectionInput" placeholder="Search section">
+              <select class="ac-input" id="eventSectionInput">
+                <option value="">-- Select Section --</option>
+              </select>
             </div>
           </div>
           <div style="display:flex;gap:8px;">
-            <button type="button" class="btn-outline" onclick="addEventSection()">Add</button>
+            <button type="button" class="btn-outline" id="addEventSectionBtn" onclick="addEventSection()">Add</button>
           </div>
-          <datalist id="eventProgramOptions"></datalist>
-          <datalist id="eventYearOptions"></datalist>
-          <datalist id="eventSectionOptions"></datalist>
           <input type="hidden" name="selected_sections" id="eventSectionsHidden">
           <div id="eventSectionsTableWrap" style="margin-top:10px;"></div>
           <label class="class-type-item" style="margin-top:10px;">

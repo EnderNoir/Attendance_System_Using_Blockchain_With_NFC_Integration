@@ -1169,10 +1169,10 @@
       fillSelect('editProgram', programs,       '-- Select Program --');
       fillSelect('editSection', sectionLetters, '-- Select Section --');
 
-      // Event schedule combo-box datalists
-      fillDatalist('eventProgramOptions',  programs);
-      fillDatalist('eventYearOptions',     yearLevels);
-      fillDatalist('eventSectionOptions',  sectionLetters);
+      // Event schedule selects
+      fillSelect('eventProgramInput',  programs,       '-- Select Program --');
+      fillSelect('eventYearInput',     yearLevels,     '-- Select Year Level --');
+      fillSelect('eventSectionInput',  sectionLetters, '-- Select Section --');
     })();
 
     checkPresessions();
@@ -1188,12 +1188,18 @@
 
   function toggleEventAllTeachers() {
     const checked = !!document.getElementById('eventAllTeachers')?.checked;
-    // Only target the row with the input and add button
-    const inputRow = document.getElementById('eventTeacherInput')?.closest('div.mb-3')?.querySelector('div[style*="display:flex"]');
+    const teacherInput = document.getElementById('eventTeacherInput');
+    const teacherAddBtn = teacherInput?.nextElementSibling;
     const teacherList = document.getElementById('eventTeachersList');
-    if (inputRow) {
-      inputRow.style.opacity = checked ? '0.5' : '1';
-      inputRow.style.pointerEvents = checked ? 'none' : 'auto';
+    
+    if (teacherInput) {
+      teacherInput.disabled = checked;
+      teacherInput.style.opacity = checked ? '0.5' : '1';
+    }
+    if (teacherAddBtn) {
+      teacherAddBtn.disabled = checked;
+      teacherAddBtn.style.opacity = checked ? '0.5' : '1';
+      teacherAddBtn.style.pointerEvents = checked ? 'none' : 'auto';
     }
     if (teacherList) {
       teacherList.style.opacity = checked ? '0.5' : '1';
@@ -1207,17 +1213,25 @@
 
   function toggleEventAllStudents() {
     const checked = !!document.getElementById('eventAllStudents')?.checked;
+    const semesterSelect = document.getElementById('eventSemester');
+    const programSelect = document.getElementById('eventProgramInput');
+    const yearSelect = document.getElementById('eventYearInput');
+    const sectionSelect = document.getElementById('eventSectionInput');
+    const addBtn = document.getElementById('addEventSectionBtn');
     const sectionFields = document.querySelector('#eventForm .section-fields');
-    const addButtonRow = document.querySelector('#eventForm button[onclick="addEventSection()"]')?.closest('div[style*="display:flex"]');
     const tableWrap = document.getElementById('eventSectionsTableWrap');
+
+    [semesterSelect, programSelect, yearSelect, sectionSelect, addBtn].forEach(el => {
+      if (el) {
+        el.disabled = checked;
+        el.style.opacity = checked ? '0.5' : '1';
+        if (el === addBtn) el.style.pointerEvents = checked ? 'none' : 'auto';
+      }
+    });
 
     if (sectionFields) {
       sectionFields.style.opacity = checked ? '0.5' : '1';
       sectionFields.style.pointerEvents = checked ? 'none' : 'auto';
-    }
-    if (addButtonRow) {
-      addButtonRow.style.opacity = checked ? '0.5' : '1';
-      addButtonRow.style.pointerEvents = checked ? 'none' : 'auto';
     }
     if (tableWrap) {
       tableWrap.style.opacity = checked ? '0.5' : '1';

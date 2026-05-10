@@ -1420,6 +1420,7 @@ def _migrate_add_missing_columns():
                     event_id             TEXT PRIMARY KEY,
                     title                TEXT NOT NULL DEFAULT '',
                     description          TEXT NOT NULL DEFAULT '',
+                    semester             TEXT NOT NULL DEFAULT '',
                     teacher_usernames_json TEXT NOT NULL DEFAULT '[]',
                     section_keys_json    TEXT NOT NULL DEFAULT '[]',
                     start_at             TEXT NOT NULL DEFAULT '',
@@ -1434,6 +1435,15 @@ def _migrate_add_missing_columns():
             conn.execute('CREATE INDEX IF NOT EXISTS idx_event_sched_start ON event_schedules(start_at)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_event_sched_active ON event_schedules(is_active)')
             print('[MIGRATION] Created missing table: event_schedules')
+
+        # [MIGRATION] Add semester to event_schedules if missing
+        try:
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(event_schedules)").fetchall()]
+            if 'semester' not in cols:
+                conn.execute("ALTER TABLE event_schedules ADD COLUMN semester TEXT NOT NULL DEFAULT ''")
+                print('[MIGRATION] Added semester column to event_schedules')
+        except Exception as e:
+            print(f"[MIGRATION] Failed to add semester to event_schedules: {e}")
 
         if 'no_class_days' not in existing_tables:
             conn.execute(

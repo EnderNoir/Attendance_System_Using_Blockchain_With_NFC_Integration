@@ -6074,6 +6074,7 @@ def api_session_attendance(sess_id):
                     if tname:
                         teachers_involved.append(tname)
 
+            sched_meta = _parse_event_schedule_id(sess.get('schedule_id', ''))
             if not sched_meta:
                 # Try parsing from subject_id if schedule_id is generic
                 subj_id = sess.get('subject_id', '')

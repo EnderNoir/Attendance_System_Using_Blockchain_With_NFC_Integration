@@ -101,6 +101,14 @@ def send_student_attendance_receipt(
     section_display = (section_key.replace('|', ' · ') if section_key else '—')
     if semester:
         section_display += f" · {semester}"
+    
+    if class_type == 'school_event' and programs_involved:
+        # Format list of sections with semester
+        section_display = "<br>".join([str(p).replace('|', ' · ') for p in programs_involved])
+    
+    instructor_display = teacher_name or '—'
+    if class_type == 'school_event' and teachers_involved:
+        instructor_display = "<br>".join(teachers_involved)
         
     tx_row = ''
     excuse_section = ''
@@ -206,13 +214,13 @@ def send_student_attendance_receipt(
               <td style="padding:8px 12px;font-size:12px;color:#666;
                          border-bottom:1px solid #eee;">{ 'Program(s) and Section(s)' if class_type == 'school_event' else 'Section' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{section_display if class_type != 'school_event' else (", ".join(programs_involved) if programs_involved else section_display)}</td>
+                         border-bottom:1px solid #eee;">{section_display}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
                          border-bottom:1px solid #eee;">{ 'Teachers Involved' if class_type == 'school_event' else 'Instructor' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{teacher_name if class_type != 'school_event' else (", ".join(teachers_involved) if teachers_involved else teacher_name)}</td>
+                         border-bottom:1px solid #eee;">{instructor_display}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;

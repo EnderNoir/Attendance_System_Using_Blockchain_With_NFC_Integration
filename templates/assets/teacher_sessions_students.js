@@ -252,18 +252,16 @@ function renderSessModal(sessId, data) {
     sessTxHtml += `</div></div>`;
   document.getElementById('sm_info_grid').innerHTML = `${sessTxHtml}
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-book"></i> ${classType === 'school_event' ? 'Event Name' : 'Subject'}</div>
-      <div class="sm-info-val">${s.subject_name}${s.course_code ? ' <code style="font-size:10px;">[' + s.course_code + ']</code>' : ''}</div></div>
-    ${classType === 'school_event' && data.event_description ? `
+      <div class="sm-info-val">${s.subject_name}${s.course_code && classType !== 'school_event' ? ' <code style="font-size:10px;">[' + s.course_code + ']</code>' : ''}</div></div>
+    ${classType === 'school_event' && (data.event_description || s.event_description) ? `
     <div class="sm-info-box" style="grid-column: 1/-1;"><div class="sm-info-lbl"><i class="bi bi-card-text"></i> Event Description</div>
-      <div class="sm-info-val">${data.event_description}</div></div>` : ''}
+      <div class="sm-info-val">${data.event_description || s.event_description}</div></div>` : ''}
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-collection"></i> Class Type</div>
       <div class="sm-info-val">${classTypeLabel(s.class_type || data.class_type || 'lecture')}</div></div>
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-grid"></i> ${classType === 'school_event' ? 'Program(s) and Section(s) Involved' : 'Section'}</div>
       <div class="sm-info-val">${classType === 'school_event' ? sectionsInvolved : (s.section_key || '').replace(/\|/g, ' · ') + (data.semester ? ' · ' + data.semester : '')}</div></div>
-    ${classType === 'school_event' ? `
-    <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-people"></i> Teachers Involved</div>
+    <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-people"></i> ${classType === 'school_event' ? 'Teachers Involved' : 'Instructor'}</div>
       <div class="sm-info-val">${teachersInvolved}</div></div>
-    ` : ''}
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-clock"></i> Time Slot</div>
       <div class="sm-info-val">${normalizeTimeSlot(s.time_slot) || '—'}</div></div>
     <div class="sm-info-box"><div class="sm-info-lbl"><i class="bi bi-people"></i> Total Enrolled</div>

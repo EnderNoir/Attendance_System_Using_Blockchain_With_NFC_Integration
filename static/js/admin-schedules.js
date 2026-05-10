@@ -404,9 +404,14 @@
       const sectionKeys = Array.isArray(s.section_keys_involved) && s.section_keys_involved.length
         ? s.section_keys_involved
         : (s.section_key ? [s.section_key] : []);
+      
       const scopeLines = sectionKeys
         .filter(Boolean)
         .map((sec) => {
+          if (typeof sec === 'object') {
+            const p = String(sec.key || '').split('|');
+            return (p[0] || '-') + '-' + (p[1] || '-') + '-' + (p[2] || '-') + (sec.semester ? ' · ' + sec.semester : '');
+          }
           const p = String(sec).split('|');
           return (p[0] || '-') + '-' + (p[1] || '-') + '-' + (p[2] || '-');
         });

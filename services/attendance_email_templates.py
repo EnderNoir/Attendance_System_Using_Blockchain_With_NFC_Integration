@@ -758,3 +758,74 @@ def send_teacher_session_summary(
         f'[DAVS] Session Summary - {subject_name} · {section_disp}',
         html,
     )
+
+def send_audit_resolution_email(recipients, conflicts):
+    """
+    Sends a high-priority alert about detected and resolved tampering.
+    """
+    from services.email_service import send_email_async
+    
+    rows_html = ""
+    for c in conflicts:
+        rows_html += f"""
+        <tr>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+                <div style="font-weight:700;color:#1E4A1A;">{c['subject_name']}</div>
+                <div style="font-size:10px;color:#666;">ID: {c['sess_id'][:8]}...</div>
+            </td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+                <div style="font-weight:600;">{c['student_name']}</div>
+                <div style="font-size:10px;color:#666;">NFC: {c['nfc_id']}</div>
+            </td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+                <span style="color:#C0392B;font-weight:700;">{c['db_status'].upper()}</span>
+            </td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+                <span style="color:#2D6A27;font-weight:700;">{c['bc_status'].upper()}</span>
+            </td>
+        </tr>
+        """
+
+    html = f'''
+    <html><body style="font-family:sans-serif;background:#f4f7f6;padding:20px;">
+        <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #eee;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+            <div style="background:#C0392B;padding:24px;text-align:center;color:#fff;">
+                <h2 style="margin:0;font-size:20px;letter-spacing:1px;">BLOCKCHAIN INTEGRITY ALERT</h2>
+                <p style="margin:8px 0 0;font-size:13px;opacity:0.9;">Tampering Detected & Resolved</p>
+            </div>
+            <div style="padding:32px;">
+                <p style="font-size:14px;color:#444;line-height:1.6;">
+                    The system has detected discrepancies between the <strong>Local Database</strong> and the <strong>Immutable Blockchain Ledger</strong>. 
+                    Unauthorized changes were identified and have been automatically <strong>resolved</strong> to match the original blockchain record.
+                </p>
+                <div style="margin:24px 0;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:8px;">
+                        <thead style="background:#f8fafc;">
+                            <tr>
+                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">SESSION</th>
+                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">STUDENT</th>
+                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">TAMPERED</th>
+                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">RESTORED</th>
+                            </tr>
+                        </thead>
+                        <tbody>{rows_html}</tbody>
+                    </table>
+                </div>
+                <div style="background:#f0f9ff;border-left:4px solid #0369a1;padding:16px;border-radius:4px;margin-bottom:24px;">
+                    <p style="margin:0;font-size:12px;color:#0369a1;line-height:1.5;">
+                        <strong>Security Note:</strong> These records are now synchronized with the Sepolia blockchain. Any further unauthorized modification to the database will be flagged in the next audit scan.
+                    </p>
+                </div>
+                <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0;">
+                    Automated Security Report &bull; DAVS Blockchain System
+                </p>
+            </div>
+        </div>
+    </body></html>
+    '''
+    
+    send_email_async(
+        recipients,
+        "[SECURITY] Blockchain Integrity Audit - Tampering Resolved",
+        html
+    )

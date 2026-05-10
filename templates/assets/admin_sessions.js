@@ -491,3 +491,117 @@ function resetEnded() {
   });
   filterEnded();
 }
+
+/** 
+ * --- BLOCKCHAIN INTEGRITY AUDIT ---
+ */
+function runBlockchainAudit() {
+  const overlay = document.getElementById('auditOverlay');
+  overlay.style.display = 'flex';
+  overlay.classList.add('show');
+
+  fetch('/api/admin/audit_sessions')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error);
+      showAuditResults(data);
+    })
+    .catch(err => {
+      alert("Audit failed: " + err.message);
+    })
+    .finally(() => {
+      overlay.classList.remove('show');
+      setTimeout(() => overlay.style.display = 'none', 300);
+    });
+}
+
+function showAuditResults(data) {
+  const modal = document.getElementById('auditResultModal');
+  const body = document.getElementById('auditResultBody');
+  const countSpan = document.getElementById('auditConflictCount');
+  
+  const conflicts = data.conflicts || [];
+  countSpan.textContent = conflicts.length + ' Conflicts';
+  countSpan.style.background = conflicts.length > 0 ? 'var(--danger)' : 'var(--success)';
+  countSpan.style.color = 'white';
+
+  if (conflicts.length === 0) {
+    body.innerHTML = `
+      <div style="text-align:center;padding:40px;color:var(--muted);">
+        <i class="bi bi-shield-check" style="font-size:48px;color:var(--success);opacity:.5;display:block;margin-bottom:12px;"></i>
+        <div style="font-weight:600;color:var(--foreground);font-size:16px;">All Records Verified</div>
+        <p style="font-size:12px;margin-top:8px;">No discrepancies detected between Local Database and Blockchain Ledger.</p>
+      </div>
+    `;
+    document.getElementById('btnResolveAudit').style.display = 'none';
+  } else {
+    let html = `
+      <div style="margin-bottom:16px;font-size:12px;color:var(--danger);background:rgba(192,57,43,.05);padding:10px;border-radius:6px;border:1px solid rgba(192,57,43,.1);">
+        <i class="bi bi-exclamation-triangle-fill"></i> Data tampering detected in ${conflicts.length} record(s). Local database does not match the immutable blockchain ledger.
+      </div>
+      <table class="att-table">
+        <thead>
+          <tr>
+            <th>Session / Event</th>
+            <th>Student</th>
+            <th>Local DB</th>
+            <th>Blockchain</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    
+    conflicts.forEach(c => {
+      html += `
+        <tr>
+          <td>
+            <div style="font-weight:600;">${c.subject_name}</div>
+            <div style="font-size:10px;color:var(--muted);">${c.sess_id.substring(0,8)}...</div>
+          </td>
+          <td>
+             <div style="font-weight:600;">${c.student_name}</div>
+             <div style="font-size:10px;font-family:monospace;color:var(--muted);">${c.nfc_id}</div>
+          </td>
+          <td><span class="att-status st-absent" style="text-transform:uppercase;font-size:10px;">${c.db_status}</span></td>
+          <td><span class="att-status st-present" style="text-transform:uppercase;font-size:10px;background:var(--success);color:white;">${c.bc_status}</span></td>
+        </tr>
+      `;
+    });
+    
+    html += `</tbody></table>`;
+    body.innerHTML = html;
+    document.getElementById('btnResolveAudit').style.display = 'block';
+    document.getElementById('btnResolveAudit').onclick = () => resolveAuditConflicts(conflicts);
+  }
+
+  modal.classList.add('show');
+}
+
+function resolveAuditConflicts(conflicts) {
+  const btn = document.getElementById('btnResolveAudit');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Resolving...';
+
+  fetch('/api/admin/resolve_tampering', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conflicts })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) throw new Error(data.error);
+    alert(`Success! ${data.resolved} tampered records have been restored to their original blockchain state. Faculty and Admin have been notified.`);
+    closeAuditModal();
+    window.location.reload();
+  })
+  .catch(err => {
+    alert("Resolution failed: " + err.message);
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  });
+}
+
+function closeAuditModal() {
+  document.getElementById('auditResultModal').classList.remove('show');
+}

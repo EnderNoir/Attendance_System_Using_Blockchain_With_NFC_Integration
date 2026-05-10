@@ -2288,6 +2288,7 @@ def _event_schedule_rows_for_teacher(username):
                 'years_involved': years,
                 'sections_involved': sections,
                 'section_keys_involved': section_keys,
+                'section_details_involved': ev.get('section_keys', []),
                 'students_involved_count': students_count,
             }
         )
@@ -3575,16 +3576,47 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         class_type_norm = str(class_type or 'lecture').strip().lower()
         
         # Get session details for formatting
+        if isinstance(section_key, list):
+            # For school events, list all involved sections specifically
+            unique_progs = sorted({str(sk).split('|')[0] for sk in section_key if sk})
+            unique_years = sorted({str(sk).split('|')[1] for sk in section_key if '|' in str(sk)})
+            unique_secs = sorted({str(sk).split('|')[2] for sk in section_key if len(str(sk).split('|')) > 2})
+            
+            prog_disp = "\n".join(unique_progs) if unique_progs else "—"
+            year_disp = "\n".join(unique_years) if unique_years else "—"
+            sec_disp = "\n".join(unique_secs) if unique_secs else "—"
+            
+            # Formatted list for metadata
+            formatted_list = []
+            for sk in section_key:
+                if not sk: continue
+                p = str(sk).split('|')
+                line = "-".join([x for x in p if x and x != '-'])
+                if semester and semester != '-':
+                    line += f" {semester}"
+                formatted_list.append(line)
+            sections_involved_text = "\n".join(sorted(set(formatted_list)))
+        else:
+            sk_disp = str(section_key or '')
+            parts = sk_disp.split('|')
+            prog_disp = parts[0] if len(parts) > 0 else '—'
+            year_disp = parts[1] if len(parts) > 1 else '—'
+            sec_disp = parts[2] if len(parts) > 2 else '—'
+            sections_involved_text = sk_disp.replace('|', ' ')
+            if semester and semester != '-':
+                sections_involved_text += f" {semester}"
+
         session_data = {
             'subject_name': subject_name,
             'course_code': course_code,
             'teacher_name': teacher_name,
-            'program': section_key.split('|')[0] if section_key else '—',
-            'year_level': section_key.split('|')[1] if section_key and len(section_key.split('|')) > 1 else '—',
-            'section': section_key.split('|')[2] if section_key and len(section_key.split('|')) > 2 else '—',
+            'program': prog_disp,
+            'year_level': year_disp,
+            'section': sec_disp,
             'semester': semester or '—',
             'session_date': '',
             'time_slot': time_slot or '—',
+            'sections_involved': sections_involved_text
         }
         
         # Get date
@@ -3640,7 +3672,7 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
             enrollment_statuses.append(e_status)
             status_labels.append(status.upper())
             excused_reasons.append(excuse_note if status.lower() == 'excused' else 'NONE')
-            programs_sections_per_student.append(p_section.replace('|', ' ') if p_section else '—')
+            programs_sections_per_student.append(p_section.replace('|', '-') if p_section else '—')
             
             # Tapped timestamp
             try:
@@ -3672,7 +3704,7 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
                 'student_name': s_name,
                 'student_id': s_id,
                 'enrollment_status': e_status,
-                'program_section': p_section.replace('|', ' ') if p_section else '-',
+                'program_section': p_section.replace('|', '-') if p_section else '-',
                 'status': status.lower(),
                 'tap_time': tap_time_fmt,
                 'excuse_reason': excuse_note if status.lower() == 'excused' else 'NONE',
@@ -3680,11 +3712,16 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         
         # Collect all programs/sections for events
         if class_type_norm in ('school_event', 'event'):
-            ps_set = set()
-            for sr in student_records:
-                if sr['program_section'] and sr['program_section'] != '—':
-                    ps_set.add(sr['program_section'].replace('|', ' '))
-            session_data['program_sections_involved'] = ', '.join(sorted(ps_set))
+            # Use the detailed list built at the start if available, 
+            # otherwise fallback to student-based aggregation
+            if session_data.get('sections_involved'):
+                session_data['program_sections_involved'] = session_data['sections_involved']
+            else:
+                ps_set = set()
+                for sr in student_records:
+                    if sr['program_section'] and sr['program_section'] not in ('—', '-'):
+                        ps_set.add(sr['program_section'].replace('|', ' '))
+                session_data['program_sections_involved'] = "\n".join(sorted(ps_set))
         
         # Use the new format_session_log_data function
         log_data = format_session_log_data(class_type_norm, session_data, student_records)

@@ -575,15 +575,25 @@
                 ? s.teachers_involved
                 : [s.teacher_name || '—'];
             document.getElementById('infoTeacherName').innerHTML = teachers.map((t) => esc(t)).join('<br>');
-            const sectionKeys = Array.isArray(s.section_keys_involved) && s.section_keys_involved.length
-                ? s.section_keys_involved
-                : (s.section_key ? [s.section_key] : []);
-            const sections = sectionKeys.map((sec) => {
-                const p = String(sec || '').split('|');
-                return (p[0] || '-') + '-' + (p[1] || '-') + '-' + (p[2] || '-');
+
+            const details = Array.isArray(s.section_details_involved) && s.section_details_involved.length
+                ? s.section_details_involved
+                : (s.section_key ? [{key: s.section_key, semester: s.semester}] : []);
+
+            const scopeLines = details.filter(Boolean).map((sec) => {
+                const k = typeof sec === 'object' ? (sec.key || '') : String(sec);
+                const sem = typeof sec === 'object' ? (sec.semester || '') : (s.semester || '');
+                const p = k.split('|');
+                const prog = p[0] || '';
+                const yr = p[1] || '';
+                const sect = p[2] || '';
+                let line = [prog, yr, sect].filter(x => x && x !== '-').join('-');
+                if (sem && sem !== '-') line += ' ' + sem;
+                return line;
             });
-            document.getElementById('infoSectionName').innerHTML = sections.length
-                ? sections.map((v) => '<div>' + esc(v) + '</div>').join('')
+
+            document.getElementById('infoSectionName').innerHTML = scopeLines.length
+                ? scopeLines.map((v) => '<div>' + esc(v) + '</div>').join('')
                 : '—';
         } else {
             document.getElementById('infoTeacherName').textContent = s.teacher_name || '—';

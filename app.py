@@ -687,6 +687,21 @@ NFC UID: {sr.get('nfc_id', '—')}
     return log_data.strip()
 
 
+def normalize_section_key(key):
+    if not key: return ""
+    return str(key).strip().replace(" ", "").upper()
+
+def _get_section_keys_from_event(ev):
+    raw = ev.get('section_keys', []) or []
+    out = []
+    for s in raw:
+        if isinstance(s, dict):
+            k = s.get('key')
+            if k: out.append(normalize_section_key(k))
+        elif isinstance(s, str) and s.strip():
+            out.append(normalize_section_key(s))
+    return list(dict.fromkeys(out))
+
 def _canonical_role(role_value):
     role_norm = (role_value or '').strip().lower().replace(' ', '_')
     if role_norm in ('superadmin', 'super_admin'):
@@ -2187,7 +2202,7 @@ def _event_schedule_to_rows(event_row):
                     'programs_involved': programs_involved,
                     'years_involved': years_involved,
                     'sections_involved': sections_involved,
-                    'section_keys_involved': section_keys,
+                    'section_keys_involved': all_keys,
                 }
             )
     return rows
@@ -2208,7 +2223,8 @@ def _event_schedule_rows_for_teacher(username):
         if username_norm not in {u.lower() for u in teacher_usernames}:
             continue
 
-        section_keys = [normalize_section_key(s) for s in list(ev.get('section_keys', []) or []) if str(s or '').strip()]
+        section_keys = _get_section_keys_from_event(ev)
+        
         if not section_keys:
             continue
 
@@ -2773,7 +2789,7 @@ def check_and_start_scheduled_sessions():
                 continue
 
             teacher_usernames = ev.get('teacher_usernames', []) or []
-            section_keys = ev.get('section_keys', []) or []
+            section_keys = _get_section_keys_from_event(ev)
             if not teacher_usernames:
                 teacher_usernames = ['']
             if not section_keys:
@@ -5854,10 +5870,7 @@ def api_session_attendance(sess_id):
             sched_meta = _parse_event_schedule_id(sess.get('schedule_id', ''))
             ev = db_get_event_schedule_by_id(sched_meta.get('event_id')) if sched_meta else None
             if ev:
-                for sk in list(ev.get('section_keys', []) or []):
-                    skn = normalize_section_key(sk)
-                    if skn:
-                        section_keys.add(skn)
+                section_keys.update(_get_section_keys_from_event(ev))
                 for uname in list(ev.get('teacher_usernames', []) or []):
                     u = db_get_user(uname)
                     tname = str((u or {}).get('full_name', uname) or '').strip()
@@ -6353,7 +6366,7 @@ def live_session(sess_id):
         sched_meta = _parse_event_schedule_id(sess.get('schedule_id', ''))
         ev = db_get_event_schedule_by_id(sched_meta.get('event_id')) if sched_meta else None
         if ev:
-            section_keys = [normalize_section_key(s) for s in list(ev.get('section_keys', []) or []) if str(s or '').strip()]
+            section_keys = _get_section_keys_from_event(ev)
             if section_keys:
                 section_keys_for_view = set(section_keys)
 
@@ -6453,7 +6466,7 @@ def live_session(sess_id):
                 for uname in list(ev.get('teacher_usernames', []) or []):
                     u = db_get_user(uname)
                     teacher_names.append((u or {}).get('full_name', uname))
-                section_keys = [normalize_section_key(s) for s in list(ev.get('section_keys', []) or []) if str(s or '').strip()]
+                section_keys = _get_section_keys_from_event(ev)
                 programs = sorted({str(s).split('|')[0] for s in section_keys if '|' in str(s) and str(s).split('|')[0]})
                 years = sorted({str(s).split('|')[1] for s in section_keys if len(str(s).split('|')) > 1 and str(s).split('|')[1]})
                 sections = sorted({str(s).split('|')[2] for s in section_keys if len(str(s).split('|')) > 2 and str(s).split('|')[2]})

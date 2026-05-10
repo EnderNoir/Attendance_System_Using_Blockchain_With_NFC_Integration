@@ -634,8 +634,6 @@ TAPPED TIME: {tapped_time}
 """
     
     return log_data.strip()
-    
-    return log_data.strip()
 
 
 def _canonical_role(role_value):
@@ -4051,8 +4049,9 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                         student_rows=rows,
                         session_tx_hash=session_tx_hash,
                         session_block_number=session_block_number,
-                        course_code=sess.get('course_code', ''),
                         semester=sess.get('semester', ''),
+                        class_type=sess.get('class_type', 'lecture'),
+                        course_code=sess.get('course_code', ''),
                     )
             except Exception as e:
                 print(f"[EMAIL] Teacher summary error: {e}")
@@ -4101,16 +4100,16 @@ def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
                 # IRREGULAR student bypass: if student is irregular, they can join the preferred session regardless of section/semester match
                 is_irregular = (student.get('enrollment_status') == 'Irregular')
                 if is_irregular:
-                    s = _session_row_with_logs(get_db(), pref_row)
+                    s = _session_row_with_logs(conn, pref_row)
                     return pref_row['sess_id'], s
 
                 # For school events, allow by section only (semester is not enforced).
                 if pref_class_type == 'school_event' and pref_section == student_key:
-                    s = _session_row_with_logs(get_db(), pref_row)
+                    s = _session_row_with_logs(conn, pref_row)
                     return pref_row['sess_id'], s
 
                 if pref_section == student_key and (not pref_semester or not student_semester or pref_semester == student_semester):
-                    s = _session_row_with_logs(get_db(), pref_row)
+                    s = _session_row_with_logs(conn, pref_row)
                     return pref_row['sess_id'], s
 
                 # School events can have sibling sessions (same event_id) for other sections.
@@ -4126,7 +4125,7 @@ def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
                         ).fetchone()
                         if sibling:
                             # For school events, do not enforce semester.
-                            s = _session_row_with_logs(get_db(), sibling)
+                            s = _session_row_with_logs(conn, sibling)
                             return sibling['sess_id'], s
 
                 # Preferred session provided but doesn't match this student's context.
@@ -5227,6 +5226,7 @@ def _mark_attendance_async(nfc_id, sess_id=None):
                             semester=log_row['semester'],
                             time_slot=log_row['time_slot'],
                             enrollment_status=student_info.get('enrollment_status', 'Regular'),
+                            class_type=log_row.get('class_type', 'lecture'),
                         )
             except Exception as e:
                 print(f"[WARN] Failed to send 2nd email for {nfc_id}: {e}")
@@ -6984,6 +6984,7 @@ def mark_pico():
         time_slot      = sess.get('time_slot'),
         enrollment_status = student_info.get('enrollment_status', 'Regular'),
         class_type      = sess.get('class_type', 'lecture'),
+        nfc_id          = nfc_id,
     )
 
     return jsonify({

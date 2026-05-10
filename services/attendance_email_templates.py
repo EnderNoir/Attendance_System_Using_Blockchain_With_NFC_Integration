@@ -294,6 +294,8 @@ def send_student_attendance_receipt_initial_tap(
     semester=None,
     time_slot=None,
     enrollment_status='Regular',
+    class_type='lecture',
+    nfc_id=None,
 ):
     """Send initial attendance receipt email to student immediately after tap (WITHOUT blockchain TX info)."""
     if not student_email or '@' not in student_email or send_email_fn is None:
@@ -404,7 +406,7 @@ def send_student_attendance_receipt_initial_tap(
               <td style="padding:8px 12px;font-size:12px;color:#666;
                          border-bottom:1px solid #eee;">Class Type</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;text-transform:capitalize;">Lecture/Laboratory</td>
+                         border-bottom:1px solid #eee;text-transform:capitalize;">{str(class_type or 'Lecture').replace('_', ' ')}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
@@ -468,8 +470,9 @@ def send_teacher_session_summary(
     session_tx_hash=None,
     session_block_number=None,
     send_email_fn: Optional[Callable] = None,
-    course_code=None,
     semester=None,
+    class_type='lecture',
+    course_code=None,
 ):
     """Send session summary email to teacher when session ends."""
     if not teacher_email or '@' not in teacher_email or send_email_fn is None:
@@ -522,39 +525,33 @@ def send_teacher_session_summary(
           </td>
         </tr>'''
     
-    # Add session blockchain info if available
-    session_blockchain_info = ''
-    if session_tx_hash:
-        session_blockchain_info = f'''
       <!-- Session Blockchain Info -->
       <tr>
-        <td style="background:#E8F5E9;padding:16px 32px;border-top:1px solid #ddd;">
+        <td style="background:#E8F5E9;padding:20px 32px;border-top:1px solid #ddd;">
           <div style="font-size:13px;font-weight:700;color:#2D6A27;margin-bottom:12px;">
-            📋 Session Blockchain Record
+            📋 Blockchain Verification
           </div>
-          <table width="100%" cellpadding="0" cellspacing="0">
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #c8e6c9;border-radius:8px;overflow:hidden;background:#fff;">
             <tr>
-              <td style="padding:6px 0;font-size:12px;color:#666;width:120px;">Transaction Hash:</td>
-              <td style="padding:6px 0;font-size:11px;font-family:monospace;color:#2D6A27;word-break:break-all;">
-                {session_tx_hash}
+              <td style="padding:10px 15px;font-size:12px;color:#666;border-bottom:1px solid #eee;width:120px;">Transaction Hash:</td>
+              <td style="padding:10px 15px;font-size:11px;font-family:monospace;color:#2D6A27;word-break:break-all;border-bottom:1px solid #eee;">
+                {session_tx_hash if session_tx_hash else '<i>Pending...</i>'}
               </td>
             </tr>
             <tr>
-              <td style="padding:6px 0;font-size:12px;color:#666;">Block Number:</td>
-              <td style="padding:6px 0;font-size:12px;font-family:monospace;color:#333;">
-                {session_block_number}
+              <td style="padding:10px 15px;font-size:12px;color:#666;border-bottom:1px solid #eee;">Block Number:</td>
+              <td style="padding:10px 15px;font-size:12px;font-family:monospace;color:#333;border-bottom:1px solid #eee;">
+                {session_block_number if session_block_number else '—'}
               </td>
             </tr>
             <tr>
-              <td colspan="2" style="padding:16px 0;text-align:center;border-top:1px solid #ccc;margin-top:8px;padding-top:16px;">
-                <div style="font-size:11px;color:#666;margin-bottom:10px;">
-                  ✓ This entire session's attendance record has been permanently recorded on the Sepolia blockchain.
-                </div>
+              <td colspan="2" style="padding:15px;text-align:center;">
                 <a href="https://sepolia.etherscan.io/tx/{session_tx_hash}" 
-                   style="display:inline-block;background:#2D6A27;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:bold;font-size:13px;" 
+                   style="display:inline-block;background:#2D6A27;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:bold;font-size:13px;{ 'display:none;' if not session_tx_hash else '' }" 
                    target="_blank">
                   View on Blockchain Explorer
                 </a>
+                { '<div style="font-size:12px;color:#666;">Transaction details will be available shortly once confirmed on the network.</div>' if not session_tx_hash else '' }
               </td>
             </tr>
           </table>
@@ -621,7 +618,7 @@ def send_teacher_session_summary(
               <td style="padding:8px 12px;font-size:12px;color:#666;
                          border-bottom:1px solid #eee;">Class Type</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;text-transform:capitalize;">Lecture/Laboratory</td>
+                         border-bottom:1px solid #eee;text-transform:capitalize;">{str(class_type or 'Lecture').replace('_', ' ')}</td>
             </tr>
           </table>
           <!-- Stat boxes -->

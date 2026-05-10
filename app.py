@@ -3660,11 +3660,17 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
             status_code = chain_status_code(status)
             status_codes.append(status_code)
             
-            # Get student info
+            # Populate additional lists for the contract
             st = get_student_by_nfc_cached(nfc_id)
             s_name = st.get('full_name', 'Unknown') if st else 'Unknown'
             s_id = st.get('student_id', '-') if st else '-'
             e_status = st.get('enrollment_status', 'Regular') if st else 'Regular'
+            
+            student_names.append(s_name)
+            student_ids.append(s_id)
+            enrollment_statuses.append(e_status)
+            status_labels.append(status.upper())
+            excused_reasons.append(excuse_note if status.lower() == 'excused' else 'NONE')
             p_key = build_student_section_key(st) if st else '-'
             p_sem = normalize_semester(st.get('semester')) if st else None
             if not p_sem and session_data:
@@ -3778,7 +3784,10 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
                         log_data
                     )
                 )
-        except web3.exceptions.ABIFunctionNotFound as e:
+        except Exception as e:
+            # Handle Web3 exceptions by string checking if the module attribute lookup fails
+            err_msg = str(e)
+            if "ABIFunctionNotFound" in err_msg:
             # Fallback for older contract version if recordSession exists (unlikely given traceback, but safe)
             try:
                 tx_hash_obj = send_contract_tx(

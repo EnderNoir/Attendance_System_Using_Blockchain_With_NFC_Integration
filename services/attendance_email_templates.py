@@ -519,6 +519,9 @@ def send_teacher_session_summary(
                      border-bottom:1px solid #eee;white-space:nowrap;">
              {"-" if st.get("status", "absent").lower() in ("absent", "excused") else _fmt_time(st.get("tap_time", "-"))}
           </td>
+          <td style="padding:7px 10px;font-size:11px;color:#666;border-bottom:1px solid #eee;font-family:monospace;">
+             {st.get("nfc_id", "—")}
+          </td>
           <td style="padding:7px 10px;border-bottom:1px solid #eee;">
             <span style="background:{bg};color:{clr};font-weight:700;
                          font-size:11px;padding:2px 8px;border-radius:20px;
@@ -673,6 +676,8 @@ def send_teacher_session_summary(
                            text-align:left;font-weight:600;">Enrollment</th>
                 <th style="padding:9px 10px;font-size:11px;color:#fff;
                            text-align:left;font-weight:600;">Tap Time</th>
+                <th style="padding:9px 10px;font-size:11px;color:#fff;
+                           text-align:left;font-weight:600;">NFC UID</th>
                 <th style="padding:9px 10px;font-size:11px;color:#fff;
                            text-align:left;font-weight:600;">Status</th>
               </tr>

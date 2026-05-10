@@ -30,6 +30,25 @@ def _now_local():
         return _now_local()
 
 
+# ── Time formatting helpers ──────────────────────────────────────────────────
+def fmt_slot_blockchain(slot):
+    """Format '07:00 - 09:00' to '7:00 AM TO 9:00 AM'."""
+    if not slot or slot == '—': return '—'
+    slot_str = str(slot)
+    delimiter = ' - ' if ' - ' in slot_str else (' to ' if ' to ' in slot_str else None)
+    if not delimiter: return slot_str
+    try:
+        parts = slot_str.split(delimiter)
+        if len(parts) == 2:
+            def _sub_fmt(t):
+                try:
+                    dt = datetime.strptime(t.strip(), '%H:%M')
+                    return dt.strftime('%I:%M %p').lstrip('0')
+                except: return t.strip()
+            return f"{_sub_fmt(parts[0])} TO {_sub_fmt(parts[1])}".upper()
+        return slot_str
+    except: return slot_str
+
 # ── Jinja2 custom filters ─────────────────────────────────────────────────────
 import json as _json_mod
 from services.cvsu_parsing import (
@@ -571,7 +590,13 @@ def format_session_log_data(class_type, session, student_records, is_school_even
         instructor_lines = ', '.join([f"{mask_name(t.strip())}" for t in teachers if t.strip()])
         program_lines = session.get('program_sections_involved', '')
         
-        log_data = f"""--- BLOCKCHAIN ATTENDANCE RECORD ---
+        # Adding multiple newlines and a clear separator to help "View as UTF-8" on Etherscan
+        log_data = f"""
+
+
+============================================================
+           --- BLOCKCHAIN ATTENDANCE RECORD ---
+============================================================
 CLASS TYPE: SCHOOL EVENT
 EVENT NAME: {session.get('subject_name', 'UNNAMED EVENT').upper()}
 INSTRUCTOR NAME(S):
@@ -579,7 +604,7 @@ INSTRUCTOR NAME(S):
 PROGRAM(S) AND SECTION(S):
 {program_lines}
 SESSION DATE: {session.get('session_date', 'UNKNOWN')}
-TIME SLOT: {session.get('time_slot', '—')}
+TIME SLOT: {fmt_slot_blockchain(session.get('time_slot', '—'))}
 
 ATTENDANCE RECORDS:
 """
@@ -606,7 +631,13 @@ NFC UID: {sr.get('nfc_id', '—')}
     else:
         # LECTURE/LABORATORY FORMAT
         display_type = class_type_norm.replace('_', ' ').upper()
-        log_data = f"""--- BLOCKCHAIN ATTENDANCE RECORD ---
+        # Adding multiple newlines and a clear separator to help "View as UTF-8" on Etherscan
+        log_data = f"""
+
+
+============================================================
+           --- BLOCKCHAIN ATTENDANCE RECORD ---
+============================================================
 CLASS TYPE: {display_type}
 SUBJECT NAME: {session.get('subject_name', 'UNNAMED')}
 COURSE CODE: {session.get('course_code', '—')}
@@ -616,7 +647,7 @@ YEAR LEVEL: {session.get('year_level', '—')}
 SECTION: {session.get('section', '—')}
 SEMESTER: {session.get('semester', '—')}
 SESSION DATE: {session.get('session_date', 'UNKNOWN')}
-TIME SLOT: {session.get('time_slot', '—')}
+TIME SLOT: {fmt_slot_blockchain(session.get('time_slot', '—'))}
 
 ATTENDANCE RECORDS:
 """
@@ -6605,21 +6636,8 @@ def excuse_student(sess_id):
             (excuse_id, sess_id, nfc_id)
         )
     
-    send_student_attendance_receipt(
-        student_name=student.get('name', ''),
-        student_email=student.get('email', ''),
-        student_id=student.get('student_id', ''),
-        subject_name=sess.get('subject_name', ''),
-        section_key=sess.get('section_key', ''),
-        teacher_name=sess.get('teacher_name', ''),
-        tap_time=_now_local().strftime('%B %d, %Y  %I:%M %p'),
-        status='excused',
-        tx_hash=exc_tx,
-        block_num=exc_block,
-        semester=sess.get('semester'),
-        time_slot=sess.get('time_slot'),
-        enrollment_status=student.get('enrollment_status', 'Regular')
-    )
+    # (Removed redundant excused email to ensure only 2 emails total)
+    pass
     
     name = student.get('name', nfc_id)
     return jsonify({'status': 'ok', 'name': name, 'nfc_id': nfc_id, 'reason': reason_label})

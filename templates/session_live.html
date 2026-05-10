@@ -175,13 +175,9 @@
             {% if is_school_event and session_meta and session_meta.section_keys %}
               {% for k in session_meta.section_keys %}{{ k.replace('|', ' ') }}{% if not loop.last %}, {% endif %}{% endfor %}
             {% else %}
-              {{ (sess.section_key or '').replace('|',' · ') }}
+              {{ (sess.section_key or '').replace('|',' · ') }}{% if sess.semester %} · {{ sess.semester }}{% endif %}
             {% endif %}
           </td>
-        </tr>
-        <tr>
-          <td style="background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Semester</td>
-          <td style="padding:9px 12px; border-bottom:1px solid var(--border); word-break:break-word;">{{ sess.semester or 'Any Semester' }}</td>
         </tr>
         <tr>
           <td style="background:rgba(255,255,255,.03); padding:9px 12px; border-bottom:1px solid var(--border); color:var(--muted); font-weight:700; vertical-align:top;">Class Duration</td>

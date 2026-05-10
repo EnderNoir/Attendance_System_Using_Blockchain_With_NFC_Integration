@@ -108,7 +108,7 @@ def send_student_attendance_receipt(
     
     instructor_display = teacher_name or '—'
     if class_type == 'school_event' and teachers_involved:
-        instructor_display = "<br>".join(teachers_involved)
+        instructor_display = "<br>".join([str(t) for t in teachers_involved])
         
     tx_row = ''
     excuse_section = ''
@@ -520,11 +520,11 @@ def send_teacher_session_summary(
     # Teacher display for events
     teacher_disp = teacher_name
     if class_type == 'school_event' and teachers_involved:
-        teacher_disp = ", ".join(teachers_involved)
+        teacher_disp = "<br>".join([str(t) for t in teachers_involved])
         
     # Section display for events
     if class_type == 'school_event' and programs_involved:
-        section_disp = ", ".join(programs_involved)
+        section_disp = "<br>".join([str(p).replace('|', ' · ') for p in programs_involved])
         
     rows_html = ''
     for i, st in enumerate(student_rows):
@@ -624,13 +624,13 @@ def send_teacher_session_summary(
             { f'<tr><td style="padding:8px 12px;font-size:12px;color:#666;border-bottom:1px solid #eee;">Event Description</td><td style="padding:8px 12px;font-size:12px;color:#333;border-bottom:1px solid #eee;">{event_description}</td></tr>' if class_type == 'school_event' and event_description else '' }
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">{ 'Involved' if class_type == 'school_event' else 'Section' }</td>
+                         border-bottom:1px solid #eee;">{ 'Program(s) and Section(s) involved' if class_type == 'school_event' else 'Section' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
                          border-bottom:1px solid #eee;">{section_disp}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">{ 'Instructors' if class_type == 'school_event' else 'Instructor' }</td>
+                         border-bottom:1px solid #eee;">{ 'Instructors involved' if class_type == 'school_event' else 'Instructor' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
                          border-bottom:1px solid #eee;">{teacher_disp}</td>
             </tr>

@@ -218,8 +218,8 @@ function renderSessModal(sessId, data) {
   const sts = data.students || [];
   const classType = normalizeClassType(s.class_type || data.class_type || 'lecture');
   const classTypeLabel = classType === 'school_event' ? 'School Event' : (classType === 'laboratory' ? 'Laboratory' : 'Lecture');
-  const teachersInvolved = (data.teachers_involved || s.teachers_involved || []).join(', ') || (s.teacher_name || '-');
-  const sectionsInvolved = (data.sections_involved || s.section_keys_involved || []).map((x) => String(x || '').replace(/\|/g, ' ')).join(', ') || ((s.section_key || '').replace(/\|/g, ' '));
+  const teachersInvolved = (data.teachers_involved || s.teachers_involved || []).join('<br>') || (s.teacher_name || '-');
+  const sectionsInvolved = (data.sections_involved || s.section_keys_involved || []).map((x) => String(x || '').replace(/\|/g, ' ')).join('<br>') || ((s.section_key || '').replace(/\|/g, ' '));
 
   const cnt = { present: 0, late: 0, absent: 0, excused: 0 };
   sts.forEach((st) => {

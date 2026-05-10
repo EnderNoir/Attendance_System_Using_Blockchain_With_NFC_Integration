@@ -2178,7 +2178,7 @@ def _event_schedule_to_rows(ev):
         rows.append(
             {
                 'schedule_id': schedule_id,
-                'section_key': ", ".join(sorted({str(sk).replace('|', ' ') for sk in all_keys if sk})) or 'MULTIPLE',
+                'section_key': ", ".join(sorted({str(sk).replace('|', ' ') for sk in all_keys if sk})) or 'No Sections',
                 'subject_id': f"event:{event_id}",
                 'subject_name': title,
                 'course_code': 'EVENT',
@@ -2197,7 +2197,7 @@ def _event_schedule_to_rows(ev):
                 'event_date': start_dt.strftime('%Y-%m-%d'),
                 'event_start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
                 'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                'semester': semester_label or 'MULTIPLE',
+                'semester': semester_label or (", ".join(sorted({str(s.get('semester', '')) for s in section_data if s.get('semester')})) or 'Any Semester'),
                 'teachers_involved': teachers_involved,
                 'programs_involved': programs_involved,
                 'years_involved': years_involved,
@@ -2263,7 +2263,7 @@ def _event_schedule_rows_for_teacher(username):
         rows.append(
             {
                 'schedule_id': schedule_id,
-                'section_key': ", ".join(sorted({str(sk).replace('|', ' ') for sk in section_keys if sk})) or 'MULTIPLE',
+                'section_key': ", ".join(sorted({str(sk).replace('|', ' ') for sk in section_keys if sk})) or 'No Sections',
                 'subject_id': f"event:{ev.get('event_id', '')}",
                 'subject_name': str(ev.get('title', 'School Event') or 'School Event').strip(),
                 'course_code': 'EVENT',
@@ -3979,16 +3979,37 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     section_key = normalize_section_key(sess.get('section_key', ''))
     sess_semester = normalize_semester(sess.get('semester') or '')
     is_school_event = str(sess.get('class_type', 'lecture')).strip().lower() == 'school_event'
-    if is_school_event:
-        # Events should not filter by semester.
-        sess_semester = ''
+    involved_sections = {section_key}
     
-    # Filter students belonging to this section & semester
-    section_students = [
-        s for s in all_students_list 
-        if build_student_section_key(s) == section_key
-        and (not sess_semester or not normalize_semester(s.get('semester')) or normalize_semester(s.get('semester')) == sess_semester)
-    ]
+    if is_school_event:
+        # Fetch all sections involved in this event
+        sched_id = sess.get('schedule_id')
+        if sched_id:
+            sched_meta = _parse_event_schedule_id(sched_id)
+            ev_id = sched_meta.get('event_id')
+            if ev_id:
+                ev_row = db_get_event_schedule_by_id(ev_id)
+                if ev_row:
+                    import json
+                    raw_sk = ev_row.get('section_keys_json')
+                    if raw_sk:
+                        try:
+                            s_keys = json.loads(raw_sk)
+                            for entry in s_keys:
+                                k = entry.get('key') if isinstance(entry, dict) else entry
+                                if k: involved_sections.add(normalize_section_key(k))
+                        except: pass
+
+    # Filter students belonging to involved sections & semester
+    section_students = []
+    for s in all_students_list:
+        sk = build_student_section_key(s)
+        if sk in involved_sections:
+            if not is_school_event:
+                # Classroom session: must match semester if specified
+                if sess_semester and normalize_semester(s.get('semester')) and normalize_semester(s.get('semester')) != sess_semester:
+                    continue
+            section_students.append(s)
     
     # Add irregular students who tapped in but aren't in the official section list
     tapped_nfc_ids = set(sess.get('present', [])) | set(sess.get('late', [])) | set(sess.get('excused', []))
@@ -4192,6 +4213,18 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                                 except: pass
                 teachers_list = sorted(list({t for t in teachers_list if t}))
                 sections_list = sorted(list({s for s in sections_list if s}))
+                # Formatting: BSCS 1st year 1st Semester
+                formatted_sections = []
+                for s in sections_list:
+                    parts = s.split('|')
+                    if len(parts) >= 2:
+                        # BSCS|1|A|1st Semester -> BSCS 1st year A 1st Semester
+                        # Wait, normalize_section_key returns Course|Year|Section
+                        # and sections_list might have Course|Year|Section|Semester
+                        formatted_sections.append(s.replace('|', ' '))
+                    else:
+                        formatted_sections.append(s)
+                sections_list = formatted_sections
 
             for st in section_students:
                 nid = st['nfcId']
@@ -4307,28 +4340,31 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                     session_tx_hash = fresh_sess.get('session_tx_hash', '')
                     session_block_number = fresh_sess.get('session_block_number', 0)
                     
-                    send_teacher_session_summary(
-                        teacher_email=teacher_email,
-                        teacher_name=sess.get('teacher_name', ''),
-                        subject_name=sess.get('subject_name', ''),
-                        section_key=sess.get('section_key', ''),
-                        time_slot=sess.get('time_slot', ''),
-                        started_at=sess.get('started_at', ''),
-                        ended_at=ended_at,
-                        present_count=present_count,
-                        late_count=late_count,
-                        absent_count=absent_count,
-                        excused_count=excused_count,
-                        student_rows=rows,
-                        session_tx_hash=session_tx_hash,
-                        session_block_number=session_block_number,
-                        semester=sess.get('semester', ''),
-                        class_type=sess.get('class_type', 'lecture'),
-                        course_code=sess.get('course_code', ''),
-                        event_description=sess.get('event_description'),
-                        teachers_involved=sess.get('teachers_involved'),
-                        programs_involved=sess.get('programs_involved'),
-                    )
+                    if session_tx_hash:
+                        send_teacher_session_summary(
+                            teacher_email=teacher_email,
+                            teacher_name=sess.get('teacher_name', ''),
+                            subject_name=sess.get('subject_name', ''),
+                            section_key=sess.get('section_key', ''),
+                            time_slot=sess.get('time_slot', ''),
+                            started_at=sess.get('started_at', ''),
+                            ended_at=ended_at,
+                            present_count=present_count,
+                            late_count=late_count,
+                            absent_count=absent_count,
+                            excused_count=excused_count,
+                            student_rows=rows,
+                            session_tx_hash=session_tx_hash,
+                            session_block_number=session_block_number,
+                            semester=sess.get('semester', ''),
+                            class_type=sess.get('class_type', 'lecture'),
+                            course_code=sess.get('course_code', ''),
+                            event_description=sess.get('event_description'),
+                            teachers_involved=teachers_list,
+                            programs_involved=sections_list,
+                        )
+                    else:
+                        print(f"[EMAIL] Skipping teacher summary for {sess_id}: TX hash pending/failed.")
             except Exception as e:
                 print(f"[EMAIL] Teacher summary error: {e}")
 
@@ -4388,21 +4424,31 @@ def get_active_session_for_nfc(nfc_id, preferred_sess_id=None):
                     s = _session_row_with_logs(conn, pref_row)
                     return pref_row['sess_id'], s
 
-                # School events can have sibling sessions (same event_id) for other sections.
+                # School events: allow any student whose section is involved in the event
                 if pref_class_type == 'school_event':
+                    # Parse event_id from schedule_id (format: event:<ev_id>:<date>:<sec>)
                     meta = _parse_event_schedule_id(pref_dict.get('schedule_id', ''))
                     if meta and meta.get('event_id'):
-                        pattern = f"event:{meta['event_id']}:%:{student_key}"
-                        sibling = conn.execute(
-                            "SELECT * FROM sessions "
-                            "WHERE ended_at IS NULL AND class_type='school_event' AND schedule_id LIKE ? "
-                            "ORDER BY started_at DESC LIMIT 1",
-                            (pattern,),
-                        ).fetchone()
-                        if sibling:
-                            # For school events, do not enforce semester.
-                            s = _session_row_with_logs(conn, sibling)
-                            return sibling['sess_id'], s
+                        ev_id = meta['event_id']
+                        # Check if student_key is in the event's section list
+                        ev = db_get_event_schedule_by_id(ev_id)
+                        if ev:
+                            import json
+                            raw_sk = ev.get('section_keys_json')
+                            if raw_sk:
+                                try:
+                                    involved_sections = json.loads(raw_sk)
+                                    # involved_sections is a list of strings or dicts {key, semester}
+                                    match_found = False
+                                    for entry in involved_sections:
+                                        k = entry.get('key') if isinstance(entry, dict) else entry
+                                        if normalize_section_key(k) == student_key:
+                                            match_found = True
+                                            break
+                                    if match_found:
+                                        s = _session_row_with_logs(conn, pref_row)
+                                        return pref_row['sess_id'], s
+                                except: pass
 
                 # Preferred session provided but doesn't match this student's context.
                 return None, None
@@ -6092,7 +6138,7 @@ def api_session_attendance(sess_id):
         # so we can see who is 'absent' in real-time.
         # For COMPLETED sessions, we strictly only show students from the attendance logs 
         # (which already include the captured absent students) and excuse records.
-        if not sess.get('ended_at'):
+        if not sess.get('ended_at') or is_school_event:
             all_students = get_all_students()
             sess_semester = normalize_semester(sess.get('semester') or '')
             if is_school_event:
@@ -6612,7 +6658,18 @@ def live_session(sess_id):
                 for uname in list(ev.get('teacher_usernames', []) or []):
                     u = db_get_user(uname)
                     teacher_names.append((u or {}).get('full_name', uname))
-                section_keys = _get_section_keys_from_event(ev)
+                # Build section_keys with semesters for display
+                section_keys = []
+                for s in ev.get('section_keys', []):
+                    if isinstance(s, dict):
+                        k = s.get('key', '')
+                        sem = s.get('semester', '')
+                        if k:
+                            disp = normalize_section_key(k)
+                            if sem: disp += f"|{sem}"
+                            section_keys.append(disp)
+                    elif isinstance(s, str) and s.strip():
+                        section_keys.append(normalize_section_key(s))
                 programs = sorted({str(s).split('|')[0] for s in section_keys if '|' in str(s) and str(s).split('|')[0]})
                 years = sorted({str(s).split('|')[1] for s in section_keys if len(str(s).split('|')) > 1 and str(s).split('|')[1]})
                 sections = sorted({str(s).split('|')[2] for s in section_keys if len(str(s).split('|')) > 2 and str(s).split('|')[2]})

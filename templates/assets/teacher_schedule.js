@@ -596,6 +596,8 @@
         }
         document.getElementById('infoClassType').textContent = classTypeLabel(s.class_type);
         document.getElementById('infoGrace').textContent = (s.grace_minutes || 15) + ' minutes';
+        const graceRow = document.getElementById('infoGraceRow');
+        if (graceRow) graceRow.style.display = isSchoolEvent(s) ? 'none' : 'flex';
         document.getElementById('infoLiveIndicator').style.display = isLive(s) ? 'block' : 'none';
         const monitorBtn = document.getElementById('monitorLiveBtn');
         const endForm = document.getElementById('endSessionForm');

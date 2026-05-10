@@ -83,6 +83,8 @@ def send_student_attendance_receipt(
     enrollment_status='Regular',
     class_type='lecture',
     event_description=None,
+    teachers_involved=None,
+    programs_involved=None,
 ):
     """Send attendance receipt email to student."""
     if not student_email or '@' not in student_email or send_email_fn is None:
@@ -197,19 +199,20 @@ def send_student_attendance_receipt(
               <td style="padding:8px 12px;font-size:12px;font-weight:600;
                          color:#333;border-bottom:1px solid #eee;">
                 {subject_name}
+                {f'<div style="font-weight:normal;font-size:11px;color:#666;margin-top:2px;">{event_description}</div>' if class_type == 'school_event' and event_description else ''}
               </td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Section</td>
+                         border-bottom:1px solid #eee;">{ 'Program(s) and Section(s)' if class_type == 'school_event' else 'Section' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{section_display}</td>
+                         border-bottom:1px solid #eee;">{section_display if class_type != 'school_event' else (", ".join(programs_involved) if programs_involved else section_display)}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Instructor</td>
+                         border-bottom:1px solid #eee;">{ 'Teachers Involved' if class_type == 'school_event' else 'Instructor' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{teacher_name}</td>
+                         border-bottom:1px solid #eee;">{teacher_name if class_type != 'school_event' else (", ".join(teachers_involved) if teachers_involved else teacher_name)}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
@@ -298,6 +301,9 @@ def send_student_attendance_receipt_initial_tap(
     enrollment_status='Regular',
     class_type='lecture',
     nfc_id=None,
+    event_description=None,
+    teachers_involved=None,
+    programs_involved=None,
 ):
     """Send initial attendance receipt email to student immediately after tap (WITHOUT blockchain TX info)."""
     if not student_email or '@' not in student_email or send_email_fn is None:
@@ -368,23 +374,24 @@ def send_student_attendance_receipt_initial_tap(
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Subject</td>
+                         border-bottom:1px solid #eee;">{ 'Event Name' if class_type == 'school_event' else 'Subject' }</td>
               <td style="padding:8px 12px;font-size:12px;font-weight:600;
                          color:#333;border-bottom:1px solid #eee;">
                 {subject_name}
+                {f'<div style="font-weight:normal;font-size:11px;color:#666;margin-top:2px;">{event_description}</div>' if class_type == 'school_event' and event_description else ''}
               </td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Section</td>
+                         border-bottom:1px solid #eee;">{ 'Program(s) and Section(s)' if class_type == 'school_event' else 'Section' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{section_display}</td>
+                         border-bottom:1px solid #eee;">{section_display if class_type != 'school_event' else (", ".join(programs_involved) if programs_involved else section_display)}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Instructor</td>
+                         border-bottom:1px solid #eee;">{ 'Teachers Involved' if class_type == 'school_event' else 'Instructor' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{teacher_name}</td>
+                         border-bottom:1px solid #eee;">{teacher_name if class_type != 'school_event' else (", ".join(teachers_involved) if teachers_involved else teacher_name)}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
@@ -528,15 +535,11 @@ def send_teacher_session_summary(
                {st.get('enrollment_status', 'Regular')}
              </span>
           </td>
-          <td style="padding:7px 10px;font-size:10px;color:#666;border-bottom:1px solid #eee;max-width:120px;word-break:break-word;">
-             {st.get('program_section', '—')}
-          </td>
-          <td style="padding:7px 10px;font-size:11px;color:#666;
-                     border-bottom:1px solid #eee;white-space:nowrap;">
-             {"-" if st.get("status", "absent").lower() in ("absent", "excused") else _fmt_time(st.get("tap_time", "-"))}
+          <td style="padding:7px 10px;font-size:10px;color:#666;border-bottom:1px solid #eee;">
+             {st.get('program_section', '—').replace('|', ' · ')}
           </td>
           <td style="padding:7px 10px;font-size:11px;color:#666;border-bottom:1px solid #eee;font-family:monospace;">
-             {st.get("nfc_id", "—")}
+             {st.get("nfc_id", st.get("nfc_uid", "—"))}
           </td>
           <td style="padding:7px 10px;border-bottom:1px solid #eee;">
             <span style="background:{bg};color:{clr};font-weight:700;
@@ -698,7 +701,7 @@ def send_teacher_session_summary(
                 <th style="padding:9px 10px;font-size:11px;color:#fff;
                            text-align:left;font-weight:600;">Enrollment</th>
                 <th style="padding:9px 10px;font-size:11px;color:#fff;
-                           text-align:left;font-weight:600;">Tap Time</th>
+                           text-align:left;font-weight:600;">Program and Section</th>
                 <th style="padding:9px 10px;font-size:11px;color:#fff;
                            text-align:left;font-weight:600;">NFC UID</th>
                 <th style="padding:9px 10px;font-size:11px;color:#fff;

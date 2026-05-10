@@ -603,18 +603,24 @@ def format_session_log_data(class_type, session, student_records, is_school_even
         
 
 
-============================================================
-           --- BLOCKCHAIN ATTENDANCE RECORD ---
-============================================================
-CLASS TYPE: SCHOOL EVENT
-EVENT NAME: {session.get('subject_name', 'UNNAMED EVENT').upper()}
-INSTRUCTOR NAME(S):
-{instructor_lines}
-PROGRAM(S) AND SECTION(S):
-{program_lines}
-SEMESTER: {session.get('semester', '—')}
-SESSION DATE: {session.get('session_date', 'UNKNOWN')}
-TIME SLOT: {fmt_slot_blockchain(session.get('time_slot', '—'))}
+ ============================================================
+            --- BLOCKCHAIN ATTENDANCE RECORD ---
+ ============================================================
+ 
+ 
+ 
+ 
+ 
+ CLASS TYPE: SCHOOL EVENT
+ EVENT NAME: {session.get('subject_name', 'UNNAMED EVENT').upper()}
+ EVENT DESCRIPTION: {session.get('event_description', '—')}
+ TEACHERS INVOLVED:
+ {instructor_lines}
+ PROGRAM(S) AND SECTION(S):
+ {program_lines}
+ SEMESTER: {session.get('semester', '—')}
+ SESSION DATE: {session.get('session_date', 'UNKNOWN')}
+ TIME SLOT: {fmt_slot_blockchain(session.get('time_slot', '—'))}
 
 ATTENDANCE RECORDS:
 """
@@ -2177,44 +2183,49 @@ def _event_schedule_to_rows(event_row):
     years_involved = sorted({str(sk).split('|')[1] for sk in all_keys if len(str(sk).split('|')) > 1 and str(sk).split('|')[1]})
     sections_involved = sorted({str(sk).split('|')[2] for sk in all_keys if len(str(sk).split('|')) > 2 and str(sk).split('|')[2]})
 
+    # Unified schedule_id for all teachers/sections in this event
+    schedule_id = f"event:{event_id}"
+    
     rows = []
+    # For school events, we'll return a single row that represents the whole event,
+    # but we'll still populate teacher_username as needed for dashboard visibility.
+    # Actually, to make it show up for EACH teacher, we should return one row per teacher,
+    # but they all share the SAME schedule_id.
     for teacher_username in teacher_usernames:
         teacher = (db_get_user(teacher_username) if teacher_username else {}) or {}
         teacher_name = teacher.get('full_name', teacher_username or 'Event Monitor')
-        for s_obj in section_data:
-            section_key = normalize_section_key(s_obj.get('key', ''))
-            s_semester = s_obj.get('semester') or event_row.get('semester', '1st Semester')
-            schedule_id = f"event:{event_id}:{teacher_username}:{section_key}"
-            rows.append(
-                {
-                    'schedule_id': schedule_id,
-                    'section_key': section_key,
-                    'subject_id': f"event:{event_id}",
-                    'subject_name': title,
-                    'course_code': 'EVENT',
-                    'teacher_username': teacher_username,
-                    'teacher_name': teacher_name,
-                    'day_of_week': start_dt.weekday(),
-                    'start_time': start_dt.strftime('%H:%M'),
-                    'end_time': end_dt.strftime('%H:%M'),
-                    'class_type': 'school_event',
-                    'grace_minutes': 0,
-                    'is_active': 1,
-                    'is_event': 1,
-                    'event_id': event_id,
-                    'event_title': title,
-                    'event_description': desc,
-                    'event_date': start_dt.strftime('%Y-%m-%d'),
-                    'event_start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                    'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                    'semester': s_semester,
-                    'teachers_involved': teachers_involved,
-                    'programs_involved': programs_involved,
-                    'years_involved': years_involved,
-                    'sections_involved': sections_involved,
-                    'section_keys_involved': all_keys,
-                }
-            )
+        # We don't loop sections here for the schedule_id anymore, 
+        # but we include all section keys in the metadata.
+        rows.append(
+            {
+                'schedule_id': schedule_id,
+                'section_key': 'MULTIPLE', # Placeholder
+                'subject_id': f"event:{event_id}",
+                'subject_name': title,
+                'course_code': 'EVENT',
+                'teacher_username': teacher_username,
+                'teacher_name': teacher_name,
+                'day_of_week': start_dt.weekday(),
+                'start_time': start_dt.strftime('%H:%M'),
+                'end_time': end_dt.strftime('%H:%M'),
+                'class_type': 'school_event',
+                'grace_minutes': 0,
+                'is_active': 1,
+                'is_event': 1,
+                'event_id': event_id,
+                'event_title': title,
+                'event_description': desc,
+                'event_date': start_dt.strftime('%Y-%m-%d'),
+                'event_start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'semester': 'MULTIPLE', # Placeholder
+                'teachers_involved': teachers_involved,
+                'programs_involved': programs_involved,
+                'years_involved': years_involved,
+                'sections_involved': sections_involved,
+                'section_keys_involved': all_keys,
+            }
+        )
     return rows
 
 
@@ -2247,10 +2258,8 @@ def _event_schedule_rows_for_teacher(username):
         if end_dt <= start_dt:
             continue
 
-        # Keep schedule_id compatible with runtime sessions by anchoring to one
-        # concrete section schedule key.
-        representative_section = section_keys[0]
-        schedule_id = f"event:{ev.get('event_id', '')}:{username_norm}:{representative_section}"
+        # Unified schedule_id for all teachers in this event
+        schedule_id = f"event:{ev.get('event_id', '')}"
 
         teacher = db_get_user(username_norm) or {}
         teacher_name = teacher.get('full_name', username_norm)
@@ -2274,7 +2283,7 @@ def _event_schedule_rows_for_teacher(username):
         rows.append(
             {
                 'schedule_id': schedule_id,
-                'section_key': representative_section,
+                'section_key': 'MULTIPLE',
                 'subject_id': f"event:{ev.get('event_id', '')}",
                 'subject_name': str(ev.get('title', 'School Event') or 'School Event').strip(),
                 'course_code': 'EVENT',
@@ -5939,11 +5948,12 @@ def api_session_attendance(sess_id):
             nid = lg['nfc_id']
             st  = get_student_by_nfc_cached(nid) or {}
             excuse_info = excuse_details.get(nid, {})
-            origin = (
+            origin = [
                 str(st.get('course') or '').strip(),
                 str(st.get('year_level') or '').strip(),
                 str(st.get('section') or '').strip(),
-            )
+                str(st.get('semester') or '').strip(),
+            ]
             section_origin = '-'.join([x for x in origin if x]) or '-'
             students_map[nid] = {
                 'nfc_id':     nid,
@@ -6010,6 +6020,7 @@ def api_session_attendance(sess_id):
                     str(s.get('course') or '').strip(),
                     str(s.get('year_level') or '').strip(),
                     str(s.get('section') or '').strip(),
+                    str(s.get('semester') or '').strip(),
                 ]).strip('-') or '-'
                 students_map[nid] = {
                     'nfc_id':     nid,
@@ -6039,6 +6050,8 @@ def api_session_attendance(sess_id):
             'section_key':  section_key,
             'sections_involved': sorted([sk for sk in section_keys if sk]),
             'teachers_involved': teachers_involved,
+            'event_description': ev.get('description', '') if is_school_event and 'ev' in locals() and ev else '',
+            'semester': sess.get('semester', ''),
             'students_involved_count': len(students_out),
             'time_slot':    sess.get('time_slot', ''),
             'started_at':   sess.get('started_at', ''),

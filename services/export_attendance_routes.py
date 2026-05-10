@@ -610,6 +610,7 @@ def export_session_attendance_impl(
                         str(st.get('course', '') or '').strip(),
                         str(st.get('year_level', '') or '').strip(),
                         str(st.get('section', '') or '').strip(),
+                        str(sess.get('semester', '') or '').strip(),
                     ]).strip('-') or '—',
                     'year': st.get('year_level', ''),
                     'status': status,

@@ -903,12 +903,15 @@
     const programInput = document.getElementById('eventProgramInput');
     const yearInput = document.getElementById('eventYearInput');
     const sectionInput = document.getElementById('eventSectionInput');
-    if (!programInput || !yearInput || !sectionInput) return;
+    const semesterInput = document.getElementById('eventSemester');
+    if (!programInput || !yearInput || !sectionInput || !semesterInput) return;
     const program = String(programInput.value || '').trim();
     const year = String(yearInput.value || '').trim();
     const section = String(sectionInput.value || '').trim();
-    if (!program || !year || !section) {
-      showAppAlert('Please select program, year level, and section.', 'Incomplete Section');
+    const semester = String(semesterInput.value || '').trim();
+    
+    if (!program || !year || !section || !semester) {
+      showAppAlert('Please select program, year level, semester, and section.', 'Incomplete Section');
       return;
     }
     const combined = program + '|' + year + '|' + section;
@@ -918,7 +921,6 @@
       showAppAlert('Please select a valid Program/Year/Section from existing sections.', 'Invalid Section');
       return;
     }
-    const semester = document.getElementById('eventSemester')?.value || '1st Semester';
     if (!eventSections.some(s => s.key === sec && s.semester === semester)) {
       eventSections.push({ key: sec, semester: semester });
       renderEventSections();
@@ -926,6 +928,7 @@
     programInput.value = '';
     yearInput.value = '';
     sectionInput.value = '';
+    // Don't clear semester as it's likely the same for multiple sections
   }
   function removeEventSection(secKey, sem) {
     eventSections = eventSections.filter((s) => !(s.key === secKey && s.semester === sem));
@@ -1187,9 +1190,10 @@
   });
 
   function toggleEventAllTeachers() {
-    const checked = !!document.getElementById('eventAllTeachers')?.checked;
+    const toggle = document.getElementById('eventAllTeachers');
+    const checked = !!toggle?.checked;
     const teacherInput = document.getElementById('eventTeacherInput');
-    const teacherAddBtn = teacherInput?.nextElementSibling;
+    const teacherAddBtn = teacherInput?.parentElement?.querySelector('button');
     const teacherList = document.getElementById('eventTeachersList');
     
     if (teacherInput) {
@@ -1212,7 +1216,8 @@
   }
 
   function toggleEventAllStudents() {
-    const checked = !!document.getElementById('eventAllStudents')?.checked;
+    const toggle = document.getElementById('eventAllStudents');
+    const checked = !!toggle?.checked;
     const semesterSelect = document.getElementById('eventSemester');
     const programSelect = document.getElementById('eventProgramInput');
     const yearSelect = document.getElementById('eventYearInput');

@@ -157,7 +157,8 @@ def send_student_attendance_receipt(
         subject_name, section_key, teacher_name,
         tap_time, status, tx_hash, block_num,
         sess_id=None, nfc_id=None, semester=None, time_slot=None,
-        enrollment_status='Regular', class_type='lecture'):
+        enrollment_status='Regular', class_type='lecture',
+        event_description=None):
         """Send attendance receipt email to student."""
         _send_student_attendance_receipt_template(
                 student_name=student_name,
@@ -178,6 +179,7 @@ def send_student_attendance_receipt(
                 time_slot=time_slot,
                 enrollment_status=enrollment_status,
                 class_type=class_type,
+                event_description=event_description,
         )
 
 def send_student_attendance_receipt_initial_tap(
@@ -186,7 +188,7 @@ def send_student_attendance_receipt_initial_tap(
         tap_time, status,
         semester=None, time_slot=None,
         enrollment_status='Regular', class_type='lecture',
-        nfc_id=None):
+        nfc_id=None, event_description=None):
         """Send INITIAL attendance receipt email to student (immediately after tap, without blockchain TX info)."""
         _send_student_attendance_receipt_initial_tap_template(
                 student_name=student_name,
@@ -203,6 +205,7 @@ def send_student_attendance_receipt_initial_tap(
                 enrollment_status=enrollment_status,
                 class_type=class_type,
                 nfc_id=nfc_id,
+                event_description=event_description,
         )
 
 def send_teacher_session_summary(
@@ -211,7 +214,8 @@ def send_teacher_session_summary(
         started_at, ended_at,
         present_count, late_count, absent_count, excused_count,
         student_rows, session_tx_hash=None, session_block_number=None,
-        course_code=None, semester=None, class_type='lecture'):
+        course_code=None, semester=None, class_type='lecture',
+        event_description=None, teachers_involved=None, programs_involved=None):
         """Send session summary email to teacher when session ends."""
         _send_teacher_session_summary_template(
                 teacher_email=teacher_email,
@@ -229,9 +233,11 @@ def send_teacher_session_summary(
                 session_tx_hash=session_tx_hash,
                 session_block_number=session_block_number,
                 send_email_fn=_send_email,
-                course_code=course_code,
                 semester=semester,
                 class_type=class_type,
+                event_description=event_description,
+                teachers_involved=teachers_involved,
+                programs_involved=programs_involved,
         )
 
 
@@ -594,6 +600,9 @@ def format_session_log_data(class_type, session, student_records, is_school_even
         log_data = f"""
 
 
+        
+
+
 ============================================================
            --- BLOCKCHAIN ATTENDANCE RECORD ---
 ============================================================
@@ -603,6 +612,7 @@ INSTRUCTOR NAME(S):
 {instructor_lines}
 PROGRAM(S) AND SECTION(S):
 {program_lines}
+SEMESTER: {session.get('semester', '—')}
 SESSION DATE: {session.get('session_date', 'UNKNOWN')}
 TIME SLOT: {fmt_slot_blockchain(session.get('time_slot', '—'))}
 
@@ -633,6 +643,9 @@ NFC UID: {sr.get('nfc_id', '—')}
         display_type = class_type_norm.replace('_', ' ').upper()
         # Adding multiple newlines and a clear separator to help "View as UTF-8" on Etherscan
         log_data = f"""
+
+
+        
 
 
 ============================================================
@@ -1252,6 +1265,7 @@ def init_db():
         end_at               TEXT NOT NULL DEFAULT '',
         is_active            INTEGER NOT NULL DEFAULT 1,
         created_by           TEXT NOT NULL DEFAULT '',
+        semester             TEXT NOT NULL DEFAULT '1st Semester',
         created_at           TEXT NOT NULL DEFAULT '',
         updated_at           TEXT NOT NULL DEFAULT ''
     );
@@ -2158,6 +2172,7 @@ def _event_schedule_to_rows(event_row):
                     'event_date': start_dt.strftime('%Y-%m-%d'),
                     'event_start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
                     'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                    'semester': event_row.get('semester', '1st Semester'),
                     'teachers_involved': teachers_involved,
                     'programs_involved': programs_involved,
                     'years_involved': years_involved,
@@ -2413,10 +2428,10 @@ def db_save_event_schedule(e: dict) -> str:
     with get_db() as conn:
         conn.execute(
             "INSERT INTO event_schedules "
-            "(event_id,title,description,teacher_usernames_json,section_keys_json,start_at,end_at,is_active,created_by,created_at,updated_at) "
-            "VALUES (?,?,?,?,?,?,?,1,?,?,?) "
+            "(event_id,title,description,semester,teacher_usernames_json,section_keys_json,start_at,end_at,is_active,created_by,created_at,updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,1,?,?,?) "
             "ON CONFLICT(event_id) DO UPDATE SET "
-            "title=excluded.title, description=excluded.description, "
+            "title=excluded.title, description=excluded.description, semester=excluded.semester, "
             "teacher_usernames_json=excluded.teacher_usernames_json, "
             "section_keys_json=excluded.section_keys_json, "
             "start_at=excluded.start_at, end_at=excluded.end_at, updated_at=excluded.updated_at",
@@ -2424,6 +2439,7 @@ def db_save_event_schedule(e: dict) -> str:
                 event_id,
                 title,
                 description,
+                str(e.get('semester', '1st Semester')),
                 json.dumps(teacher_usernames),
                 json.dumps(section_keys),
                 start_at,
@@ -4075,6 +4091,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                         time_slot=sess.get('time_slot'),
                         enrollment_status=st.get('enrollment_status', 'Regular'),
                         class_type=sess.get('class_type', 'lecture'),
+                        event_description=sess.get('event_description'),
                     )
                 except Exception as e:
                     print(f"[EMAIL] Failed absence email for {nid}: {e}")
@@ -4108,6 +4125,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                             time_slot=sess.get('time_slot'),
                             enrollment_status=st.get('enrollment_status', 'Regular'),
                             class_type=sess.get('class_type', 'lecture'),
+                            event_description=sess.get('event_description'),
                         )
                 except Exception as e:
                     print(f"[EMAIL] Failed final receipt email for {nid}: {e}")
@@ -4132,14 +4150,23 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                             excused_count += 1
                         else:
                             absent_count += 1
+                        # Formatting: BSCS4A (1st Semester)
+                        prog_code = st.get('course', '—')
+                        yr = st.get('year_level', '—')[0] if st.get('year_level') else '—'
+                        sec = st.get('section', '—')
+                        sem = sess.get('semester', '—')
+                        ps_disp = f"{prog_code}{yr}{sec} ({sem})"
+                        
                         rows.append({
                             'name': st.get('name', '—'),
                             'student_id': st.get('student_id', ''),
+                            'nfc_id': nid,
                             'status': st_status,
                             'tap_time': lg.get('tap_time', '—') if lg else '—',
                             'tx_hash': lg.get('tx_hash', '') if lg else '',
                             'block_num': lg.get('block_number', '') if lg else '',
                             'enrollment_status': st.get('enrollment_status', 'Regular'),
+                            'program_section': ps_disp,
                         })
                     
                     # Reload session to get the latest TX hash/block
@@ -4165,6 +4192,9 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                         semester=sess.get('semester', ''),
                         class_type=sess.get('class_type', 'lecture'),
                         course_code=sess.get('course_code', ''),
+                        event_description=sess.get('event_description'),
+                        teachers_involved=sess.get('teachers_involved'),
+                        programs_involved=sess.get('programs_involved'),
                     )
             except Exception as e:
                 print(f"[EMAIL] Teacher summary error: {e}")
@@ -7049,6 +7079,7 @@ def mark_pico():
         enrollment_status = student_info.get('enrollment_status', 'Regular'),
         class_type      = sess.get('class_type', 'lecture'),
         nfc_id          = nfc_id,
+        event_description = sess.get('event_description'),
     )
 
     return jsonify({
@@ -7403,8 +7434,23 @@ def admin_event_schedule_create():
         description = request.form.get('description', '').strip()
         start_dt_local = request.form.get('start_at', '').strip()
         end_dt_local = request.form.get('end_at', '').strip()
+        semester = request.form.get('semester', '1st Semester').strip()
+        
+        all_teachers = request.form.get('all_teachers') == 'on'
+        all_students = request.form.get('all_students') == 'on'
+
         teacher_usernames = _parse_csv_or_json('selected_teachers')
         section_keys_raw = _parse_csv_or_json('selected_sections')
+
+        if all_teachers:
+            # Get all teachers (faculty role)
+            all_u = db_get_all_users()
+            teacher_usernames = [uname for uname, u in all_u.items() if u.get('role') == 'faculty']
+        
+        if all_students:
+            # Get all unique section keys from students
+            all_st = db_get_all_students()
+            section_keys_raw = list({f"{s.get('course')}|{s.get('year_level')}|{s.get('section')}" for s in all_st if s.get('course') and s.get('year_level') and s.get('section')})
 
         if not title:
             flash('Event title is required.', 'danger')
@@ -7439,6 +7485,7 @@ def admin_event_schedule_create():
             {
                 'title': title,
                 'description': description,
+                'semester': semester,
                 'teacher_usernames': teacher_usernames,
                 'section_keys': section_keys,
                 'start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),

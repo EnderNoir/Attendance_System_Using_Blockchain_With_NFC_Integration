@@ -82,6 +82,7 @@ def send_student_attendance_receipt(
     time_slot=None,
     enrollment_status='Regular',
     class_type='lecture',
+    event_description=None,
 ):
     """Send attendance receipt email to student."""
     if not student_email or '@' not in student_email or send_email_fn is None:
@@ -192,7 +193,7 @@ def send_student_attendance_receipt(
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Subject</td>
+                         border-bottom:1px solid #eee;">{ 'Event Name' if class_type == 'school_event' else 'Subject' }</td>
               <td style="padding:8px 12px;font-size:12px;font-weight:600;
                          color:#333;border-bottom:1px solid #eee;">
                 {subject_name}
@@ -474,6 +475,9 @@ def send_teacher_session_summary(
     semester=None,
     class_type='lecture',
     course_code=None,
+    event_description=None,
+    teachers_involved=None,
+    programs_involved=None,
 ):
     """Send session summary email to teacher when session ends."""
     if not teacher_email or '@' not in teacher_email or send_email_fn is None:
@@ -495,8 +499,17 @@ def send_teacher_session_summary(
     
     # Subject display with course code
     subject_display = subject_name
-    if course_code:
+    if class_type != 'school_event' and course_code:
         subject_display += f" [{course_code}]"
+        
+    # Teacher display for events
+    teacher_disp = teacher_name
+    if class_type == 'school_event' and teachers_involved:
+        teacher_disp = ", ".join(teachers_involved)
+        
+    # Section display for events
+    if class_type == 'school_event' and programs_involved:
+        section_disp = ", ".join(programs_involved)
         
     rows_html = ''
     for i, st in enumerate(student_rows):
@@ -514,6 +527,9 @@ def send_teacher_session_summary(
              <span style="font-size:10px;font-weight:700;color:{'#C0392B' if st.get('enrollment_status','Regular')=='Irregular' else '#2D6A27'};">
                {st.get('enrollment_status', 'Regular')}
              </span>
+          </td>
+          <td style="padding:7px 10px;font-size:10px;color:#666;border-bottom:1px solid #eee;max-width:120px;word-break:break-word;">
+             {st.get('program_section', '—')}
           </td>
           <td style="padding:7px 10px;font-size:11px;color:#666;
                      border-bottom:1px solid #eee;white-space:nowrap;">
@@ -590,15 +606,22 @@ def send_teacher_session_summary(
                         overflow:hidden;margin-bottom:16px;">
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;width:140px;">Subject</td>
+                         border-bottom:1px solid #eee;width:140px;">{ 'Event Name' if class_type == 'school_event' else 'Subject' }</td>
               <td style="padding:8px 12px;font-size:12px;font-weight:600;
                          color:#333;border-bottom:1px solid #eee;">{subject_display}</td>
             </tr>
+            { f'<tr><td style="padding:8px 12px;font-size:12px;color:#666;border-bottom:1px solid #eee;">Event Description</td><td style="padding:8px 12px;font-size:12px;color:#333;border-bottom:1px solid #eee;">{event_description}</td></tr>' if class_type == 'school_event' and event_description else '' }
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
-                         border-bottom:1px solid #eee;">Section</td>
+                         border-bottom:1px solid #eee;">{ 'Involved' if class_type == 'school_event' else 'Section' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
                          border-bottom:1px solid #eee;">{section_disp}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">{ 'Instructors' if class_type == 'school_event' else 'Instructor' }</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;">{teacher_disp}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;

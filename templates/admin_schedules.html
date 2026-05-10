@@ -546,6 +546,18 @@
           </datalist>
           <input type="hidden" name="selected_teachers" id="eventTeachersHidden">
           <div id="eventTeachersList" class="active-filters" style="margin-top:8px;"></div>
+          <label class="class-type-item" style="margin-top:10px;">
+            <input type="checkbox" id="eventAllTeachers" name="all_teachers" onchange="toggleEventAllTeachers()">
+            <span>Include All Teachers</span>
+          </label>
+        </div>
+        <div class="mb-3">
+          <label class="form-label-sm">Semester *</label>
+          <select class="ac-input" name="semester" id="eventSemester" required>
+            <option value="1st Semester">1st Semester</option>
+            <option value="2nd Semester">2nd Semester</option>
+            <option value="Short Session">Short Session</option>
+          </select>
         </div>
         <div class="mb-3">
           <label class="form-label-sm">Programs / Year / Sections Involved *</label>
@@ -571,6 +583,10 @@
           <datalist id="eventSectionOptions"></datalist>
           <input type="hidden" name="selected_sections" id="eventSectionsHidden">
           <div id="eventSectionsTableWrap" style="margin-top:10px;"></div>
+          <label class="class-type-item" style="margin-top:10px;">
+            <input type="checkbox" id="eventAllStudents" name="all_students" onchange="toggleEventAllStudents()">
+            <span>Include All Programs & Sections</span>
+          </label>
         </div>
         <div class="mb-3">
           <label class="form-label-sm">Start Date/Time *</label>

@@ -1181,4 +1181,35 @@
     }
   });
 
+  function toggleEventAllTeachers() {
+    const checked = !!document.getElementById('eventAllTeachers')?.checked;
+    const inputRow = document.getElementById('eventTeacherInput')?.closest('.mb-3');
+    if (inputRow) {
+      inputRow.style.opacity = checked ? '0.5' : '1';
+      inputRow.style.pointerEvents = checked ? 'none' : 'auto';
+    }
+    if (checked) {
+      eventTeachers = [];
+      renderEventTeachers();
+    }
+  }
+
+  function toggleEventAllStudents() {
+    const checked = !!document.getElementById('eventAllStudents')?.checked;
+    const sectionFields = document.querySelector('#eventForm .section-fields');
+    const addButton = document.querySelector('#eventForm button[onclick="addEventSection()"]');
+    if (sectionFields) {
+      sectionFields.style.opacity = checked ? '0.5' : '1';
+      sectionFields.style.pointerEvents = checked ? 'none' : 'auto';
+    }
+    if (addButton) {
+      addButton.style.opacity = checked ? '0.5' : '1';
+      addButton.style.pointerEvents = checked ? 'none' : 'auto';
+    }
+    if (checked) {
+      eventSections = [];
+      renderEventSections();
+    }
+  }
+
 

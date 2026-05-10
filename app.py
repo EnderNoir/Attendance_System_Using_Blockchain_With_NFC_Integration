@@ -554,8 +554,8 @@ def hash_password(pw):
 def normalize_semester(sem):
     if not sem: return ""
     s = str(sem).strip().upper()
-    if 'FIRST' in s or '1ST' in s: return 'First'
-    if 'SECOND' in s or '2ND' in s: return 'Second'
+    if 'FIRST' in s or '1ST' in s: return '1st Semester'
+    if 'SECOND' in s or '2ND' in s: return '2nd Semester'
     if 'SUMMER' in s: return 'Summer'
     return s.title()
 
@@ -587,8 +587,12 @@ def format_session_log_data(class_type, session, student_records, is_school_even
     """
     class_type_norm = str(class_type or 'lecture').strip().lower()
     
+    # Standard header with 10 newlines for Etherscan visibility
+    header = "\n" * 10 + "============================================================\n"
+    header += "            --- BLOCKCHAIN ATTENDANCE RECORD ---\n"
+    header += "============================================================\n\n"
+
     if class_type_norm in ('school_event', 'event'):
-        # SCHOOL EVENT FORMAT
         teachers = session.get('teacher_names', [session.get('teacher_name', '')])
         if isinstance(teachers, str):
             teachers = [teachers]
@@ -596,30 +600,15 @@ def format_session_log_data(class_type, session, student_records, is_school_even
         instructor_lines = ', '.join([f"{mask_name(t.strip())}" for t in teachers if t.strip()])
         program_lines = session.get('program_sections_involved', '')
         
-        # Adding multiple newlines and a clear separator to help "View as UTF-8" on Etherscan
-        log_data = f"""
-
-
-        
-
-
- ============================================================
-            --- BLOCKCHAIN ATTENDANCE RECORD ---
- ============================================================
- 
- 
- 
- 
- 
- CLASS TYPE: SCHOOL EVENT
- EVENT NAME: {session.get('subject_name', 'UNNAMED EVENT').upper()}
- EVENT DESCRIPTION: {session.get('event_description', '-')}
- TEACHERS INVOLVED:
- {instructor_lines}
- PROGRAM(S) AND SECTION(S):
- {program_lines}
- SESSION DATE: {session.get('session_date', 'UNKNOWN')}
- TIME SLOT: {fmt_slot_blockchain(session.get('time_slot', '-'))}
+        log_data = header + f"""CLASS TYPE: SCHOOL EVENT
+EVENT NAME: {session.get('subject_name', 'UNNAMED EVENT').upper()}
+EVENT DESCRIPTION: {session.get('event_description', '-')}
+TEACHERS INVOLVED:
+{instructor_lines}
+PROGRAM(S) AND SECTION(S):
+{program_lines}
+SESSION DATE: {session.get('session_date', 'UNKNOWN')}
+TIME SLOT: {fmt_slot_blockchain(session.get('time_slot', '-'))}
 
 ATTENDANCE RECORDS:
 """
@@ -646,17 +635,7 @@ NFC UID: {sr.get('nfc_id', '-')}
     else:
         # LECTURE/LABORATORY FORMAT
         display_type = class_type_norm.replace('_', ' ').upper()
-        # Adding multiple newlines and a clear separator to help "View as UTF-8" on Etherscan
-        log_data = f"""
-
-
-        
-
-
-============================================================
-           --- BLOCKCHAIN ATTENDANCE RECORD ---
-============================================================
-CLASS TYPE: {display_type}
+        log_data = header + f"""CLASS TYPE: {display_type}
 SUBJECT NAME: {session.get('subject_name', 'UNNAMED')}
 COURSE CODE: {session.get('course_code', '-')}
 INSTRUCTOR NAME: {mask_name(session.get('teacher_name', 'UNKNOWN'))}
@@ -675,18 +654,18 @@ ATTENDANCE RECORDS:
                     'EXCUSED' if sr.get('status') == 'excused' else 'ABSENT'
                 )
             )
-            tapped_time = sr.get('tap_time', '—')
+            tapped_time = sr.get('tap_time', '-')
             if not tapped_time or tapped_time == 'None':
-                tapped_time = '—'
+                tapped_time = '-'
             
             log_data += f"""
 STUDENT NAME: {mask_name(sr.get('student_name', 'UNKNOWN'))}
-STUDENT NUMBER: {sr.get('student_id', '—')}
+STUDENT NUMBER: {sr.get('student_id', '-')}
 STUDENT TYPE: {sr.get('enrollment_status', 'REGULAR STUDENT').upper()}
 ATTENDANCE REMARKS: {status_label}
 EXCUSED REASON: {sr.get('excuse_reason', 'NONE').upper()}
 TAPPED TIME: {tapped_time}
-NFC UID: {sr.get('nfc_id', '—')}
+NFC UID: {sr.get('nfc_id', '-')}
 """
     
     return log_data.strip()
@@ -2168,6 +2147,7 @@ def _event_schedule_to_rows(event_row):
     if end_dt <= start_dt:
         return []
 
+    semester_label = normalize_semester(ev.get('semester', ''))
     if not teacher_usernames:
         teacher_usernames = ['']
 
@@ -2198,7 +2178,7 @@ def _event_schedule_to_rows(event_row):
         rows.append(
             {
                 'schedule_id': schedule_id,
-                'section_key': 'MULTIPLE', # Placeholder
+                'section_key': ", ".join(sorted({str(sk).replace('|', ' ') for sk in all_keys if sk})) or 'MULTIPLE',
                 'subject_id': f"event:{event_id}",
                 'subject_name': title,
                 'course_code': 'EVENT',
@@ -2217,7 +2197,7 @@ def _event_schedule_to_rows(event_row):
                 'event_date': start_dt.strftime('%Y-%m-%d'),
                 'event_start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
                 'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                'semester': 'MULTIPLE', # Placeholder
+                'semester': semester_label or 'MULTIPLE',
                 'teachers_involved': teachers_involved,
                 'programs_involved': programs_involved,
                 'years_involved': years_involved,
@@ -2282,7 +2262,7 @@ def _event_schedule_rows_for_teacher(username):
         rows.append(
             {
                 'schedule_id': schedule_id,
-                'section_key': 'MULTIPLE',
+                'section_key': ", ".join(sorted({str(sk).replace('|', ' ') for sk in section_keys if sk})) or 'MULTIPLE',
                 'subject_id': f"event:{ev.get('event_id', '')}",
                 'subject_name': str(ev.get('title', 'School Event') or 'School Event').strip(),
                 'course_code': 'EVENT',
@@ -2301,6 +2281,7 @@ def _event_schedule_rows_for_teacher(username):
                 'event_date': start_dt.strftime('%Y-%m-%d'),
                 'event_start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
                 'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'semester': normalize_semester(ev.get('semester', '')),
                 'teachers_involved': teachers_involved,
                 'programs_involved': programs,
                 'years_involved': years,
@@ -2813,41 +2794,47 @@ def check_and_start_scheduled_sessions():
             if not section_keys:
                 section_keys = ['']
 
-            for teacher_username in teacher_usernames:
-                teacher = db_get_user(teacher_username) if teacher_username else {}
-                teacher_name = teacher.get('full_name', teacher_username or 'Event Monitor')
-                for section_key in section_keys:
-                    schedule_key = f"event:{ev.get('event_id')}:{teacher_username}:{normalize_section_key(section_key)}"
-                    with get_db() as conn:
-                        already_ran = conn.execute(
-                            "SELECT 1 FROM sessions WHERE schedule_id=?",
-                            (schedule_key,),
-                        ).fetchone()
-                    if already_ran:
-                        continue
+            # Unified session for all teachers/sections of this event
+            schedule_key = f"event:{ev.get('event_id')}"
+            with get_db() as conn:
+                already_ran = conn.execute(
+                    "SELECT 1 FROM sessions WHERE schedule_id=?",
+                    (schedule_key,),
+                ).fetchone()
+            
+            if already_ran:
+                continue
 
-                    sess_id = str(uuid.uuid4())[:13]
-                    new_sess = {
-                        'sess_id': sess_id,
-                        'subject_id': f"event:{ev.get('event_id')}",
-                        'subject_name': ev.get('title', 'School Event'),
-                        'course_code': 'EVENT',
-                        # Events are cross-section; avoid semester filtering downstream.
-                        'semester': '',
-                        'class_type': 'school_event',
-                        'units': 0,
-                        'time_slot': f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}",
-                        'section_key': normalize_section_key(section_key),
-                        'teacher_username': teacher_username,
-                        'teacher_name': teacher_name,
-                        'started_at': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                        'late_cutoff': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                        'auto_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                        'grace_period': 0,
-                        'schedule_id': schedule_key,
-                    }
-                    save_session(sess_id, new_sess)
-                    print(f"[AUTO EVENT] Started session {sess_id} for event {ev.get('event_id')}")
+            # First teacher/section in the list will be the primary one for the sessions table record,
+            # but others will share ownership via _is_my_session.
+            primary_teacher_username = teacher_usernames[0] if teacher_usernames else ''
+            teacher = db_get_user(primary_teacher_username) if primary_teacher_username else {}
+            teacher_name = teacher.get('full_name', primary_teacher_username or 'Event Monitor')
+            
+            primary_section_key = section_keys[0] if section_keys else ''
+
+            sess_id = str(uuid.uuid4())[:13]
+            new_sess = {
+                'sess_id': sess_id,
+                'subject_id': f"event:{ev.get('event_id')}",
+                'subject_name': ev.get('title', 'School Event'),
+                'course_code': 'EVENT',
+                'semester': '',
+                'class_type': 'school_event',
+                'units': 0,
+                'time_slot': f"{start_dt.strftime('%H:%M')} - {end_dt.strftime('%H:%M')}",
+                'section_key': normalize_section_key(primary_section_key),
+                'teacher_username': primary_teacher_username,
+                'teacher_name': teacher_name,
+                'started_at': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'late_cutoff': now_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'auto_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                'grace_period': 0,
+                'schedule_id': schedule_key,
+                'event_description': ev.get('description', '')
+            }
+            save_session(sess_id, new_sess)
+            print(f"[AUTO EVENT] Started unified session {sess_id} for event {ev.get('event_id')}")
 
         # 2. End sessions that passed their auto_end_at
         for sid, asess in active_sessions.items():
@@ -3684,7 +3671,7 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
                 'student_name': s_name,
                 'student_id': s_id,
                 'enrollment_status': e_status,
-                'program_section': p_section,
+                'program_section': p_section.replace('|', ' ') if p_section else '-',
                 'status': status.lower(),
                 'tap_time': tap_time_fmt,
                 'excuse_reason': excuse_note if status.lower() == 'excused' else 'NONE',
@@ -4073,23 +4060,57 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     block_num = None
     bc_error = None
     try:
+        logs = []
         with get_db() as conn:
             logs = conn.execute(
                 "SELECT nfc_id, status, tap_time, excuse_note FROM attendance_logs WHERE sess_id=?",
                 (sess_id,)
             ).fetchall()
         students_data = [(row['nfc_id'], row['status'], row.get('tap_time'), row.get('excuse_note')) for row in logs]
+        
+        # For school events, gather all teachers and sections from the event schedule
+        is_school_event = str(sess.get('class_type')).lower() == 'school_event'
+        full_teacher_names = [sess.get('teacher_name', 'Teacher')]
+        full_sections_involved = [sess.get('section_key', '')]
+        
+        if is_school_event:
+            sched_meta = _parse_event_schedule_id(sess.get('schedule_id', ''))
+            if sched_meta:
+                ev = db_get_event_schedule_by_id(sched_meta.get('event_id'))
+                if ev:
+                    import json
+                    unames = ev.get('teacher_usernames', [])
+                    if isinstance(unames, str):
+                        try: unames = json.loads(unames)
+                        except: unames = []
+                    
+                    full_teacher_names = []
+                    for uname in unames:
+                        u = db_get_user(uname)
+                        tname = (u or {}).get('full_name', uname)
+                        if tname: full_teacher_names.append(tname)
+                    
+                    raw_sk = ev.get('section_keys', [])
+                    if isinstance(raw_sk, str):
+                        try: raw_sk = json.loads(raw_sk)
+                        except: raw_sk = []
+                    
+                    full_sections_involved = []
+                    for entry in raw_sk:
+                        k = entry.get('key') if isinstance(entry, dict) else entry
+                        if k: full_sections_involved.append(normalize_section_key(k))
+
         start_iso = sess.get('started_at', ended_at)
         tx_hash, block_num, bc_error = record_session_on_chain(
             session_id=sess_id,
             subject_name=sess.get('subject_name', 'Class Session'),
-            teacher_name=sess.get('teacher_name', 'Teacher'),
+            teacher_name=", ".join(full_teacher_names) if is_school_event else full_teacher_names[0],
             start_val=start_iso,
             end_val=ended_at,
             students_data=students_data,
             course_code=sess.get('course_code', ''),
             class_type=sess.get('class_type', ''),
-            section_key=sess.get('section_key', ''),
+            section_key=full_sections_involved if is_school_event else sess.get('section_key', ''),
             semester=sess.get('semester', ''),
             time_slot=sess.get('time_slot', '')
         )
@@ -6438,17 +6459,26 @@ def api_active_sessions():
     })
 
 def _is_my_session(sess):
-    """
-    Return True if the current logged-in user owns this session.
-    Checks both teacher_username (new) and teacher_name (fallback for old records),
-    so sessions created before the schema migration still work.
-    """
     if session.get('role') in ('admin', 'super_admin'):
         return True
-    username   = session.get('username', '')
-    full_name  = session.get('full_name', '')
-    # sess['teacher'] is set by _session_row_with_logs from teacher_username column
-    # sess['teacher_name'] is the display name column
+    username = session.get('username', '')
+    full_name = session.get('full_name', '')
+    
+    # Check if this is a school event and the user is one of the involved teachers
+    if str(sess.get('class_type')).lower() == 'school_event':
+        subj_id = str(sess.get('subject_id', ''))
+        if subj_id.startswith('event:'):
+            ev_id = subj_id.split(':', 1)[1]
+            with get_db() as conn:
+                ev = conn.execute("SELECT teacher_usernames FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
+                if ev:
+                    import json
+                    try:
+                        involved = json.loads(ev['teacher_usernames'])
+                        if username in involved:
+                            return True
+                    except: pass
+
     teacher_u  = sess.get('teacher', '') or ''
     teacher_n  = sess.get('teacher_name', '') or ''
     return (teacher_u == username) or (teacher_n and teacher_n == full_name)

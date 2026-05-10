@@ -223,6 +223,7 @@ function renderSessModal(sessId, data) {
 
     const sessTx = data.session_tx_hash || s.session_tx_hash;
     const sessBlock = data.session_block_number || s.session_block_number;
+    let sessTxHtml = '';
     if (sessTx) {
       sessTxHtml = `
       <div class="sm-info-box">
@@ -247,27 +248,22 @@ function renderSessModal(sessId, data) {
   document.getElementById('sm_info_grid').innerHTML = `
     ${sessTxHtml}
     <div class="sm-info-box">
-      <div class="sm-info-lbl"><i class="bi bi-book"></i> Subject</div>
-      <div class="sm-info-val">${s.subject_name}${s.course_code ? ' <code style="font-size:10px;background:rgba(45,106,39,.08);color:var(--accent);padding:1px 5px;border-radius:3px;">[' + s.course_code + ']</code>' : ''}</div>
+      <div class="sm-info-lbl"><i class="bi bi-book"></i> ${classType === 'school_event' ? 'Event Name' : 'Subject'}</div>
+      <div class="sm-info-val">${s.subject_name}${s.course_code && classType !== 'school_event' ? ' <code style="font-size:10px;background:rgba(45,106,39,.08);color:var(--accent);padding:1px 5px;border-radius:3px;">[' + s.course_code + ']</code>' : ''}</div>
+    </div>
+    ${classType === 'school_event' && (data.event_description || s.event_description) ? `
+    <div class="sm-info-box" style="grid-column: 1/-1;">
+      <div class="sm-info-lbl"><i class="bi bi-card-text"></i> Event Description</div>
+      <div class="sm-info-val">${data.event_description || s.event_description}</div>
+    </div>` : ''}
+    <div class="sm-info-box">
+      <div class="sm-info-lbl"><i class="bi bi-grid"></i> ${classType === 'school_event' ? 'Program(s) and Section(s) Involved' : 'Section'}</div>
+      <div class="sm-info-val">${classType === 'school_event' ? sectionsInvolved : (s.section_key || '').replace(/\|/g, ' · ') + (s.semester ? ' · ' + s.semester : '')}</div>
     </div>
     <div class="sm-info-box">
-      <div class="sm-info-lbl"><i class="bi bi-grid"></i> Section</div>
-      <div class="sm-info-val">${(s.section_key || '').replace(/\|/g, ' | ')}${s.semester ? ' | ' + s.semester : ''}</div>
+      <div class="sm-info-lbl"><i class="bi bi-person-badge"></i> ${classType === 'school_event' ? 'Teachers Involved' : 'Instructor'}</div>
+      <div class="sm-info-val">${classType === 'school_event' ? teachersInvolved : (s.teacher_name || '-')}</div>
     </div>
-    <div class="sm-info-box">
-      <div class="sm-info-lbl"><i class="bi bi-person-badge"></i> Instructor</div>
-      <div class="sm-info-val">${s.teacher_name || '-'}</div>
-    </div>
-    ${classType === 'school_event' ? `
-    <div class="sm-info-box">
-      <div class="sm-info-lbl"><i class="bi bi-people"></i> Teachers Involved</div>
-      <div class="sm-info-val">${teachersInvolved}</div>
-    </div>
-    <div class="sm-info-box">
-      <div class="sm-info-lbl"><i class="bi bi-diagram-3"></i> Sections Involved</div>
-      <div class="sm-info-val">${sectionsInvolved}</div>
-    </div>
-    ` : ''}
     <div class="sm-info-box">
       <div class="sm-info-lbl"><i class="bi bi-clock"></i> Time Slot</div>
       <div class="sm-info-val">${s.time_slot || '-'}</div>
@@ -348,8 +344,8 @@ function renderSessModal(sessId, data) {
         <th style="width:36px;">#</th>
         <th>Student Name</th>
         <th>Student ID</th>
-        <th>${classType === 'school_event' ? 'Program-Year-Section' : 'Class Type'}</th>
         <th>Enrollment Type</th>
+        <th>${classType === 'school_event' ? 'Program-Year-Section' : 'Class Type'}</th>
         <th>Status</th>
         <th>Tapped Time</th>
         <th>Excused Reason</th>
@@ -371,8 +367,10 @@ function renderSessModal(sessId, data) {
             <td class="att-num">${i + 1}</td>
             <td style="font-weight:600;">${st.name || '-'}</td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${st.student_id || st.nfc_id || '-'}</td>
-            <td style="font-size:11px;color:var(--muted);">${classType === 'school_event' ? (st.section_origin || '-') : classTypeLabel}</td>
-            <td><span style="font-size:10px; font-weight:700; color:${(st.enrollment_status||'Regular')==='Irregular'?'var(--danger)':'var(--success)'};">${st.enrollment_status||'Regular'}</span></td>
+            <td>${st.enrollment_status === 'Irregular' ? '<span style="font-size:9px;background:rgba(192,57,43,.1);color:var(--danger);padding:1px 5px;border-radius:4px;font-weight:700;text-transform:uppercase;border:1px solid rgba(192,57,43,.2);">Irregular</span>' : '<span style="font-size:9px;background:rgba(46,204,113,.1);color:var(--success);padding:1px 5px;border-radius:4px;font-weight:700;text-transform:uppercase;border:1px solid rgba(46,204,113,.2);">Regular</span>'}</td>
+            <td>${classType === 'school_event'
+              ? `<span style="font-size:11px;color:var(--muted);">${st.section_origin || '-'}</span>`
+              : `<span style="font-size:11px;color:var(--muted);">${classTypeLabel}</span>`}</td>
             <td><span class="att-status ${stCls[status] || 'st-absent'}">${stLbl[status] || status}</span></td>
             <td style="font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);">${displayTapTime}</td>
             <td style="font-size:11px;">${status === 'excused' ? `<span style="color:#60a5fa;font-weight:600;">${reasonLabel}</span>${reasonDetail}` : '<span style="color:var(--muted);">-</span>'}</td>

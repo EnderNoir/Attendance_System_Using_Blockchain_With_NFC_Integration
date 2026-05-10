@@ -425,8 +425,17 @@
     }
     if (isSchoolEvent(s)) {
       document.getElementById('infoDayTime').textContent = (fmtEventDate(s.event_date) || DOW_NAMES[dayIdx]) + ' @ ' + fmtTime(to24h(s.start_time)) + ' - ' + fmtTime(to24h(s.end_time));
+      // Display event description if available
+      const descEl = document.getElementById('infoDescription');
+      const descRow = document.getElementById('infoDescriptionRow');
+      if (descEl && descRow) {
+        descEl.textContent = s.event_description || s.description || '-';
+        descRow.style.display = 'flex';
+      }
     } else {
       document.getElementById('infoDayTime').textContent = DOW_NAMES[dayIdx] + ' @ ' + fmtTime(to24h(s.start_time)) + ' - ' + fmtTime(to24h(s.end_time));
+      const descRow = document.getElementById('infoDescriptionRow');
+      if (descRow) descRow.style.display = 'none';
     }
     document.getElementById('infoClassType').textContent = classTypeLabel(s.class_type);
     document.getElementById('infoGrace').textContent = (s.grace_minutes || 15) + ' minutes';

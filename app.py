@@ -571,7 +571,8 @@ def format_session_log_data(class_type, session, student_records, is_school_even
         instructor_lines = ', '.join([f"{mask_name(t.strip())}" for t in teachers if t.strip()])
         program_lines = session.get('program_sections_involved', '')
         
-        log_data = f"""CLASS TYPE: SCHOOL EVENT
+        log_data = f"""--- BLOCKCHAIN ATTENDANCE RECORD ---
+CLASS TYPE: SCHOOL EVENT
 EVENT NAME: {session.get('subject_name', 'UNNAMED EVENT').upper()}
 INSTRUCTOR NAME(S):
 {instructor_lines}
@@ -604,7 +605,9 @@ NFC UID: {sr.get('nfc_id', '—')}
 """
     else:
         # LECTURE/LABORATORY FORMAT
-        log_data = f"""CLASS TYPE: LECTURE/LABORATORY
+        display_type = class_type_norm.replace('_', ' ').upper()
+        log_data = f"""--- BLOCKCHAIN ATTENDANCE RECORD ---
+CLASS TYPE: {display_type}
 SUBJECT NAME: {session.get('subject_name', 'UNNAMED')}
 COURSE CODE: {session.get('course_code', '—')}
 INSTRUCTOR NAME: {mask_name(session.get('teacher_name', 'UNKNOWN'))}
@@ -634,6 +637,7 @@ STUDENT TYPE: {sr.get('enrollment_status', 'REGULAR STUDENT').upper()}
 ATTENDANCE REMARKS: {status_label}
 EXCUSED REASON: {sr.get('excuse_reason', 'NONE').upper()}
 TAPPED TIME: {tapped_time}
+NFC UID: {sr.get('nfc_id', '—')}
 """
     
     return log_data.strip()
@@ -5270,44 +5274,10 @@ def _mark_attendance_async(nfc_id, sess_id=None):
                     (tx_hash, block_num, sess_id, nfc_id)
                 )
             
-            # ── Send SECOND email with blockchain TX info ──────────────────────────
-            # Get all the details needed for the email
-            try:
-                with get_db() as conn:
-                    log_row = conn.execute(
-                        "SELECT al.*, s.subject_name, s.section_key, s.teacher_name, "
-                        "s.time_slot, s.semester FROM attendance_logs al "
-                        "JOIN sessions s ON al.sess_id = s.sess_id "
-                        "WHERE al.sess_id=? AND al.nfc_id=?",
-                        (sess_id, nfc_id)
-                    ).fetchone()
-                
-                if log_row:
-                    all_s = get_all_students()
-                    student_info = next((s for s in all_s if s['nfcId']==nfc_id), {})
-                    student_email = student_info.get('email', '')
-                    
-                    if student_email:
-                        send_student_attendance_receipt(
-                            student_name=log_row['student_name'],
-                            student_email=student_email,
-                            student_id=log_row['student_id'],
-                            subject_name=log_row['subject_name'],
-                            section_key=log_row['section_key'],
-                            teacher_name=log_row['teacher_name'],
-                            tap_time=log_row['tap_time'],
-                            status=log_row['status'],
-                            tx_hash=tx_hash,
-                            block_num=block_num,
-                            sess_id=sess_id,
-                            nfc_id=nfc_id,
-                            semester=log_row['semester'],
-                            time_slot=log_row['time_slot'],
-                            enrollment_status=student_info.get('enrollment_status', 'Regular'),
-                            class_type=log_row.get('class_type', 'lecture'),
-                        )
-            except Exception as e:
-                print(f"[WARN] Failed to send 2nd email for {nfc_id}: {e}")
+            # (Removed redundant per-tap student email to ensure only 2 emails total)
+            pass
+        except Exception as e:
+            print(f"[WARN] Async blockchain update failed for {nfc_id}: {e}")
     except Exception as e:
         print(f"[WARN] Async blockchain write failed for {nfc_id}: {e}")
 

@@ -266,6 +266,7 @@ def send_student_attendance_receipt(
           <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
             This is an automated attendance receipt from the DAVS system.<br>
             {"The TX hash above is your tamper-proof blockchain proof of attendance.<br>" if tx_hash else ""}
+            {f'<div style="margin-top:8px;padding:8px;background:#f8fafc;border-radius:4px;border-left:3px solid #cbd5e1;color:#64748b;"><strong>How to verify:</strong> To verify the attendance record, click the "View on Blockchain Explorer" button above. On Etherscan, go to the <strong>"More Details"</strong> section, find <strong>"Input Data"</strong>, and click <strong>"View Input As"</strong> &rarr; <strong>"UTF-8"</strong> to see the full attendance record.</div>' if tx_hash else ""}
             Please do not reply to this email.
           </div>
         </td>
@@ -438,7 +439,7 @@ def send_student_attendance_receipt_initial_tap(
           <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
             This is an automated attendance receipt from the DAVS system.<br>
             Your attendance is being permanently recorded on the blockchain.<br>
-            You will receive a second email with your blockchain transaction hash shortly.<br>
+            You will receive a <strong>final confirmation email</strong> with the blockchain transaction hash once the session is finalized.<br>
             Please do not reply to this email.
           </div>
         </td>
@@ -687,6 +688,7 @@ def send_teacher_session_summary(
           <div style="font-size:11px;color:#94a3b8;line-height:1.6;">
             This is an automated session summary from the DAVS system.<br>
             All TX hashes are immutable blockchain records verifiable on the Sepolia testnet.<br>
+            {f'<div style="margin-top:8px;padding:8px;background:#f8fafc;border-radius:4px;border-left:3px solid #cbd5e1;color:#64748b;"><strong>How to verify:</strong> To verify the attendance record, click the "View on Blockchain Explorer" button above. On Etherscan, go to the <strong>"More Details"</strong> section, find <strong>"Input Data"</strong>, and click <strong>"View Input As"</strong> &rarr; <strong>"UTF-8"</strong> to see the full attendance record.</div>' if session_tx_hash else ""}
             Please do not reply to this email.
           </div>
         </td>

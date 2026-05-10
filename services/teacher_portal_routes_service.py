@@ -103,11 +103,11 @@ def teacher_dashboard_page_impl(
             if schedule_id.startswith('event:'):
                 ev_id = schedule_id.split(':', 1)[1]
                 with get_db() as conn:
-                    ev = conn.execute("SELECT teacher_usernames FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
+                    ev = conn.execute("SELECT teacher_usernames_json FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
                     if ev:
                         import json
                         try:
-                            involved = json.loads(ev['teacher_usernames'])
+                            involved = json.loads(ev['teacher_usernames_json'])
                             if username in involved:
                                 is_mine = True
                         except: pass
@@ -210,11 +210,11 @@ def teacher_sessions_students_page_impl(
                 schedule_id = row['schedule_id'] or ''
                 if schedule_id.startswith('event:'):
                     ev_id = schedule_id.split(':', 1)[1]
-                    ev = conn.execute("SELECT teacher_usernames FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
+                    ev = conn.execute("SELECT teacher_usernames_json FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
                     if ev:
                         import json
                         try:
-                            involved = json.loads(ev['teacher_usernames'])
+                            involved = json.loads(ev['teacher_usernames_json'])
                             if username in involved:
                                 is_mine = True
                         except: pass
@@ -363,11 +363,11 @@ def teacher_records_page_impl(
                 schedule_id = row['schedule_id'] or ''
                 if schedule_id.startswith('event:'):
                     ev_id = schedule_id.split(':', 1)[1]
-                    ev = conn.execute("SELECT teacher_usernames FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
+                    ev = conn.execute("SELECT teacher_usernames_json FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
                     if ev:
                         import json
                         try:
-                            involved = json.loads(ev['teacher_usernames'])
+                            involved = json.loads(ev['teacher_usernames_json'])
                             if username in involved:
                                 is_mine = True
                         except: pass

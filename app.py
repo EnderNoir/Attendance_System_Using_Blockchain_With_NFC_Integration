@@ -4170,11 +4170,11 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                         sched_meta = _parse_event_schedule_id(sched_id)
                         ev_id = sched_meta.get('event_id')
                         if ev_id:
-                            ev_row = _conn.execute("SELECT section_keys, teacher_usernames FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
+                            ev_row = _conn.execute("SELECT section_keys_json, teacher_usernames_json FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
                             if ev_row:
                                 import json
                                 try:
-                                    s_keys = json.loads(ev_row['section_keys'])
+                                    s_keys = json.loads(ev_row['section_keys_json'])
                                     for entry in s_keys:
                                         if isinstance(entry, dict):
                                             k = entry.get('key', '')
@@ -4184,7 +4184,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                                             sections_list.append(entry)
                                 except: pass
                                 try:
-                                    t_users = json.loads(ev_row['teacher_usernames'])
+                                    t_users = json.loads(ev_row['teacher_usernames_json'])
                                     for tuname in t_users:
                                         u = db_get_user(tuname)
                                         if u and u.get('full_name'):
@@ -6471,11 +6471,11 @@ def _is_my_session(sess):
         if subj_id.startswith('event:'):
             ev_id = subj_id.split(':', 1)[1]
             with get_db() as conn:
-                ev = conn.execute("SELECT teacher_usernames FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
+                ev = conn.execute("SELECT teacher_usernames_json FROM event_schedules WHERE event_id=?", (ev_id,)).fetchone()
                 if ev:
                     import json
                     try:
-                        involved = json.loads(ev['teacher_usernames'])
+                        involved = json.loads(ev['teacher_usernames_json'])
                         if username in involved:
                             return True
                     except: pass

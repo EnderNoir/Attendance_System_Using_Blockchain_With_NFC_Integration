@@ -138,7 +138,7 @@ def send_student_attendance_receipt(
         subject_name, section_key, teacher_name,
         tap_time, status, tx_hash, block_num,
         sess_id=None, nfc_id=None, semester=None, time_slot=None,
-        enrollment_status='Regular'):
+        enrollment_status='Regular', class_type='lecture'):
         """Send attendance receipt email to student."""
         _send_student_attendance_receipt_template(
                 student_name=student_name,
@@ -158,6 +158,7 @@ def send_student_attendance_receipt(
                 semester=semester,
                 time_slot=time_slot,
                 enrollment_status=enrollment_status,
+                class_type=class_type,
         )
 
 def send_student_attendance_receipt_initial_tap(
@@ -165,7 +166,7 @@ def send_student_attendance_receipt_initial_tap(
         subject_name, section_key, teacher_name,
         tap_time, status,
         semester=None, time_slot=None,
-        enrollment_status='Regular'):
+        enrollment_status='Regular', class_type='lecture'):
         """Send INITIAL attendance receipt email to student (immediately after tap, without blockchain TX info)."""
         _send_student_attendance_receipt_initial_tap_template(
                 student_name=student_name,
@@ -180,6 +181,7 @@ def send_student_attendance_receipt_initial_tap(
                 semester=semester,
                 time_slot=time_slot,
                 enrollment_status=enrollment_status,
+                class_type=class_type,
         )
 
 def send_teacher_session_summary(
@@ -535,7 +537,7 @@ def mask_name(name):
     if not name or len(name.strip()) == 0:
         return "***"
     
-    parts = str(name).strip().split()
+    parts = str(name).strip().upper().split()
     masked_parts = []
     
     for part in parts:
@@ -563,15 +565,8 @@ def format_session_log_data(class_type, session, student_records, is_school_even
         if isinstance(teachers, str):
             teachers = [teachers]
         
-        # Get unique program-section combinations from students
-        programs_sections = set()
-        for sr in student_records:
-            prog_sec = sr.get('program_section', '')
-            if prog_sec:
-                programs_sections.add(prog_sec)
-        
         instructor_lines = ', '.join([f"{mask_name(t.strip())}" for t in teachers if t.strip()])
-        program_lines = ', '.join(sorted(programs_sections)) if programs_sections else ''
+        program_lines = session.get('program_sections_involved', '')
         
         log_data = f"""CLASS TYPE: SCHOOL EVENT
 EVENT NAME: {session.get('subject_name', 'UNNAMED EVENT').upper()}
@@ -590,7 +585,9 @@ ATTENDANCE RECORDS:
                     'EXCUSED' if sr.get('status') == 'excused' else 'ABSENT'
                 )
             )
-            tapped_time = '—' if sr.get('status') in ('absent', 'excused') else sr.get('tap_time', '—')
+            tapped_time = sr.get('tap_time', '—')
+            if not tapped_time or tapped_time == 'None':
+                tapped_time = '—'
             
             log_data += f"""
 STUDENT NAME: {mask_name(sr.get('student_name', 'UNKNOWN'))}
@@ -598,14 +595,13 @@ STUDENT NUMBER: {sr.get('student_id', '—')}
 STUDENT TYPE: {sr.get('enrollment_status', 'REGULAR STUDENT').upper()}
 PROGRAM AND SECTION: {sr.get('program_section', '—')}
 ATTENDANCE REMARKS: {status_label}
-EXCUSED REASON: {'NONE' if sr.get('status') != 'excused' else sr.get('excuse_reason', 'NONE')}
+EXCUSED REASON: {sr.get('excuse_reason', 'NONE').upper()}
 TAPPED TIME: {tapped_time}
+NFC UID: {sr.get('nfc_id', '—')}
 """
     else:
         # LECTURE/LABORATORY FORMAT
-        class_label = 'LABORATORY' if class_type_norm == 'laboratory' else 'LECTURE'
-        
-        log_data = f"""CLASS TYPE: {class_label}
+        log_data = f"""CLASS TYPE: LECTURE/LABORATORY
 SUBJECT NAME: {session.get('subject_name', 'UNNAMED')}
 COURSE CODE: {session.get('course_code', '—')}
 INSTRUCTOR NAME: {mask_name(session.get('teacher_name', 'UNKNOWN'))}
@@ -624,16 +620,20 @@ ATTENDANCE RECORDS:
                     'EXCUSED' if sr.get('status') == 'excused' else 'ABSENT'
                 )
             )
-            tapped_time = '—' if sr.get('status') in ('absent', 'excused') else sr.get('tap_time', '—')
+            tapped_time = sr.get('tap_time', '—')
+            if not tapped_time or tapped_time == 'None':
+                tapped_time = '—'
             
             log_data += f"""
 STUDENT NAME: {mask_name(sr.get('student_name', 'UNKNOWN'))}
 STUDENT NUMBER: {sr.get('student_id', '—')}
 STUDENT TYPE: {sr.get('enrollment_status', 'REGULAR STUDENT').upper()}
 ATTENDANCE REMARKS: {status_label}
-EXCUSED REASON: {'NONE' if sr.get('status') != 'excused' else sr.get('excuse_reason', 'NONE')}
+EXCUSED REASON: {sr.get('excuse_reason', 'NONE').upper()}
 TAPPED TIME: {tapped_time}
 """
+    
+    return log_data.strip()
     
     return log_data.strip()
 
@@ -3442,7 +3442,8 @@ def mask_teacher_name(name):
 
 def record_session_on_chain(session_id: str, subject_name: str, teacher_name: str, 
                             start_val, end_val, students_data: list,
-                            course_code="", class_type="", section_key="", semester=""):
+                            course_code="", class_type="", section_key="", semester="",
+                            time_slot=""):
     """
     Record entire session attendance data to blockchain using recordSession().
     students_data = [(nfc_id1, 'present'), (nfc_id2, 'late'), ...]
@@ -3486,7 +3487,7 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
             'section': section_key.split('|')[2] if section_key and len(section_key.split('|')) > 2 else '—',
             'semester': semester or '—',
             'session_date': '',
-            'time_slot': '—',
+            'time_slot': time_slot or '—',
         }
         
         # Get date
@@ -3506,11 +3507,12 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         status_codes = []
         
         for item in students_data:
-            if not isinstance(item, (list, tuple)) or len(item) < 2:
-                print(f"[BLOCKCHAIN ERROR] Invalid student data item: {item}")
-                continue
-                
-            nfc_id, status = item[0], item[1]
+            # item format: (nfc_id, status, tap_time, excuse_note)
+            nfc_id = item[0]
+            status = item[1]
+            tap_time_raw = item[2] if len(item) > 2 else '—'
+            excuse_note = item[3] if len(item) > 3 else 'NONE'
+            
             nfc_ids.append(nfc_id)
             status_codes.append(chain_status_code(status))
             
@@ -3521,15 +3523,36 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
             enrollment_status = st.get('enrollment_status', 'Regular') if st else 'Regular'
             program_section = build_student_section_key(st) if st else '—'
             
+            # Format tap time for log
+            tap_time_fmt = '—'
+            if status.lower() in ('present', 'late') and tap_time_raw and tap_time_raw != '—':
+                try:
+                    if ' ' in str(tap_time_raw):
+                        dt = datetime.strptime(str(tap_time_raw), '%Y-%m-%d %H:%M:%S')
+                    else:
+                        dt = datetime.strptime(str(tap_time_raw), '%H:%M:%S')
+                    tap_time_fmt = dt.strftime('%I:%M %p').lstrip('0')
+                except:
+                    tap_time_fmt = str(tap_time_raw)
+            
             student_records.append({
+                'nfc_id': nfc_id,
                 'student_name': student_name,
                 'student_id': student_id,
                 'enrollment_status': enrollment_status,
                 'program_section': program_section,
                 'status': status.lower(),
-                'tap_time': '—',
-                'excuse_reason': 'NONE',
+                'tap_time': tap_time_fmt,
+                'excuse_reason': excuse_note if status.lower() == 'excused' else 'NONE',
             })
+        
+        # Collect all programs/sections for events
+        if class_type_norm in ('school_event', 'event'):
+            ps_set = set()
+            for sr in student_records:
+                if sr['program_section'] and sr['program_section'] != '—':
+                    ps_set.add(sr['program_section'].replace('|', ' '))
+            session_data['program_sections_involved'] = ', '.join(sorted(ps_set))
         
         # Use the new format_session_log_data function
         log_data = format_session_log_data(class_type_norm, session_data, student_records)
@@ -3861,10 +3884,10 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     try:
         with get_db() as conn:
             logs = conn.execute(
-                "SELECT nfc_id, status FROM attendance_logs WHERE sess_id=?",
+                "SELECT nfc_id, status, tap_time, excuse_note FROM attendance_logs WHERE sess_id=?",
                 (sess_id,)
             ).fetchall()
-        students_data = [(row['nfc_id'], row['status']) for row in logs]
+        students_data = [(row['nfc_id'], row['status'], row.get('tap_time'), row.get('excuse_note')) for row in logs]
         start_iso = sess.get('started_at', ended_at)
         tx_hash, block_num, bc_error = record_session_on_chain(
             session_id=sess_id,
@@ -3876,7 +3899,8 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
             course_code=sess.get('course_code', ''),
             class_type=sess.get('class_type', ''),
             section_key=sess.get('section_key', ''),
-            semester=sess.get('semester', '')
+            semester=sess.get('semester', ''),
+            time_slot=sess.get('time_slot', '')
         )
         if tx_hash:
             print(f"[\u2705 BLOCKCHAIN] Session {sess_id} TX={tx_hash[:16]}...")
@@ -3939,6 +3963,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                         semester=sess.get('semester'),
                         time_slot=sess.get('time_slot'),
                         enrollment_status=st.get('enrollment_status', 'Regular'),
+                        class_type=sess.get('class_type', 'lecture'),
                     )
                 except Exception as e:
                     print(f"[EMAIL] Failed absence email for {nid}: {e}")
@@ -3971,6 +3996,7 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                             semester=sess.get('semester'),
                             time_slot=sess.get('time_slot'),
                             enrollment_status=st.get('enrollment_status', 'Regular'),
+                            class_type=sess.get('class_type', 'lecture'),
                         )
                 except Exception as e:
                     print(f"[EMAIL] Failed final receipt email for {nid}: {e}")
@@ -6957,6 +6983,7 @@ def mark_pico():
         semester       = sess.get('semester'),
         time_slot      = sess.get('time_slot'),
         enrollment_status = student_info.get('enrollment_status', 'Regular'),
+        class_type      = sess.get('class_type', 'lecture'),
     )
 
     return jsonify({

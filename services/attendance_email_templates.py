@@ -81,6 +81,7 @@ def send_student_attendance_receipt(
     semester=None,
     time_slot=None,
     enrollment_status='Regular',
+    class_type='lecture',
 ):
     """Send attendance receipt email to student."""
     if not student_email or '@' not in student_email or send_email_fn is None:
@@ -226,6 +227,18 @@ def send_student_attendance_receipt(
                          border-bottom:1px solid #eee;">Time Slot</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
                          border-bottom:1px solid #eee;">{_fmt_slot(time_slot)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Class Type</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;text-transform:capitalize;">{str(class_type or 'Lecture/Laboratory').replace('_', ' ')}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">NFC UID</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;font-family:monospace;">{nfc_id or '—'}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
@@ -389,6 +402,18 @@ def send_student_attendance_receipt_initial_tap(
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Class Type</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;text-transform:capitalize;">Lecture/Laboratory</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">NFC UID</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;font-family:monospace;">{nfc_id or '—'}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
                          border-bottom:1px solid #eee;">Enrollment Type</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
                          border-bottom:1px solid #eee;">{enrollment_status}</td>
@@ -521,9 +546,13 @@ def send_teacher_session_summary(
               </td>
             </tr>
             <tr>
-              <td colspan="2" style="padding:8px 0;font-size:11px;color:#999;border-top:1px solid #ccc;margin-top:8px;padding-top:8px;">
-                ✓ This entire session's attendance record has been permanently recorded on the Sepolia blockchain.<br/>
-                <a href="https://sepolia.etherscan.io/tx/{session_tx_hash}" style="color:#2D6A27;text-decoration:none;font-weight:bold;" target="_blank">
+              <td colspan="2" style="padding:16px 0;text-align:center;border-top:1px solid #ccc;margin-top:8px;padding-top:16px;">
+                <div style="font-size:11px;color:#666;margin-bottom:10px;">
+                  ✓ This entire session's attendance record has been permanently recorded on the Sepolia blockchain.
+                </div>
+                <a href="https://sepolia.etherscan.io/tx/{session_tx_hash}" 
+                   style="display:inline-block;background:#2D6A27;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:bold;font-size:13px;" 
+                   target="_blank">
                   View on Blockchain Explorer
                 </a>
               </td>
@@ -587,6 +616,12 @@ def send_teacher_session_summary(
                          border-bottom:1px solid #eee;">Ended</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
                          border-bottom:1px solid #eee;">{_fmt_dt(ended_at)}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;color:#666;
+                         border-bottom:1px solid #eee;">Class Type</td>
+              <td style="padding:8px 12px;font-size:12px;color:#333;
+                         border-bottom:1px solid #eee;text-transform:capitalize;">Lecture/Laboratory</td>
             </tr>
           </table>
           <!-- Stat boxes -->

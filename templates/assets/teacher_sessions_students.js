@@ -232,8 +232,8 @@ function renderSessModal(sessId, data) {
       <div class="sm-info-lbl"><i class="bi bi-blockchain"></i> Session TX</div>
       <div class="sm-info-val">`;
 
-    const displayTxHash = data.session_tx_hash || s.session_tx_hash || '';
-    const displayBlockNum = data.session_block_number || s.session_block_number || '';
+    const displayTxHash = data.session_tx_hash || (data.session_meta && data.session_meta.session_tx_hash) || s.session_tx_hash || '';
+    const displayBlockNum = data.session_block_number || (data.session_meta && data.session_meta.session_block_number) || s.session_block_number || '';
 
     if (displayTxHash) {
       sessTxHtml += `

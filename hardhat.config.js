@@ -1,5 +1,5 @@
 require("@nomiclabs/hardhat-waffle");
-require("dotenv").config();
+require("dotenv").config({ path: ".env.local" });
 
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL || process.env.BLOCKCHAIN_RPC_URL || "";
 const ADMIN_PRIVATE_KEY = process.env.ADMIN_PRIVATE_KEY || "";
@@ -13,7 +13,16 @@ try {
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.19",
+  solidity: {
+    version: "0.8.19",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+      viaIR: true,
+    },
+  },
   paths: {
     artifacts: "./artifacts",
   },
@@ -25,14 +34,7 @@ module.exports = {
       url: "http://127.0.0.1:8545",
     },
     sepolia: {
-      url:
-        process.env.SEPOLIA_RPC_URL ||
-        "https://sepolia.infura.io/v3/YOUR_INFURA_KEY",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      chainId: 11155111,
-    },
-    sepolia: {
-      url: SEPOLIA_RPC_URL,
+      url: SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/YOUR_INFURA_KEY",
       accounts: ADMIN_PRIVATE_KEY ? [ADMIN_PRIVATE_KEY] : [],
       chainId: 11155111,
     },

@@ -35,7 +35,7 @@
     {
       "type": "event",
       "anonymous": false,
-      "name": "SessionRecorded",
+      "name": "SessionRecordedLecture",
       "inputs": [
         {
           "type": "string",
@@ -44,22 +44,52 @@
         },
         {
           "type": "string",
+          "name": "classType",
+          "indexed": false
+        },
+        {
+          "type": "string",
           "name": "subjectName",
           "indexed": false
         },
         {
           "type": "string",
-          "name": "teacherName",
+          "name": "courseCode",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "instructorName",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "program",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "yearLevel",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "section",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "semester",
           "indexed": false
         },
         {
           "type": "uint256",
-          "name": "startTime",
+          "name": "sessionDate",
           "indexed": false
         },
         {
-          "type": "uint256",
-          "name": "endTime",
+          "type": "string",
+          "name": "timeSlot",
           "indexed": false
         },
         {
@@ -70,6 +100,105 @@
         {
           "type": "string",
           "name": "logData",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "SessionRecordedSchoolEvent",
+      "inputs": [
+        {
+          "type": "string",
+          "name": "sessionId",
+          "indexed": true
+        },
+        {
+          "type": "string",
+          "name": "classType",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "eventName",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "instructorNames",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "programsAndSections",
+          "indexed": false
+        },
+        {
+          "type": "uint256",
+          "name": "sessionDate",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "timeSlot",
+          "indexed": false
+        },
+        {
+          "type": "uint256",
+          "name": "studentCount",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "logData",
+          "indexed": false
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "anonymous": false,
+      "name": "StudentAttendanceRecorded",
+      "inputs": [
+        {
+          "type": "string",
+          "name": "sessionId",
+          "indexed": true
+        },
+        {
+          "type": "string",
+          "name": "nfcUid",
+          "indexed": true
+        },
+        {
+          "type": "string",
+          "name": "studentName",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "studentNumber",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "studentType",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "attendanceRemarks",
+          "indexed": false
+        },
+        {
+          "type": "string",
+          "name": "excusedReason",
+          "indexed": false
+        },
+        {
+          "type": "uint256",
+          "name": "tappedTime",
           "indexed": false
         }
       ]
@@ -183,6 +312,10 @@
         {
           "type": "uint8",
           "name": "status"
+        },
+        {
+          "type": "string",
+          "name": "nfcId"
         }
       ]
     },
@@ -242,6 +375,10 @@
             },
             {
               "type": "string",
+              "name": "classType"
+            },
+            {
+              "type": "string",
               "name": "subjectName"
             },
             {
@@ -257,12 +394,82 @@
               "name": "endTime"
             },
             {
-              "type": "string[]",
-              "name": "studentNfcIds"
+              "type": "uint256",
+              "name": "sessionDate"
             },
             {
-              "type": "uint8[]",
-              "name": "studentStatuses"
+              "type": "string",
+              "name": "timeSlot"
+            },
+            {
+              "type": "string",
+              "name": "courseCode"
+            },
+            {
+              "type": "string",
+              "name": "program"
+            },
+            {
+              "type": "string",
+              "name": "yearLevel"
+            },
+            {
+              "type": "string",
+              "name": "section"
+            },
+            {
+              "type": "string",
+              "name": "semester"
+            },
+            {
+              "type": "string",
+              "name": "eventName"
+            },
+            {
+              "type": "string",
+              "name": "instructorNames"
+            },
+            {
+              "type": "string",
+              "name": "programsAndSections"
+            },
+            {
+              "type": "tuple[]",
+              "name": "attendanceRecords",
+              "components": [
+                {
+                  "type": "string",
+                  "name": "nfcUid"
+                },
+                {
+                  "type": "string",
+                  "name": "studentName"
+                },
+                {
+                  "type": "string",
+                  "name": "studentNumber"
+                },
+                {
+                  "type": "string",
+                  "name": "studentType"
+                },
+                {
+                  "type": "uint8",
+                  "name": "status"
+                },
+                {
+                  "type": "string",
+                  "name": "attendanceRemarks"
+                },
+                {
+                  "type": "string",
+                  "name": "excusedReason"
+                },
+                {
+                  "type": "uint256",
+                  "name": "tappedTime"
+                }
+              ]
             },
             {
               "type": "uint256",
@@ -283,6 +490,132 @@
             {
               "type": "string",
               "name": "logData"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getSessionAllAttendanceRecords",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_sessionId"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "tuple[]",
+          "components": [
+            {
+              "type": "string",
+              "name": "nfcUid"
+            },
+            {
+              "type": "string",
+              "name": "studentName"
+            },
+            {
+              "type": "string",
+              "name": "studentNumber"
+            },
+            {
+              "type": "string",
+              "name": "studentType"
+            },
+            {
+              "type": "uint8",
+              "name": "status"
+            },
+            {
+              "type": "string",
+              "name": "attendanceRemarks"
+            },
+            {
+              "type": "string",
+              "name": "excusedReason"
+            },
+            {
+              "type": "uint256",
+              "name": "tappedTime"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getSessionAttendanceCount",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_sessionId"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "function",
+      "name": "getSessionAttendanceRecord",
+      "constant": true,
+      "stateMutability": "view",
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_sessionId"
+        },
+        {
+          "type": "uint256",
+          "name": "_index"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "tuple",
+          "components": [
+            {
+              "type": "string",
+              "name": "nfcUid"
+            },
+            {
+              "type": "string",
+              "name": "studentName"
+            },
+            {
+              "type": "string",
+              "name": "studentNumber"
+            },
+            {
+              "type": "string",
+              "name": "studentType"
+            },
+            {
+              "type": "uint8",
+              "name": "status"
+            },
+            {
+              "type": "string",
+              "name": "attendanceRemarks"
+            },
+            {
+              "type": "string",
+              "name": "excusedReason"
+            },
+            {
+              "type": "uint256",
+              "name": "tappedTime"
             }
           ]
         }
@@ -333,7 +666,7 @@
     },
     {
       "type": "function",
-      "name": "recordSession",
+      "name": "recordLectureSession",
       "constant": false,
       "payable": false,
       "inputs": [
@@ -343,11 +676,43 @@
         },
         {
           "type": "string",
+          "name": "_classType"
+        },
+        {
+          "type": "string",
           "name": "_subjectName"
         },
         {
           "type": "string",
-          "name": "_teacherName"
+          "name": "_courseCode"
+        },
+        {
+          "type": "string",
+          "name": "_instructorName"
+        },
+        {
+          "type": "string",
+          "name": "_program"
+        },
+        {
+          "type": "string",
+          "name": "_yearLevel"
+        },
+        {
+          "type": "string",
+          "name": "_section"
+        },
+        {
+          "type": "string",
+          "name": "_semester"
+        },
+        {
+          "type": "uint256",
+          "name": "_sessionDate"
+        },
+        {
+          "type": "string",
+          "name": "_timeSlot"
         },
         {
           "type": "uint256",
@@ -359,11 +724,112 @@
         },
         {
           "type": "string[]",
-          "name": "_studentNfcIds"
+          "name": "_nfcUids"
+        },
+        {
+          "type": "string[]",
+          "name": "_studentNames"
+        },
+        {
+          "type": "string[]",
+          "name": "_studentNumbers"
+        },
+        {
+          "type": "string[]",
+          "name": "_studentTypes"
         },
         {
           "type": "uint8[]",
-          "name": "_studentStatuses"
+          "name": "_statuses"
+        },
+        {
+          "type": "string[]",
+          "name": "_attendanceRemarks"
+        },
+        {
+          "type": "string[]",
+          "name": "_excusedReasons"
+        },
+        {
+          "type": "uint256[]",
+          "name": "_tappedTimes"
+        },
+        {
+          "type": "string",
+          "name": "_logData"
+        }
+      ],
+      "outputs": []
+    },
+    {
+      "type": "function",
+      "name": "recordSchoolEventSession",
+      "constant": false,
+      "payable": false,
+      "inputs": [
+        {
+          "type": "string",
+          "name": "_sessionId"
+        },
+        {
+          "type": "string",
+          "name": "_eventName"
+        },
+        {
+          "type": "string",
+          "name": "_instructorNames"
+        },
+        {
+          "type": "string",
+          "name": "_programsAndSections"
+        },
+        {
+          "type": "uint256",
+          "name": "_sessionDate"
+        },
+        {
+          "type": "string",
+          "name": "_timeSlot"
+        },
+        {
+          "type": "uint256",
+          "name": "_startTime"
+        },
+        {
+          "type": "uint256",
+          "name": "_endTime"
+        },
+        {
+          "type": "string[]",
+          "name": "_nfcUids"
+        },
+        {
+          "type": "string[]",
+          "name": "_studentNames"
+        },
+        {
+          "type": "string[]",
+          "name": "_studentNumbers"
+        },
+        {
+          "type": "string[]",
+          "name": "_studentTypes"
+        },
+        {
+          "type": "string[]",
+          "name": "_programsAndSectionsPerStudent"
+        },
+        {
+          "type": "uint8[]",
+          "name": "_statuses"
+        },
+        {
+          "type": "string[]",
+          "name": "_attendanceRemarks"
+        },
+        {
+          "type": "uint256[]",
+          "name": "_tappedTimes"
         },
         {
           "type": "string",
@@ -428,6 +894,10 @@
         },
         {
           "type": "string",
+          "name": "classType"
+        },
+        {
+          "type": "string",
           "name": "subjectName"
         },
         {
@@ -441,6 +911,46 @@
         {
           "type": "uint256",
           "name": "endTime"
+        },
+        {
+          "type": "uint256",
+          "name": "sessionDate"
+        },
+        {
+          "type": "string",
+          "name": "timeSlot"
+        },
+        {
+          "type": "string",
+          "name": "courseCode"
+        },
+        {
+          "type": "string",
+          "name": "program"
+        },
+        {
+          "type": "string",
+          "name": "yearLevel"
+        },
+        {
+          "type": "string",
+          "name": "section"
+        },
+        {
+          "type": "string",
+          "name": "semester"
+        },
+        {
+          "type": "string",
+          "name": "eventName"
+        },
+        {
+          "type": "string",
+          "name": "instructorNames"
+        },
+        {
+          "type": "string",
+          "name": "programsAndSections"
         },
         {
           "type": "uint256",

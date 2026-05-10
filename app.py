@@ -158,7 +158,7 @@ def send_student_attendance_receipt(
         tap_time, status, tx_hash, block_num,
         sess_id=None, nfc_id=None, semester=None, time_slot=None,
         enrollment_status='Regular', class_type='lecture',
-        event_description=None):
+        event_description=None, teachers_involved=None, programs_involved=None):
         """Send attendance receipt email to student."""
         _send_student_attendance_receipt_template(
                 student_name=student_name,
@@ -180,6 +180,8 @@ def send_student_attendance_receipt(
                 enrollment_status=enrollment_status,
                 class_type=class_type,
                 event_description=event_description,
+                teachers_involved=teachers_involved,
+                programs_involved=programs_involved,
         )
 
 def send_student_attendance_receipt_initial_tap(
@@ -188,7 +190,8 @@ def send_student_attendance_receipt_initial_tap(
         tap_time, status,
         semester=None, time_slot=None,
         enrollment_status='Regular', class_type='lecture',
-        nfc_id=None, event_description=None):
+        nfc_id=None, event_description=None,
+        teachers_involved=None, programs_involved=None):
         """Send INITIAL attendance receipt email to student (immediately after tap, without blockchain TX info)."""
         _send_student_attendance_receipt_initial_tap_template(
                 student_name=student_name,
@@ -206,6 +209,8 @@ def send_student_attendance_receipt_initial_tap(
                 class_type=class_type,
                 nfc_id=nfc_id,
                 event_description=event_description,
+                teachers_involved=teachers_involved,
+                programs_involved=programs_involved,
         )
 
 def send_teacher_session_summary(

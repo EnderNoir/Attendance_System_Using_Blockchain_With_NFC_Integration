@@ -593,8 +593,15 @@
             });
 
             document.getElementById('infoSectionName').innerHTML = scopeLines.length
-                ? scopeLines.map((v) => '<div>' + esc(v) + '</div>').join('')
+                ? scopeLines.map((v) => '<div style="margin-bottom:2px;">' + esc(v) + '</div>').join('')
                 : '—';
+            
+            // Sync teacher row to show all involved teachers
+            if (Array.isArray(s.teachers_involved) && s.teachers_involved.length > 0) {
+                document.getElementById('infoTeacherName').innerHTML = s.teachers_involved.map(t => '<div style="margin-bottom:2px;">' + esc(t) + '</div>').join('');
+            } else {
+                document.getElementById('infoTeacherName').textContent = s.teacher_name || '—';
+            }
         } else {
             document.getElementById('infoTeacherName').textContent = s.teacher_name || '—';
             document.getElementById('infoSectionName').textContent = (s.section_key || '').split('|').join(' · ');

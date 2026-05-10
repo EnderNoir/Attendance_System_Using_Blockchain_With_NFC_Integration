@@ -598,11 +598,17 @@ def format_session_log_data(class_type, session, student_records, is_school_even
     header += "============================================================\n\n"
 
     if class_type_norm in ('school_event', 'event'):
-        teachers = session.get('teacher_names', [session.get('teacher_name', '')])
-        if isinstance(teachers, str):
-            teachers = [teachers]
-        
-        instructor_lines = ', '.join([f"{mask_name(t.strip())}" for t in teachers if t.strip()])
+        # Collect teachers from session data
+        teachers_raw = session.get('teacher_names') or session.get('teacher_name') or ''
+        if isinstance(teachers_raw, str):
+            # Split by comma or semicolon if multiple names are in a single string
+            teachers = [t.strip() for t in re.split(r'[,;]', teachers_raw) if t.strip()]
+        elif isinstance(teachers_raw, list):
+            teachers = [str(t).strip() for t in teachers_raw if t]
+        else:
+            teachers = []
+            
+        instructor_lines = "\n".join([mask_name(t) for t in teachers])
         program_lines = session.get('program_sections_involved', '')
         
         log_data = header + f"""CLASS TYPE: SCHOOL EVENT
@@ -2261,6 +2267,25 @@ def _event_schedule_rows_for_teacher(username):
         years = sorted({str(sk).split('|')[1] for sk in section_keys if len(str(sk).split('|')) > 1 and str(sk).split('|')[1]})
         sections = sorted({str(sk).split('|')[2] for sk in section_keys if len(str(sk).split('|')) > 2 and str(sk).split('|')[2]})
 
+        # Build full program strings for involved metadata
+        programs_involved_full = []
+        for entry in ev.get('section_keys', []):
+            k = entry.get('key') if isinstance(entry, dict) else entry
+            sm = entry.get('semester') if isinstance(entry, dict) else ''
+            if k:
+                p = str(k).split('|')
+                prog = p[0] if p else ''
+                yr = p[1] if len(p) > 1 else ''
+                sec = p[2] if len(p) > 2 else ''
+                if yr.isdigit():
+                    suffixes = {1: '1st', 2: '2nd', 3: '3rd', 4: '4th'}
+                    yr = f"{suffixes.get(int(yr), yr)} Year"
+                line = f"{prog}-{yr}-{sec}"
+                sem_fmt = normalize_semester(sm)
+                if sem_fmt:
+                    line += f" {sem_fmt}"
+                programs_involved_full.append(line)
+
         section_key_set = set(section_keys)
         students_count = 0
         for st in db_get_all_students():
@@ -2291,7 +2316,7 @@ def _event_schedule_rows_for_teacher(username):
                 'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
                 'semester': normalize_semester(ev.get('semester', '')),
                 'teachers_involved': teachers_involved,
-                'programs_involved': programs,
+                'programs_involved': sorted(list(set(programs_involved_full))),
                 'years_involved': years,
                 'sections_involved': sections,
                 'section_keys_involved': section_keys,
@@ -3582,36 +3607,37 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         # ── Build logData using new format ─────────────────────────
         class_type_norm = str(class_type or 'lecture').strip().lower()
         
-        # Get session details for formatting
+        formatted_list = []
         if isinstance(section_key, list):
-            # For school events, list all involved sections specifically
-            unique_progs = sorted({str(sk).split('|')[0] for sk in section_key if sk})
-            unique_years = sorted({str(sk).split('|')[1] for sk in section_key if '|' in str(sk)})
-            unique_secs = sorted({str(sk).split('|')[2] for sk in section_key if len(str(sk).split('|')) > 2})
-            
-            prog_disp = "\n".join(unique_progs) if unique_progs else "—"
-            year_disp = "\n".join(unique_years) if unique_years else "—"
-            sec_disp = "\n".join(unique_secs) if unique_secs else "—"
-            
-            # Formatted list for metadata
-            formatted_list = []
-            for sk in section_key:
-                if not sk: continue
-                p = str(sk).split('|')
-                line = "-".join([x for x in p if x and x != '-'])
-                if semester and semester != '-':
-                    line += f" {semester}"
-                formatted_list.append(line)
-            sections_involved_text = "\n".join(sorted(set(formatted_list)))
+            for entry in section_key:
+                if not entry: continue
+                sk = entry.get('key') if isinstance(entry, dict) else entry
+                sm = entry.get('semester') if isinstance(entry, dict) else ''
+                if sk:
+                    p = str(sk).split('|')
+                    prog = p[0] if p else ''
+                    yr = p[1] if len(p) > 1 else ''
+                    sec = p[2] if len(p) > 2 else ''
+                    if yr.isdigit():
+                        suffixes = {1: '1st', 2: '2nd', 3: '3rd', 4: '4th'}
+                        yr = f"{suffixes.get(int(yr), yr)} Year"
+                    line = f"{prog}-{yr}-{sec}"
+                    sem_fmt = normalize_semester(sm)
+                    if sem_fmt: line += f" {sem_fmt}"
+                    formatted_list.append(line)
+            sections_involved_text = "\n".join(sorted(list(set(formatted_list))))
         else:
-            sk_disp = str(section_key or '')
-            parts = sk_disp.split('|')
-            prog_disp = parts[0] if len(parts) > 0 else '—'
-            year_disp = parts[1] if len(parts) > 1 else '—'
-            sec_disp = parts[2] if len(parts) > 2 else '—'
-            sections_involved_text = sk_disp.replace('|', ' ')
-            if semester and semester != '-':
-                sections_involved_text += f" {semester}"
+            sk_disp = str(section_key or '').replace('|', '-')
+            sem_fmt = normalize_semester(semester)
+            sections_involved_text = f"{sk_disp} {sem_fmt}" if sem_fmt else sk_disp
+
+        # Get individual components for summary (using first entry as base)
+        base_sk = (section_key[0] if isinstance(section_key, list) and section_key else section_key) or ''
+        if isinstance(base_sk, dict): base_sk = base_sk.get('key', '')
+        parts = str(base_sk).split('|')
+        prog_disp = parts[0] if len(parts) > 0 else '—'
+        year_disp = parts[1] if len(parts) > 1 else '—'
+        sec_disp = parts[2] if len(parts) > 2 else '—'
 
         session_data = {
             'subject_name': subject_name,
@@ -3620,7 +3646,7 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
             'program': prog_disp,
             'year_level': year_disp,
             'section': sec_disp,
-            'semester': semester or '—',
+            'semester': normalize_semester(semester) or '—',
             'session_date': '',
             'time_slot': time_slot or '—',
             'sections_involved': sections_involved_text
@@ -3719,10 +3745,15 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         
         # Collect all programs/sections for events
         if class_type_norm in ('school_event', 'event'):
-            # Use the detailed list built at the start if available, 
-            # otherwise fallback to student-based aggregation
-            if session_data.get('sections_involved'):
-                session_data['program_sections_involved'] = session_data['sections_involved']
+            # Use the detailed list built at the start if available
+            involved = session_data.get('sections_involved') or session_data.get('programs_involved')
+            if involved:
+                if isinstance(involved, list):
+                    # Remove duplicates and format
+                    unique_involved = sorted(list(set([str(p).replace('|', '-') for p in involved if p])))
+                    session_data['program_sections_involved'] = "\n".join(unique_involved)
+                else:
+                    session_data['program_sections_involved'] = str(involved).replace('|', '-')
             else:
                 ps_set = set()
                 for sr in student_records:
@@ -6112,16 +6143,26 @@ def api_session_attendance(sess_id):
                     tname = str((u or {}).get('full_name', uname) or '').strip()
                     if tname:
                         teachers_involved.append(tname)
+                
+                # Update event description from event record if missing
+                if not sess.get('event_description') and ev.get('description'):
+                    sess['event_description'] = ev.get('description')
 
-            # Build final display list
+            # Build final display list and remove duplicates
             for sk in sorted(section_keys):
                 if not sk: continue
                 sems = sorted(list(sk_sem_map.get(sk, [])))
                 if sems:
                     for sm in sems:
-                        section_display_list.append(f"{sk}|{sm}")
+                        item = f"{sk}|{sm}"
+                        if item not in section_display_list:
+                            section_display_list.append(item)
                 else:
-                    section_display_list.append(sk)
+                    if sk not in section_display_list:
+                        section_display_list.append(sk)
+            
+            # Remove duplicate teachers
+            teachers_involved = sorted(list(set([t for t in teachers_involved if t])))
         else:
             # Regular session
             sk = normalize_section_key(sess.get('section_key', ''))

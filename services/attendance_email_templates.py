@@ -108,7 +108,9 @@ def send_student_attendance_receipt(
     
     instructor_display = teacher_name or '—'
     if class_type == 'school_event' and teachers_involved:
-        instructor_display = "<br>".join([str(t) for t in teachers_involved])
+        # Remove duplicates
+        unique_teachers = sorted(list(set([str(t) for t in teachers_involved if t])))
+        instructor_display = "<br>".join(unique_teachers)
         
     tx_row = ''
     excuse_section = ''
@@ -328,6 +330,17 @@ def send_student_attendance_receipt_initial_tap(
     section_display = (section_key.replace('|', ' · ') if section_key else '—')
     if semester:
         section_display += f" · {semester}"
+    
+    if class_type == 'school_event' and programs_involved:
+        # Format list of sections with semester and remove duplicates
+        unique_programs = sorted(list(set([str(p).replace('|', ' · ') for p in programs_involved if p])))
+        section_display = "<br>".join(unique_programs)
+    
+    instructor_display = teacher_name or '—'
+    if class_type == 'school_event' and teachers_involved:
+        # Remove duplicates
+        unique_teachers = sorted(list(set([str(t) for t in teachers_involved if t])))
+        instructor_display = "<br>".join(unique_teachers)
 
     html = f'''<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head>
@@ -393,13 +406,13 @@ def send_student_attendance_receipt_initial_tap(
               <td style="padding:8px 12px;font-size:12px;color:#666;
                          border-bottom:1px solid #eee;">{ 'Program(s) and Section(s)' if class_type == 'school_event' else 'Section' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{section_display if class_type != 'school_event' else (", ".join(programs_involved) if programs_involved else section_display)}</td>
+                         border-bottom:1px solid #eee;">{section_display}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
                          border-bottom:1px solid #eee;">{ 'Teachers Involved' if class_type == 'school_event' else 'Instructor' }</td>
               <td style="padding:8px 12px;font-size:12px;color:#333;
-                         border-bottom:1px solid #eee;">{teacher_name if class_type != 'school_event' else (", ".join(teachers_involved) if teachers_involved else teacher_name)}</td>
+                         border-bottom:1px solid #eee;">{instructor_display}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;font-size:12px;color:#666;
@@ -520,11 +533,15 @@ def send_teacher_session_summary(
     # Teacher display for events
     teacher_disp = teacher_name
     if class_type == 'school_event' and teachers_involved:
-        teacher_disp = "<br>".join([str(t) for t in teachers_involved])
+        # Remove duplicates
+        unique_teachers = sorted(list(set([str(t) for t in teachers_involved if t])))
+        teacher_disp = "<br>".join(unique_teachers)
         
     # Section display for events
     if class_type == 'school_event' and programs_involved:
-        section_disp = "<br>".join([str(p).replace('|', ' · ') for p in programs_involved])
+        # Remove duplicates
+        unique_programs = sorted(list(set([str(p).replace('|', ' · ') for p in programs_involved if p])))
+        section_disp = "<br>".join(unique_programs)
         
     rows_html = ''
     for i, st in enumerate(student_rows):

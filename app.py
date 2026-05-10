@@ -166,7 +166,8 @@ def send_student_attendance_receipt_initial_tap(
         subject_name, section_key, teacher_name,
         tap_time, status,
         semester=None, time_slot=None,
-        enrollment_status='Regular', class_type='lecture'):
+        enrollment_status='Regular', class_type='lecture',
+        nfc_id=None):
         """Send INITIAL attendance receipt email to student (immediately after tap, without blockchain TX info)."""
         _send_student_attendance_receipt_initial_tap_template(
                 student_name=student_name,
@@ -182,6 +183,7 @@ def send_student_attendance_receipt_initial_tap(
                 time_slot=time_slot,
                 enrollment_status=enrollment_status,
                 class_type=class_type,
+                nfc_id=nfc_id,
         )
 
 def send_teacher_session_summary(
@@ -190,7 +192,7 @@ def send_teacher_session_summary(
         started_at, ended_at,
         present_count, late_count, absent_count, excused_count,
         student_rows, session_tx_hash=None, session_block_number=None,
-        course_code=None, semester=None):
+        course_code=None, semester=None, class_type='lecture'):
         """Send session summary email to teacher when session ends."""
         _send_teacher_session_summary_template(
                 teacher_email=teacher_email,
@@ -210,6 +212,7 @@ def send_teacher_session_summary(
                 send_email_fn=_send_email,
                 course_code=course_code,
                 semester=semester,
+                class_type=class_type,
         )
 
 
@@ -3503,6 +3506,13 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         student_records = []
         nfc_ids = []
         status_codes = []
+        student_names = []
+        student_ids = []
+        enrollment_statuses = []
+        status_labels = []
+        excused_reasons = []
+        tapped_timestamps = []
+        programs_sections_per_student = [] # for school events
         
         for item in students_data:
             # item format: (nfc_id, status, tap_time, excuse_note)
@@ -3512,33 +3522,54 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
             excuse_note = item[3] if len(item) > 3 else 'NONE'
             
             nfc_ids.append(nfc_id)
-            status_codes.append(chain_status_code(status))
+            status_code = chain_status_code(status)
+            status_codes.append(status_code)
             
             # Get student info
             st = get_student_by_nfc_cached(nfc_id)
-            student_name = st.get('full_name', 'Unknown') if st else 'Unknown'
-            student_id = st.get('student_id', '—') if st else '—'
-            enrollment_status = st.get('enrollment_status', 'Regular') if st else 'Regular'
-            program_section = build_student_section_key(st) if st else '—'
+            s_name = st.get('full_name', 'Unknown') if st else 'Unknown'
+            s_id = st.get('student_id', '—') if st else '—'
+            e_status = st.get('enrollment_status', 'Regular') if st else 'Regular'
+            p_section = build_student_section_key(st) if st else '—'
             
+            student_names.append(mask_name(s_name))
+            student_ids.append(s_id)
+            enrollment_statuses.append(e_status)
+            status_labels.append(status.upper())
+            excused_reasons.append(excuse_note if status.lower() == 'excused' else 'NONE')
+            programs_sections_per_student.append(p_section.replace('|', ' ') if p_section else '—')
+            
+            # Tapped timestamp
+            try:
+                if status.lower() in ('present', 'late') and tap_time_raw and tap_time_raw != '—':
+                    if ' ' in str(tap_time_raw):
+                        dt_tap = datetime.strptime(str(tap_time_raw), '%Y-%m-%d %H:%M:%S')
+                    else:
+                        dt_tap = datetime.strptime(str(tap_time_raw), '%H:%M:%S')
+                    tapped_timestamps.append(int(dt_tap.timestamp()))
+                else:
+                    tapped_timestamps.append(0)
+            except:
+                tapped_timestamps.append(0)
+
             # Format tap time for log
             tap_time_fmt = '—'
             if status.lower() in ('present', 'late') and tap_time_raw and tap_time_raw != '—':
                 try:
                     if ' ' in str(tap_time_raw):
-                        dt = datetime.strptime(str(tap_time_raw), '%Y-%m-%d %H:%M:%S')
+                        dt_log = datetime.strptime(str(tap_time_raw), '%Y-%m-%d %H:%M:%S')
                     else:
-                        dt = datetime.strptime(str(tap_time_raw), '%H:%M:%S')
-                    tap_time_fmt = dt.strftime('%I:%M %p').lstrip('0')
+                        dt_log = datetime.strptime(str(tap_time_raw), '%H:%M:%S')
+                    tap_time_fmt = dt_log.strftime('%I:%M %p').lstrip('0')
                 except:
                     tap_time_fmt = str(tap_time_raw)
             
             student_records.append({
                 'nfc_id': nfc_id,
-                'student_name': student_name,
-                'student_id': student_id,
-                'enrollment_status': enrollment_status,
-                'program_section': program_section,
+                'student_name': s_name,
+                'student_id': s_id,
+                'enrollment_status': e_status,
+                'program_section': p_section,
                 'status': status.lower(),
                 'tap_time': tap_time_fmt,
                 'excuse_reason': excuse_note if status.lower() == 'excused' else 'NONE',
@@ -3555,21 +3586,68 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
         # Use the new format_session_log_data function
         log_data = format_session_log_data(class_type_norm, session_data, student_records)
         
-        print(f"[BLOCKCHAIN] Recording session {session_id}: {len(nfc_ids)} students, Class Type: {class_type_norm}")
-        
-        tx_hash_obj = send_contract_tx(
-            contract.functions.recordSession(
-                session_id,
-                class_type_norm,
-                subject_name,
-                teacher_name,
-                start_ts,
-                end_ts,
-                nfc_ids,
-                status_codes,
-                log_data
-            )
-        )
+        # Call specific contract function
+        try:
+            if class_type_norm in ('school_event', 'event'):
+                tx_hash_obj = send_contract_tx(
+                    contract.functions.recordSchoolEventSession(
+                        session_id,
+                        subject_name, # event name
+                        teacher_name, # instructor names
+                        session_data.get('program_sections_involved', '—'),
+                        int(dt.timestamp()) if 'dt' in locals() else int(_now_local().timestamp()),
+                        time_slot or '—',
+                        start_ts,
+                        end_ts,
+                        nfc_ids,
+                        student_names,
+                        student_ids,
+                        enrollment_statuses,
+                        programs_sections_per_student,
+                        status_codes,
+                        status_labels,
+                        tapped_timestamps,
+                        log_data
+                    )
+                )
+            else:
+                tx_hash_obj = send_contract_tx(
+                    contract.functions.recordLectureSession(
+                        session_id,
+                        class_type_norm,
+                        subject_name,
+                        course_code or '—',
+                        teacher_name,
+                        session_data['program'],
+                        session_data['year_level'],
+                        session_data['section'],
+                        session_data['semester'],
+                        int(dt.timestamp()) if 'dt' in locals() else int(_now_local().timestamp()),
+                        time_slot or '—',
+                        start_ts,
+                        end_ts,
+                        nfc_ids,
+                        student_names,
+                        student_ids,
+                        enrollment_statuses,
+                        status_codes,
+                        status_labels,
+                        excused_reasons,
+                        tapped_timestamps,
+                        log_data
+                    )
+                )
+        except web3.exceptions.ABIFunctionNotFound as e:
+            # Fallback for older contract version if recordSession exists (unlikely given traceback, but safe)
+            try:
+                tx_hash_obj = send_contract_tx(
+                    contract.functions.recordSession(
+                        session_id, class_type_norm, subject_name, teacher_name,
+                        start_ts, end_ts, nfc_ids, status_codes, log_data
+                    )
+                )
+            except:
+                raise e
         
         if not tx_hash_obj:
             return None, None, "Transaction submission failed (send_contract_tx returned None)"

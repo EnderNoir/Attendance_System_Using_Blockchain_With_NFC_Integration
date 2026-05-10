@@ -3788,15 +3788,17 @@ def record_session_on_chain(session_id: str, subject_name: str, teacher_name: st
             # Handle Web3 exceptions by string checking if the module attribute lookup fails
             err_msg = str(e)
             if "ABIFunctionNotFound" in err_msg:
-            # Fallback for older contract version if recordSession exists (unlikely given traceback, but safe)
-            try:
-                tx_hash_obj = send_contract_tx(
-                    contract.functions.recordSession(
-                        session_id, class_type_norm, subject_name, teacher_name,
-                        start_ts, end_ts, nfc_ids, status_codes, log_data
+                # Fallback for older contract version if recordSession exists (unlikely given traceback, but safe)
+                try:
+                    tx_hash_obj = send_contract_tx(
+                        contract.functions.recordSession(
+                            session_id, class_type_norm, subject_name, teacher_name,
+                            start_ts, end_ts, nfc_ids, status_codes, log_data
+                        )
                     )
-                )
-            except:
+                except:
+                    raise e
+            else:
                 raise e
         
         if not tx_hash_obj:

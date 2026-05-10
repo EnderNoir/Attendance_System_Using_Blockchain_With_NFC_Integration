@@ -2118,8 +2118,15 @@ def _event_schedule_to_rows(event_row):
     start_at = str(event_row.get('start_at', '') or '').strip()
     end_at = str(event_row.get('end_at', '') or '').strip()
     teacher_usernames = list(event_row.get('teacher_usernames', []) or [])
-    section_keys = [normalize_section_key(s) for s in list(event_row.get('section_keys', []) or []) if str(s or '').strip()]
-    if not start_at or not end_at or not event_id or not section_keys:
+    raw_sections = event_row.get('section_keys', []) or []
+    section_data = []
+    for s in raw_sections:
+        if isinstance(s, dict):
+            section_data.append(s)
+        elif isinstance(s, str) and s.strip():
+            section_data.append({"key": normalize_section_key(s), "semester": event_row.get('semester', '1st Semester')})
+    
+    if not start_at or not end_at or not event_id or not section_data:
         return []
 
     try:
@@ -2140,20 +2147,23 @@ def _event_schedule_to_rows(event_row):
         teachers_involved.append(str(tu.get('full_name', u) or u).strip())
     teachers_involved = sorted({t for t in teachers_involved if t})
 
-    programs_involved = sorted({str(sk).split('|')[0] for sk in section_keys if '|' in str(sk) and str(sk).split('|')[0]})
-    years_involved = sorted({str(sk).split('|')[1] for sk in section_keys if len(str(sk).split('|')) > 1 and str(sk).split('|')[1]})
-    sections_involved = sorted({str(sk).split('|')[2] for sk in section_keys if len(str(sk).split('|')) > 2 and str(sk).split('|')[2]})
+    all_keys = [s.get('key') for s in section_data if s.get('key')]
+    programs_involved = sorted({str(sk).split('|')[0] for sk in all_keys if '|' in str(sk) and str(sk).split('|')[0]})
+    years_involved = sorted({str(sk).split('|')[1] for sk in all_keys if len(str(sk).split('|')) > 1 and str(sk).split('|')[1]})
+    sections_involved = sorted({str(sk).split('|')[2] for sk in all_keys if len(str(sk).split('|')) > 2 and str(sk).split('|')[2]})
 
     rows = []
     for teacher_username in teacher_usernames:
         teacher = (db_get_user(teacher_username) if teacher_username else {}) or {}
         teacher_name = teacher.get('full_name', teacher_username or 'Event Monitor')
-        for section_key in section_keys:
-            schedule_id = f"event:{event_id}:{teacher_username}:{normalize_section_key(section_key)}"
+        for s_obj in section_data:
+            section_key = normalize_section_key(s_obj.get('key', ''))
+            s_semester = s_obj.get('semester') or event_row.get('semester', '1st Semester')
+            schedule_id = f"event:{event_id}:{teacher_username}:{section_key}"
             rows.append(
                 {
                     'schedule_id': schedule_id,
-                    'section_key': normalize_section_key(section_key),
+                    'section_key': section_key,
                     'subject_id': f"event:{event_id}",
                     'subject_name': title,
                     'course_code': 'EVENT',
@@ -2172,7 +2182,7 @@ def _event_schedule_to_rows(event_row):
                     'event_date': start_dt.strftime('%Y-%m-%d'),
                     'event_start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
                     'event_end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                    'semester': event_row.get('semester', '1st Semester'),
+                    'semester': s_semester,
                     'teachers_involved': teachers_involved,
                     'programs_involved': programs_involved,
                     'years_involved': years_involved,
@@ -2412,12 +2422,25 @@ def db_get_event_schedule_by_id(event_id):
 def db_save_event_schedule(e: dict) -> str:
     now = _now_local().strftime('%Y-%m-%d %H:%M:%S')
     event_id = str(e.get('event_id') or str(uuid.uuid4())).strip()
+    # teacher_usernames remains a list of strings
     teacher_usernames = list(dict.fromkeys(
         str(u).strip() for u in e.get('teacher_usernames', []) if str(u).strip()
     ))
-    section_keys = list(dict.fromkeys(
-        normalize_section_key(s) for s in e.get('section_keys', []) if str(s).strip()
-    ))
+    # section_keys can be a list of strings or a list of dicts
+    section_keys = e.get('section_keys', [])
+    if not isinstance(section_keys, list):
+        section_keys = []
+    
+    # Normalize
+    processed_sections = []
+    for s in section_keys:
+        if isinstance(s, dict):
+            if s.get('key'):
+                s['key'] = normalize_section_key(s['key'])
+                processed_sections.append(s)
+        elif isinstance(s, str) and s.strip():
+            processed_sections.append({"key": normalize_section_key(s), "semester": e.get('semester', '1st Semester')})
+    section_keys = processed_sections
     title = str(e.get('title', '')).strip()
     description = str(e.get('description', '')).strip()
     start_at = str(e.get('start_at', '')).strip()
@@ -7440,7 +7463,18 @@ def admin_event_schedule_create():
         all_students = request.form.get('all_students') == 'on'
 
         teacher_usernames = _parse_csv_or_json('selected_teachers')
-        section_keys_raw = _parse_csv_or_json('selected_sections')
+        # This will now be a list of objects if it was JSON
+        raw_sections = request.form.get('selected_sections', '')
+        section_data = []
+        if raw_sections.startswith('['):
+            try:
+                section_data = json.loads(raw_sections)
+            except:
+                pass
+        else:
+            # Fallback for CSV
+            for k in [x.strip() for x in raw_sections.split(',') if x.strip()]:
+                section_data.append({"key": normalize_section_key(k), "semester": semester})
 
         if all_teachers:
             # Get all teachers (faculty role)
@@ -7450,7 +7484,8 @@ def admin_event_schedule_create():
         if all_students:
             # Get all unique section keys from students
             all_st = db_get_all_students()
-            section_keys_raw = list({f"{s.get('course')}|{s.get('year_level')}|{s.get('section')}" for s in all_st if s.get('course') and s.get('year_level') and s.get('section')})
+            unique_keys = list({f"{s.get('course')}|{s.get('year_level')}|{s.get('section')}" for s in all_st if s.get('course') and s.get('year_level') and s.get('section')})
+            section_data = [{"key": k, "semester": semester} for k in unique_keys]
 
         if not title:
             flash('Event title is required.', 'danger')
@@ -7487,7 +7522,7 @@ def admin_event_schedule_create():
                 'description': description,
                 'semester': semester,
                 'teacher_usernames': teacher_usernames,
-                'section_keys': section_keys,
+                'section_keys': section_data,
                 'start_at': start_dt.strftime('%Y-%m-%d %H:%M:%S'),
                 'end_at': end_dt.strftime('%Y-%m-%d %H:%M:%S'),
                 'created_by': session.get('username', ''),

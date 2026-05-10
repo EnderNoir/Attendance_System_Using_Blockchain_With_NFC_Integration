@@ -918,32 +918,37 @@
       showAppAlert('Please select a valid Program/Year/Section from existing sections.', 'Invalid Section');
       return;
     }
-    if (!eventSections.includes(sec)) {
-      eventSections.push(sec);
+    const semester = document.getElementById('eventSemester')?.value || '1st Semester';
+    if (!eventSections.some(s => s.key === sec && s.semester === semester)) {
+      eventSections.push({ key: sec, semester: semester });
       renderEventSections();
     }
     programInput.value = '';
     yearInput.value = '';
     sectionInput.value = '';
   }
-  function removeEventSection(sec) {
-    eventSections = eventSections.filter((s) => s !== sec);
+  function removeEventSection(secKey, sem) {
+    eventSections = eventSections.filter((s) => !(s.key === secKey && s.semester === sem));
     renderEventSections();
   }
   function renderEventSections() {
     const wrap = document.getElementById('eventSectionsTableWrap');
     const hidden = document.getElementById('eventSectionsHidden');
     if (!wrap || !hidden) return;
-    hidden.value = eventSections.join(',');
+    hidden.value = JSON.stringify(eventSections);
     if (!eventSections.length) {
       wrap.innerHTML = '';
       return;
     }
-    wrap.innerHTML = '<table class="ac-table"><thead><tr><th class="ac-th">Program</th><th class="ac-th">Year</th><th class="ac-th">Section</th><th class="ac-th">Action</th></tr></thead><tbody>' +
-      eventSections.map((sec) => {
-        const p = String(sec).split('|');
-        return '<tr><td class="ac-td">' + esc(p[0] || '') + '</td><td class="ac-td">' + esc(p[1] || '') + '</td><td class="ac-td">' + esc(p[2] || '') + '</td>' +
-          '<td class="ac-td"><button type="button" class="btn-outline" onclick="removeEventSection(\'' + esc(sec) + '\')">Remove</button></td></tr>';
+    wrap.innerHTML = '<table class="ac-table"><thead><tr><th class="ac-th">Program</th><th class="ac-th">Year</th><th class="ac-th">Section</th><th class="ac-th">Semester</th><th class="ac-th">Action</th></tr></thead><tbody>' +
+      eventSections.map((s) => {
+        const p = String(s.key).split('|');
+        return '<tr>' +
+          '<td class="ac-td">' + esc(p[0] || '') + '</td>' +
+          '<td class="ac-td">' + esc(p[1] || '') + '</td>' +
+          '<td class="ac-td">' + esc(p[2] || '') + '</td>' +
+          '<td class="ac-td">' + esc(s.semester || '') + '</td>' +
+          '<td class="ac-td"><button type="button" class="btn-outline" onclick="removeEventSection(\'' + esc(s.key) + '\', \'' + esc(s.semester) + '\')">Remove</button></td></tr>';
       }).join('') + '</tbody></table>';
   }
   function applyPreset(prefix, st, et) {
@@ -1183,10 +1188,16 @@
 
   function toggleEventAllTeachers() {
     const checked = !!document.getElementById('eventAllTeachers')?.checked;
-    const inputRow = document.getElementById('eventTeacherInput')?.closest('.mb-3');
+    // Only target the row with the input and add button
+    const inputRow = document.getElementById('eventTeacherInput')?.closest('div.mb-3')?.querySelector('div[style*="display:flex"]');
+    const teacherList = document.getElementById('eventTeachersList');
     if (inputRow) {
       inputRow.style.opacity = checked ? '0.5' : '1';
       inputRow.style.pointerEvents = checked ? 'none' : 'auto';
+    }
+    if (teacherList) {
+      teacherList.style.opacity = checked ? '0.5' : '1';
+      teacherList.style.pointerEvents = checked ? 'none' : 'auto';
     }
     if (checked) {
       eventTeachers = [];
@@ -1197,14 +1208,20 @@
   function toggleEventAllStudents() {
     const checked = !!document.getElementById('eventAllStudents')?.checked;
     const sectionFields = document.querySelector('#eventForm .section-fields');
-    const addButton = document.querySelector('#eventForm button[onclick="addEventSection()"]');
+    const addButtonRow = document.querySelector('#eventForm button[onclick="addEventSection()"]')?.closest('div[style*="display:flex"]');
+    const tableWrap = document.getElementById('eventSectionsTableWrap');
+
     if (sectionFields) {
       sectionFields.style.opacity = checked ? '0.5' : '1';
       sectionFields.style.pointerEvents = checked ? 'none' : 'auto';
     }
-    if (addButton) {
-      addButton.style.opacity = checked ? '0.5' : '1';
-      addButton.style.pointerEvents = checked ? 'none' : 'auto';
+    if (addButtonRow) {
+      addButtonRow.style.opacity = checked ? '0.5' : '1';
+      addButtonRow.style.pointerEvents = checked ? 'none' : 'auto';
+    }
+    if (tableWrap) {
+      tableWrap.style.opacity = checked ? '0.5' : '1';
+      tableWrap.style.pointerEvents = checked ? 'none' : 'auto';
     }
     if (checked) {
       eventSections = [];

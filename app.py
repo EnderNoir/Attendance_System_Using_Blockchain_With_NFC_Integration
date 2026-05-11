@@ -8164,6 +8164,139 @@ def _save_excuse_attachment(uploaded):
     uploaded.save(fpath)
     return fname
 
+
+# --- BLOCKCHAIN INTEGRITY AUDIT ---
+
+@app.route('/api/admin/audit_sessions', methods=['GET'])
+@admin_only
+def api_audit_sessions():
+    """
+    Scans all completed sessions with a blockchain TX and compares DB vs Blockchain.
+    """
+    if not (BLOCKCHAIN_ONLINE and contract):
+        return jsonify({'error': 'Blockchain system is offline.'}), 503
+
+    with get_db() as conn:
+        sessions = conn.execute(
+            "SELECT sess_id, subject_name, session_tx_hash, class_type "
+            "FROM sessions WHERE session_tx_hash IS NOT NULL AND session_tx_hash != '' "
+            "ORDER BY started_at DESC"
+        ).fetchall()
+
+    conflicts = []
+    scanned_count = 0
+
+    for s in sessions:
+        sess_id = s['sess_id']
+        tx_hash = s['session_tx_hash']
+        scanned_count += 1
+
+        try:
+            # Fetch blockchain records for this session
+            bc_records = contract.functions.getSessionAllAttendanceRecords(sess_id).call()
+            if not bc_records:
+                continue
+
+            # Fetch DB records
+            with get_db() as conn:
+                db_logs = conn.execute(
+                    "SELECT nfc_id, student_name, status FROM attendance_logs WHERE sess_id=?",
+                    (sess_id,)
+                ).fetchall()
+            
+            db_map = {lg['nfc_id']: lg['status'].lower() for lg in db_logs}
+
+            for bc in bc_records:
+                nfc_id = bc[0]
+                # Blockchain status is uint8: 1=present, 2=late, 3=absent, 4=excused
+                bc_status_code = bc[4]
+                bc_status = "absent"
+                if bc_status_code == 1: bc_status = "present"
+                elif bc_status_code == 2: bc_status = "late"
+                elif bc_status_code == 4: bc_status = "excused"
+                
+                db_status = db_map.get(nfc_id, "absent")
+
+                if db_status != bc_status:
+                    conflicts.append({
+                        'sess_id': sess_id,
+                        'subject_name': s['subject_name'],
+                        'class_type': s['class_type'],
+                        'student_name': bc[1],
+                        'nfc_id': nfc_id,
+                        'db_status': db_status,
+                        'bc_status': bc_status,
+                        'tx_hash': tx_hash
+                    })
+        except Exception as e:
+            print(f"[AUDIT] Error scanning session {sess_id}: {e}")
+
+    return jsonify({
+        'scanned': scanned_count,
+        'conflicts': conflicts,
+        'status': 'success'
+    })
+
+@app.route('/api/admin/resolve_tampering', methods=['POST'])
+@admin_only
+def api_resolve_tampering():
+    """
+    Reverts tampered DB records to match the Blockchain Source of Truth.
+    """
+    data = request.json or {}
+    conflicts = data.get('conflicts', [])
+    if not conflicts:
+        return jsonify({'error': 'No conflicts provided.'}), 400
+
+    resolved_count = 0
+    resolved_details = []
+
+    try:
+        with get_db() as conn:
+            for c in conflicts:
+                sess_id = c['sess_id']
+                nfc_id = c['nfc_id']
+                bc_status = c['bc_status']
+                
+                # Restore the record
+                conn.execute(
+                    "UPDATE attendance_logs SET status=? WHERE sess_id=? AND nfc_id=?",
+                    (bc_status, sess_id, nfc_id)
+                )
+                
+                # Update session totals
+                db_update_session_totals(sess_id)
+                resolved_count += 1
+                resolved_details.append(c)
+
+        # Send Notification Report
+        if resolved_count > 0:
+            send_audit_resolution_report(resolved_details)
+
+        return jsonify({
+            'status': 'success',
+            'resolved': resolved_count
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def send_audit_resolution_report(conflicts):
+    """
+    Sends an email alert to admin and faculty about detected and resolved tampering.
+    """
+    try:
+        with get_db() as conn:
+            users = conn.execute("SELECT email, full_name, role FROM accounts WHERE status='approved'").fetchall()
+        
+        recipients = [u['email'] for u in users if u['email']]
+        if not recipients: return
+
+        from services.attendance_email_templates import send_audit_resolution_email
+        send_audit_resolution_email(recipients, conflicts)
+    except Exception as e:
+        print(f"[EMAIL] Audit report failed: {e}")
+
+
 @app.route('/teacher/schedule')
 @staff_required
 def teacher_schedule():

@@ -8168,11 +8168,14 @@ def _save_excuse_attachment(uploaded):
 # --- BLOCKCHAIN INTEGRITY AUDIT ---
 
 @app.route('/api/admin/audit_sessions', methods=['GET'])
-@admin_only
+@login_required
 def api_audit_sessions():
     """
     Scans all completed sessions with a blockchain TX and compares DB vs Blockchain.
     """
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized access.'}), 403
+    
     if not (BLOCKCHAIN_ONLINE and contract):
         return jsonify({'error': 'Blockchain system is offline.'}), 503
 
@@ -8238,11 +8241,14 @@ def api_audit_sessions():
     })
 
 @app.route('/api/admin/resolve_tampering', methods=['POST'])
-@admin_only
+@login_required
 def api_resolve_tampering():
     """
     Reverts tampered DB records to match the Blockchain Source of Truth.
     """
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized access.'}), 403
+        
     data = request.json or {}
     conflicts = data.get('conflicts', [])
     if not conflicts:

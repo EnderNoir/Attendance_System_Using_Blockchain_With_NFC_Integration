@@ -8173,12 +8173,11 @@ def api_audit_sessions():
     """
     Scans all completed sessions with a blockchain TX and compares DB vs Blockchain.
     """
-    if session.get('role') != 'admin':
+    if session.get('role') not in ('admin', 'super_admin'):
         return jsonify({'error': 'Unauthorized access.'}), 403
     
     if not (BLOCKCHAIN_ONLINE and contract):
         return jsonify({'error': 'Blockchain system is offline.'}), 503
-
     with get_db() as conn:
         sessions = conn.execute(
             "SELECT sess_id, subject_name, session_tx_hash, class_type "
@@ -8246,7 +8245,7 @@ def api_resolve_tampering():
     """
     Reverts tampered DB records to match the Blockchain Source of Truth.
     """
-    if session.get('role') != 'admin':
+    if session.get('role') not in ('admin', 'super_admin'):
         return jsonify({'error': 'Unauthorized access.'}), 403
         
     data = request.json or {}

@@ -730,7 +730,8 @@
   /* Info rows */
   .pm-info-row {
     display: grid;
-    grid-template-columns: 132px 1fr;
+    grid-template-columns: 140px 1fr;
+    align-items: center;
     gap: 12px;
     padding: 12px 14px;
     border: 1.5px solid var(--border);

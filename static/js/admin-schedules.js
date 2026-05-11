@@ -425,8 +425,8 @@
       document.getElementById('infoSectionName').textContent = (s.section_key || '').split('|').join(' - ');
       document.querySelector('#infoSectionName').previousElementSibling.textContent = 'Section';
       document.getElementById('infoSemester').textContent = s.semester || 'Any Semester';
-      document.getElementById('infoGraceRow').style.display = 'flex';
-      document.getElementById('infoSemesterRow').style.display = 'flex';
+      document.getElementById('infoGraceRow').style.display = 'grid';
+      document.getElementById('infoSemesterRow').style.display = 'grid';
     }
     if (isSchoolEvent(s)) {
       document.getElementById('infoDayTime').textContent = (fmtEventDate(s.event_date) || DOW_NAMES[dayIdx]) + ' @ ' + fmtTime(to24h(s.start_time)) + ' - ' + fmtTime(to24h(s.end_time));
@@ -435,7 +435,7 @@
       const descRow = document.getElementById('infoDescriptionRow');
       if (descEl && descRow) {
         descEl.textContent = s.event_description || s.description || '-';
-        descRow.style.display = 'flex';
+        descRow.style.display = 'grid';
       }
     } else {
       document.getElementById('infoDayTime').textContent = DOW_NAMES[dayIdx] + ' @ ' + fmtTime(to24h(s.start_time)) + ' - ' + fmtTime(to24h(s.end_time));

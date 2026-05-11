@@ -8210,12 +8210,14 @@ def api_audit_sessions():
 
             for bc in bc_records:
                 nfc_id = bc[0]
-                # Blockchain status is uint8: 1=present, 2=late, 3=absent, 4=excused
                 bc_status_code = bc[4]
-                bc_status = "absent"
-                if bc_status_code == 1: bc_status = "present"
-                elif bc_status_code == 2: bc_status = "late"
-                elif bc_status_code == 4: bc_status = "excused"
+                
+                # Enum mapping based on chain_status_code
+                bc_status = "absent" # default fallback
+                if bc_status_code == 0: bc_status = "present"
+                elif bc_status_code == 1: bc_status = "late"
+                elif bc_status_code == 2: bc_status = "absent"
+                elif bc_status_code == 3: bc_status = "excused"
                 
                 db_status = db_map.get(nfc_id, "absent")
 

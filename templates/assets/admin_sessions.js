@@ -600,7 +600,7 @@ function showAuditResults(data) {
           <td><span class="att-status st-absent" style="text-transform:uppercase;font-size:10px;">${c.db_status}</span></td>
           <td><span class="att-status st-present" style="text-transform:uppercase;font-size:10px;background:var(--success);color:white;">${c.bc_status}</span></td>
           <td>
-            <button class="btn-rst" onclick="openSessModal('${c.sess_id}'); closeAuditModal();" style="padding:4px 8px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);cursor:pointer;">
+            <button class="btn-rst" onclick="openSessModal('${c.sess_id}');" style="padding:4px 8px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);cursor:pointer;">
               <i class="bi bi-eye"></i> View Session
             </button>
           </td>

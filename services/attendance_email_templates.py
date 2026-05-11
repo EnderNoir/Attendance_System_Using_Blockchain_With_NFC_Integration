@@ -759,7 +759,7 @@ def send_teacher_session_summary(
         html,
     )
 
-def send_audit_resolution_email(recipients, conflicts):
+def send_audit_resolution_email(recipients, conflicts, cfg):
     """
     Sends a high-priority alert about detected and resolved tampering.
     """
@@ -844,5 +844,6 @@ def send_audit_resolution_email(recipients, conflicts):
     send_email_async(
         recipients,
         "[DAVS] Blockchain Integrity Audit - Tampering Resolved",
-        html
+        html,
+        cfg
     )

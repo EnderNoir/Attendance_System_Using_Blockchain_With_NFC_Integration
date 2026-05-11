@@ -8303,8 +8303,11 @@ def send_audit_resolution_report(conflicts):
         recipients = [u['email'] for u in users if u['email']]
         if not recipients: return
 
+        from services.email_service import get_email_config
+        cfg = get_email_config(get_db)
+
         from services.attendance_email_templates import send_audit_resolution_email
-        send_audit_resolution_email(recipients, conflicts)
+        send_audit_resolution_email(recipients, conflicts, cfg)
     except Exception as e:
         print(f"[EMAIL] Audit report failed: {e}")
 

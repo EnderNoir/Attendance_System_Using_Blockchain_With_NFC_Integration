@@ -8222,12 +8222,16 @@ def api_audit_sessions():
                 db_status = db_map.get(nfc_id, "absent")
 
                 if db_status != bc_status:
+                    st = get_student_by_nfc_cached(nfc_id)
+                    student_number = st.get('student_id', '-') if st else '-'
+
                     conflicts.append({
                         'sess_id': sess_id,
                         'subject_name': s['subject_name'],
                         'class_type': s['class_type'],
                         'started_at': s['started_at'],
                         'student_name': bc[1],
+                        'student_id': student_number,
                         'nfc_id': nfc_id,
                         'db_status': db_status,
                         'bc_status': bc_status,

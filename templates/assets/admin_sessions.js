@@ -560,8 +560,8 @@ function showAuditResults(data) {
             <th>Session Tx</th>
             <th>Session Date</th>
             <th>Student Name</th>
-            <th>Local DB</th>
-            <th>Blockchain</th>
+            <th>PostgreSQL Database</th>
+            <th>Sepolia Blockchain</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -595,7 +595,7 @@ function showAuditResults(data) {
           </td>
           <td>
              <div style="font-weight:600;">${c.student_name}</div>
-             <div style="font-size:10px;font-family:monospace;color:var(--muted);">${c.nfc_id}</div>
+             <div style="font-size:10px;font-family:monospace;color:var(--muted);">${c.student_id} | ${c.nfc_id}</div>
           </td>
           <td><span class="att-status st-absent" style="text-transform:uppercase;font-size:10px;">${c.db_status}</span></td>
           <td><span class="att-status st-present" style="text-transform:uppercase;font-size:10px;background:var(--success);color:white;">${c.bc_status}</span></td>
@@ -631,9 +631,14 @@ function resolveAuditConflicts(conflicts) {
   .then(r => r.json())
   .then(data => {
     if (data.error) throw new Error(data.error);
-    alert(`Success! ${data.resolved} tampered records have been restored to their original blockchain state. Faculty and Admin have been notified.`);
     closeAuditModal();
-    window.location.reload();
+    if (typeof showAppSuccess === 'function') {
+      showAppSuccess(`${data.resolved} tampered records have been restored to their original blockchain state. Faculty and Admin have been notified.`, 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      alert(`Success! ${data.resolved} tampered records have been restored. Faculty and Admin notified.`);
+      window.location.reload();
+    }
   })
   .catch(err => {
     alert("Resolution failed: " + err.message);

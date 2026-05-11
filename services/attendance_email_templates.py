@@ -767,45 +767,62 @@ def send_audit_resolution_email(recipients, conflicts):
     
     rows_html = ""
     for c in conflicts:
+        date_fmt = '-'
+        if c.get('started_at'):
+            from datetime import datetime
+            try:
+                dt = datetime.strptime(c['started_at'], '%Y-%m-%d %H:%M:%S')
+                date_fmt = dt.strftime('%B %d, %Y')
+            except:
+                date_fmt = c['started_at']
+        
         rows_html += f"""
         <tr>
             <td style="padding:10px; border-bottom:1px solid #eee;">
                 <div style="font-weight:700;color:#1E4A1A;">{c['subject_name']}</div>
-                <div style="font-size:10px;color:#666;">ID: {c['sess_id'][:8]}...</div>
+                <div style="font-size:10px;color:#666;">{c.get('class_type', 'Lecture').title()}</div>
+            </td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+                <a href="https://sepolia.etherscan.io/tx/{c['tx_hash']}" style="font-size:10px;font-family:monospace;color:#2D6A27;text-decoration:none;">{c['tx_hash'][:10]}...</a>
+            </td>
+            <td style="padding:10px; border-bottom:1px solid #eee;">
+                <div style="font-size:10px;color:#444;">{date_fmt}</div>
             </td>
             <td style="padding:10px; border-bottom:1px solid #eee;">
                 <div style="font-weight:600;">{c['student_name']}</div>
-                <div style="font-size:10px;color:#666;">NFC: {c['nfc_id']}</div>
+                <div style="font-size:10px;color:#666;">{c.get('student_id', '-')} | {c['nfc_id']}</div>
             </td>
             <td style="padding:10px; border-bottom:1px solid #eee;">
-                <span style="color:#C0392B;font-weight:700;">{c['db_status'].upper()}</span>
+                <span style="color:#C0392B;font-weight:700;font-size:10px;">{c['db_status'].upper()}</span>
             </td>
             <td style="padding:10px; border-bottom:1px solid #eee;">
-                <span style="color:#2D6A27;font-weight:700;">{c['bc_status'].upper()}</span>
+                <span style="color:#2D6A27;font-weight:700;font-size:10px;">{c['bc_status'].upper()}</span>
             </td>
         </tr>
         """
 
     html = f'''
     <html><body style="font-family:sans-serif;background:#f4f7f6;padding:20px;">
-        <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #eee;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
-            <div style="background:#C0392B;padding:24px;text-align:center;color:#fff;">
-                <h2 style="margin:0;font-size:20px;letter-spacing:1px;">BLOCKCHAIN INTEGRITY ALERT</h2>
-                <p style="margin:8px 0 0;font-size:13px;opacity:0.9;">Tampering Detected & Resolved</p>
+        <div style="max-width:800px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #eee;box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+            <div style="background:#2D6A27;padding:24px;text-align:center;color:#fff;">
+                <h2 style="margin:0;font-size:20px;letter-spacing:1px;">BLOCKCHAIN INTEGRITY RESOLVED</h2>
+                <p style="margin:8px 0 0;font-size:13px;opacity:0.9;">Tampered Records Safely Restored</p>
             </div>
             <div style="padding:32px;">
                 <p style="font-size:14px;color:#444;line-height:1.6;">
-                    The system has detected discrepancies between the <strong>Local Database</strong> and the <strong>Immutable Blockchain Ledger</strong>. 
-                    Unauthorized changes were identified and have been automatically <strong>resolved</strong> to match the original blockchain record.
+                    The DAVS integrity scanner detected discrepancies between the <strong>PostgreSQL Database</strong> and the <strong>Sepolia Blockchain</strong>. 
+                    The unauthorized local changes have been successfully <strong>resolved and synced</strong> to perfectly match the immutable blockchain ledger below.
                 </p>
-                <div style="margin:24px 0;">
-                    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:8px;">
+                <div style="margin:24px 0; overflow-x:auto;">
+                    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:8px;min-width:600px;">
                         <thead style="background:#f8fafc;">
                             <tr>
                                 <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">SESSION</th>
+                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">TX HASH</th>
+                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">DATE</th>
                                 <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">STUDENT</th>
-                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">TAMPERED</th>
-                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">RESTORED</th>
+                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">LOCAL DB (TAMPERED)</th>
+                                <th style="padding:10px;text-align:left;font-size:11px;color:#64748b;">BLOCKCHAIN (RESTORED)</th>
                             </tr>
                         </thead>
                         <tbody>{rows_html}</tbody>
@@ -813,7 +830,7 @@ def send_audit_resolution_email(recipients, conflicts):
                 </div>
                 <div style="background:#f0f9ff;border-left:4px solid #0369a1;padding:16px;border-radius:4px;margin-bottom:24px;">
                     <p style="margin:0;font-size:12px;color:#0369a1;line-height:1.5;">
-                        <strong>Security Note:</strong> These records are now synchronized with the Sepolia blockchain. Any further unauthorized modification to the database will be flagged in the next audit scan.
+                        <strong>Status: Solved.</strong> These records are now synchronized with the Sepolia blockchain. The database is secure.
                     </p>
                 </div>
                 <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0;">
@@ -826,6 +843,6 @@ def send_audit_resolution_email(recipients, conflicts):
     
     send_email_async(
         recipients,
-        "[SECURITY] Blockchain Integrity Audit - Tampering Resolved",
+        "[DAVS] Blockchain Integrity Audit - Tampering Resolved",
         html
     )

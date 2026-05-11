@@ -226,6 +226,8 @@
       fetch('/api/my_profile', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
         var em = document.getElementById('pmEmail'); if (em && d.email) em.value = d.email;
         var ie = document.getElementById('pm_info_email'); if (ie) ie.textContent = d.email || '—';
+        var iu = document.getElementById('pm_info_username'); if (iu) iu.innerHTML = '<code>' + (d.username || '') + '</code>';
+        var eu = document.getElementById('pmUsername'); if (eu) eu.value = d.username || '';
         var rp = document.getElementById('pmRolePill'); if (rp) rp.textContent = (d.role || 'admin').toUpperCase();
         if (d.photo) { var url = '/static/uploads/' + d.photo + '?t=' + Date.now(); setAvatarImg('pmInfoAvatarWrap', url); setAvatarImg('pmEditAvatarWrap', url); }
       }).catch(function () { });
@@ -273,12 +275,14 @@
     }
     async function saveProfileModal() {
       var name = document.getElementById('pmName') ? document.getElementById('pmName').value.trim() : '';
+      var uname = document.getElementById('pmUsername') ? document.getElementById('pmUsername').value.trim() : '';
       var email = document.getElementById('pmEmail') ? document.getElementById('pmEmail').value.trim() : '';
       var pass = document.getElementById('pmPass') ? document.getElementById('pmPass').value : '';
       var pass2 = document.getElementById('pmPass2') ? document.getElementById('pmPass2').value : '';
       var otp = document.getElementById('pmOtp') ? document.getElementById('pmOtp').value.trim() : '';
       var msg = document.getElementById('pmMsg'); var ok = true;
       if (!name) { var el = document.getElementById('pmName'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmNameErr'); if (er) er.style.display = 'block'; ok = false; }
+      if (!uname) { var el = document.getElementById('pmUsername'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmUsernameErr'); if (er) er.style.display = 'block'; ok = false; }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { var el = document.getElementById('pmEmail'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmEmailErr'); if (er) er.style.display = 'block'; ok = false; }
       if (pass && pass.length < 6) { var el = document.getElementById('pmPass'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmPassErr'); if (er) er.style.display = 'block'; ok = false; }
       if (pass && pass2 && pass !== pass2) { var er = document.getElementById('pmPass2Err'); if (er) er.style.display = 'block'; ok = false; }
@@ -286,7 +290,7 @@
       if (!ok) return;
       if (pmStagedFile) { var fd = new FormData(); fd.append('photo', pmStagedFile); fd.append('person_id', '{{ session.get("username","") }}'); try { var pr = await fetch('/upload_photo', { method: 'POST', credentials: 'same-origin', body: fd }); var pd = await pr.json(); if (pd.ok) { setSidebarPhoto(pd.url); setAvatarImg('pmInfoAvatarWrap', pd.url + '?t=' + Date.now()); } } catch (e) { console.warn(e); } pmStagedFile = null; }
       try {
-        var r = await fetch('/update_profile', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: name, email: email, password: pass || undefined, password_otp: pass ? otp : undefined }) });
+        var r = await fetch('/update_profile', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: name, new_username: uname, email: email, password: pass || undefined, password_otp: pass ? otp : undefined }) });
         var d = await r.json(); if (msg) msg.style.display = 'block';
         if (d.ok) {
           if (msg) { msg.style.color = 'var(--success)'; msg.textContent = '✓ Profile saved!'; }
@@ -294,6 +298,7 @@
           var dn = document.getElementById('pmDisplayName'); if (dn) dn.textContent = d.full_name;
           var ni = document.getElementById('pm_info_name'); if (ni) ni.textContent = d.full_name;
           var ei = document.getElementById('pm_info_email'); if (ei && email) ei.textContent = email;
+          var ui = document.getElementById('pm_info_username'); if (ui) ui.innerHTML = '<code>' + (d.username || uname) + '</code>';
           setTimeout(function () { closePM(); if (msg) msg.style.display = 'none'; }, 1400);
         } else { if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Error saving.'; } }
       } catch (e) { if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = 'Network error.'; } }

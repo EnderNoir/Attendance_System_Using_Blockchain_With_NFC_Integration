@@ -8180,7 +8180,7 @@ def api_audit_sessions():
         return jsonify({'error': 'Blockchain system is offline.'}), 503
     with get_db() as conn:
         sessions = conn.execute(
-            "SELECT sess_id, subject_name, session_tx_hash, class_type "
+            "SELECT sess_id, subject_name, session_tx_hash, class_type, started_at "
             "FROM sessions WHERE session_tx_hash IS NOT NULL AND session_tx_hash != '' "
             "ORDER BY started_at DESC"
         ).fetchall()
@@ -8224,6 +8224,7 @@ def api_audit_sessions():
                         'sess_id': sess_id,
                         'subject_name': s['subject_name'],
                         'class_type': s['class_type'],
+                        'started_at': s['started_at'],
                         'student_name': bc[1],
                         'nfc_id': nfc_id,
                         'db_status': db_status,

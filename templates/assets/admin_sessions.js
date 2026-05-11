@@ -495,24 +495,38 @@ function resetEnded() {
 /** 
  * --- BLOCKCHAIN INTEGRITY AUDIT ---
  */
+let auditAbortController = null;
+
 function runBlockchainAudit() {
   const overlay = document.getElementById('auditOverlay');
   overlay.style.display = 'flex';
   overlay.classList.add('show');
 
-  fetch('/api/admin/audit_sessions')
+  auditAbortController = new AbortController();
+
+  fetch('/api/admin/audit_sessions', { signal: auditAbortController.signal })
     .then(r => r.json())
     .then(data => {
       if (data.error) throw new Error(data.error);
       showAuditResults(data);
     })
     .catch(err => {
-      alert("Audit failed: " + err.message);
+      if (err.name === 'AbortError') {
+        console.log('Audit cancelled by user.');
+      } else {
+        alert("Audit failed: " + err.message);
+      }
     })
     .finally(() => {
       overlay.classList.remove('show');
       setTimeout(() => overlay.style.display = 'none', 300);
     });
+}
+
+function cancelAudit() {
+  if (auditAbortController) {
+    auditAbortController.abort();
+  }
 }
 
 function showAuditResults(data) {
@@ -543,20 +557,41 @@ function showAuditResults(data) {
         <thead>
           <tr>
             <th>Session / Event</th>
-            <th>Student</th>
+            <th>Session Tx</th>
+            <th>Session Date</th>
+            <th>Student Name</th>
             <th>Local DB</th>
             <th>Blockchain</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
     `;
     
     conflicts.forEach(c => {
+      let dateFmt = '-';
+      if (c.started_at) {
+        try {
+          const d = new Date(c.started_at.replace(' ', 'T'));
+          dateFmt = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        } catch (e) {
+          dateFmt = c.started_at;
+        }
+      }
+      
       html += `
         <tr>
           <td>
             <div style="font-weight:600;">${c.subject_name}</div>
-            <div style="font-size:10px;color:var(--muted);">${c.sess_id.substring(0,8)}...</div>
+            <div style="font-size:10px;color:var(--muted);">${c.class_type || 'Lecture'}</div>
+          </td>
+          <td>
+            <a href="https://sepolia.etherscan.io/tx/${c.tx_hash}" target="_blank" style="font-size:10px;font-family:monospace;color:var(--accent);text-decoration:none;">
+              ${c.tx_hash.substring(0,10)}... <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+          </td>
+          <td>
+            <div style="font-size:10px;color:var(--foreground);">${dateFmt}</div>
           </td>
           <td>
              <div style="font-weight:600;">${c.student_name}</div>
@@ -564,6 +599,11 @@ function showAuditResults(data) {
           </td>
           <td><span class="att-status st-absent" style="text-transform:uppercase;font-size:10px;">${c.db_status}</span></td>
           <td><span class="att-status st-present" style="text-transform:uppercase;font-size:10px;background:var(--success);color:white;">${c.bc_status}</span></td>
+          <td>
+            <button class="btn-rst" onclick="openSessModal('${c.sess_id}'); closeAuditModal();" style="padding:4px 8px;font-size:10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);cursor:pointer;">
+              <i class="bi bi-eye"></i> View Session
+            </button>
+          </td>
         </tr>
       `;
     });

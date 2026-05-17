@@ -2416,6 +2416,19 @@ def db_delete_schedule(schedule_id):
                     "UPDATE event_schedules SET is_active=0, updated_at=? WHERE event_id=?",
                     (now, event_id)
                 )
+            # Also finalize any active sessions associated with this event so
+            # automation won't continue to consider them active.
+            try:
+                sids = _event_related_session_ids(schedule_id, include_ended=False)
+                for sid in sids:
+                    try:
+                        _finalize_session(sid, ended_time=now, async_chain_and_email=True)
+                    except Exception as e:
+                        print(f"[AUTO] Failed to finalize session {sid} for event {event_id}: {e}")
+                if sids:
+                    print(f"[AUTO] Ended {len(sids)} active session(s) for event {event_id}")
+            except Exception as e:
+                print(f"[AUTO] Error checking sessions for event {event_id}: {e}")
         return
 
     with get_db() as conn:
@@ -2869,6 +2882,16 @@ def check_and_start_scheduled_sessions():
             }
             save_session(sess_id, new_sess)
             print(f"[AUTO EVENT] Started unified session {sess_id} for event {ev.get('event_id')}")
+            # Archive the event so it only runs once and won't be re-triggered
+            try:
+                with get_db() as conn:
+                    conn.execute(
+                        "UPDATE event_schedules SET is_active=0, updated_at=? WHERE event_id=?",
+                        (now_dt.strftime('%Y-%m-%d %H:%M:%S'), str(ev.get('event_id') or '')),
+                    )
+                print(f"[AUTO EVENT] Archived event {ev.get('event_id')}")
+            except Exception as e:
+                print(f"[AUTO EVENT] Failed to archive event {ev.get('event_id')}: {e}")
 
         # 2. End sessions that passed their auto_end_at
         for sid, asess in active_sessions.items():

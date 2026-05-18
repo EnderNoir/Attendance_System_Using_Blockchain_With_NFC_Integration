@@ -432,7 +432,7 @@ function openPM() {
       if (ie) ie.textContent = d.email || "—";
       var username = stripUsernamePrefix(d.username || "");
       var iu = document.getElementById("pm_info_username");
-      if (iu) iu.innerHTML = "<code>@" + username + "</code>";
+      if (iu) iu.textContent = "@" + username;
       var eu = document.getElementById("pmUsername");
       if (eu) eu.value = username;
       var rp = document.getElementById("pmRolePill");
@@ -660,9 +660,7 @@ async function saveProfileModal() {
       var ei = document.getElementById("pm_info_email");
       if (ei && email) ei.textContent = email;
       var ui = document.getElementById("pm_info_username");
-      if (ui)
-        ui.innerHTML =
-          "<code>@" + stripUsernamePrefix(d.username || uname) + "</code>";
+      if (ui) ui.textContent = "@" + stripUsernamePrefix(d.username || uname);
       setTimeout(function () {
         closePM();
         if (msg) msg.style.display = "none";
@@ -711,7 +709,7 @@ function openTPM() {
       if (ie) ie.textContent = d.email || "—";
       var username = stripUsernamePrefix(d.username || "");
       var iu = document.getElementById("tpm_info_username");
-      if (iu) iu.innerHTML = "<code>@" + username + "</code>";
+      if (iu) iu.textContent = "@" + username;
       var eu = document.getElementById("tpmUsername");
       if (eu) eu.value = username;
       var sw = document.getElementById("tpm_info_sections_wrap");
@@ -880,7 +878,7 @@ async function saveTeacherProfile() {
       var ei = document.getElementById("tpm_info_email");
       if (ei && email) ei.textContent = email;
       var ui = document.getElementById("tpm_info_username");
-      if (ui) ui.innerHTML = "<code>@" + uname + "</code>";
+      if (ui) ui.textContent = "@" + uname;
       setTimeout(function () {
         closeTPM();
         if (msg) msg.style.display = "none";

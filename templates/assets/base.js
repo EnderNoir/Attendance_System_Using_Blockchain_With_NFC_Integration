@@ -402,6 +402,10 @@ function buildSectionsTable(s) {
   return buildSectionAccordion(s);
 }
 
+function stripUsernamePrefix(uname) {
+  return (uname || "").replace(/^@+/, "");
+}
+
 /* ══ ADMIN PROFILE MODAL ══ */
 var pmStagedFile = null;
 function openPM() {
@@ -426,10 +430,11 @@ function openPM() {
       if (em && d.email) em.value = d.email;
       var ie = document.getElementById("pm_info_email");
       if (ie) ie.textContent = d.email || "—";
+      var username = stripUsernamePrefix(d.username || "");
       var iu = document.getElementById("pm_info_username");
-      if (iu) iu.innerHTML = "<code>@" + (d.username || "") + "</code>";
+      if (iu) iu.innerHTML = "<code>@" + username + "</code>";
       var eu = document.getElementById("pmUsername");
-      if (eu) eu.value = d.username || "";
+      if (eu) eu.value = username;
       var rp = document.getElementById("pmRolePill");
       if (rp) rp.textContent = (d.role || "admin").toUpperCase();
       if (d.photo) {
@@ -605,6 +610,7 @@ async function saveProfileModal() {
     ok = false;
   }
   if (!ok) return;
+  uname = stripUsernamePrefix(uname);
   if (pmStagedFile) {
     var fd = new FormData();
     fd.append("photo", pmStagedFile);
@@ -654,7 +660,9 @@ async function saveProfileModal() {
       var ei = document.getElementById("pm_info_email");
       if (ei && email) ei.textContent = email;
       var ui = document.getElementById("pm_info_username");
-      if (ui) ui.innerHTML = "<code>@" + (d.username || uname) + "</code>";
+      if (ui)
+        ui.innerHTML =
+          "<code>@" + stripUsernamePrefix(d.username || uname) + "</code>";
       setTimeout(function () {
         closePM();
         if (msg) msg.style.display = "none";
@@ -701,10 +709,11 @@ function openTPM() {
       if (em && d.email) em.value = d.email;
       var ie = document.getElementById("tpm_info_email");
       if (ie) ie.textContent = d.email || "—";
+      var username = stripUsernamePrefix(d.username || "");
       var iu = document.getElementById("tpm_info_username");
-      if (iu) iu.innerHTML = "<code>@" + d.username + "</code>";
+      if (iu) iu.innerHTML = "<code>@" + username + "</code>";
       var eu = document.getElementById("tpmUsername");
-      if (eu) eu.value = d.username || "";
+      if (eu) eu.value = username;
       var sw = document.getElementById("tpm_info_sections_wrap");
       if (sw) sw.innerHTML = buildSectionAccordion(d.sections || []);
       if (d.photo) {
@@ -821,6 +830,7 @@ async function saveTeacherProfile() {
     ok = false;
   }
   if (!ok) return;
+  uname = stripUsernamePrefix(uname);
   if (tpmStagedFile) {
     var fd = new FormData();
     fd.append("photo", tpmStagedFile);

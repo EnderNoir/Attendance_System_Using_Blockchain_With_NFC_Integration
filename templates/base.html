@@ -158,7 +158,7 @@
                 <span class="pm-info-lbl">Username</span
                 ><span class="pm-info-val"
                   ><code id="pm_info_username"
-                    >@{{ session.get('username','') }}</code
+                    >@{{ session.get('username','')|trim('@') }}</code
                   ></span
                 >
               </div>
@@ -593,7 +593,9 @@
               <div class="pm-info-row">
                 <span class="pm-info-lbl">Username</span
                 ><span class="pm-info-val" id="tpm_info_username"
-                  ><code>@{{ session.get('username','') }}</code></span
+                  ><code
+                    >@{{ session.get('username','')|trim('@') }}</code
+                  ></span
                 >
               </div>
               <div class="pm-info-row">

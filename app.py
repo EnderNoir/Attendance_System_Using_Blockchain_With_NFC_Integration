@@ -5211,95 +5211,110 @@ def api_move_up_all_students():
 @admin_required
 def register():
     if request.method == 'POST':
-        nfc_id = request.form['nfc_id'].strip().upper()
-        
-        fname = request.form.get('first_name', '').strip()
-        mi = request.form.get('middle_initial', '').strip()
-        lname = request.form.get('last_name', '').strip()
-        name = f"{fname} {mi} {lname}".replace('  ', ' ').strip()
+        try:
+            # Validate NFC ID
+            nfc_id = request.form.get('nfc_id', '').strip().upper()
+            if not nfc_id:
+                flash('⚠ NFC ID is required. Please tap an NFC card on the reader.', 'error')
+                return render_template('enroll.html', subjects_db=db_get_all_subjects(), users_db=db_get_all_users())
+            
+            fname = request.form.get('first_name', '').strip()
+            mi = request.form.get('middle_initial', '').strip()
+            lname = request.form.get('last_name', '').strip()
+            name = f"{fname} {mi} {lname}".replace('  ', ' ').strip()
 
-        # ── Check for duplicate NFC ID ──────────────────────────────────
-        existing_student = db_get_student(nfc_id)
-        if existing_student:
-            flash(f'⚠ NFC ID {nfc_id} is already registered to {existing_student.get("full_name", "Unknown")}. Use a different NFC card or update the existing student.', 'warning')
+            # ── Check for duplicate NFC ID ──────────────────────────────────
+            existing_student = db_get_student(nfc_id)
+            if existing_student:
+                flash(f'⚠ NFC ID {nfc_id} is already registered to {existing_student.get("full_name", "Unknown")}. Use a different NFC card or update the existing student.', 'warning')
+                return render_template('enroll.html', subjects_db=db_get_all_subjects(), users_db=db_get_all_users())
+            
+            extras = []
+            raw_date = request.form.get('date_registered','').strip()
+            if raw_date:
+                try:
+                    d = datetime.strptime(raw_date, '%Y-%m-%d')
+                    raw_date = d.strftime('%B %Y')
+                except:
+                    try:
+                        d = datetime.strptime(raw_date, '%Y-%m')
+                        raw_date = d.strftime('%B %Y')
+                    except:
+                        raw_date = raw_date or ''
+            section_val = request.form.get('section','').strip().upper()
+            
+            # Generate CVSU email if not provided or empty
+            email_val = request.form.get('email','').strip()
+            if not email_val:
+                # Generate CVSU pattern email: sc.firstname.lastname@cvsu.edu.ph
+                clean = re.sub(r'\b[A-Za-z]\.\s*', '', name).strip()
+                clean = re.sub(r'\b(JR|SR|II|III|IV)\.?\b', '', clean, flags=re.IGNORECASE).strip()
+                clean = re.sub(r'\s+', ' ', clean)
+                words = clean.split()
+                if len(words) >= 2:
+                    first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
+                    last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
+                    if first_slug and last_slug:
+                        email_val = f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
+            
+            for k,prefix in [('student_id','ID'),('course','Course'),('year_level','Year'),
+                              ('adviser','Adviser'),('contact','Tel'),
+                              ('semester','Sem'),('school_year','SY')]:
+                v = request.form.get(k,'').strip()
+                if v: extras.append(f"{prefix}:{v}")
+            
+            # Add generated/provided email
+            if email_val: extras.append(f"Email:{email_val}")
+            if section_val: extras.append(f"Sec:{section_val}")
+            if raw_date: extras.append(f"RegDate:{raw_date}")
+            major = request.form.get('major','').strip() or 'N/A'
+            extras.append(f"Major:{major}")
+            on_chain = name + (' | ' + ' | '.join(extras) if extras else '')
+            p = parse_student(on_chain)
+            student_name_map[nfc_id] = name
+            # ── Blockchain Registration (DISABLED for Profiles) ─────────────
+            # Only attendance is recorded on-chain now to support NFC recycling.
+            student_address = request.form.get('eth_address', '0x0000000000000000000000000000000000000000').strip() or '0x0000000000000000000000000000000000000000'
+            enrollment_status_val = request.form.get('enrollment_status', 'Regular').strip()
+
+            db_save_student({
+                **p,
+                'nfcId': nfc_id,
+                'name': name,
+                'first_name': fname,
+                'middle_initial': mi,
+                'last_name': lname,
+                'date_registered': raw_date,
+                'address': student_address,
+                'enrollment_status': enrollment_status_val
+            })
+            send_student_welcome_email(
+                student_name=name,
+                student_email=email_val,
+                nfc_id=nfc_id,
+                student_id=request.form.get('student_id', '').strip(),
+                course=request.form.get('course', '').strip(),
+                year_level=request.form.get('year_level', '').strip(),
+                section=section_val,
+            )
+            photo_file = request.files.get('student_photo')
+            if photo_file and photo_file.filename:
+                ext = os.path.splitext(photo_file.filename)[1].lower()
+                if ext in ('.jpg','.jpeg','.png','.gif','.webp'):
+                    fname = f"photo_{nfc_id.replace(' ','_')}{ext}"
+                    photo_file.save(os.path.join(UPLOAD_FOLDER, fname))
+                    db_save_photo(nfc_id, fname)
+            saved_subj = _register_save_pending_subjects(request, session)
+            if saved_subj:
+                print(f"[INFO] {saved_subj} subject(s) added to catalogue from registration.")
+            flash(f'Student {name} registered successfully.')
+            return redirect(url_for('index'))
+        except Exception as e:
+            import traceback
+            tb = traceback.format_exc()
+            print(f'[ENROLL ERROR]\n{tb}')
+            flash(f'Error registering student: {str(e)}', 'error')
             return render_template('enroll.html', subjects_db=db_get_all_subjects(), users_db=db_get_all_users())
-        
-        extras = []
-        raw_date = request.form.get('date_registered','').strip()
-        if raw_date:
-            try:
-                d = datetime.strptime(raw_date, '%Y-%m')
-                raw_date = d.strftime('%B %Y')
-            except:
-                pass
-        section_val = request.form.get('section','').strip().upper()
-        
-        # Generate CVSU email if not provided or empty
-        email_val = request.form.get('email','').strip()
-        if not email_val:
-            # Generate CVSU pattern email: sc.firstname.lastname@cvsu.edu.ph
-            clean = re.sub(r'\b[A-Za-z]\.\s*', '', name).strip()
-            clean = re.sub(r'\b(JR|SR|II|III|IV)\.?\b', '', clean, flags=re.IGNORECASE).strip()
-            clean = re.sub(r'\s+', ' ', clean)
-            words = clean.split()
-            if len(words) >= 2:
-                first_slug = ''.join(re.sub(r'[^a-z]', '', w.lower()) for w in words[:-1])
-                last_slug  = re.sub(r'[^a-z]', '', words[-1].lower())
-                if first_slug and last_slug:
-                    email_val = f'sc.{first_slug}.{last_slug}@cvsu.edu.ph'
-        
-        for k,prefix in [('student_id','ID'),('course','Course'),('year_level','Year'),
-                          ('adviser','Adviser'),('contact','Tel'),
-                          ('semester','Sem'),('school_year','SY')]:
-            v = request.form.get(k,'').strip()
-            if v: extras.append(f"{prefix}:{v}")
-        
-        # Add generated/provided email
-        if email_val: extras.append(f"Email:{email_val}")
-        if section_val: extras.append(f"Sec:{section_val}")
-        if raw_date: extras.append(f"RegDate:{raw_date}")
-        major = request.form.get('major','').strip() or 'N/A'
-        extras.append(f"Major:{major}")
-        on_chain = name + (' | ' + ' | '.join(extras) if extras else '')
-        p = parse_student(on_chain)
-        student_name_map[nfc_id] = name
-        # ── Blockchain Registration (DISABLED for Profiles) ─────────────
-        # Only attendance is recorded on-chain now to support NFC recycling.
-        student_address = request.form.get('eth_address', '0x0000000000000000000000000000000000000000').strip() or '0x0000000000000000000000000000000000000000'
-        enrollment_status_val = request.form.get('enrollment_status', 'Regular').strip()
-
-        db_save_student({
-            **p,
-            'nfcId': nfc_id,
-            'name': name,
-            'first_name': fname,
-            'middle_initial': mi,
-            'last_name': lname,
-            'date_registered': raw_date,
-            'address': student_address,
-            'enrollment_status': enrollment_status_val
-        })
-        send_student_welcome_email(
-            student_name=name,
-            student_email=email_val,
-            nfc_id=nfc_id,
-            student_id=request.form.get('student_id', '').strip(),
-            course=request.form.get('course', '').strip(),
-            year_level=request.form.get('year_level', '').strip(),
-            section=section_val,
-        )
-        photo_file = request.files.get('student_photo')
-        if photo_file and photo_file.filename:
-            ext = os.path.splitext(photo_file.filename)[1].lower()
-            if ext in ('.jpg','.jpeg','.png','.gif','.webp'):
-                fname = f"photo_{nfc_id.replace(' ','_')}{ext}"
-                photo_file.save(os.path.join(UPLOAD_FOLDER, fname))
-                db_save_photo(nfc_id, fname)
-        saved_subj = _register_save_pending_subjects(request, session)
-        if saved_subj:
-            print(f"[INFO] {saved_subj} subject(s) added to catalogue from registration.")
-        flash(f'Student {name} registered successfully.')
-        return redirect(url_for('index'))
     return render_template('enroll.html', subjects_db=db_get_all_subjects(), users_db=db_get_all_users())
 
 
@@ -5366,148 +5381,175 @@ def batch_register():
                                subjects_db=db_get_all_subjects(),
                                users_db=db_get_all_users())
  
-    # POST: receive JSON list of students with nfc_id already assigned
-    students_json = request.form.get('students_data', '[]')
     try:
-        students_in = json.loads(students_json)
-    except Exception:
-        flash('Invalid student data payload.')
-        return redirect(url_for('batch_register'))
- 
-    # Filter to only students that have an nfc_id (skipped ones are excluded)
-    students_in = [s for s in students_in if s.get('nfc_id')]
- 
-    success_count  = 0
-    errors         = []
-    subjects_saved = 0
- 
-    # ── Save all subjects across all students to the catalogue ────────────
-    existing_subj  = db_get_all_subjects()
-    existing_codes = {
-        v.get('course_code', '').upper(): k
-        for k, v in existing_subj.items()
-        if v.get('course_code')
-    }
-    for student in students_in:
-        for subj in (student.get('subjects') or []):
-            code_upper = (subj.get('course_code') or '').upper().strip()
-            name_val   = (subj.get('name') or '').strip()
-            if not name_val:
-                continue
-            if code_upper and code_upper in existing_codes:
-                continue
-            new_id = str(uuid.uuid4())[:8]
-            db_save_subject(new_id, {
-                'name':        name_val,
-                'course_code': subj.get('course_code', ''),
-                'units':       str(subj.get('units', '3')),
-                'created_by':  session.get('username', 'admin'),
-                'created_at':  _now_local().strftime('%Y-%m-%d %H:%M:%S'),
-            })
-            if code_upper:
-                existing_codes[code_upper] = new_id
-            subjects_saved += 1
- 
-    # ── Register each student ─────────────────────────────────────────────
-    for student in students_in:
+        # POST: receive JSON list of students with nfc_id already assigned
+        students_json = request.form.get('students_data', '[]')
         try:
-            nfc_id = student.get('nfc_id', '').strip().upper()
-            name   = (student.get('name') or '').strip()
- 
-            if not nfc_id:
-                errors.append(f"Missing NFC ID for {name or 'Unknown'}")
-                continue
-            if not name:
-                errors.append(f"Missing name for NFC {nfc_id}")
-                continue
-            
-            # ── Check for duplicate NFC ID ──────────────────────────────
-            existing_student = db_get_student(nfc_id)
-            if existing_student:
-                errors.append(f"NFC ID {nfc_id} is already registered to {existing_student.get('full_name', 'Unknown')}. Skipped.")
-                continue
+            students_in = json.loads(students_json)
+        except Exception as json_err:
+            flash(f'Invalid student data payload: {str(json_err)}')
+            return redirect(url_for('batch_register'))
+        
+        if not isinstance(students_in, list):
+            flash('Student data must be a list.')
+            return redirect(url_for('batch_register'))
+     
+        # Filter to only students that have an nfc_id (skipped ones are excluded)
+        students_in = [s for s in students_in if s.get('nfc_id')]
+     
+        success_count  = 0
+        errors         = []
+        subjects_saved = 0
+     
+        # ── Save all subjects across all students to the catalogue ────────────
+        try:
+            existing_subj  = db_get_all_subjects()
+            existing_codes = {
+                v.get('course_code', '').upper(): k
+                for k, v in existing_subj.items()
+                if v.get('course_code')
+            }
+            for student in students_in:
+                for subj in (student.get('subjects') or []):
+                    try:
+                        code_upper = (subj.get('course_code') or '').upper().strip()
+                        name_val   = (subj.get('name') or '').strip()
+                        if not name_val:
+                            continue
+                        if code_upper and code_upper in existing_codes:
+                            continue
+                        new_id = str(uuid.uuid4())[:8]
+                        db_save_subject(new_id, {
+                            'name':        name_val,
+                            'course_code': subj.get('course_code', ''),
+                            'units':       str(subj.get('units', '3')),
+                            'created_by':  session.get('username', 'admin'),
+                            'created_at':  _now_local().strftime('%Y-%m-%d %H:%M:%S'),
+                        })
+                        if code_upper:
+                            existing_codes[code_upper] = new_id
+                        subjects_saved += 1
+                    except Exception as subj_err:
+                        print(f"[BATCH SUBJECT ERROR] Failed to save subject {subj.get('name', 'Unknown')}: {subj_err}")
+                        continue
+        except Exception as subj_init_err:
+            print(f"[BATCH SUBJECT INIT ERROR] {subj_init_err}")
+            errors.append(f"Failed to process subjects: {str(subj_init_err)}")
+     
+        # ── Register each student ─────────────────────────────────────────────
+        for student in students_in:
+            try:
+                nfc_id = student.get('nfc_id', '').strip().upper()
+                name   = (student.get('name') or '').strip()
+     
+                if not nfc_id:
+                    errors.append(f"Missing NFC ID for {name or 'Unknown'}")
+                    continue
+                if not name:
+                    errors.append(f"Missing name for NFC {nfc_id}")
+                    continue
+                
+                # ── Check for duplicate NFC ID ──────────────────────────────
+                existing_student = db_get_student(nfc_id)
+                if existing_student:
+                    errors.append(f"NFC ID {nfc_id} is already registered to {existing_student.get('full_name', 'Unknown')}. Skipped.")
+                    continue
 
-            # Build normalized payload string for parse_student()
-            extras    = []
-            email_val = (student.get('email') or '').strip()
-            if not email_val:
-                email_val = _generate_cvsu_email(name)
- 
-            for field, prefix in [
-                ('student_id',  'ID'),
-                ('course',      'Course'),
-                ('year_level',  'Year'),
-                ('adviser',     'Adviser'),
-                ('contact',     'Tel'),
-                ('semester',    'Sem'),
-                ('school_year', 'SY'),
-            ]:
-                v = (student.get(field) or '').strip()
-                if v:
-                    extras.append(f"{prefix}:{v}")
- 
-            if email_val:
-                extras.append(f"Email:{email_val}")
- 
-            section_val = (student.get('section') or '').strip().upper()
-            if section_val:
-                extras.append(f"Sec:{section_val}")
- 
-            date_reg = (student.get('date_registered') or '').strip()
-            if date_reg:
-                extras.append(f"RegDate:{date_reg}")
- 
-            major = (student.get('major') or 'N/A').strip()
-            extras.append(f"Major:{major}")
- 
-            # Save photo if provided
-            photo_file = _save_base64_photo(nfc_id, student.get('photo_base64', ''))
-            
-            db_save_student({
-                'nfcId':      nfc_id,
-                'name':       name,
-                'first_name': student.get('first_name', ''),
-                'middle_initial': student.get('middle_initial', ''),
-                'last_name':  student.get('last_name', ''),
-                'student_id': (student.get('student_id') or '').strip(),
-                'course': (student.get('course') or '').strip(),
-                'year_level': (student.get('year_level') or '').strip(),
-                'section': (student.get('section') or '').strip().upper(),
-                'email': email_val,
-                'semester': (student.get('semester') or '').strip(),
-                'school_year': (student.get('school_year') or '').strip(),
-                'adviser': (student.get('adviser') or '').strip(),
-                'contact': (student.get('contact') or '').strip(),
-                'major': (student.get('major') or 'N/A').strip(),
-                'date_registered': student.get('date_registered', '').strip(),
-                'photo_file': photo_file,
-                'enrollment_status': student.get('enrollment_status', 'Regular'),
-            })
-            
-            send_student_welcome_email(
-                student_name=name,
-                student_email=email_val,
-                nfc_id=nfc_id,
-                student_id=(student.get('student_id') or '').strip(),
-                course=(student.get('course') or '').strip(),
-                year_level=(student.get('year_level') or '').strip(),
-                section=(student.get('section') or '').strip().upper(),
-            )
-            success_count += 1
- 
-        except Exception as e:
-            errors.append(f"Error registering {student.get('name', 'Unknown')}: {e}")
- 
-    # Flash results
-    if success_count:
-        subj_note  = f" {subjects_saved} subject(s) added to catalogue." if subjects_saved else ""
-        flash(f"Registered {success_count} student(s) successfully.{subj_note}")
- 
-    if errors:
-        flash("Errors: " + " | ".join(errors[:5]) +
-              (f" (+{len(errors)-5} more)" if len(errors) > 5 else ""))
- 
-    return redirect(url_for('dashboard'))
+                # Build normalized payload string for parse_student()
+                extras    = []
+                email_val = (student.get('email') or '').strip()
+                if not email_val:
+                    email_val = _generate_cvsu_email(name)
+     
+                for field, prefix in [
+                    ('student_id',  'ID'),
+                    ('course',      'Course'),
+                    ('year_level',  'Year'),
+                    ('adviser',     'Adviser'),
+                    ('contact',     'Tel'),
+                    ('semester',    'Sem'),
+                    ('school_year', 'SY'),
+                ]:
+                    v = (student.get(field) or '').strip()
+                    if v:
+                        extras.append(f"{prefix}:{v}")
+     
+                if email_val:
+                    extras.append(f"Email:{email_val}")
+     
+                section_val = (student.get('section') or '').strip().upper()
+                if section_val:
+                    extras.append(f"Sec:{section_val}")
+     
+                date_reg = (student.get('date_registered') or '').strip()
+                if date_reg:
+                    extras.append(f"RegDate:{date_reg}")
+     
+                major = (student.get('major') or 'N/A').strip()
+                extras.append(f"Major:{major}")
+     
+                # Save photo if provided
+                photo_file = _save_base64_photo(nfc_id, student.get('photo_base64', ''))
+                
+                db_save_student({
+                    'nfcId':      nfc_id,
+                    'name':       name,
+                    'first_name': student.get('first_name', ''),
+                    'middle_initial': student.get('middle_initial', ''),
+                    'last_name':  student.get('last_name', ''),
+                    'student_id': (student.get('student_id') or '').strip(),
+                    'course': (student.get('course') or '').strip(),
+                    'year_level': (student.get('year_level') or '').strip(),
+                    'section': (student.get('section') or '').strip().upper(),
+                    'email': email_val,
+                    'semester': (student.get('semester') or '').strip(),
+                    'school_year': (student.get('school_year') or '').strip(),
+                    'adviser': (student.get('adviser') or '').strip(),
+                    'contact': (student.get('contact') or '').strip(),
+                    'major': (student.get('major') or 'N/A').strip(),
+                    'date_registered': student.get('date_registered', '').strip(),
+                    'photo_file': photo_file,
+                    'enrollment_status': student.get('enrollment_status', 'Regular'),
+                })
+                
+                try:
+                    send_student_welcome_email(
+                        student_name=name,
+                        student_email=email_val,
+                        nfc_id=nfc_id,
+                        student_id=(student.get('student_id') or '').strip(),
+                        course=(student.get('course') or '').strip(),
+                        year_level=(student.get('year_level') or '').strip(),
+                        section=(student.get('section') or '').strip().upper(),
+                    )
+                except Exception as email_err:
+                    print(f"[BATCH EMAIL ERROR] Failed to send email for {name}: {email_err}")
+                    # Don't add to errors - email failure shouldn't block registration
+                
+                success_count += 1
+     
+            except Exception as e:
+                import traceback
+                tb = traceback.format_exc()
+                print(f"[BATCH REGISTER ERROR] {student.get('name', 'Unknown')}\n{tb}")
+                errors.append(f"Error registering {student.get('name', 'Unknown')}: {str(e)}")
+     
+        # Flash results
+        if success_count:
+            subj_note  = f" {subjects_saved} subject(s) added to catalogue." if subjects_saved else ""
+            flash(f"Registered {success_count} student(s) successfully.{subj_note}")
+     
+        if errors:
+            flash("Errors: " + " | ".join(errors[:5]) +
+                  (f" (+{len(errors)-5} more)" if len(errors) > 5 else ""), 'warning')
+     
+        return redirect(url_for('dashboard'))
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[BATCH REGISTER FATAL ERROR]\n{tb}")
+        flash(f'Unexpected error during batch registration: {str(e)}', 'error')
+        return redirect(url_for('batch_register'))
 
 @app.route('/parse_batch_pdfs', methods=['POST'])
 @admin_required

@@ -2416,6 +2416,19 @@ def db_delete_schedule(schedule_id):
                     "UPDATE event_schedules SET is_active=0, updated_at=? WHERE event_id=?",
                     (now, event_id)
                 )
+            # Also finalize any active sessions associated with this event so
+            # automation won't continue to consider them active.
+            try:
+                sids = _event_related_session_ids(schedule_id, include_ended=False)
+                for sid in sids:
+                    try:
+                        _finalize_session(sid, ended_time=now, async_chain_and_email=True)
+                    except Exception as e:
+                        print(f"[AUTO] Failed to finalize session {sid} for event {event_id}: {e}")
+                if sids:
+                    print(f"[AUTO] Ended {len(sids)} active session(s) for event {event_id}")
+            except Exception as e:
+                print(f"[AUTO] Error checking sessions for event {event_id}: {e}")
         return
 
     with get_db() as conn:
@@ -2869,6 +2882,7 @@ def check_and_start_scheduled_sessions():
             }
             save_session(sess_id, new_sess)
             print(f"[AUTO EVENT] Started unified session {sess_id} for event {ev.get('event_id')}")
+            # (Previously archived here on start) — archiving moved to finalization step
 
         # 2. End sessions that passed their auto_end_at
         for sid, asess in active_sessions.items():
@@ -4253,6 +4267,25 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
                     (tx_hash, block_num or 0, sess_id)
                 )
         print(f"[✅ BLOCKCHAIN] Session {sess_id} synced with TX={tx_hash[:16]}...")
+        # If this was a one-time event session, archive the corresponding event
+        try:
+            if str(sess.get('class_type')).lower() == 'school_event' and sess.get('schedule_id'):
+                sched_id = str(sess.get('schedule_id') or '').strip()
+                if sched_id.startswith('event:'):
+                    meta = _parse_event_schedule_id(sched_id)
+                    ev_id = meta.get('event_id') if meta else None
+                    if ev_id:
+                        try:
+                            with get_db() as conn:
+                                conn.execute(
+                                    "UPDATE event_schedules SET is_active=0, updated_at=? WHERE event_id=?",
+                                    (ended_at, ev_id),
+                                )
+                            print(f"[AUTO EVENT] Archived event {ev_id} after blockchain upload")
+                        except Exception as _e:
+                            print(f"[AUTO EVENT] Failed to archive event {ev_id} after blockchain upload: {_e}")
+        except Exception:
+            pass
     else:
         print(f"[⚠️] Session {sess_id} blockchain skipped/failed: {bc_error}")
 
@@ -4261,6 +4294,8 @@ def _finalize_session(sess_id, ended_time=None, async_chain_and_email=True):
     sess['blockchain_processing'] = False
     save_session(sess_id, sess)
     sessions_db[sess_id] = sess
+
+    
 
     def _post_finalize_worker():
         with app.app_context():

@@ -1,389 +1,948 @@
 /* ══ SESSION INTEGRITY — prevents cross-tab session mixing ══ */
-    (function () {
-      // Store current session identity in sessionStorage (tab-local)
-      // Each tab tracks its own logged-in user identity
-      const username = '{{ session.get("username","") }}';
-      const role = '{{ session.get("role","") }}';
-      if (username) {
-        const stored = window.sessionStorage.getItem('davs_session_user');
-        const storedRole = window.sessionStorage.getItem('davs_session_role');
-        // If the tab previously had a DIFFERENT user (session was swapped in same tab),
-        // reload the page to ensure we show the correct user's data.
-        if (stored && stored !== username) {
-          window.sessionStorage.setItem('davs_session_user', username);
-          window.sessionStorage.setItem('davs_session_role', role);
-          // Reload without cache to get fresh server-rendered content for this user
-          window.location.reload(true);
-          return;
-        }
-        window.sessionStorage.setItem('davs_session_user', username);
-        window.sessionStorage.setItem('davs_session_role', role);
-      }
-    })();
-    function toggleTheme() { var h = document.documentElement, c = h.getAttribute('data-theme') || 'light', n = c === 'dark' ? 'light' : 'dark'; h.setAttribute('data-theme', n); try { localStorage.setItem('davs_theme', n); } catch (e) { } updateThemeIcon(n); }
-    function updateThemeIcon(t) { var isDark = (t || document.documentElement.getAttribute('data-theme') || 'light') === 'dark'; var i = document.getElementById('themeIcon'), l = document.getElementById('themeLabel'); if (i) i.className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-fill'; if (l) l.textContent = isDark ? 'Light' : 'Dark'; }
-    (function () { try { var s = localStorage.getItem('davs_theme') || 'light'; document.documentElement.setAttribute('data-theme', s); updateThemeIcon(s); } catch (e) { } })();
-
-    /* ══ CLOCK ══ */
-    function updateClock() { var el = document.getElementById('clock'); if (el) el.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
-    updateClock(); setInterval(updateClock, 1000);
-
-    /* ══ SIDEBAR ══ */
-    function openSidebar() { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebarOverlay').classList.add('open'); document.body.style.overflow = 'hidden'; }
-    function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebarOverlay').classList.remove('open'); document.body.style.overflow = ''; }
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSidebar(); });
-
-    /* ══ TOAST ══ */
-    var lastSeenTimestamp = Date.now() / 1000;
-    function showCustomToast(e) { var s = document.getElementById('toastStack'), t = document.createElement('div'); t.className = 'custom-toast'; var tm = new Date(e.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); t.innerHTML = '<div class="toast-dot"></div><div><div class="toast-title">Attendance Marked</div><div class="toast-body-text">' + e.name + ' &middot; <code>' + e.nfc_id + '</code></div><div class="toast-body-text">' + tm + '</div></div>'; s.appendChild(t); setTimeout(function () { t.style.opacity = '0'; t.style.transform = 'translateX(20px)'; t.style.transition = 'all .3s'; setTimeout(function () { t.remove(); }, 300); }, 5000); }
-    var _davsPollActive = !window.location.pathname.match(/\/session\//);
-    function pollAttendance() {
-      if (!_davsPollActive) return;
-      fetch('/api/attendance/recent?since=' + lastSeenTimestamp, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (evs) { evs.forEach(function (e) { if (e.timestamp > lastSeenTimestamp) lastSeenTimestamp = e.timestamp; showCustomToast(e); }); }).catch(function () { });
+(function () {
+  // Store current session identity in sessionStorage (tab-local)
+  // Each tab tracks its own logged-in user identity
+  const username = '{{ session.get("username","") }}';
+  const role = '{{ session.get("role","") }}';
+  if (username) {
+    const stored = window.sessionStorage.getItem("davs_session_user");
+    const storedRole = window.sessionStorage.getItem("davs_session_role");
+    // If the tab previously had a DIFFERENT user (session was swapped in same tab),
+    // reload the page to ensure we show the correct user's data.
+    if (stored && stored !== username) {
+      window.sessionStorage.setItem("davs_session_user", username);
+      window.sessionStorage.setItem("davs_session_role", role);
+      // Reload without cache to get fresh server-rendered content for this user
+      window.location.reload(true);
+      return;
     }
-    window.addEventListener('load', function () { if (_davsPollActive) { pollAttendance(); setInterval(pollAttendance, 3000); } });
+    window.sessionStorage.setItem("davs_session_user", username);
+    window.sessionStorage.setItem("davs_session_role", role);
+  }
+})();
+function toggleTheme() {
+  var h = document.documentElement,
+    c = h.getAttribute("data-theme") || "light",
+    n = c === "dark" ? "light" : "dark";
+  h.setAttribute("data-theme", n);
+  try {
+    localStorage.setItem("davs_theme", n);
+  } catch (e) {}
+  updateThemeIcon(n);
+}
+function updateThemeIcon(t) {
+  var isDark =
+    (t || document.documentElement.getAttribute("data-theme") || "light") ===
+    "dark";
+  var i = document.getElementById("themeIcon"),
+    l = document.getElementById("themeLabel");
+  if (i) i.className = isDark ? "bi bi-sun-fill" : "bi bi-moon-fill";
+  if (l) l.textContent = isDark ? "Light" : "Dark";
+}
+(function () {
+  try {
+    var s = localStorage.getItem("davs_theme") || "light";
+    document.documentElement.setAttribute("data-theme", s);
+    updateThemeIcon(s);
+  } catch (e) {}
+})();
 
-    /* ══ SIDEBAR PHOTO ══ */
-    (function () { fetch('/get_my_photo', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) { if (d.url) setSidebarPhoto(d.url); }).catch(function () { }); })();
-    function setSidebarPhoto(url) { var w = document.getElementById('sidebarAvatarWrap'); if (!w) return; w.innerHTML = ''; w.style.cssText = 'width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;'; var img = document.createElement('img'); img.src = url + '?t=' + Date.now(); img.style = 'width:100%;height:100%;object-fit:cover;'; w.appendChild(img); }
+/* ══ CLOCK ══ */
+function updateClock() {
+  var el = document.getElementById("clock");
+  if (el)
+    el.textContent = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+}
+updateClock();
+setInterval(updateClock, 1000);
 
-    /* ══ AVATAR UTIL ══ */
-    function setAvatarImg(wrapId, src) { var w = document.getElementById(wrapId); if (!w) return; w.innerHTML = ''; w.style.overflow = 'hidden'; var img = document.createElement('img'); img.src = src; img.style = 'width:100%;height:100%;object-fit:cover;border-radius:50%;'; w.appendChild(img); }
+/* ══ SIDEBAR ══ */
+function openSidebar() {
+  document.getElementById("sidebar").classList.add("open");
+  document.getElementById("sidebarOverlay").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+function closeSidebar() {
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("sidebarOverlay").classList.remove("open");
+  document.body.style.overflow = "";
+}
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") closeSidebar();
+});
 
-    /* ══ SHARED APP DIALOG ══ */
-    var _appDialogResolver = null;
-    function closeAppDialog(result) {
-      var dialog = document.getElementById('appDialog');
-      if (dialog) dialog.classList.remove('show');
-      if (_appDialogResolver) {
-        var resolver = _appDialogResolver;
-        _appDialogResolver = null;
-        resolver(!!result);
-      }
-    }
-    function showAppDialog(opts) {
-      var dialog = document.getElementById('appDialog');
-      var title = document.getElementById('appDialogTitle');
-      var message = document.getElementById('appDialogMessage');
-      var actions = document.getElementById('appDialogActions');
-      if (!dialog || !title || !message || !actions) {
-        var isConfirm = !!(opts && opts.confirm);
-        if (isConfirm) return Promise.resolve(window.confirm((opts && opts.message) || 'Are you sure?'));
-        window.alert((opts && opts.message) || 'Done.');
-        return Promise.resolve(true);
-      }
-      title.textContent = (opts && opts.title) || (opts && opts.confirm ? 'Confirmation' : 'Notice');
-      message.textContent = (opts && opts.message) || '';
-      var cancelLabel = (opts && opts.cancelText) || 'Cancel';
-      var okLabel = (opts && opts.okText) || 'OK';
-      if (opts && opts.confirm) {
-        actions.innerHTML = '<button type="button" class="btn-outline" onclick="closeAppDialog(false)">' + cancelLabel + '</button>' +
-          '<button type="button" class="btn-primary" onclick="closeAppDialog(true)">' + okLabel + '</button>';
-      } else {
-        actions.innerHTML = '<button type="button" class="btn-primary" onclick="closeAppDialog(true)">' + okLabel + '</button>';
-      }
-      dialog.classList.add('show');
-      return new Promise(function (resolve) { _appDialogResolver = resolve; });
-    }
-    function showAppAlert(message, title) {
-      return showAppDialog({ message: message, title: title || 'Notice', confirm: false, okText: 'OK' });
-    }
-    function showAppConfirm(message, title, okText, cancelText) {
-      return showAppDialog({ message: message, title: title || 'Confirmation', confirm: true, okText: okText || 'Confirm', cancelText: cancelText || 'Cancel' });
-    }
-
-    function showAppPrompt(message, defaultVal) {
-      return new Promise(resolve => {
-        const overlay = document.createElement('div');
-        overlay.className = 'app-dialog-backdrop show';
-        overlay.style.zIndex = '99999';
-        overlay.onclick = e => { if (e.target === overlay) close(); };
-        
-        const box = document.createElement('div');
-        box.className = 'app-dialog-box';
-        
-        const head = document.createElement('div');
-        head.className = 'app-dialog-head';
-        head.innerHTML = '<div class="app-dialog-title">Input Required</div><button type="button" class="app-dialog-close"><i class="bi bi-x"></i></button>';
-        head.querySelector('button').onclick = close;
-        
-        const body = document.createElement('div');
-        body.className = 'app-dialog-body';
-        body.innerHTML = `<div style="margin-bottom:10px;font-size:14px;color:var(--text);">${message}</div><input type="text" class="upd-input" style="width:100%;font-size:14px;padding:8px;" value="${defaultVal || ''}" />`;
-        
-        const actions = document.createElement('div');
-        actions.className = 'app-dialog-actions';
-        actions.innerHTML = '<button type="button" class="btn-outline">Cancel</button><button type="button" class="btn-primary">OK</button>';
-        actions.querySelector('.btn-outline').onclick = close;
-        actions.querySelector('.btn-primary').onclick = () => {
-          const val = body.querySelector('input').value;
-          document.body.removeChild(overlay);
-          resolve(val);
-        };
-        
-        box.appendChild(head);
-        box.appendChild(body);
-        box.appendChild(actions);
-        overlay.appendChild(box);
-        document.body.appendChild(overlay);
-        
-        const input = body.querySelector('input');
-        input.focus();
-        input.setSelectionRange(0, input.value.length);
-        input.onkeydown = e => { if (e.key === 'Enter') actions.querySelector('.btn-primary').click(); if (e.key === 'Escape') close(); };
-        
-        function close() {
-          document.body.removeChild(overlay);
-          resolve(null);
-        }
+/* ══ TOAST ══ */
+var lastSeenTimestamp = Date.now() / 1000;
+function showCustomToast(e) {
+  var s = document.getElementById("toastStack"),
+    t = document.createElement("div");
+  t.className = "custom-toast";
+  var tm = new Date(e.timestamp * 1000).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  t.innerHTML =
+    '<div class="toast-dot"></div><div><div class="toast-title">Attendance Marked</div><div class="toast-body-text">' +
+    e.name +
+    " &middot; <code>" +
+    e.nfc_id +
+    '</code></div><div class="toast-body-text">' +
+    tm +
+    "</div></div>";
+  s.appendChild(t);
+  setTimeout(function () {
+    t.style.opacity = "0";
+    t.style.transform = "translateX(20px)";
+    t.style.transition = "all .3s";
+    setTimeout(function () {
+      t.remove();
+    }, 300);
+  }, 5000);
+}
+var _davsPollActive = !window.location.pathname.match(/\/session\//);
+function pollAttendance() {
+  if (!_davsPollActive) return;
+  fetch("/api/attendance/recent?since=" + lastSeenTimestamp, {
+    credentials: "same-origin",
+  })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (evs) {
+      evs.forEach(function (e) {
+        if (e.timestamp > lastSeenTimestamp) lastSeenTimestamp = e.timestamp;
+        showCustomToast(e);
       });
-    }
+    })
+    .catch(function () {});
+}
+window.addEventListener("load", function () {
+  if (_davsPollActive) {
+    pollAttendance();
+    setInterval(pollAttendance, 3000);
+  }
+});
 
-    function showAppSuccess(msg) {
-      const overlay = document.createElement('div');
-      overlay.className = 'app-success-overlay';
-      overlay.innerHTML = `<div class="app-success-box">
+/* ══ SIDEBAR PHOTO ══ */
+(function () {
+  fetch("/get_my_photo", { credentials: "same-origin" })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (d) {
+      if (d.url) setSidebarPhoto(d.url);
+    })
+    .catch(function () {});
+})();
+function setSidebarPhoto(url) {
+  var w = document.getElementById("sidebarAvatarWrap");
+  if (!w) return;
+  w.innerHTML = "";
+  w.style.cssText =
+    "width:32px;height:32px;border-radius:50%;overflow:hidden;flex-shrink:0;";
+  var img = document.createElement("img");
+  img.src = url + "?t=" + Date.now();
+  img.style = "width:100%;height:100%;object-fit:cover;";
+  w.appendChild(img);
+}
+
+/* ══ AVATAR UTIL ══ */
+function setAvatarImg(wrapId, src) {
+  var w = document.getElementById(wrapId);
+  if (!w) return;
+  w.innerHTML = "";
+  w.style.overflow = "hidden";
+  var img = document.createElement("img");
+  img.src = src;
+  img.style = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+  w.appendChild(img);
+}
+
+/* ══ SHARED APP DIALOG ══ */
+var _appDialogResolver = null;
+function closeAppDialog(result) {
+  var dialog = document.getElementById("appDialog");
+  if (dialog) dialog.classList.remove("show");
+  if (_appDialogResolver) {
+    var resolver = _appDialogResolver;
+    _appDialogResolver = null;
+    resolver(!!result);
+  }
+}
+function showAppDialog(opts) {
+  var dialog = document.getElementById("appDialog");
+  var title = document.getElementById("appDialogTitle");
+  var message = document.getElementById("appDialogMessage");
+  var actions = document.getElementById("appDialogActions");
+  if (!dialog || !title || !message || !actions) {
+    var isConfirm = !!(opts && opts.confirm);
+    if (isConfirm)
+      return Promise.resolve(
+        window.confirm((opts && opts.message) || "Are you sure?"),
+      );
+    window.alert((opts && opts.message) || "Done.");
+    return Promise.resolve(true);
+  }
+  title.textContent =
+    (opts && opts.title) || (opts && opts.confirm ? "Confirmation" : "Notice");
+  message.textContent = (opts && opts.message) || "";
+  var cancelLabel = (opts && opts.cancelText) || "Cancel";
+  var okLabel = (opts && opts.okText) || "OK";
+  if (opts && opts.confirm) {
+    actions.innerHTML =
+      '<button type="button" class="btn-outline" onclick="closeAppDialog(false)">' +
+      cancelLabel +
+      "</button>" +
+      '<button type="button" class="btn-primary" onclick="closeAppDialog(true)">' +
+      okLabel +
+      "</button>";
+  } else {
+    actions.innerHTML =
+      '<button type="button" class="btn-primary" onclick="closeAppDialog(true)">' +
+      okLabel +
+      "</button>";
+  }
+  dialog.classList.add("show");
+  return new Promise(function (resolve) {
+    _appDialogResolver = resolve;
+  });
+}
+function showAppAlert(message, title) {
+  return showAppDialog({
+    message: message,
+    title: title || "Notice",
+    confirm: false,
+    okText: "OK",
+  });
+}
+function showAppConfirm(message, title, okText, cancelText) {
+  return showAppDialog({
+    message: message,
+    title: title || "Confirmation",
+    confirm: true,
+    okText: okText || "Confirm",
+    cancelText: cancelText || "Cancel",
+  });
+}
+
+function showAppPrompt(message, defaultVal) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "app-dialog-backdrop show";
+    overlay.style.zIndex = "99999";
+    overlay.onclick = (e) => {
+      if (e.target === overlay) close();
+    };
+
+    const box = document.createElement("div");
+    box.className = "app-dialog-box";
+
+    const head = document.createElement("div");
+    head.className = "app-dialog-head";
+    head.innerHTML =
+      '<div class="app-dialog-title">Input Required</div><button type="button" class="app-dialog-close"><i class="bi bi-x"></i></button>';
+    head.querySelector("button").onclick = close;
+
+    const body = document.createElement("div");
+    body.className = "app-dialog-body";
+    body.innerHTML = `<div style="margin-bottom:10px;font-size:14px;color:var(--text);">${message}</div><input type="text" class="upd-input" style="width:100%;font-size:14px;padding:8px;" value="${
+      defaultVal || ""
+    }" />`;
+
+    const actions = document.createElement("div");
+    actions.className = "app-dialog-actions";
+    actions.innerHTML =
+      '<button type="button" class="btn-outline">Cancel</button><button type="button" class="btn-primary">OK</button>';
+    actions.querySelector(".btn-outline").onclick = close;
+    actions.querySelector(".btn-primary").onclick = () => {
+      const val = body.querySelector("input").value;
+      document.body.removeChild(overlay);
+      resolve(val);
+    };
+
+    box.appendChild(head);
+    box.appendChild(body);
+    box.appendChild(actions);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    const input = body.querySelector("input");
+    input.focus();
+    input.setSelectionRange(0, input.value.length);
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") actions.querySelector(".btn-primary").click();
+      if (e.key === "Escape") close();
+    };
+
+    function close() {
+      document.body.removeChild(overlay);
+      resolve(null);
+    }
+  });
+}
+
+function showAppSuccess(msg) {
+  const overlay = document.createElement("div");
+  overlay.className = "app-success-overlay";
+  overlay.innerHTML = `<div class="app-success-box">
         <div class="app-success-icon"><i class="bi bi-check-lg"></i></div>
         <div class="app-success-text">${msg}</div>
       </div>`;
-      document.body.appendChild(overlay);
-      setTimeout(() => overlay.classList.add('show'), 10);
-      setTimeout(() => {
-        overlay.classList.remove('show');
-        setTimeout(() => overlay.remove(), 400);
-      }, 500);
-    }
-    
-    function showAppError(msg) {
-       showAppAlert(msg, 'Error');
-    }
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.classList.add("show"), 10);
+  setTimeout(() => {
+    overlay.classList.remove("show");
+    setTimeout(() => overlay.remove(), 400);
+  }, 500);
+}
 
-    /* ══ SECTION ACCORDION ══ */
-    function buildSectionAccordion(sections) {
-      if (!sections || !sections.length) return '<span style="font-size:13px;color:var(--muted);font-weight:500;">No sections assigned.</span>';
-      var groups = {};
-      sections.forEach(function (key) { 
-        var parts = key.split('|'); 
-        var prog = parts[0] || 'Unknown'; 
-        var yr = parts[1] || '—'; 
-        var sem = parts.length >= 4 ? (parts[2] || '—') : '';
-        var sec = parts.length >= 4 ? (parts[3] || '—') : (parts[2] || '—'); 
-        
-        if (!groups[prog]) groups[prog] = {}; 
-        if (!groups[prog][yr]) groups[prog][yr] = {}; 
-        if (sem) {
-          if (!groups[prog][yr][sem]) groups[prog][yr][sem] = [];
-          groups[prog][yr][sem].push(sec);
-        } else {
-          if (!groups[prog][yr]['default']) groups[prog][yr]['default'] = [];
-          groups[prog][yr]['default'].push(sec);
-        }
-      });
-      var html = '';
-      Object.keys(groups).sort().forEach(function (prog) {
-        var yo = groups[prog]; 
-        var tot = 0;
-        Object.values(yo).forEach(function(y) { 
-          Object.values(y).forEach(function(s) { tot += s.length; });
+function showAppError(msg) {
+  showAppAlert(msg, "Error");
+}
+
+/* ══ SECTION ACCORDION ══ */
+function buildSectionAccordion(sections) {
+  if (!sections || !sections.length)
+    return '<span style="font-size:13px;color:var(--muted);font-weight:500;">No sections assigned.</span>';
+  var groups = {};
+  sections.forEach(function (key) {
+    var parts = key.split("|");
+    var prog = parts[0] || "Unknown";
+    var yr = parts[1] || "—";
+    var sem = parts.length >= 4 ? parts[2] || "—" : "";
+    var sec = parts.length >= 4 ? parts[3] || "—" : parts[2] || "—";
+
+    if (!groups[prog]) groups[prog] = {};
+    if (!groups[prog][yr]) groups[prog][yr] = {};
+    if (sem) {
+      if (!groups[prog][yr][sem]) groups[prog][yr][sem] = [];
+      groups[prog][yr][sem].push(sec);
+    } else {
+      if (!groups[prog][yr]["default"]) groups[prog][yr]["default"] = [];
+      groups[prog][yr]["default"].push(sec);
+    }
+  });
+  var html = "";
+  Object.keys(groups)
+    .sort()
+    .forEach(function (prog) {
+      var yo = groups[prog];
+      var tot = 0;
+      Object.values(yo).forEach(function (y) {
+        Object.values(y).forEach(function (s) {
+          tot += s.length;
         });
-        html += '<div class="sec-accordion"><div class="sec-acc-program" onclick="toggleSecAccProgram(this)">';
-        html += '<span class="sec-acc-program-name"><i class="bi bi-mortarboard"></i>' + prog + '</span>';
-        html += '<span style="display:flex;align-items:center;gap:8px;"><span class="sec-acc-program-count">' + tot + ' section' + (tot !== 1 ? 's' : '') + '</span><i class="bi bi-chevron-down sec-acc-chevron"></i></span></div>';
-        html += '<div class="sec-acc-years">';
-        Object.keys(yo).sort().forEach(function (yr) {
+      });
+      html +=
+        '<div class="sec-accordion"><div class="sec-acc-program" onclick="toggleSecAccProgram(this)">';
+      html +=
+        '<span class="sec-acc-program-name"><i class="bi bi-mortarboard"></i>' +
+        prog +
+        "</span>";
+      html +=
+        '<span style="display:flex;align-items:center;gap:8px;"><span class="sec-acc-program-count">' +
+        tot +
+        " section" +
+        (tot !== 1 ? "s" : "") +
+        '</span><i class="bi bi-chevron-down sec-acc-chevron"></i></span></div>';
+      html += '<div class="sec-acc-years">';
+      Object.keys(yo)
+        .sort()
+        .forEach(function (yr) {
           var sems = yo[yr];
           html += '<div class="sec-acc-year" onclick="toggleSecAccYear(this)">';
-          html += '<span class="sec-acc-year-label"><i class="bi bi-layers"></i>' + yr + '</span>';
-          html += '<span style="display:flex;align-items:center;gap:8px;"><i class="bi bi-chevron-down sec-acc-year-chevron"></i></span></div>';
+          html +=
+            '<span class="sec-acc-year-label"><i class="bi bi-layers"></i>' +
+            yr +
+            "</span>";
+          html +=
+            '<span style="display:flex;align-items:center;gap:8px;"><i class="bi bi-chevron-down sec-acc-year-chevron"></i></span></div>';
           html += '<div class="sec-acc-sections" style="padding-left:15px;">';
-          Object.keys(sems).sort().forEach(function(sem) {
-            var secs = sems[sem];
-            if (sem !== 'default') {
-              html += '<div style="font-size:11px; font-weight:700; color:var(--muted); margin: 8px 0 4px 4px; text-transform:uppercase; letter-spacing:0.5px;">' + sem + '</div>';
-            }
-            html += '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">';
-            secs.forEach(function (s) { html += '<span class="sec-chip">' + s + '</span>'; });
-            html += '</div>';
-          });
-          html += '</div>';
+          Object.keys(sems)
+            .sort()
+            .forEach(function (sem) {
+              var secs = sems[sem];
+              if (sem !== "default") {
+                html +=
+                  '<div style="font-size:11px; font-weight:700; color:var(--muted); margin: 8px 0 4px 4px; text-transform:uppercase; letter-spacing:0.5px;">' +
+                  sem +
+                  "</div>";
+              }
+              html +=
+                '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">';
+              secs.forEach(function (s) {
+                html += '<span class="sec-chip">' + s + "</span>";
+              });
+              html += "</div>";
+            });
+          html += "</div>";
         });
-        html += '</div></div>';
+      html += "</div></div>";
+    });
+  return html;
+}
+function toggleSecAccProgram(el) {
+  var d = el.nextElementSibling;
+  var o = d.classList.contains("open");
+  el.classList.toggle("open", !o);
+  d.classList.toggle("open", !o);
+}
+function toggleSecAccYear(el) {
+  var d = el.nextElementSibling;
+  var o = d.classList.contains("open");
+  el.classList.toggle("open", !o);
+  d.classList.toggle("open", !o);
+}
+function buildSectionsTable(s) {
+  return buildSectionAccordion(s);
+}
+
+function stripUsernamePrefix(uname) {
+  return (uname || "").replace(/^@+/, "");
+}
+
+/* ══ ADMIN PROFILE MODAL ══ */
+var pmStagedFile = null;
+function openPM() {
+  var m = document.getElementById("profileModal");
+  if (!m) return;
+  document.querySelectorAll("#profileModal .pm-pane").forEach(function (p) {
+    p.classList.remove("active");
+  });
+  var ip = document.getElementById("pm-info");
+  if (ip) ip.classList.add("active");
+  document.querySelectorAll("#profileModal .pm-tab").forEach(function (b, i) {
+    b.classList.toggle("active-tab", i === 0);
+  });
+  pmStagedFile = null;
+  m.classList.add("show");
+  fetch("/api/my_profile", { credentials: "same-origin" })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (d) {
+      var em = document.getElementById("pmEmail");
+      if (em && d.email) em.value = d.email;
+      var ie = document.getElementById("pm_info_email");
+      if (ie) ie.textContent = d.email || "—";
+      var username = stripUsernamePrefix(d.username || "");
+      var iu = document.getElementById("pm_info_username");
+      if (iu) iu.textContent = "@" + username;
+      var eu = document.getElementById("pmUsername");
+      if (eu) eu.value = username;
+      var rp = document.getElementById("pmRolePill");
+      if (rp) rp.textContent = (d.role || "admin").toUpperCase();
+      if (d.photo) {
+        var url = "/static/uploads/" + d.photo + "?t=" + Date.now();
+        setAvatarImg("pmInfoAvatarWrap", url);
+        setAvatarImg("pmEditAvatarWrap", url);
+      }
+    })
+    .catch(function () {});
+}
+function closePM() {
+  var m = document.getElementById("profileModal");
+  if (m) m.classList.remove("show");
+  pmStagedFile = null;
+}
+function switchPmTab(id, btn) {
+  document.querySelectorAll("#profileModal .pm-pane").forEach(function (p) {
+    p.classList.remove("active");
+  });
+  document.querySelectorAll("#profileModal .pm-tab").forEach(function (b) {
+    b.classList.remove("active-tab");
+  });
+  var p = document.getElementById("pm-" + id);
+  if (p) p.classList.add("active");
+  if (btn) btn.classList.add("active-tab");
+}
+function stageAdminPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  pmStagedFile = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    setAvatarImg("pmEditAvatarWrap", e.target.result);
+  };
+  reader.readAsDataURL(pmStagedFile);
+}
+function clearPmErr(el, errId) {
+  el.style.borderColor = "";
+  var e = document.getElementById(errId);
+  if (e) e.style.display = "none";
+}
+function checkPmPwMatch() {
+  var pw = document.getElementById("pmPass")
+    ? document.getElementById("pmPass").value
+    : "";
+  var pw2 = document.getElementById("pmPass2")
+    ? document.getElementById("pmPass2").value
+    : "";
+  var err = document.getElementById("pmPass2Err");
+  if (err) err.style.display = pw && pw2 && pw !== pw2 ? "block" : "none";
+}
+async function requestProfilePasswordOtp(kind) {
+  var isTeacher = kind === "teacher";
+  var prefix = isTeacher ? "tpm" : "pm";
+  var passEl = document.getElementById(prefix + "Pass");
+  var pass = passEl ? passEl.value : "";
+  var msg = document.getElementById(prefix + "Msg");
+  var hint = document.getElementById(prefix + "OtpHint");
+  var btn = document.getElementById(prefix + "OtpBtn");
+  if (!pass || pass.length < 6) {
+    if (passEl) passEl.style.borderColor = "var(--danger)";
+    var perr = document.getElementById(prefix + "PassErr");
+    if (perr) perr.style.display = "block";
+    if (hint) {
+      hint.style.color = "var(--danger)";
+      hint.textContent = "Enter your new password first before requesting OTP.";
+    }
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+  }
+  try {
+    var r = await fetch("/request_password_change_otp", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    var d = await r.json();
+    if (d.ok) {
+      if (hint) {
+        hint.style.color = "var(--success)";
+        hint.textContent = "OTP sent to " + (d.sent_to || "your email") + ".";
+      }
+      if (msg) {
+        msg.style.display = "block";
+        msg.style.color = "var(--success)";
+        msg.textContent = "OTP sent. Enter the 6-digit code to continue.";
+      }
+    } else {
+      if (hint) {
+        hint.style.color = "var(--danger)";
+        hint.textContent = d.error || "Unable to send OTP.";
+      }
+      if (msg) {
+        msg.style.display = "block";
+        msg.style.color = "var(--danger)";
+        msg.textContent = d.error || "Unable to send OTP.";
+      }
+    }
+  } catch (e) {
+    if (hint) {
+      hint.style.color = "var(--danger)";
+      hint.textContent = "Network error while sending OTP.";
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Send OTP";
+    }
+  }
+}
+async function saveProfileModal() {
+  var name = document.getElementById("pmName")
+    ? document.getElementById("pmName").value.trim()
+    : "";
+  var uname = document.getElementById("pmUsername")
+    ? document.getElementById("pmUsername").value.trim()
+    : "";
+  var email = document.getElementById("pmEmail")
+    ? document.getElementById("pmEmail").value.trim()
+    : "";
+  var pass = document.getElementById("pmPass")
+    ? document.getElementById("pmPass").value
+    : "";
+  var pass2 = document.getElementById("pmPass2")
+    ? document.getElementById("pmPass2").value
+    : "";
+  var otp = document.getElementById("pmOtp")
+    ? document.getElementById("pmOtp").value.trim()
+    : "";
+  var msg = document.getElementById("pmMsg");
+  var ok = true;
+  if (!name) {
+    var el = document.getElementById("pmName");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("pmNameErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (!uname) {
+    var el = document.getElementById("pmUsername");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("pmUsernameErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    var el = document.getElementById("pmEmail");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("pmEmailErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (pass && pass.length < 6) {
+    var el = document.getElementById("pmPass");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("pmPassErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (pass && pass2 && pass !== pass2) {
+    var er = document.getElementById("pmPass2Err");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (pass && (!otp || otp.length !== 6)) {
+    var el = document.getElementById("pmOtp");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("pmOtpErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (!ok) return;
+  uname = stripUsernamePrefix(uname);
+  if (pmStagedFile) {
+    var fd = new FormData();
+    fd.append("photo", pmStagedFile);
+    fd.append("person_id", '{{ session.get("username","") }}');
+    try {
+      var pr = await fetch("/upload_photo", {
+        method: "POST",
+        credentials: "same-origin",
+        body: fd,
       });
-      return html;
-    }
-    function toggleSecAccProgram(el) { var d = el.nextElementSibling; var o = d.classList.contains('open'); el.classList.toggle('open', !o); d.classList.toggle('open', !o); }
-    function toggleSecAccYear(el) { var d = el.nextElementSibling; var o = d.classList.contains('open'); el.classList.toggle('open', !o); d.classList.toggle('open', !o); }
-    function buildSectionsTable(s) { return buildSectionAccordion(s); }
-
-    /* ══ ADMIN PROFILE MODAL ══ */
-    var pmStagedFile = null;
-    function openPM() {
-      var m = document.getElementById('profileModal'); if (!m) return;
-      document.querySelectorAll('#profileModal .pm-pane').forEach(function (p) { p.classList.remove('active'); });
-      var ip = document.getElementById('pm-info'); if (ip) ip.classList.add('active');
-      document.querySelectorAll('#profileModal .pm-tab').forEach(function (b, i) { b.classList.toggle('active-tab', i === 0); });
-      pmStagedFile = null; m.classList.add('show');
-      fetch('/api/my_profile', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
-        var em = document.getElementById('pmEmail'); if (em && d.email) em.value = d.email;
-        var ie = document.getElementById('pm_info_email'); if (ie) ie.textContent = d.email || '—';
-        var iu = document.getElementById('pm_info_username'); if (iu) iu.innerHTML = '<code>' + (d.username || '') + '</code>';
-        var eu = document.getElementById('pmUsername'); if (eu) eu.value = d.username || '';
-        var rp = document.getElementById('pmRolePill'); if (rp) rp.textContent = (d.role || 'admin').toUpperCase();
-        if (d.photo) { var url = '/static/uploads/' + d.photo + '?t=' + Date.now(); setAvatarImg('pmInfoAvatarWrap', url); setAvatarImg('pmEditAvatarWrap', url); }
-      }).catch(function () { });
-    }
-    function closePM() { var m = document.getElementById('profileModal'); if (m) m.classList.remove('show'); pmStagedFile = null; }
-    function switchPmTab(id, btn) {
-      document.querySelectorAll('#profileModal .pm-pane').forEach(function (p) { p.classList.remove('active'); });
-      document.querySelectorAll('#profileModal .pm-tab').forEach(function (b) { b.classList.remove('active-tab'); });
-      var p = document.getElementById('pm-' + id); if (p) p.classList.add('active'); if (btn) btn.classList.add('active-tab');
-    }
-    function stageAdminPhoto(input) { if (!input.files || !input.files[0]) return; pmStagedFile = input.files[0]; var reader = new FileReader(); reader.onload = function (e) { setAvatarImg('pmEditAvatarWrap', e.target.result); }; reader.readAsDataURL(pmStagedFile); }
-    function clearPmErr(el, errId) { el.style.borderColor = ''; var e = document.getElementById(errId); if (e) e.style.display = 'none'; }
-    function checkPmPwMatch() { var pw = document.getElementById('pmPass') ? document.getElementById('pmPass').value : ''; var pw2 = document.getElementById('pmPass2') ? document.getElementById('pmPass2').value : ''; var err = document.getElementById('pmPass2Err'); if (err) err.style.display = (pw && pw2 && pw !== pw2) ? 'block' : 'none'; }
-    async function requestProfilePasswordOtp(kind) {
-      var isTeacher = kind === 'teacher';
-      var prefix = isTeacher ? 'tpm' : 'pm';
-      var passEl = document.getElementById(prefix + 'Pass');
-      var pass = passEl ? passEl.value : '';
-      var msg = document.getElementById(prefix + 'Msg');
-      var hint = document.getElementById(prefix + 'OtpHint');
-      var btn = document.getElementById(prefix + 'OtpBtn');
-      if (!pass || pass.length < 6) {
-        if (passEl) passEl.style.borderColor = 'var(--danger)';
-        var perr = document.getElementById(prefix + 'PassErr');
-        if (perr) perr.style.display = 'block';
-        if (hint) { hint.style.color = 'var(--danger)'; hint.textContent = 'Enter your new password first before requesting OTP.'; }
-        return;
+      var pd = await pr.json();
+      if (pd.ok) {
+        setSidebarPhoto(pd.url);
+        setAvatarImg("pmInfoAvatarWrap", pd.url + "?t=" + Date.now());
       }
-      if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
-      try {
-        var r = await fetch('/request_password_change_otp', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-        var d = await r.json();
-        if (d.ok) {
-          if (hint) { hint.style.color = 'var(--success)'; hint.textContent = 'OTP sent to ' + (d.sent_to || 'your email') + '.'; }
-          if (msg) { msg.style.display = 'block'; msg.style.color = 'var(--success)'; msg.textContent = 'OTP sent. Enter the 6-digit code to continue.'; }
-        } else {
-          if (hint) { hint.style.color = 'var(--danger)'; hint.textContent = d.error || 'Unable to send OTP.'; }
-          if (msg) { msg.style.display = 'block'; msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Unable to send OTP.'; }
-        }
-      } catch (e) {
-        if (hint) { hint.style.color = 'var(--danger)'; hint.textContent = 'Network error while sending OTP.'; }
-      } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Send OTP'; }
+    } catch (e) {
+      console.warn(e);
+    }
+    pmStagedFile = null;
+  }
+  try {
+    var r = await fetch("/update_profile", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: name,
+        new_username: uname,
+        email: email,
+        password: pass || undefined,
+        password_otp: pass ? otp : undefined,
+      }),
+    });
+    var d = await r.json();
+    if (msg) msg.style.display = "block";
+    if (d.ok) {
+      if (msg) {
+        msg.style.color = "var(--success)";
+        msg.textContent = "✓ Profile saved!";
+      }
+      var sn = document.getElementById("sidebarName");
+      if (sn) sn.textContent = d.full_name;
+      var dn = document.getElementById("pmDisplayName");
+      if (dn) dn.textContent = d.full_name;
+      var ni = document.getElementById("pm_info_name");
+      if (ni) ni.textContent = d.full_name;
+      var ei = document.getElementById("pm_info_email");
+      if (ei && email) ei.textContent = email;
+      var ui = document.getElementById("pm_info_username");
+      if (ui) ui.textContent = "@" + stripUsernamePrefix(d.username || uname);
+      setTimeout(function () {
+        closePM();
+        if (msg) msg.style.display = "none";
+      }, 1400);
+    } else {
+      if (msg) {
+        msg.style.color = "var(--danger)";
+        msg.textContent = d.error || "Error saving.";
       }
     }
-    async function saveProfileModal() {
-      var name = document.getElementById('pmName') ? document.getElementById('pmName').value.trim() : '';
-      var uname = document.getElementById('pmUsername') ? document.getElementById('pmUsername').value.trim() : '';
-      var email = document.getElementById('pmEmail') ? document.getElementById('pmEmail').value.trim() : '';
-      var pass = document.getElementById('pmPass') ? document.getElementById('pmPass').value : '';
-      var pass2 = document.getElementById('pmPass2') ? document.getElementById('pmPass2').value : '';
-      var otp = document.getElementById('pmOtp') ? document.getElementById('pmOtp').value.trim() : '';
-      var msg = document.getElementById('pmMsg'); var ok = true;
-      if (!name) { var el = document.getElementById('pmName'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmNameErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (!uname) { var el = document.getElementById('pmUsername'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmUsernameErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { var el = document.getElementById('pmEmail'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmEmailErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (pass && pass.length < 6) { var el = document.getElementById('pmPass'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmPassErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (pass && pass2 && pass !== pass2) { var er = document.getElementById('pmPass2Err'); if (er) er.style.display = 'block'; ok = false; }
-      if (pass && (!otp || otp.length !== 6)) { var el = document.getElementById('pmOtp'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('pmOtpErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (!ok) return;
-      if (pmStagedFile) { var fd = new FormData(); fd.append('photo', pmStagedFile); fd.append('person_id', '{{ session.get("username","") }}'); try { var pr = await fetch('/upload_photo', { method: 'POST', credentials: 'same-origin', body: fd }); var pd = await pr.json(); if (pd.ok) { setSidebarPhoto(pd.url); setAvatarImg('pmInfoAvatarWrap', pd.url + '?t=' + Date.now()); } } catch (e) { console.warn(e); } pmStagedFile = null; }
-      try {
-        var r = await fetch('/update_profile', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: name, new_username: uname, email: email, password: pass || undefined, password_otp: pass ? otp : undefined }) });
-        var d = await r.json(); if (msg) msg.style.display = 'block';
-        if (d.ok) {
-          if (msg) { msg.style.color = 'var(--success)'; msg.textContent = '✓ Profile saved!'; }
-          var sn = document.getElementById('sidebarName'); if (sn) sn.textContent = d.full_name;
-          var dn = document.getElementById('pmDisplayName'); if (dn) dn.textContent = d.full_name;
-          var ni = document.getElementById('pm_info_name'); if (ni) ni.textContent = d.full_name;
-          var ei = document.getElementById('pm_info_email'); if (ei && email) ei.textContent = email;
-          var ui = document.getElementById('pm_info_username'); if (ui) ui.innerHTML = '<code>' + (d.username || uname) + '</code>';
-          setTimeout(function () { closePM(); if (msg) msg.style.display = 'none'; }, 1400);
-        } else { if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Error saving.'; } }
-      } catch (e) { if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = 'Network error.'; } }
+  } catch (e) {
+    if (msg) {
+      msg.style.color = "var(--danger)";
+      msg.textContent = "Network error.";
     }
+  }
+}
 
-    /* ══ TEACHER PROFILE MODAL ══ */
-    var tpmStagedFile = null;
-    function openTPM() {
-      var m = document.getElementById('teacherProfileModal'); if (!m) return;
-      document.querySelectorAll('#teacherProfileModal .pm-pane').forEach(function (p) { p.classList.remove('active'); });
-      var ip = document.getElementById('tpm-info'); if (ip) ip.classList.add('active');
-      document.querySelectorAll('#teacherProfileModal .pm-tab').forEach(function (b, i) { b.classList.toggle('active-tab', i === 0); });
-      tpmStagedFile = null; m.classList.add('show');
-      fetch('/api/my_profile', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
-        var em = document.getElementById('tpmEmail'); if (em && d.email) em.value = d.email;
-        var ie = document.getElementById('tpm_info_email'); if (ie) ie.textContent = d.email || '—';
-        var iu = document.getElementById('tpm_info_username'); if (iu) iu.innerHTML = '<code>' + d.username + '</code>';
-        var eu = document.getElementById('tpmUsername'); if (eu) eu.value = d.username || '';
-        var sw = document.getElementById('tpm_info_sections_wrap'); if (sw) sw.innerHTML = buildSectionAccordion(d.sections || []);
-        if (d.photo) { var url = '/static/uploads/' + d.photo + '?t=' + Date.now(); setAvatarImg('tpmInfoAvatarWrap', url); setAvatarImg('tpmEditAvatarWrap', url); }
-      }).catch(function () { });
+/* ══ TEACHER PROFILE MODAL ══ */
+var tpmStagedFile = null;
+function openTPM() {
+  var m = document.getElementById("teacherProfileModal");
+  if (!m) return;
+  document
+    .querySelectorAll("#teacherProfileModal .pm-pane")
+    .forEach(function (p) {
+      p.classList.remove("active");
+    });
+  var ip = document.getElementById("tpm-info");
+  if (ip) ip.classList.add("active");
+  document
+    .querySelectorAll("#teacherProfileModal .pm-tab")
+    .forEach(function (b, i) {
+      b.classList.toggle("active-tab", i === 0);
+    });
+  tpmStagedFile = null;
+  m.classList.add("show");
+  fetch("/api/my_profile", { credentials: "same-origin" })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (d) {
+      var em = document.getElementById("tpmEmail");
+      if (em && d.email) em.value = d.email;
+      var ie = document.getElementById("tpm_info_email");
+      if (ie) ie.textContent = d.email || "—";
+      var username = stripUsernamePrefix(d.username || "");
+      var iu = document.getElementById("tpm_info_username");
+      if (iu) iu.textContent = "@" + username;
+      var eu = document.getElementById("tpmUsername");
+      if (eu) eu.value = username;
+      var sw = document.getElementById("tpm_info_sections_wrap");
+      if (sw) sw.innerHTML = buildSectionAccordion(d.sections || []);
+      if (d.photo) {
+        var url = "/static/uploads/" + d.photo + "?t=" + Date.now();
+        setAvatarImg("tpmInfoAvatarWrap", url);
+        setAvatarImg("tpmEditAvatarWrap", url);
+      }
+    })
+    .catch(function () {});
+}
+function closeTPM() {
+  var m = document.getElementById("teacherProfileModal");
+  if (m) m.classList.remove("show");
+  tpmStagedFile = null;
+}
+function switchTPMTab(id, btn) {
+  document
+    .querySelectorAll("#teacherProfileModal .pm-pane")
+    .forEach(function (p) {
+      p.classList.remove("active");
+    });
+  document
+    .querySelectorAll("#teacherProfileModal .pm-tab")
+    .forEach(function (b) {
+      b.classList.remove("active-tab");
+    });
+  var p = document.getElementById("tpm-" + id);
+  if (p) p.classList.add("active");
+  if (btn) btn.classList.add("active-tab");
+}
+function stageTeacherPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  tpmStagedFile = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    setAvatarImg("tpmEditAvatarWrap", e.target.result);
+  };
+  reader.readAsDataURL(tpmStagedFile);
+}
+function clearTPMErr(el, errId) {
+  el.style.borderColor = "";
+  var e = document.getElementById(errId);
+  if (e) e.style.display = "none";
+}
+function checkTPMPwMatch() {
+  var pw = document.getElementById("tpmPass")
+    ? document.getElementById("tpmPass").value
+    : "";
+  var pw2 = document.getElementById("tpmPass2")
+    ? document.getElementById("tpmPass2").value
+    : "";
+  var err = document.getElementById("tpmPass2Err");
+  if (err) err.style.display = pw && pw2 && pw !== pw2 ? "block" : "none";
+}
+async function saveTeacherProfile() {
+  var name = document.getElementById("tpmName")
+    ? document.getElementById("tpmName").value.trim()
+    : "";
+  var uname = document.getElementById("tpmUsername")
+    ? document.getElementById("tpmUsername").value.trim()
+    : "";
+  var email = document.getElementById("tpmEmail")
+    ? document.getElementById("tpmEmail").value.trim()
+    : "";
+  var pass = document.getElementById("tpmPass")
+    ? document.getElementById("tpmPass").value
+    : "";
+  var pass2 = document.getElementById("tpmPass2")
+    ? document.getElementById("tpmPass2").value
+    : "";
+  var otp = document.getElementById("tpmOtp")
+    ? document.getElementById("tpmOtp").value.trim()
+    : "";
+  var msg = document.getElementById("tpmMsg");
+  var ok = true;
+  if (!name) {
+    var el = document.getElementById("tpmName");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("tpmNameErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (!uname) {
+    var el = document.getElementById("tpmUsername");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("tpmUsernameErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    var el = document.getElementById("tpmEmail");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("tpmEmailErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (pass && pass.length < 6) {
+    var el = document.getElementById("tpmPass");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("tpmPassErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (pass && pass2 && pass !== pass2) {
+    var er = document.getElementById("tpmPass2Err");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (pass && (!otp || otp.length !== 6)) {
+    var el = document.getElementById("tpmOtp");
+    if (el) el.style.borderColor = "var(--danger)";
+    var er = document.getElementById("tpmOtpErr");
+    if (er) er.style.display = "block";
+    ok = false;
+  }
+  if (!ok) return;
+  uname = stripUsernamePrefix(uname);
+  if (tpmStagedFile) {
+    var fd = new FormData();
+    fd.append("photo", tpmStagedFile);
+    fd.append("person_id", '{{ session.get("username","") }}');
+    try {
+      var pr = await fetch("/upload_photo", {
+        method: "POST",
+        credentials: "same-origin",
+        body: fd,
+      });
+      var pd = await pr.json();
+      if (pd.ok) {
+        setSidebarPhoto(pd.url);
+        setAvatarImg("tpmInfoAvatarWrap", pd.url + "?t=" + Date.now());
+      }
+    } catch (e) {
+      console.warn(e);
     }
-    function closeTPM() { var m = document.getElementById('teacherProfileModal'); if (m) m.classList.remove('show'); tpmStagedFile = null; }
-    function switchTPMTab(id, btn) {
-      document.querySelectorAll('#teacherProfileModal .pm-pane').forEach(function (p) { p.classList.remove('active'); });
-      document.querySelectorAll('#teacherProfileModal .pm-tab').forEach(function (b) { b.classList.remove('active-tab'); });
-      var p = document.getElementById('tpm-' + id); if (p) p.classList.add('active'); if (btn) btn.classList.add('active-tab');
+    tpmStagedFile = null;
+  }
+  try {
+    var r = await fetch("/update_profile", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: name,
+        new_username: uname,
+        email: email,
+        password: pass || undefined,
+        password_otp: pass ? otp : undefined,
+      }),
+    });
+    var d = await r.json();
+    if (msg) msg.style.display = "block";
+    if (d.ok) {
+      if (msg) {
+        msg.style.color = "var(--success)";
+        msg.textContent = "✓ Profile saved!";
+      }
+      var sn = document.getElementById("sidebarName");
+      if (sn) sn.textContent = d.full_name;
+      var dn = document.getElementById("tpmDisplayName");
+      if (dn) dn.textContent = d.full_name;
+      var ni = document.getElementById("tpm_info_name");
+      if (ni) ni.textContent = d.full_name;
+      var ei = document.getElementById("tpm_info_email");
+      if (ei && email) ei.textContent = email;
+      var ui = document.getElementById("tpm_info_username");
+      if (ui) ui.textContent = "@" + uname;
+      setTimeout(function () {
+        closeTPM();
+        if (msg) msg.style.display = "none";
+      }, 1400);
+    } else {
+      if (msg) {
+        msg.style.color = "var(--danger)";
+        msg.textContent = d.error || "Error saving.";
+      }
     }
-    function stageTeacherPhoto(input) { if (!input.files || !input.files[0]) return; tpmStagedFile = input.files[0]; var reader = new FileReader(); reader.onload = function (e) { setAvatarImg('tpmEditAvatarWrap', e.target.result); }; reader.readAsDataURL(tpmStagedFile); }
-    function clearTPMErr(el, errId) { el.style.borderColor = ''; var e = document.getElementById(errId); if (e) e.style.display = 'none'; }
-    function checkTPMPwMatch() { var pw = document.getElementById('tpmPass') ? document.getElementById('tpmPass').value : ''; var pw2 = document.getElementById('tpmPass2') ? document.getElementById('tpmPass2').value : ''; var err = document.getElementById('tpmPass2Err'); if (err) err.style.display = (pw && pw2 && pw !== pw2) ? 'block' : 'none'; }
-    async function saveTeacherProfile() {
-      var name = document.getElementById('tpmName') ? document.getElementById('tpmName').value.trim() : '';
-      var uname = document.getElementById('tpmUsername') ? document.getElementById('tpmUsername').value.trim() : '';
-      var email = document.getElementById('tpmEmail') ? document.getElementById('tpmEmail').value.trim() : '';
-      var pass = document.getElementById('tpmPass') ? document.getElementById('tpmPass').value : '';
-      var pass2 = document.getElementById('tpmPass2') ? document.getElementById('tpmPass2').value : '';
-      var otp = document.getElementById('tpmOtp') ? document.getElementById('tpmOtp').value.trim() : '';
-      var msg = document.getElementById('tpmMsg'); var ok = true;
-      if (!name) { var el = document.getElementById('tpmName'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmNameErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (!uname) { var el = document.getElementById('tpmUsername'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmUsernameErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { var el = document.getElementById('tpmEmail'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmEmailErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (pass && pass.length < 6) { var el = document.getElementById('tpmPass'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmPassErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (pass && pass2 && pass !== pass2) { var er = document.getElementById('tpmPass2Err'); if (er) er.style.display = 'block'; ok = false; }
-      if (pass && (!otp || otp.length !== 6)) { var el = document.getElementById('tpmOtp'); if (el) el.style.borderColor = 'var(--danger)'; var er = document.getElementById('tpmOtpErr'); if (er) er.style.display = 'block'; ok = false; }
-      if (!ok) return;
-      if (tpmStagedFile) { var fd = new FormData(); fd.append('photo', tpmStagedFile); fd.append('person_id', '{{ session.get("username","") }}'); try { var pr = await fetch('/upload_photo', { method: 'POST', credentials: 'same-origin', body: fd }); var pd = await pr.json(); if (pd.ok) { setSidebarPhoto(pd.url); setAvatarImg('tpmInfoAvatarWrap', pd.url + '?t=' + Date.now()); } } catch (e) { console.warn(e); } tpmStagedFile = null; }
-      try {
-        var r = await fetch('/update_profile', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: name, new_username: uname, email: email, password: pass || undefined, password_otp: pass ? otp : undefined }) });
-        var d = await r.json(); if (msg) msg.style.display = 'block';
-        if (d.ok) {
-          if (msg) { msg.style.color = 'var(--success)'; msg.textContent = '✓ Profile saved!'; }
-          var sn = document.getElementById('sidebarName'); if (sn) sn.textContent = d.full_name;
-          var dn = document.getElementById('tpmDisplayName'); if (dn) dn.textContent = d.full_name;
-          var ni = document.getElementById('tpm_info_name'); if (ni) ni.textContent = d.full_name;
-          var ei = document.getElementById('tpm_info_email'); if (ei && email) ei.textContent = email;
-          var ui = document.getElementById('tpm_info_username'); if (ui) ui.innerHTML = '<code>' + uname + '</code>';
-          setTimeout(function () { closeTPM(); if (msg) msg.style.display = 'none'; }, 1400);
-        } else { if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Error saving.'; } }
-      } catch (e) { if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = 'Network error.'; } }
+  } catch (e) {
+    if (msg) {
+      msg.style.color = "var(--danger)";
+      msg.textContent = "Network error.";
     }
+  }
+}
 
-    /* ══ BLOCKCHAIN STATUS ══ */
-    function updateChainBadge() { fetch('/api/blockchain_status', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) { var badge = document.getElementById('chainBadge'), lbl = document.getElementById('chainStatus'); if (!badge || !lbl) return; if (d.online) { badge.classList.remove('offline'); lbl.textContent = 'Blockchain Online'; } else { badge.classList.add('offline'); lbl.textContent = 'Offline — ' + d.student_cache_count + ' cached'; } }).catch(function () { var badge = document.getElementById('chainBadge'), lbl = document.getElementById('chainStatus'); if (badge) badge.classList.add('offline'); if (lbl) lbl.textContent = 'Network error'; }); }
-    updateChainBadge(); setInterval(updateChainBadge, 10000);
+/* ══ BLOCKCHAIN STATUS ══ */
+function updateChainBadge() {
+  fetch("/api/blockchain_status", { credentials: "same-origin" })
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (d) {
+      var badge = document.getElementById("chainBadge"),
+        lbl = document.getElementById("chainStatus");
+      if (!badge || !lbl) return;
+      if (d.online) {
+        badge.classList.remove("offline");
+        lbl.textContent = "Blockchain Online";
+      } else {
+        badge.classList.add("offline");
+        lbl.textContent = "Offline — " + d.student_cache_count + " cached";
+      }
+    })
+    .catch(function () {
+      var badge = document.getElementById("chainBadge"),
+        lbl = document.getElementById("chainStatus");
+      if (badge) badge.classList.add("offline");
+      if (lbl) lbl.textContent = "Network error";
+    });
+}
+updateChainBadge();
+setInterval(updateChainBadge, 10000);
 
-    // ── Shared export button animation ────────────────────────────────────────
-    // Call this on ANY export button: animateExportBtn(btn, '/export/url?params')
-    // The button shows "Exporting…" for 2s then resets. Works for all export types.
-    function animateExportBtn(btn, url) {
-      const original = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Exporting…';
-      const a = document.createElement('a');
-      a.href = url;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.innerHTML = original;
-      }, 2000);
-    }
-
+// ── Shared export button animation ────────────────────────────────────────
+// Call this on ANY export button: animateExportBtn(btn, '/export/url?params')
+// The button shows "Exporting…" for 2s then resets. Works for all export types.
+function animateExportBtn(btn, url) {
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Exporting…';
+  const a = document.createElement("a");
+  a.href = url;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }, 2000);
+}
 
 // --- Phone NFC Logic ---
 let phoneNfcCtrl = null;
@@ -393,15 +952,17 @@ let phoneNfcCtrl = null;
  * Supports byte reversal (LSB vs MSB)
  */
 function nfcHexToDec(hex, reverse = false) {
-  if (!hex) return '';
+  if (!hex) return "";
   let finalHex = hex;
   if (reverse) {
     // Robust byte reversal for any even-length hex string
     let pairs = hex.match(/.{1,2}/g) || [];
-    finalHex = pairs.reverse().join('');
+    finalHex = pairs.reverse().join("");
   }
   try {
-    return BigInt('0x' + finalHex).toString().padStart(10, '0');
+    return BigInt("0x" + finalHex)
+      .toString()
+      .padStart(10, "0");
   } catch (e) {
     console.error("NFC Conversion Error:", e);
     return finalHex;
@@ -409,26 +970,27 @@ function nfcHexToDec(hex, reverse = false) {
 }
 
 // Load preference from localStorage, default to true (LSB) as it matches the user's laptop reader
-let _phoneNfcReverse = localStorage.getItem('davs_nfc_reverse') !== 'false';
-let _lastRawHex = '';
+let _phoneNfcReverse = localStorage.getItem("davs_nfc_reverse") !== "false";
+let _lastRawHex = "";
 
 function startPhoneNFC() {
-  const modal = document.getElementById('phoneNfcModal');
-  if (modal) modal.classList.add('show');
-  
+  const modal = document.getElementById("phoneNfcModal");
+  if (modal) modal.classList.add("show");
+
   // Initialize checkbox state
-  const chk = document.getElementById('chkNfcReverse');
+  const chk = document.getElementById("chkNfcReverse");
   if (chk) chk.checked = _phoneNfcReverse;
-  
-  const icon = document.getElementById('phoneNfcIcon');
-  const title = document.getElementById('phoneNfcTitle');
-  const desc = document.getElementById('phoneNfcDesc');
-  
-  title.textContent = 'Phone NFC v2.1';
-  
-  if (!('NDEFReader' in window)) {
-    icon.innerHTML = '<i class="bi bi-exclamation-triangle-fill" style="color:var(--warning); font-size: 40px;"></i>';
-    title.textContent = 'Device Not Compatible';
+
+  const icon = document.getElementById("phoneNfcIcon");
+  const title = document.getElementById("phoneNfcTitle");
+  const desc = document.getElementById("phoneNfcDesc");
+
+  title.textContent = "Phone NFC v2.1";
+
+  if (!("NDEFReader" in window)) {
+    icon.innerHTML =
+      '<i class="bi bi-exclamation-triangle-fill" style="color:var(--warning); font-size: 40px;"></i>';
+    title.textContent = "Device Not Compatible";
     desc.innerHTML = `
       <div style="text-align: left; font-size: 13px; line-height: 1.5; color: var(--text);">
         <p>Web NFC is currently only supported on <b>Android phones</b> using <b>Google Chrome</b>.</p>
@@ -447,197 +1009,245 @@ function startPhoneNFC() {
     return;
   }
 
-  icon.innerHTML = '<div style="width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto;"></div>';
-  title.textContent = 'Connecting...';
-  desc.textContent = 'Please allow NFC permissions if prompted.';
+  icon.innerHTML =
+    '<div style="width:48px;height:48px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto;"></div>';
+  title.textContent = "Connecting...";
+  desc.textContent = "Please allow NFC permissions if prompted.";
 
   try {
     const ndef = new window.NDEFReader();
     phoneNfcCtrl = new AbortController();
-    ndef.scan({ signal: phoneNfcCtrl.signal }).then(() => {
-      icon.innerHTML = '<i class="bi bi-check-circle-fill" style="color:var(--success);"></i>';
-      title.textContent = 'NFC Connected';
-      desc.textContent = 'You can now use your phone to read NFC cards. Close this popup to continue reading.';
-      
-      ndef.onreadingerror = () => {
-        showAppToast("NFC Read Error - Please try again", "error");
-      };
-      
-      ndef.onreading = (event) => {
-        let serial = event.serialNumber;
-        let rawUid = '';
-        
-        if (serial) {
-          rawUid = serial.replace(/:/g, '').toUpperCase();
-        } else if (event.message && event.message.records && event.message.records.length > 0) {
-          const record = event.message.records[0];
-          if (record.data) {
-            rawUid = new TextDecoder().decode(record.data).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    ndef
+      .scan({ signal: phoneNfcCtrl.signal })
+      .then(() => {
+        icon.innerHTML =
+          '<i class="bi bi-check-circle-fill" style="color:var(--success);"></i>';
+        title.textContent = "NFC Connected";
+        desc.textContent =
+          "You can now use your phone to read NFC cards. Close this popup to continue reading.";
+
+        ndef.onreadingerror = () => {
+          showAppToast("NFC Read Error - Please try again", "error");
+        };
+
+        ndef.onreading = (event) => {
+          let serial = event.serialNumber;
+          let rawUid = "";
+
+          if (serial) {
+            rawUid = serial.replace(/:/g, "").toUpperCase();
+          } else if (
+            event.message &&
+            event.message.records &&
+            event.message.records.length > 0
+          ) {
+            const record = event.message.records[0];
+            if (record.data) {
+              rawUid = new TextDecoder()
+                .decode(record.data)
+                .replace(/[^a-zA-Z0-9]/g, "")
+                .toUpperCase();
+            }
           }
-        }
 
-        if (!rawUid) return;
-        _lastRawHex = rawUid;
+          if (!rawUid) return;
+          _lastRawHex = rawUid;
 
-        // Convert to Decimal
-        const uid = nfcHexToDec(rawUid, _phoneNfcReverse);
+          // Convert to Decimal
+          const uid = nfcHexToDec(rawUid, _phoneNfcReverse);
 
-        // Update Modal UI
-        const lastUidEl = document.getElementById('phoneNfcLastUid');
-        const hexEl = document.getElementById('phoneNfcHex');
-        if (lastUidEl) {
-          lastUidEl.textContent = uid;
-          lastUidEl.style.color = 'var(--success)';
-          setTimeout(() => { if(lastUidEl) lastUidEl.style.color = ''; }, 1000);
-        }
-        if (hexEl) {
-          // Show formatted hex for debugging (MSB or LSB based on setting)
-          let displayHex = rawUid;
-          if (_phoneNfcReverse) {
-             let pairs = [];
-             for (let i = 0; i < rawUid.length; i += 2) pairs.push(rawUid.substring(i, i + 2));
-             displayHex = pairs.reverse().join('');
+          // Update Modal UI
+          const lastUidEl = document.getElementById("phoneNfcLastUid");
+          const hexEl = document.getElementById("phoneNfcHex");
+          if (lastUidEl) {
+            lastUidEl.textContent = uid;
+            lastUidEl.style.color = "var(--success)";
+            setTimeout(() => {
+              if (lastUidEl) lastUidEl.style.color = "";
+            }, 1000);
           }
-          hexEl.textContent = displayHex.match(/.{1,2}/g).join(':');
-        }
+          if (hexEl) {
+            // Show formatted hex for debugging (MSB or LSB based on setting)
+            let displayHex = rawUid;
+            if (_phoneNfcReverse) {
+              let pairs = [];
+              for (let i = 0; i < rawUid.length; i += 2)
+                pairs.push(rawUid.substring(i, i + 2));
+              displayHex = pairs.reverse().join("");
+            }
+            hexEl.textContent = displayHex.match(/.{1,2}/g).join(":");
+          }
 
-        // Vibrate to confirm read
-        if (window.navigator && window.navigator.vibrate) {
-          window.navigator.vibrate(100);
-        }
+          // Vibrate to confirm read
+          if (window.navigator && window.navigator.vibrate) {
+            window.navigator.vibrate(100);
+          }
 
-        // --- SMART DISPATCH LOGIC ---
-        const panelBatch = document.getElementById('panelBatch');
-        const phase2 = document.getElementById('batchPhase2') || document.getElementById('phase2');
-        const isBatchNFC = panelBatch && panelBatch.classList.contains('active') && 
-                           phase2 && phase2.classList.contains('active');
-        
-        if (typeof window.handleNFCTap === 'function' && isBatchNFC) {
-           window.handleNFCTap(uid);
-        } 
-        else if (typeof window.s_applyUID === 'function') {
-           try {
-             window.s_applyUID(uid);
-           } catch(e) {
-             console.error("Error in s_applyUID:", e);
-           }
-        }
-        else if (typeof window.processNFCUid === 'function') {
-           window.processNFCUid(uid);
-        }
-        else {
-           // Fallback to HID scan simulation
-           const hidInput = document.getElementById('nfcHidInput') || document.getElementById('nfcHiddenInput');
-           if (hidInput) {
-             hidInput.value = uid;
-             hidInput.dispatchEvent(new Event('input', { bubbles: true }));
-             for(let i=0; i<uid.length; i++) {
-                hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: uid[i] }));
-             }
-             hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
-           }
-        }
-      };
-    }).catch(error => {
-      icon.innerHTML = '<i class="bi bi-x-circle-fill" style="color:var(--danger);"></i>';
-      title.textContent = 'NFC Access Denied';
-      desc.textContent = error.message || 'Could not start NFC scan. Please check your browser settings.';
-    });
+          // --- SMART DISPATCH LOGIC ---
+          const panelBatch = document.getElementById("panelBatch");
+          const phase2 =
+            document.getElementById("batchPhase2") ||
+            document.getElementById("phase2");
+          const isBatchNFC =
+            panelBatch &&
+            panelBatch.classList.contains("active") &&
+            phase2 &&
+            phase2.classList.contains("active");
+
+          if (typeof window.handleNFCTap === "function" && isBatchNFC) {
+            window.handleNFCTap(uid);
+          } else if (typeof window.s_applyUID === "function") {
+            try {
+              window.s_applyUID(uid);
+            } catch (e) {
+              console.error("Error in s_applyUID:", e);
+            }
+          } else if (typeof window.processNFCUid === "function") {
+            window.processNFCUid(uid);
+          } else {
+            // Fallback to HID scan simulation
+            const hidInput =
+              document.getElementById("nfcHidInput") ||
+              document.getElementById("nfcHiddenInput");
+            if (hidInput) {
+              hidInput.value = uid;
+              hidInput.dispatchEvent(new Event("input", { bubbles: true }));
+              for (let i = 0; i < uid.length; i++) {
+                hidInput.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: uid[i] }),
+                );
+              }
+              hidInput.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                  key: "Enter",
+                  code: "Enter",
+                  keyCode: 13,
+                  which: 13,
+                }),
+              );
+            }
+          }
+        };
+      })
+      .catch((error) => {
+        icon.innerHTML =
+          '<i class="bi bi-x-circle-fill" style="color:var(--danger);"></i>';
+        title.textContent = "NFC Access Denied";
+        desc.textContent =
+          error.message ||
+          "Could not start NFC scan. Please check your browser settings.";
+      });
   } catch (error) {
-    icon.innerHTML = '<i class="bi bi-x-circle-fill" style="color:var(--danger);"></i>';
-    title.textContent = 'NFC Error';
+    icon.innerHTML =
+      '<i class="bi bi-x-circle-fill" style="color:var(--danger);"></i>';
+    title.textContent = "NFC Error";
     desc.textContent = error.message;
   }
 }
 
 function closePhoneNFC() {
-  const modal = document.getElementById('phoneNfcModal');
-  if (modal) modal.classList.remove('show');
+  const modal = document.getElementById("phoneNfcModal");
+  if (modal) modal.classList.remove("show");
 }
 
 function toggleNfcReverse(checked) {
   _phoneNfcReverse = checked;
-  localStorage.setItem('davs_nfc_reverse', checked);
-  
+  localStorage.setItem("davs_nfc_reverse", checked);
+
   if (_lastRawHex) {
     const uid = nfcHexToDec(_lastRawHex, _phoneNfcReverse);
-    const lastUidEl = document.getElementById('phoneNfcLastUid');
-    const hexEl = document.getElementById('phoneNfcHex');
+    const lastUidEl = document.getElementById("phoneNfcLastUid");
+    const hexEl = document.getElementById("phoneNfcHex");
     if (lastUidEl) lastUidEl.textContent = uid;
-    
+
     if (hexEl) {
       let displayHex = _lastRawHex;
       if (_phoneNfcReverse) {
-         let pairs = [];
-         for (let i = 0; i < _lastRawHex.length; i += 2) pairs.push(_lastRawHex.substring(i, i + 2));
-         displayHex = pairs.reverse().join('');
+        let pairs = [];
+        for (let i = 0; i < _lastRawHex.length; i += 2)
+          pairs.push(_lastRawHex.substring(i, i + 2));
+        displayHex = pairs.reverse().join("");
       }
-      hexEl.textContent = displayHex.match(/.{1,2}/g).join(':');
+      hexEl.textContent = displayHex.match(/.{1,2}/g).join(":");
     }
-    
+
     // Dispatch updated UID to consumers
     // --- SMART DISPATCH LOGIC (REPEAT) ---
-    const panelBatch = document.getElementById('panelBatch');
-    const phase2 = document.getElementById('batchPhase2') || document.getElementById('phase2');
-    const isBatchNFC = panelBatch && panelBatch.classList.contains('active') && 
-                       phase2 && phase2.classList.contains('active');
-    
-    if (typeof window.handleNFCTap === 'function' && isBatchNFC) {
-       window.handleNFCTap(uid);
-    } 
-    else if (typeof window.s_applyUID === 'function') {
-       try { window.s_applyUID(uid); } catch(e) {}
-    }
-    else if (typeof window.processNFCUid === 'function') {
-       window.processNFCUid(uid);
+    const panelBatch = document.getElementById("panelBatch");
+    const phase2 =
+      document.getElementById("batchPhase2") ||
+      document.getElementById("phase2");
+    const isBatchNFC =
+      panelBatch &&
+      panelBatch.classList.contains("active") &&
+      phase2 &&
+      phase2.classList.contains("active");
+
+    if (typeof window.handleNFCTap === "function" && isBatchNFC) {
+      window.handleNFCTap(uid);
+    } else if (typeof window.s_applyUID === "function") {
+      try {
+        window.s_applyUID(uid);
+      } catch (e) {}
+    } else if (typeof window.processNFCUid === "function") {
+      window.processNFCUid(uid);
     }
   }
 }
 
-
-
 // DevTools helper to test NFC scanning without a device
 // Call testNFC('A1B2C3D4') in the browser console.
-window.testNFC = function(uid) {
-  if (!uid) uid = '04A1B2C3D4E5F6';
-  console.log('Simulating NFC tap:', uid);
-  
+window.testNFC = function (uid) {
+  if (!uid) uid = "04A1B2C3D4E5F6";
+  console.log("Simulating NFC tap:", uid);
+
   // 1. Check for Enrollment Page (Batch vs Single)
-  const panelBatch = document.getElementById('panelBatch');
-  const phase2 = document.getElementById('batchPhase2');
-  const isBatchNFC = panelBatch && panelBatch.classList.contains('active') && 
-                     phase2 && phase2.classList.contains('active');
-  
-  if (typeof window.handleNFCTap === 'function' && isBatchNFC) {
-     window.handleNFCTap(uid);
-  } 
-  else if (typeof window.s_applyUID === 'function') {
-     try {
-       window.s_applyUID(uid);
-     } catch(e) {
-       alert("testNFC Error: " + e.message);
-     }
-  }
-  else if (typeof window.processNFCUid === 'function') {
-     window.processNFCUid(uid);
-  }
-  else {
-     const hidInput = document.getElementById('nfcHidInput') || document.getElementById('nfcHiddenInput');
-     if (hidInput) {
-       hidInput.value = uid;
-       hidInput.dispatchEvent(new Event('input', { bubbles: true }));
-        for(let i=0; i<uid.length; i++) {
-          hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: uid[i] }));
-        }
-        hidInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13 }));
+  const panelBatch = document.getElementById("panelBatch");
+  const phase2 = document.getElementById("batchPhase2");
+  const isBatchNFC =
+    panelBatch &&
+    panelBatch.classList.contains("active") &&
+    phase2 &&
+    phase2.classList.contains("active");
+
+  if (typeof window.handleNFCTap === "function" && isBatchNFC) {
+    window.handleNFCTap(uid);
+  } else if (typeof window.s_applyUID === "function") {
+    try {
+      window.s_applyUID(uid);
+    } catch (e) {
+      alert("testNFC Error: " + e.message);
+    }
+  } else if (typeof window.processNFCUid === "function") {
+    window.processNFCUid(uid);
+  } else {
+    const hidInput =
+      document.getElementById("nfcHidInput") ||
+      document.getElementById("nfcHiddenInput");
+    if (hidInput) {
+      hidInput.value = uid;
+      hidInput.dispatchEvent(new Event("input", { bubbles: true }));
+      for (let i = 0; i < uid.length; i++) {
+        hidInput.dispatchEvent(new KeyboardEvent("keydown", { key: uid[i] }));
       }
-   }
+      hidInput.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          code: "Enter",
+          keyCode: 13,
+          which: 13,
+        }),
+      );
+    }
+  }
 };
 
 /* ══ DRAGGABLE + RESIZABLE MODALS (Desktop Only, ≥769px) ══ */
-(function() {
-  const MODAL_SELECTORS = '.modal-box, .sess-modal, .stud-modal, .pm-modal, .app-dialog-box, .app-dialog';
-  const HEADER_SELECTORS = '.modal-header-cs, .sm-bar, .stud-bar, .pm-modal-header, .app-dialog-head, .app-dialog-header, .modal-header, [class*="modal-header"], [class*="-bar"]';
+(function () {
+  const MODAL_SELECTORS =
+    ".modal-box, .sess-modal, .stud-modal, .pm-modal, .app-dialog-box, .app-dialog";
+  const HEADER_SELECTORS =
+    '.modal-header-cs, .sm-bar, .stud-bar, .pm-modal-header, .app-dialog-head, .app-dialog-header, .modal-header, [class*="modal-header"], [class*="-bar"]';
 
   function findDragHandle(modal) {
     // Try known header selectors first
@@ -645,7 +1255,8 @@ window.testNFC = function(uid) {
     if (header) return header;
     // Fallback: use the first direct child if it looks like a header
     const first = modal.children[0];
-    if (first && (first.tagName === 'DIV' || first.tagName === 'HEADER')) return first;
+    if (first && (first.tagName === "DIV" || first.tagName === "HEADER"))
+      return first;
     return null;
   }
 
@@ -653,40 +1264,53 @@ window.testNFC = function(uid) {
     if (modal.dataset.draggableInit) return;
     const header = findDragHandle(modal);
     if (!header) return;
-    modal.dataset.draggableInit = '1';
-    header.style.cursor = 'grab';
-    header.title = 'Drag to reposition';
+    modal.dataset.draggableInit = "1";
+    header.style.cursor = "grab";
+    header.title = "Drag to reposition";
 
-    let dragging = false, startX, startY, initX, initY;
+    let dragging = false,
+      startX,
+      startY,
+      initX,
+      initY;
 
-    header.addEventListener('mousedown', function(e) {
+    header.addEventListener("mousedown", function (e) {
       if (window.innerWidth <= 768) return;
-      if (e.target.closest('button, a, input, select')) return;
+      if (e.target.closest("button, a, input, select")) return;
       dragging = true;
-      header.style.cursor = 'grabbing';
-      modal.style.transition = 'none';
+      header.style.cursor = "grabbing";
+      modal.style.transition = "none";
 
       // Read current translate
-      let tx = 0, ty = 0;
+      let tx = 0,
+        ty = 0;
       const tr = window.getComputedStyle(modal).transform;
-      if (tr && tr !== 'none') {
-        try { const m = new DOMMatrixReadOnly(tr); tx = m.m41; ty = m.m42; } catch(_) {}
+      if (tr && tr !== "none") {
+        try {
+          const m = new DOMMatrixReadOnly(tr);
+          tx = m.m41;
+          ty = m.m42;
+        } catch (_) {}
       }
-      startX = e.clientX; startY = e.clientY;
-      initX = tx; initY = ty;
+      startX = e.clientX;
+      startY = e.clientY;
+      initX = tx;
+      initY = ty;
 
       function onMove(e) {
         if (!dragging) return;
-        modal.style.transform = `translate(${initX + e.clientX - startX}px, ${initY + e.clientY - startY}px)`;
+        modal.style.transform = `translate(${initX + e.clientX - startX}px, ${
+          initY + e.clientY - startY
+        }px)`;
       }
       function onUp() {
         dragging = false;
-        header.style.cursor = 'grab';
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
+        header.style.cursor = "grab";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
       }
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
     });
   }
 
@@ -696,16 +1320,16 @@ window.testNFC = function(uid) {
   }
 
   // Reset transforms on resize to mobile
-  window.addEventListener('resize', function() {
+  window.addEventListener("resize", function () {
     if (window.innerWidth <= 768) {
-      document.querySelectorAll(MODAL_SELECTORS).forEach(m => {
-        m.style.transform = '';
-        m.dataset.draggableInit = '';
+      document.querySelectorAll(MODAL_SELECTORS).forEach((m) => {
+        m.style.transform = "";
+        m.dataset.draggableInit = "";
       });
     }
   });
 
-  window.addEventListener('load', makeDraggable);
+  window.addEventListener("load", makeDraggable);
   // Re-scan whenever any element is clicked (catches dynamically shown modals)
-  document.addEventListener('click', () => setTimeout(makeDraggable, 120));
+  document.addEventListener("click", () => setTimeout(makeDraggable, 120));
 })();

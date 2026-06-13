@@ -1,456 +1,1314 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}DAVS{% endblock %}</title>
+    <script src="{{ url_for('static', filename='js/base_head.js') }}"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+    {% block extra_head %}{% endblock %}
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/base.css') }}"
+    />
+  </head>
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}DAVS{% endblock %}</title>
-  <script src="{{ url_for('static', filename='js/base_head.js') }}"></script>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap"
-    rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet" />
-  {% block extra_head %}{% endblock %}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}" />
-</head>
-
-<body>
-
-  <!-- ════ ADMIN PROFILE MODAL ════ -->
-  {% if session.get('role') in ('admin', 'super_admin') %}
-  <div class="pm-overlay" id="profileModal" onclick="if(event.target===this)closePM()">
-    <div class="pm-modal">
-      <div class="pm-modal-header">
-        <button onclick="closePM()"
-          style="background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;flex-shrink:0;"><i
-            class="bi bi-arrow-left"></i> Back</button>
-        <span
-          style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#fff;flex:1;min-width:0;">My
-          Profile</span>
-        <span id="pmRolePill"
-          style="background:rgba(255,255,255,.22);color:#fff;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;flex-shrink:0;"></span>
-      </div>
-      <div class="pm-tab-bar">
-        <button class="pm-tab active-tab" onclick="switchPmTab('info',this)"><i class="bi bi-person-lines-fill"></i>
-          Info</button>
-        <button class="pm-tab" onclick="switchPmTab('edit',this)"><i class="bi bi-pencil-square"></i> Edit</button>
-      </div>
-      <div class="pm-pane active" id="pm-info">
-        <div class="pm-body">
-          <div class="pm-avatar-block">
-            <div style="position:relative; width:72px; height:72px; margin:0 auto;">
-              <div id="pmInfoAvatarWrap"
-                style="width:100%;height:100%;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;border:3px solid var(--accent);">
-                {{ (session.get('full_name') or '?')[0].upper() }}</div>
-              <div class="zoom-hint" onclick="var img=document.querySelector('#pmInfoAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')" style="position:absolute; bottom:0; right:0; width:22px; height:22px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); border:2px solid #fff; color:#000; font-size:10px;"><i class="bi bi-zoom-in"></i></div>
-            </div>
-            <div class="pm-display-name" id="pmDisplayName">{{ session.get('full_name','') }}</div>
-            <div class="pm-display-sub">System Administrator · CvSU Silang DAVS</div>
-          </div>
-          <div id="pmInfoRows">
-            <div class="pm-info-row"><span class="pm-info-lbl">Full Name</span><span class="pm-info-val"
-                id="pm_info_name">{{ session.get('full_name','') }}</span></div>
-            <div class="pm-info-row"><span class="pm-info-lbl">Username</span><span class="pm-info-val"><code
-                  id="pm_info_username">{{ session.get('username','') }}</code></span></div>
-            <div class="pm-info-row"><span class="pm-info-lbl">Email</span><span class="pm-info-val"
-                id="pm_info_email">—</span></div>
-            <div class="pm-info-row" style="border-bottom:none;"><span class="pm-info-lbl">Role</span><span
-                class="pm-info-val"><span class="pill-ok">Admin</span></span></div>
-          </div>
+  <body>
+    <!-- ════ ADMIN PROFILE MODAL ════ -->
+    {% if session.get('role') in ('admin', 'super_admin') %}
+    <div
+      class="pm-overlay"
+      id="profileModal"
+      onclick="if(event.target===this)closePM()"
+    >
+      <div class="pm-modal">
+        <div class="pm-modal-header">
+          <button
+            onclick="closePM()"
+            style="
+              background: rgba(255, 255, 255, 0.18);
+              border: none;
+              color: #fff;
+              border-radius: 8px;
+              padding: 6px 14px;
+              font-size: 12px;
+              font-weight: 700;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 5px;
+              font-family: 'DM Sans', sans-serif;
+              flex-shrink: 0;
+            "
+          >
+            <i class="bi bi-arrow-left"></i> Back
+          </button>
+          <span
+            style="
+              font-family: 'Space Mono', monospace;
+              font-size: 13px;
+              font-weight: 700;
+              color: #fff;
+              flex: 1;
+              min-width: 0;
+            "
+            >My Profile</span
+          >
+          <span
+            id="pmRolePill"
+            style="
+              background: rgba(255, 255, 255, 0.22);
+              color: #fff;
+              border-radius: 20px;
+              padding: 3px 12px;
+              font-size: 11px;
+              font-weight: 700;
+              flex-shrink: 0;
+            "
+          ></span>
         </div>
-      </div>
-      <div class="pm-pane" id="pm-edit">
-        <div class="pm-body">
-          <div class="pm-photo-block">
-            <div style="position:relative;">
-              <div id="pmEditAvatarWrap"
-                style="width:58px;height:58px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
-                {{ (session.get('full_name') or '?')[0].upper() }}</div>
-              <div class="zoom-hint" onclick="var img=document.querySelector('#pmEditAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')" style="position:absolute; bottom:-2px; right:-2px; width:18px; height:18px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.3); border:1.5px solid #fff; color:#000; font-size:9px;"><i class="bi bi-zoom-in"></i></div>
-            </div>
-            <div>
+        <div class="pm-tab-bar">
+          <button class="pm-tab active-tab" onclick="switchPmTab('info',this)">
+            <i class="bi bi-person-lines-fill"></i> Info
+          </button>
+          <button class="pm-tab" onclick="switchPmTab('edit',this)">
+            <i class="bi bi-pencil-square"></i> Edit
+          </button>
+        </div>
+        <div class="pm-pane active" id="pm-info">
+          <div class="pm-body">
+            <div class="pm-avatar-block">
               <div
-                style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
-                <i class="bi bi-camera-fill"></i> Profile Photo</div>
-              <input type="file" id="pmPhotoInput" accept="image/*" style="display:none"
-                onchange="stageAdminPhoto(this)">
-              <button type="button" onclick="document.getElementById('pmPhotoInput').click()"
-                style="background:rgba(45,106,39,.12);border:1.5px solid rgba(45,106,39,.3);color:var(--accent);border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;"><i
-                  class="bi bi-upload"></i> Change Photo</button>
-              <div style="font-size:11px;color:var(--muted);margin-top:5px;font-weight:500;">JPG, PNG, WEBP · Max 5 MB
+                style="
+                  position: relative;
+                  width: 72px;
+                  height: 72px;
+                  margin: 0 auto;
+                "
+              >
+                <div
+                  id="pmInfoAvatarWrap"
+                  style="
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    background: linear-gradient(135deg, #2d6a27, #f5c518);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 26px;
+                    font-weight: 700;
+                    color: #000;
+                    border: 3px solid var(--accent);
+                  "
+                >
+                  {{ (session.get('full_name') or '?')[0].upper() }}
+                </div>
+                <div
+                  class="zoom-hint"
+                  onclick="var img=document.querySelector('#pmInfoAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')"
+                  style="
+                    position: absolute;
+                    bottom: 0;
+                    right: 0;
+                    width: 22px;
+                    height: 22px;
+                    background: var(--accent);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+                    border: 2px solid #fff;
+                    color: #000;
+                    font-size: 10px;
+                  "
+                >
+                  <i class="bi bi-zoom-in"></i>
+                </div>
+              </div>
+              <div class="pm-display-name" id="pmDisplayName">
+                {{ session.get('full_name','') }}
+              </div>
+              <div class="pm-display-sub">
+                System Administrator · CvSU Silang DAVS
+              </div>
+            </div>
+            <div id="pmInfoRows">
+              <div class="pm-info-row">
+                <span class="pm-info-lbl">Full Name</span
+                ><span class="pm-info-val" id="pm_info_name"
+                  >{{ session.get('full_name','') }}</span
+                >
+              </div>
+              <div class="pm-info-row">
+                <span class="pm-info-lbl">Username</span
+                ><span class="pm-info-val"
+                  ><code id="pm_info_username"
+                    >@{{ session.get('username','')|trim('@') }}</code
+                  ></span
+                >
+              </div>
+              <div class="pm-info-row">
+                <span class="pm-info-lbl">Email</span
+                ><span class="pm-info-val" id="pm_info_email">—</span>
+              </div>
+              <div class="pm-info-row" style="border-bottom: none">
+                <span class="pm-info-lbl">Role</span
+                ><span class="pm-info-val"
+                  ><span class="pill-ok">Admin</span></span
+                >
               </div>
             </div>
           </div>
-          <div class="pm-field"><label class="pm-label">Full Name *</label><input class="pm-input" id="pmName"
-              type="text" value="{{ session.get('full_name','') }}" oninput="clearPmErr(this,'pmNameErr')"
-              placeholder="Your full name" />
-            <div style="font-size:11px;color:var(--danger);margin-top:4px;display:none;" id="pmNameErr">Full name is
-              required.</div>
-          </div>
-          <div class="pm-field"><label class="pm-label">Username *</label><input class="pm-input" id="pmUsername"
-              type="text" value="{{ session.get('username','') }}"
-              oninput="clearPmErr(this,'pmUsernameErr');this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'')"
-              placeholder="admin_username" />
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;font-weight:500;">Changing this will log you
-              out.</div>
-            <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="pmUsernameErr">Username is
-              required.</div>
-          </div>
-          <div class="pm-field"><label class="pm-label">Email Address</label><input class="pm-input" id="pmEmail"
-              type="email" placeholder="admin@cvsu.edu.ph" oninput="clearPmErr(this,'pmEmailErr')" />
-            <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="pmEmailErr">Enter a valid
-              email.</div>
-          </div>
-          <div class="pm-pw-grid">
-            <div class="pm-field" style="margin-bottom:0;"><label class="pm-label">New Password</label><input
-                class="pm-input" id="pmPass" type="password" placeholder="Min 6 chars"
-                oninput="clearPmErr(this,'pmPassErr')" />
-              <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="pmPassErr">Min. 6
-                characters.</div>
+        </div>
+        <div class="pm-pane" id="pm-edit">
+          <div class="pm-body">
+            <div class="pm-photo-block">
+              <div style="position: relative">
+                <div
+                  id="pmEditAvatarWrap"
+                  style="
+                    width: 58px;
+                    height: 58px;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    background: linear-gradient(135deg, #2d6a27, #f5c518);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 22px;
+                    font-weight: 700;
+                    color: #000;
+                    flex-shrink: 0;
+                    border: 2px solid var(--accent);
+                  "
+                >
+                  {{ (session.get('full_name') or '?')[0].upper() }}
+                </div>
+                <div
+                  class="zoom-hint"
+                  onclick="var img=document.querySelector('#pmEditAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')"
+                  style="
+                    position: absolute;
+                    bottom: -2px;
+                    right: -2px;
+                    width: 18px;
+                    height: 18px;
+                    background: var(--accent);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+                    border: 1.5px solid #fff;
+                    color: #000;
+                    font-size: 9px;
+                  "
+                >
+                  <i class="bi bi-zoom-in"></i>
+                </div>
+              </div>
+              <div>
+                <div
+                  style="
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: var(--muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 8px;
+                  "
+                >
+                  <i class="bi bi-camera-fill"></i> Profile Photo
+                </div>
+                <input
+                  type="file"
+                  id="pmPhotoInput"
+                  accept="image/*"
+                  style="display: none"
+                  onchange="stageAdminPhoto(this)"
+                />
+                <button
+                  type="button"
+                  onclick="document.getElementById('pmPhotoInput').click()"
+                  style="
+                    background: rgba(45, 106, 39, 0.12);
+                    border: 1.5px solid rgba(45, 106, 39, 0.3);
+                    color: var(--accent);
+                    border-radius: 7px;
+                    padding: 7px 14px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    font-family: 'DM Sans', sans-serif;
+                  "
+                >
+                  <i class="bi bi-upload"></i> Change Photo
+                </button>
+                <div
+                  style="
+                    font-size: 11px;
+                    color: var(--muted);
+                    margin-top: 5px;
+                    font-weight: 500;
+                  "
+                >
+                  JPG, PNG, WEBP · Max 5 MB
+                </div>
+              </div>
             </div>
-            <div class="pm-field" style="margin-bottom:0;"><label class="pm-label">Confirm Password</label><input
-                class="pm-input" id="pmPass2" type="password" placeholder="Repeat password"
-                oninput="checkPmPwMatch()" />
-              <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="pmPass2Err">Passwords
-                don't match.</div>
+            <div class="pm-field">
+              <label class="pm-label">Full Name *</label
+              ><input
+                class="pm-input"
+                id="pmName"
+                type="text"
+                value="{{ session.get('full_name','') }}"
+                oninput="clearPmErr(this,'pmNameErr')"
+                placeholder="Your full name"
+              />
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--danger);
+                  margin-top: 4px;
+                  display: none;
+                "
+                id="pmNameErr"
+              >
+                Full name is required.
+              </div>
+            </div>
+            <div class="pm-field">
+              <label class="pm-label">Username *</label
+              ><input
+                class="pm-input"
+                id="pmUsername"
+                type="text"
+                value="{{ session.get('username','') }}"
+                oninput="clearPmErr(this,'pmUsernameErr');this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'')"
+                placeholder="admin_username"
+              />
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--muted);
+                  margin-top: 4px;
+                  font-weight: 500;
+                "
+              >
+                Changing this will log you out.
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--danger);
+                  margin-top: 3px;
+                  display: none;
+                "
+                id="pmUsernameErr"
+              >
+                Username is required.
+              </div>
+            </div>
+            <div class="pm-field">
+              <label class="pm-label">Email Address</label
+              ><input
+                class="pm-input"
+                id="pmEmail"
+                type="email"
+                placeholder="admin@cvsu.edu.ph"
+                oninput="clearPmErr(this,'pmEmailErr')"
+              />
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--danger);
+                  margin-top: 3px;
+                  display: none;
+                "
+                id="pmEmailErr"
+              >
+                Enter a valid email.
+              </div>
+            </div>
+            <div class="pm-pw-grid">
+              <div class="pm-field" style="margin-bottom: 0">
+                <label class="pm-label">New Password</label
+                ><input
+                  class="pm-input"
+                  id="pmPass"
+                  type="password"
+                  placeholder="Min 6 chars"
+                  oninput="clearPmErr(this,'pmPassErr')"
+                />
+                <div
+                  style="
+                    font-size: 11px;
+                    color: var(--danger);
+                    margin-top: 3px;
+                    display: none;
+                  "
+                  id="pmPassErr"
+                >
+                  Min. 6 characters.
+                </div>
+              </div>
+              <div class="pm-field" style="margin-bottom: 0">
+                <label class="pm-label">Confirm Password</label
+                ><input
+                  class="pm-input"
+                  id="pmPass2"
+                  type="password"
+                  placeholder="Repeat password"
+                  oninput="checkPmPwMatch()"
+                />
+                <div
+                  style="
+                    font-size: 11px;
+                    color: var(--danger);
+                    margin-top: 3px;
+                    display: none;
+                  "
+                  id="pmPass2Err"
+                >
+                  Passwords don't match.
+                </div>
+              </div>
+            </div>
+            <div class="pm-field" style="margin-top: 10px">
+              <label class="pm-label">Password OTP (Email Verification)</label>
+              <div style="display: flex; gap: 8px; align-items: center">
+                <input
+                  class="pm-input"
+                  id="pmOtp"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="6"
+                  placeholder="Enter 6-digit OTP"
+                  oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6);clearPmErr(this,'pmOtpErr')"
+                />
+                <button
+                  type="button"
+                  id="pmOtpBtn"
+                  class="btn-outline"
+                  style="white-space: nowrap"
+                  onclick="requestProfilePasswordOtp('admin')"
+                >
+                  Send OTP
+                </button>
+              </div>
+              <div
+                style="font-size: 11px; color: var(--muted); margin-top: 3px"
+                id="pmOtpHint"
+              >
+                Required only when changing password.
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--danger);
+                  margin-top: 3px;
+                  display: none;
+                "
+                id="pmOtpErr"
+              >
+                OTP is required for password change.
+              </div>
+            </div>
+            <div
+              style="padding-top: 14px; border-top: 1.5px solid var(--border)"
+            >
+              <span
+                style="font-size: 12px; font-weight: 600; display: none"
+                id="pmMsg"
+              ></span
+              ><button
+                class="btn-primary"
+                onclick="saveProfileModal()"
+                style="
+                  width: 100%;
+                  justify-content: center;
+                  margin-top: 10px;
+                  font-size: 14px;
+                  padding: 11px;
+                "
+              >
+                <i class="bi bi-check-circle"></i> Save Changes
+              </button>
             </div>
           </div>
-          <div class="pm-field" style="margin-top:10px;">
-            <label class="pm-label">Password OTP (Email Verification)</label>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input class="pm-input" id="pmOtp" type="text" inputmode="numeric" maxlength="6" placeholder="Enter 6-digit OTP"
-                oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6);clearPmErr(this,'pmOtpErr')" />
-              <button type="button" id="pmOtpBtn" class="btn-outline" style="white-space:nowrap;"
-                onclick="requestProfilePasswordOtp('admin')">Send OTP</button>
-            </div>
-            <div style="font-size:11px;color:var(--muted);margin-top:3px;" id="pmOtpHint">Required only when changing password.</div>
-            <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="pmOtpErr">OTP is required for password change.</div>
-          </div>
-          <div style="padding-top:14px;border-top:1.5px solid var(--border);"><span
-              style="font-size:12px;font-weight:600;display:none;" id="pmMsg"></span><button class="btn-primary"
-              onclick="saveProfileModal()"
-              style="width:100%;justify-content:center;margin-top:10px;font-size:14px;padding:11px;"><i
-                class="bi bi-check-circle"></i> Save Changes</button></div>
         </div>
       </div>
     </div>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <!-- ════ TEACHER PROFILE MODAL ════ -->
-  {% if session.get('role') == 'teacher' %}
-  <div class="pm-overlay" id="teacherProfileModal" onclick="if(event.target===this)closeTPM()">
-    <div class="pm-modal">
-      <div class="pm-modal-header">
-        <button onclick="closeTPM()"
-          style="background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;flex-shrink:0;"><i
-            class="bi bi-arrow-left"></i> Back</button>
-        <span
-          style="font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:#fff;flex:1;min-width:0;">My
-          Profile</span>
-        <span
-          style="background:rgba(255,255,255,.22);color:#fff;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;flex-shrink:0;">TEACHER</span>
-      </div>
-      <div class="pm-tab-bar">
-        <button class="pm-tab active-tab" onclick="switchTPMTab('info',this)"><i class="bi bi-person-lines-fill"></i>
-          Info</button>
-        <button class="pm-tab" onclick="switchTPMTab('edit',this)"><i class="bi bi-pencil-square"></i> Edit</button>
-      </div>
-      <div class="pm-pane active" id="tpm-info">
-        <div class="pm-body">
-          <div class="pm-avatar-block">
-            <div style="position:relative; width:72px; height:72px; margin:0 auto;">
-              <div id="tpmInfoAvatarWrap"
-                style="width:100%;height:100%;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#000;border:3px solid var(--accent);">
-                {{ (session.get('full_name') or '?')[0].upper() }}</div>
-              <div class="zoom-hint" onclick="var img=document.querySelector('#tpmInfoAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')" style="position:absolute; bottom:0; right:0; width:22px; height:22px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.3); border:2px solid #fff; color:#000; font-size:10px;"><i class="bi bi-zoom-in"></i></div>
-            </div>
-            <div class="pm-display-name" id="tpmDisplayName">{{ session.get('full_name','') }}</div>
-            <div class="pm-display-sub">Faculty · CvSU Silang DAVS</div>
-          </div>
-          <div style="border-top:1.5px solid var(--border);padding-top:4px;">
-            <div class="pm-info-row"><span class="pm-info-lbl">Full Name</span><span class="pm-info-val"
-                id="tpm_info_name">{{ session.get('full_name','') }}</span></div>
-            <div class="pm-info-row"><span class="pm-info-lbl">Username</span><span class="pm-info-val"
-                id="tpm_info_username"><code>{{ session.get('username','') }}</code></span></div>
-            <div class="pm-info-row"><span class="pm-info-lbl">Email</span><span class="pm-info-val"
-                id="tpm_info_email">—</span></div>
-            <div class="pm-info-row" style="border-bottom:none;"><span class="pm-info-lbl">Sections</span>
-              <div id="tpm_info_sections_wrap" style="padding-top:4px;"><span
-                  style="font-size:13px;color:var(--muted);font-weight:500;">Loading…</span></div>
-            </div>
-          </div>
+    <!-- ════ TEACHER PROFILE MODAL ════ -->
+    {% if session.get('role') == 'teacher' %}
+    <div
+      class="pm-overlay"
+      id="teacherProfileModal"
+      onclick="if(event.target===this)closeTPM()"
+    >
+      <div class="pm-modal">
+        <div class="pm-modal-header">
+          <button
+            onclick="closeTPM()"
+            style="
+              background: rgba(255, 255, 255, 0.18);
+              border: none;
+              color: #fff;
+              border-radius: 8px;
+              padding: 6px 14px;
+              font-size: 12px;
+              font-weight: 700;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 5px;
+              font-family: 'DM Sans', sans-serif;
+              flex-shrink: 0;
+            "
+          >
+            <i class="bi bi-arrow-left"></i> Back
+          </button>
+          <span
+            style="
+              font-family: 'Space Mono', monospace;
+              font-size: 13px;
+              font-weight: 700;
+              color: #fff;
+              flex: 1;
+              min-width: 0;
+            "
+            >My Profile</span
+          >
+          <span
+            style="
+              background: rgba(255, 255, 255, 0.22);
+              color: #fff;
+              border-radius: 20px;
+              padding: 3px 12px;
+              font-size: 11px;
+              font-weight: 700;
+              flex-shrink: 0;
+            "
+            >TEACHER</span
+          >
         </div>
-      </div>
-      <div class="pm-pane" id="tpm-edit">
-        <div class="pm-body">
-          <div class="pm-photo-block">
-            <div style="position:relative;">
-              <div id="tpmEditAvatarWrap"
-                style="width:58px;height:58px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#2D6A27,#F5C518);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#000;flex-shrink:0;border:2px solid var(--accent);">
-                {{ (session.get('full_name') or '?')[0].upper() }}</div>
-              <div class="zoom-hint" onclick="var img=document.querySelector('#tpmEditAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')" style="position:absolute; bottom:-2px; right:-2px; width:18px; height:18px; background:var(--accent); border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.3); border:1.5px solid #fff; color:#000; font-size:9px;"><i class="bi bi-zoom-in"></i></div>
-            </div>
-            <div>
+        <div class="pm-tab-bar">
+          <button class="pm-tab active-tab" onclick="switchTPMTab('info',this)">
+            <i class="bi bi-person-lines-fill"></i> Info
+          </button>
+          <button class="pm-tab" onclick="switchTPMTab('edit',this)">
+            <i class="bi bi-pencil-square"></i> Edit
+          </button>
+        </div>
+        <div class="pm-pane active" id="tpm-info">
+          <div class="pm-body">
+            <div class="pm-avatar-block">
               <div
-                style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
-                <i class="bi bi-camera-fill"></i> Profile Photo</div>
-              <input type="file" id="tpmPhotoInput" accept="image/*" style="display:none"
-                onchange="stageTeacherPhoto(this)">
-              <button type="button" onclick="document.getElementById('tpmPhotoInput').click()"
-                style="background:rgba(45,106,39,.12);border:1.5px solid rgba(45,106,39,.3);color:var(--accent);border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'DM Sans',sans-serif;"><i
-                  class="bi bi-upload"></i> Change Photo</button>
-              <div style="font-size:11px;color:var(--muted);margin-top:5px;font-weight:500;">JPG, PNG, WEBP · Max 5 MB
+                style="
+                  position: relative;
+                  width: 72px;
+                  height: 72px;
+                  margin: 0 auto;
+                "
+              >
+                <div
+                  id="tpmInfoAvatarWrap"
+                  style="
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    background: linear-gradient(135deg, #2d6a27, #f5c518);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 26px;
+                    font-weight: 700;
+                    color: #000;
+                    border: 3px solid var(--accent);
+                  "
+                >
+                  {{ (session.get('full_name') or '?')[0].upper() }}
+                </div>
+                <div
+                  class="zoom-hint"
+                  onclick="var img=document.querySelector('#tpmInfoAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')"
+                  style="
+                    position: absolute;
+                    bottom: 0;
+                    right: 0;
+                    width: 22px;
+                    height: 22px;
+                    background: var(--accent);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+                    border: 2px solid #fff;
+                    color: #000;
+                    font-size: 10px;
+                  "
+                >
+                  <i class="bi bi-zoom-in"></i>
+                </div>
+              </div>
+              <div class="pm-display-name" id="tpmDisplayName">
+                {{ session.get('full_name','') }}
+              </div>
+              <div class="pm-display-sub">Faculty · CvSU Silang DAVS</div>
+            </div>
+            <div
+              style="border-top: 1.5px solid var(--border); padding-top: 4px"
+            >
+              <div class="pm-info-row">
+                <span class="pm-info-lbl">Full Name</span
+                ><span class="pm-info-val" id="tpm_info_name"
+                  >{{ session.get('full_name','') }}</span
+                >
+              </div>
+              <div class="pm-info-row">
+                <span class="pm-info-lbl">Username</span
+                ><span class="pm-info-val" id="tpm_info_username"
+                  ><code
+                    >@{{ session.get('username','')|trim('@') }}</code
+                  ></span
+                >
+              </div>
+              <div class="pm-info-row">
+                <span class="pm-info-lbl">Email</span
+                ><span class="pm-info-val" id="tpm_info_email">—</span>
+              </div>
+              <div class="pm-info-row" style="border-bottom: none">
+                <span class="pm-info-lbl">Sections</span>
+                <div id="tpm_info_sections_wrap" style="padding-top: 4px">
+                  <span
+                    style="
+                      font-size: 13px;
+                      color: var(--muted);
+                      font-weight: 500;
+                    "
+                    >Loading…</span
+                  >
+                </div>
               </div>
             </div>
           </div>
-          <div class="pm-field"><label class="pm-label">Full Name *</label><input class="pm-input" id="tpmName"
-              type="text" value="{{ session.get('full_name','') }}" oninput="clearTPMErr(this,'tpmNameErr')"
-              placeholder="Your full name" />
-            <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="tpmNameErr">Full name is
-              required.</div>
-          </div>
-          <div class="pm-field"><label class="pm-label">Username</label><input class="pm-input" id="tpmUsername"
-              type="text" value="{{ session.get('username','') }}" placeholder="e.g. msantos"
-              oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'');clearTPMErr(this,'tpmUsernameErr')" />
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;font-weight:500;">Letters, numbers, underscore
-              only.</div>
-            <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="tpmUsernameErr">Username is
-              required.</div>
-          </div>
-          <div class="pm-field"><label class="pm-label">Email Address</label><input class="pm-input" id="tpmEmail"
-              type="email" placeholder="teacher@cvsu.edu.ph" oninput="clearTPMErr(this,'tpmEmailErr')" />
-            <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="tpmEmailErr">Enter a valid
-              email.</div>
-          </div>
-          <div class="pm-pw-grid">
-            <div class="pm-field" style="margin-bottom:0;"><label class="pm-label">New Password</label><input
-                class="pm-input" id="tpmPass" type="password" placeholder="Min 6 chars"
-                oninput="clearTPMErr(this,'tpmPassErr')" />
-              <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="tpmPassErr">Min. 6
-                characters.</div>
+        </div>
+        <div class="pm-pane" id="tpm-edit">
+          <div class="pm-body">
+            <div class="pm-photo-block">
+              <div style="position: relative">
+                <div
+                  id="tpmEditAvatarWrap"
+                  style="
+                    width: 58px;
+                    height: 58px;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    background: linear-gradient(135deg, #2d6a27, #f5c518);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 22px;
+                    font-weight: 700;
+                    color: #000;
+                    flex-shrink: 0;
+                    border: 2px solid var(--accent);
+                  "
+                >
+                  {{ (session.get('full_name') or '?')[0].upper() }}
+                </div>
+                <div
+                  class="zoom-hint"
+                  onclick="var img=document.querySelector('#tpmEditAvatarWrap img'); if(img)window.open(img.src.split('?')[0],'_blank')"
+                  style="
+                    position: absolute;
+                    bottom: -2px;
+                    right: -2px;
+                    width: 18px;
+                    height: 18px;
+                    background: var(--accent);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+                    border: 1.5px solid #fff;
+                    color: #000;
+                    font-size: 9px;
+                  "
+                >
+                  <i class="bi bi-zoom-in"></i>
+                </div>
+              </div>
+              <div>
+                <div
+                  style="
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: var(--muted);
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 8px;
+                  "
+                >
+                  <i class="bi bi-camera-fill"></i> Profile Photo
+                </div>
+                <input
+                  type="file"
+                  id="tpmPhotoInput"
+                  accept="image/*"
+                  style="display: none"
+                  onchange="stageTeacherPhoto(this)"
+                />
+                <button
+                  type="button"
+                  onclick="document.getElementById('tpmPhotoInput').click()"
+                  style="
+                    background: rgba(45, 106, 39, 0.12);
+                    border: 1.5px solid rgba(45, 106, 39, 0.3);
+                    color: var(--accent);
+                    border-radius: 7px;
+                    padding: 7px 14px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    font-family: 'DM Sans', sans-serif;
+                  "
+                >
+                  <i class="bi bi-upload"></i> Change Photo
+                </button>
+                <div
+                  style="
+                    font-size: 11px;
+                    color: var(--muted);
+                    margin-top: 5px;
+                    font-weight: 500;
+                  "
+                >
+                  JPG, PNG, WEBP · Max 5 MB
+                </div>
+              </div>
             </div>
-            <div class="pm-field" style="margin-bottom:0;"><label class="pm-label">Confirm Password</label><input
-                class="pm-input" id="tpmPass2" type="password" placeholder="Repeat password"
-                oninput="checkTPMPwMatch()" />
-              <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="tpmPass2Err">Passwords
-                don't match.</div>
+            <div class="pm-field">
+              <label class="pm-label">Full Name *</label
+              ><input
+                class="pm-input"
+                id="tpmName"
+                type="text"
+                value="{{ session.get('full_name','') }}"
+                oninput="clearTPMErr(this,'tpmNameErr')"
+                placeholder="Your full name"
+              />
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--danger);
+                  margin-top: 3px;
+                  display: none;
+                "
+                id="tpmNameErr"
+              >
+                Full name is required.
+              </div>
+            </div>
+            <div class="pm-field">
+              <label class="pm-label">Username</label
+              ><input
+                class="pm-input"
+                id="tpmUsername"
+                type="text"
+                value="{{ session.get('username','') }}"
+                placeholder="e.g. msantos"
+                oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_.]/g,'');clearTPMErr(this,'tpmUsernameErr')"
+              />
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--muted);
+                  margin-top: 4px;
+                  font-weight: 500;
+                "
+              >
+                Letters, numbers, underscore only.
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--danger);
+                  margin-top: 3px;
+                  display: none;
+                "
+                id="tpmUsernameErr"
+              >
+                Username is required.
+              </div>
+            </div>
+            <div class="pm-field">
+              <label class="pm-label">Email Address</label
+              ><input
+                class="pm-input"
+                id="tpmEmail"
+                type="email"
+                placeholder="teacher@cvsu.edu.ph"
+                oninput="clearTPMErr(this,'tpmEmailErr')"
+              />
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--danger);
+                  margin-top: 3px;
+                  display: none;
+                "
+                id="tpmEmailErr"
+              >
+                Enter a valid email.
+              </div>
+            </div>
+            <div class="pm-pw-grid">
+              <div class="pm-field" style="margin-bottom: 0">
+                <label class="pm-label">New Password</label
+                ><input
+                  class="pm-input"
+                  id="tpmPass"
+                  type="password"
+                  placeholder="Min 6 chars"
+                  oninput="clearTPMErr(this,'tpmPassErr')"
+                />
+                <div
+                  style="
+                    font-size: 11px;
+                    color: var(--danger);
+                    margin-top: 3px;
+                    display: none;
+                  "
+                  id="tpmPassErr"
+                >
+                  Min. 6 characters.
+                </div>
+              </div>
+              <div class="pm-field" style="margin-bottom: 0">
+                <label class="pm-label">Confirm Password</label
+                ><input
+                  class="pm-input"
+                  id="tpmPass2"
+                  type="password"
+                  placeholder="Repeat password"
+                  oninput="checkTPMPwMatch()"
+                />
+                <div
+                  style="
+                    font-size: 11px;
+                    color: var(--danger);
+                    margin-top: 3px;
+                    display: none;
+                  "
+                  id="tpmPass2Err"
+                >
+                  Passwords don't match.
+                </div>
+              </div>
+            </div>
+            <div class="pm-field" style="margin-top: 10px">
+              <label class="pm-label">Password OTP (Email Verification)</label>
+              <div style="display: flex; gap: 8px; align-items: center">
+                <input
+                  class="pm-input"
+                  id="tpmOtp"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="6"
+                  placeholder="Enter 6-digit OTP"
+                  oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6);clearTPMErr(this,'tpmOtpErr')"
+                />
+                <button
+                  type="button"
+                  id="tpmOtpBtn"
+                  class="btn-outline"
+                  style="white-space: nowrap"
+                  onclick="requestProfilePasswordOtp('teacher')"
+                >
+                  Send OTP
+                </button>
+              </div>
+              <div
+                style="font-size: 11px; color: var(--muted); margin-top: 3px"
+                id="tpmOtpHint"
+              >
+                Required only when changing password.
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  color: var(--danger);
+                  margin-top: 3px;
+                  display: none;
+                "
+                id="tpmOtpErr"
+              >
+                OTP is required for password change.
+              </div>
+            </div>
+            <div
+              style="padding-top: 14px; border-top: 1.5px solid var(--border)"
+            >
+              <span
+                style="font-size: 12px; font-weight: 600; display: none"
+                id="tpmMsg"
+              ></span
+              ><button
+                class="btn-primary"
+                onclick="saveTeacherProfile()"
+                style="
+                  width: 100%;
+                  justify-content: center;
+                  margin-top: 10px;
+                  font-size: 14px;
+                  padding: 11px;
+                "
+              >
+                <i class="bi bi-check-circle"></i> Save Changes
+              </button>
             </div>
           </div>
-          <div class="pm-field" style="margin-top:10px;">
-            <label class="pm-label">Password OTP (Email Verification)</label>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <input class="pm-input" id="tpmOtp" type="text" inputmode="numeric" maxlength="6" placeholder="Enter 6-digit OTP"
-                oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,6);clearTPMErr(this,'tpmOtpErr')" />
-              <button type="button" id="tpmOtpBtn" class="btn-outline" style="white-space:nowrap;"
-                onclick="requestProfilePasswordOtp('teacher')">Send OTP</button>
-            </div>
-            <div style="font-size:11px;color:var(--muted);margin-top:3px;" id="tpmOtpHint">Required only when changing password.</div>
-            <div style="font-size:11px;color:var(--danger);margin-top:3px;display:none;" id="tpmOtpErr">OTP is required for password change.</div>
-          </div>
-          <div style="padding-top:14px;border-top:1.5px solid var(--border);"><span
-              style="font-size:12px;font-weight:600;display:none;" id="tpmMsg"></span><button class="btn-primary"
-              onclick="saveTeacherProfile()"
-              style="width:100%;justify-content:center;margin-top:10px;font-size:14px;padding:11px;"><i
-                class="bi bi-check-circle"></i> Save Changes</button></div>
         </div>
       </div>
     </div>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <!-- ════ SIDEBAR ════ -->
-  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-row">
-        <div class="logo-icon">⛓</div>
-        <div class="app-name">DAVS</div>
-        <button class="sidebar-close" onclick="closeSidebar()" title="Close menu"><i class="bi bi-x-lg"></i></button>
+    <!-- ════ SIDEBAR ════ -->
+    <div
+      class="sidebar-overlay"
+      id="sidebarOverlay"
+      onclick="closeSidebar()"
+    ></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-row">
+          <div class="logo-icon">⛓</div>
+          <div class="app-name">DAVS</div>
+          <button
+            class="sidebar-close"
+            onclick="closeSidebar()"
+            title="Close menu"
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
       </div>
-    </div>
-    <nav class="sidebar-nav">
-      {% if session.get('role') == 'super_admin' %}
-      <div class="nav-section-label">Super Admin</div>
-      <a href="{{ url_for('admin_schedules') }}"
-        class="nav-link {% if request.endpoint in ('admin_schedules','admin_schedule_create') %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-calendar3-week"></i> Schedules</a>
-      <div class="nav-section-label" style="margin-top:6px;">Administration</div>
-      <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-house"></i> Admin Dashboard</a>
-      <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-people"></i> Students & Faculty</a>
-      <a href="{{ url_for('manage_subjects') }}"
-        class="nav-link {% if request.endpoint == 'manage_subjects' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-book"></i> Subject Catalogues</a>
-      <a href="{{ url_for('admin_sessions') }}"
-        class="nav-link {% if request.endpoint == 'admin_sessions' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-broadcast"></i> Classroom Sessions</a>
-      <a href="{{ url_for('admin_settings') }}"
-        class="nav-link {% if request.endpoint in ('admin_settings','admin_settings_save','admin_settings_test') %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-gear-fill"></i> Settings</a>
-      {% elif session.get('role') == 'admin' %}
-      <div class="nav-section-label">Main</div>
-      <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-house"></i> Admin Dashboard</a>
-      <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-people"></i> Students & Faculty</a>
-      <div class="nav-section-label" style="margin-top:6px;">Administration</div>
-      <a href="{{ url_for('manage_subjects') }}"
-        class="nav-link {% if request.endpoint == 'manage_subjects' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-book"></i> Subject Catalogues</a>
-      <a href="{{ url_for('admin_schedules') }}"
-        class="nav-link {% if request.endpoint in ('admin_schedules','admin_schedule_create') %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-calendar3-week"></i> Schedules</a>
-      <a href="{{ url_for('admin_sessions') }}"
-        class="nav-link {% if request.endpoint == 'admin_sessions' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-broadcast"></i> Classroom Sessions</a>
-      <a href="{{ url_for('admin_settings') }}"
-        class="nav-link {% if request.endpoint in ('admin_settings','admin_settings_save','admin_settings_test') %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-gear-fill"></i> System Settings</a>
-      {% else %}
-      <div class="nav-section-label">My Classroom</div>
-      <a href="{{ url_for('teacher_dashboard') }}"
-        class="nav-link {% if request.endpoint == 'teacher_dashboard' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-house"></i> My Dashboard</a>
-      <a href="{{ url_for('teacher_schedule') }}"
-        class="nav-link {% if request.endpoint == 'teacher_schedule' %}active{% endif %}" onclick="closeSidebar()"><i
-          class="bi bi-calendar3-week"></i> My Schedule</a>
-      <a href="{{ url_for('teacher_sessions_students') }}"
-        class="nav-link {% if request.endpoint == 'teacher_sessions_students' %}active{% endif %}"
-        onclick="closeSidebar()"><i class="bi bi-journal-text"></i> Sessions &amp; Students</a>
-      {% endif %}
-    </nav>
-    <div class="sidebar-footer">
-      {% if session.get('username') %}
-      <div class="sidebar-user" id="sidebarUserBtn" onclick="(function(){
+      <nav class="sidebar-nav">
+        {% if session.get('role') == 'super_admin' %}
+        <div class="nav-section-label">Super Admin</div>
+        <a
+          href="{{ url_for('admin_schedules') }}"
+          class="nav-link {% if request.endpoint in ('admin_schedules','admin_schedule_create') %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-calendar3-week"></i> Schedules</a
+        >
+        <div class="nav-section-label" style="margin-top: 6px">
+          Administration
+        </div>
+        <a
+          href="{{ url_for('index') }}"
+          class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-house"></i> Admin Dashboard</a
+        >
+        <a
+          href="{{ url_for('dashboard') }}"
+          class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-people"></i> Students & Faculty</a
+        >
+        <a
+          href="{{ url_for('manage_subjects') }}"
+          class="nav-link {% if request.endpoint == 'manage_subjects' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-book"></i> Subject Catalogues</a
+        >
+        <a
+          href="{{ url_for('admin_sessions') }}"
+          class="nav-link {% if request.endpoint == 'admin_sessions' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-broadcast"></i> Classroom Sessions</a
+        >
+        <a
+          href="{{ url_for('admin_settings') }}"
+          class="nav-link {% if request.endpoint in ('admin_settings','admin_settings_save','admin_settings_test') %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-gear-fill"></i> Settings</a
+        >
+        {% elif session.get('role') == 'admin' %}
+        <div class="nav-section-label">Main</div>
+        <a
+          href="{{ url_for('index') }}"
+          class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-house"></i> Admin Dashboard</a
+        >
+        <a
+          href="{{ url_for('dashboard') }}"
+          class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-people"></i> Students & Faculty</a
+        >
+        <div class="nav-section-label" style="margin-top: 6px">
+          Administration
+        </div>
+        <a
+          href="{{ url_for('manage_subjects') }}"
+          class="nav-link {% if request.endpoint == 'manage_subjects' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-book"></i> Subject Catalogues</a
+        >
+        <a
+          href="{{ url_for('admin_schedules') }}"
+          class="nav-link {% if request.endpoint in ('admin_schedules','admin_schedule_create') %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-calendar3-week"></i> Schedules</a
+        >
+        <a
+          href="{{ url_for('admin_sessions') }}"
+          class="nav-link {% if request.endpoint == 'admin_sessions' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-broadcast"></i> Classroom Sessions</a
+        >
+        <a
+          href="{{ url_for('admin_settings') }}"
+          class="nav-link {% if request.endpoint in ('admin_settings','admin_settings_save','admin_settings_test') %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-gear-fill"></i> System Settings</a
+        >
+        {% else %}
+        <div class="nav-section-label">My Classroom</div>
+        <a
+          href="{{ url_for('teacher_dashboard') }}"
+          class="nav-link {% if request.endpoint == 'teacher_dashboard' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-house"></i> My Dashboard</a
+        >
+        <a
+          href="{{ url_for('teacher_schedule') }}"
+          class="nav-link {% if request.endpoint == 'teacher_schedule' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-calendar3-week"></i> My Schedule</a
+        >
+        <a
+          href="{{ url_for('teacher_sessions_students') }}"
+          class="nav-link {% if request.endpoint == 'teacher_sessions_students' %}active{% endif %}"
+          onclick="closeSidebar()"
+          ><i class="bi bi-journal-text"></i> Sessions &amp; Students</a
+        >
+        {% endif %}
+      </nav>
+      <div class="sidebar-footer">
+        {% if session.get('username') %}
+        <div
+          class="sidebar-user"
+          id="sidebarUserBtn"
+          onclick="(function(){
            var r='{{ session.get('role','') }}';
            if(r==='admin'||r==='super_admin'){openPM();}
            else if(r==='teacher'){openTPM();}
-         })()" title="Edit your profile">
-        <div class="s-avatar-init" id="sidebarAvatarWrap">{{ (session.get('full_name') or '?')[0].upper() }}</div>
-        <div style="min-width:0;flex:1;overflow:hidden;">
-          <div class="u-name" id="sidebarName">{{ session.get('full_name','') }}</div>
-          <div class="u-role">{{ session.get('role','') }} <i class="bi bi-pencil"
-              style="font-size:8px;color:var(--accent);"></i></div>
+         })()"
+          title="Edit your profile"
+        >
+          <div class="s-avatar-init" id="sidebarAvatarWrap">
+            {{ (session.get('full_name') or '?')[0].upper() }}
+          </div>
+          <div style="min-width: 0; flex: 1; overflow: hidden">
+            <div class="u-name" id="sidebarName">
+              {{ session.get('full_name','') }}
+            </div>
+            <div class="u-role">
+              {{ session.get('role','') }}
+              <i
+                class="bi bi-pencil"
+                style="font-size: 8px; color: var(--accent)"
+              ></i>
+            </div>
+          </div>
+          <a
+            href="{{ url_for('logout') }}"
+            style="
+              margin-left: auto;
+              color: rgba(255, 255, 255, 0.5);
+              font-size: 16px;
+              text-decoration: none;
+              flex-shrink: 0;
+              padding: 4px;
+              border-radius: 6px;
+              transition: all 0.2s;
+            "
+            title="Sign Out"
+            onclick="event.stopPropagation()"
+            ><i class="bi bi-box-arrow-right"></i
+          ></a>
         </div>
-        <a href="{{ url_for('logout') }}"
-          style="margin-left:auto;color:rgba(255,255,255,.5);font-size:16px;text-decoration:none;flex-shrink:0;padding:4px;border-radius:6px;transition:all .2s;"
-          title="Sign Out" onclick="event.stopPropagation()"><i class="bi bi-box-arrow-right"></i></a>
-      </div>
-      {% endif %}
-      <div class="chain-badge" id="chainBadge">
-        <div class="chain-dot" id="chainDot"></div><span id="chainStatus">Checking…</span>
-      </div>
-    </div>
-  </aside>
-
-  <!-- ════ MAIN ════ -->
-  <div class="main-content" id="mainContent">
-    <div class="topbar">
-      <div class="topbar-left">
-        <button class="hamburger" id="hamburgerBtn" onclick="openSidebar()" aria-label="Open menu"><i
-            class="bi bi-list"></i></button>
-        <span class="topbar-title">{% block page_title %}DAVS{% endblock %}</span>
-      </div>
-      <div class="topbar-right">
-        <button onclick="toggleTheme()" class="theme-btn" title="Toggle theme"><i class="bi bi-moon-fill"
-            id="themeIcon"></i><span id="themeLabel">Dark</span></button>
-        <span class="topbar-time" id="clock"></span>
-      </div>
-    </div>
-    <div class="page-body">
-      {% with messages = get_flashed_messages() %}
-      {% if messages %}
-      <div class="flash-wrap">
-        {% for message in messages %}
-        {% if '✅' in message %}<div class="flash-item success"><i class="bi bi-check-circle"></i> {{ message }}</div>
-        {% elif '❌' in message %}<div class="flash-item error"><i class="bi bi-x-circle"></i> {{ message }}</div>
-        {% else %}<div class="flash-item info"><i class="bi bi-info-circle"></i> {{ message }}</div>
         {% endif %}
-        {% endfor %}
-      </div>
-      {% endif %}
-      {% endwith %}
-      {% block content %}{% endblock %}
-    </div>
-  </div>
-  <div class="toast-stack" id="toastStack"></div>
-
-  <div class="app-dialog-backdrop" id="appDialog" onclick="if(event.target===this)closeAppDialog(false)">
-    <div class="app-dialog-box" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle">
-      <div class="app-dialog-head">
-        <div class="app-dialog-title" id="appDialogTitle">Confirmation</div>
-        <button type="button" class="app-dialog-close" onclick="closeAppDialog(false)"><i class="bi bi-x"></i></button>
-      </div>
-      <div class="app-dialog-body" id="appDialogMessage"></div>
-      <div class="app-dialog-actions" id="appDialogActions"></div>
-    </div>
-  </div>
-
-  <!-- Phone NFC Modal -->
-  <div class="app-dialog-overlay" id="phoneNfcModal" onclick="if(event.target===this) closePhoneNFC()">
-    <div class="app-dialog" style="max-width: 400px;">
-      <div class="app-dialog-header">
-        <div class="app-dialog-title"><i class="bi bi-phone"></i> Phone NFC Reader</div>
-        <button type="button" class="app-dialog-close" onclick="closePhoneNFC()"><i class="bi bi-x"></i></button>
-      </div>
-      <div class="app-dialog-body" style="text-align: center; padding: 24px;">
-        <div id="phoneNfcIcon" style="font-size: 48px; margin-bottom: 16px;">
-          <i class="bi bi-phone"></i>
-        </div>
-        <div class="app-dialog-title" id="phoneNfcTitle" style="font-size: 18px; margin-bottom: 8px;">Ready to Scan</div>
-        <p id="phoneNfcDesc" style="color: var(--muted); margin-bottom: 20px;">
-          Hold the student's card against the back of your phone.
-        </p>
-        <div id="phoneNfcLastUidWrap" style="background: rgba(45,106,39,0.1); border: 1.5px dashed var(--accent); border-radius: 12px; padding: 12px; margin-top: 10px;">
-          <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); font-weight: 700; margin-bottom: 4px;">Last Captured UID</div>
-          <div id="phoneNfcLastUid" style="font-family: 'Space Mono', monospace; font-size: 20px; font-weight: 700; color: var(--text);">—</div>
-          <div id="phoneNfcHex" style="font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 4px;">--:--:--:--</div>
-        </div>
-        <div style="margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-          <input type="checkbox" id="chkNfcReverse" onchange="toggleNfcReverse(this.checked)" style="width: 16px; height: 16px; cursor: pointer;" />
-          <label for="chkNfcReverse" style="font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text);">Match External Reader (LSB)</label>
+        <div class="chain-badge" id="chainBadge">
+          <div class="chain-dot" id="chainDot"></div>
+          <span id="chainStatus">Checking…</span>
         </div>
       </div>
+    </aside>
+
+    <!-- ════ MAIN ════ -->
+    <div class="main-content" id="mainContent">
+      <div class="topbar">
+        <div class="topbar-left">
+          <button
+            class="hamburger"
+            id="hamburgerBtn"
+            onclick="openSidebar()"
+            aria-label="Open menu"
+          >
+            <i class="bi bi-list"></i>
+          </button>
+          <span class="topbar-title"
+            >{% block page_title %}DAVS{% endblock %}</span
+          >
+        </div>
+        <div class="topbar-right">
+          <button
+            onclick="toggleTheme()"
+            class="theme-btn"
+            title="Toggle theme"
+          >
+            <i class="bi bi-moon-fill" id="themeIcon"></i
+            ><span id="themeLabel">Dark</span>
+          </button>
+          <span class="topbar-time" id="clock"></span>
+        </div>
+      </div>
+      <div class="page-body">
+        {% with messages = get_flashed_messages() %} {% if messages %}
+        <div class="flash-wrap">
+          {% for message in messages %} {% if '✅' in message %}
+          <div class="flash-item success">
+            <i class="bi bi-check-circle"></i> {{ message }}
+          </div>
+          {% elif '❌' in message %}
+          <div class="flash-item error">
+            <i class="bi bi-x-circle"></i> {{ message }}
+          </div>
+          {% else %}
+          <div class="flash-item info">
+            <i class="bi bi-info-circle"></i> {{ message }}
+          </div>
+          {% endif %} {% endfor %}
+        </div>
+        {% endif %} {% endwith %} {% block content %}{% endblock %}
+      </div>
     </div>
-  </div>
+    <div class="toast-stack" id="toastStack"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-  <script>{% include 'assets/base.js' %}</script>
-  {% block extra_scripts %}{% endblock %}
+    <div
+      class="app-dialog-backdrop"
+      id="appDialog"
+      onclick="if(event.target===this)closeAppDialog(false)"
+    >
+      <div
+        class="app-dialog-box"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="appDialogTitle"
+      >
+        <div class="app-dialog-head">
+          <div class="app-dialog-title" id="appDialogTitle">Confirmation</div>
+          <button
+            type="button"
+            class="app-dialog-close"
+            onclick="closeAppDialog(false)"
+          >
+            <i class="bi bi-x"></i>
+          </button>
+        </div>
+        <div class="app-dialog-body" id="appDialogMessage"></div>
+        <div class="app-dialog-actions" id="appDialogActions"></div>
+      </div>
+    </div>
 
-  <script>
-    function showAppSuccess(message, type = 'success') {
-      const existing = document.getElementById('successModal');
-      if (existing) existing.remove();
-      const modal = document.createElement('div');
-      modal.id = 'successModal';
-      modal.className = 'upd-overlay show';
-      modal.style.zIndex = '20000';
-      const isErr = type === 'error';
-      const icon = isErr ? 'bi-exclamation-circle-fill' : 'bi-check-circle-fill';
-      const color = isErr ? '#ef4444' : 'var(--success)';
-      const title = isErr ? 'Error' : 'Success!';
-      modal.innerHTML = `
+    <!-- Phone NFC Modal -->
+    <div
+      class="app-dialog-overlay"
+      id="phoneNfcModal"
+      onclick="if(event.target===this) closePhoneNFC()"
+    >
+      <div class="app-dialog" style="max-width: 400px">
+        <div class="app-dialog-header">
+          <div class="app-dialog-title">
+            <i class="bi bi-phone"></i> Phone NFC Reader
+          </div>
+          <button
+            type="button"
+            class="app-dialog-close"
+            onclick="closePhoneNFC()"
+          >
+            <i class="bi bi-x"></i>
+          </button>
+        </div>
+        <div class="app-dialog-body" style="text-align: center; padding: 24px">
+          <div id="phoneNfcIcon" style="font-size: 48px; margin-bottom: 16px">
+            <i class="bi bi-phone"></i>
+          </div>
+          <div
+            class="app-dialog-title"
+            id="phoneNfcTitle"
+            style="font-size: 18px; margin-bottom: 8px"
+          >
+            Ready to Scan
+          </div>
+          <p id="phoneNfcDesc" style="color: var(--muted); margin-bottom: 20px">
+            Hold the student's card against the back of your phone.
+          </p>
+          <div
+            id="phoneNfcLastUidWrap"
+            style="
+              background: rgba(45, 106, 39, 0.1);
+              border: 1.5px dashed var(--accent);
+              border-radius: 12px;
+              padding: 12px;
+              margin-top: 10px;
+            "
+          >
+            <div
+              style="
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                color: var(--accent);
+                font-weight: 700;
+                margin-bottom: 4px;
+              "
+            >
+              Last Captured UID
+            </div>
+            <div
+              id="phoneNfcLastUid"
+              style="
+                font-family: 'Space Mono', monospace;
+                font-size: 20px;
+                font-weight: 700;
+                color: var(--text);
+              "
+            >
+              —
+            </div>
+            <div
+              id="phoneNfcHex"
+              style="
+                font-family: 'Space Mono', monospace;
+                font-size: 10px;
+                color: var(--muted);
+                margin-top: 4px;
+              "
+            >
+              --:--:--:--
+            </div>
+          </div>
+          <div
+            style="
+              margin-top: 15px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 8px;
+            "
+          >
+            <input
+              type="checkbox"
+              id="chkNfcReverse"
+              onchange="toggleNfcReverse(this.checked)"
+              style="width: 16px; height: 16px; cursor: pointer"
+            />
+            <label
+              for="chkNfcReverse"
+              style="
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                color: var(--text);
+              "
+              >Match External Reader (LSB)</label
+            >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      {% include 'assets/base.js' %}
+    </script>
+    {% block extra_scripts %}{% endblock %}
+
+    <script>
+      function showAppSuccess(message, type = "success") {
+        const existing = document.getElementById("successModal");
+        if (existing) existing.remove();
+        const modal = document.createElement("div");
+        modal.id = "successModal";
+        modal.className = "upd-overlay show";
+        modal.style.zIndex = "20000";
+        const isErr = type === "error";
+        const icon = isErr
+          ? "bi-exclamation-circle-fill"
+          : "bi-check-circle-fill";
+        const color = isErr ? "#ef4444" : "var(--success)";
+        const title = isErr ? "Error" : "Success!";
+        modal.innerHTML = `
         <div class="upd-box" style="max-width:400px;text-align:center;padding:32px 24px;margin:auto;margin-top:15vh;">
           <div style="font-size:48px;color:${color};margin-bottom:16px;"><i class="bi ${icon}"></i></div>
           <h3 style="margin-bottom:8px;">${title}</h3>
-          <p style="color:var(--muted);font-size:14px;margin-bottom:${isErr ? '16px' : '8px'};">${message}</p>
-          ${isErr ? `<button onclick="this.closest('.upd-overlay').remove()" class="btn-primary" style="background:${color};border:none;width:100%;padding:10px;border-radius:8px;font-weight:700;color:white;cursor:pointer;">Close</button>` : ''}
+          <p style="color:var(--muted);font-size:14px;margin-bottom:${
+            isErr ? "16px" : "8px"
+          };">${message}</p>
+          ${
+            isErr
+              ? `<button onclick="this.closest('.upd-overlay').remove()" class="btn-primary" style="background:${color};border:none;width:100%;padding:10px;border-radius:8px;font-weight:700;color:white;cursor:pointer;">Close</button>`
+              : ""
+          }
         </div>
       `;
-      document.body.appendChild(modal);
-      if (!isErr) {
-        setTimeout(() => {
-          if (modal.parentNode) {
-            modal.classList.remove('show');
-            setTimeout(() => modal.remove(), 200);
-          }
-        }, 800);
+        document.body.appendChild(modal);
+        if (!isErr) {
+          setTimeout(() => {
+            if (modal.parentNode) {
+              modal.classList.remove("show");
+              setTimeout(() => modal.remove(), 200);
+            }
+          }, 800);
+        }
       }
-    }
-  </script>
-</body>
+    </script>
+  </body>
 </html>

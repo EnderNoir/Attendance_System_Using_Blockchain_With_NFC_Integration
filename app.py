@@ -3506,7 +3506,7 @@ def send_contract_tx(contract_fn):
                     base = latest.get('baseFeePerGas', 0)
                     priority = int(web3.eth.max_priority_fee * 1.5) # 50% more priority
                     tx['maxPriorityFeePerGas'] = priority
-                    tx['maxFeePerGas'] = int(base * 2 + priority)
+                    tx['maxFeePerGas'] = int(base * 1.2 + priority)
                     if 'gasPrice' in tx: del tx['gasPrice']
                 except:
                     tx['gasPrice'] = int(web3.eth.gas_price * 1.2) # 20% buffer
@@ -4785,6 +4785,9 @@ def admin_settings_test():
 
         from_email_raw = cfg.get('smtp_from') or cfg['smtp_user']
         from_email_clean = _extract_email(from_email_raw)
+        
+        html_content = "<h3>Success!</h3><p>DAVS Email Configuration Verified ✓</p>"
+        test_to = test_email
         
         # ── SENDGRID HTTP API BYPASS ──
         if 'sendgrid.net' in host:

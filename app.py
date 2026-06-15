@@ -1239,7 +1239,22 @@ def init_db():
         requested_at TEXT NOT NULL DEFAULT ''
     );
     INSERT OR IGNORE INTO nfc_registration (id, waiting, scanned_uid) VALUES (1, 0, '');
-    -- student_overrides removed
+    CREATE TABLE IF NOT EXISTS student_overrides (
+        nfc_id          TEXT PRIMARY KEY,
+        full_name       TEXT DEFAULT '',
+        student_id      TEXT DEFAULT '',
+        email           TEXT DEFAULT '',
+        contact         TEXT DEFAULT '',
+        adviser         TEXT DEFAULT '',
+        major           TEXT DEFAULT '',
+        semester        TEXT DEFAULT '',
+        school_year     TEXT DEFAULT '',
+        date_registered TEXT DEFAULT '',
+        course          TEXT DEFAULT '',
+        year_level      TEXT DEFAULT '',
+        section         TEXT DEFAULT '',
+        enrollment_status TEXT DEFAULT 'Regular'
+    );
     CREATE TABLE IF NOT EXISTS email_config (
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL DEFAULT ''

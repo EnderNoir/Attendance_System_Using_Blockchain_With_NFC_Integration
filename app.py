@@ -4840,6 +4840,11 @@ def admin_settings_test():
                 u_email = _extract_email(cfg.get('smtp_user'))
                 sender_email = u_email if (u_email and '@' in u_email) else "no-reply@brevo.com"
 
+            # Debug: Check configuration
+            api_key_masked = api_key[:10] + '...' + api_key[-5:] if len(api_key) > 20 else '***'
+            debug_info = f"\n[BREVO DEBUG] Sender: {sender_email}\n[BREVO DEBUG] Recipient: {test_email}\n[BREVO DEBUG] API Key: {api_key_masked}\n[BREVO DEBUG] Host: {host}"
+            print(debug_info)
+
             data = {
                 "sender": {"email": sender_email},
                 "to": [{"email": test_email}],
@@ -4847,13 +4852,29 @@ def admin_settings_test():
                 "htmlContent": "<h3>Success!</h3><p>Brevo API is working correctly.</p>"
             }
             
+            print(f"[BREVO DEBUG] Request payload: {json.dumps(data)}")
+            
             req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+            req.add_header('User-Agent', 'DAVS-Attendance-System/1.0')
+            
             try:
-                urllib.request.urlopen(req, timeout=10)
-                return jsonify({'ok': True, 'message': f'Test email sent via Brevo API (Port 443 Bypass).'})
+                response = urllib.request.urlopen(req, timeout=10)
+                resp_body = response.read().decode('utf-8')
+                resp_code = response.getcode()
+                print(f"[BREVO DEBUG] ✓ API Response Code: {resp_code}")
+                print(f"[BREVO DEBUG] ✓ Response: {resp_body}")
+                return jsonify({'ok': True, 'message': f'✓ Test email sent via Brevo API!\nFrom: {sender_email}\nTo: {test_email}\nAPI Response: {resp_code} OK'})
+            except urllib.error.HTTPError as he:
+                err_code = he.code
+                err_body = he.read().decode('utf-8')
+                print(f"[BREVO DEBUG] ✗ HTTP Error {err_code}: {err_body}")
+                return jsonify({'ok': False, 'message': f'✗ Brevo API Error {err_code}:\n{err_body}\n\nSender: {sender_email}\nRecipient: {test_email}\n\nCheck:\n1. Is sender email verified in Brevo?\n2. Is API key correct?\n3. Check Brevo dashboard for details.'})
+            except urllib.error.URLError as ue:
+                print(f"[BREVO DEBUG] ✗ URL Error: {str(ue)}")
+                return jsonify({'ok': False, 'message': f'✗ Connection Error: {str(ue)}\n\nCheck your internet connection.'})
             except Exception as e:
-                err_body = e.read().decode('utf-8') if hasattr(e, 'read') else str(e)
-                return jsonify({'ok': False, 'message': f'Brevo API Error: {err_body}'})
+                print(f"[BREVO DEBUG] ✗ Exception: {str(e)}")
+                return jsonify({'ok': False, 'message': f'✗ Unexpected Error: {str(e)}'})
 
         # ── STANDARD SMTP ROUTE (Gmail, etc.) ──
         import smtplib, ssl, threading, socket
